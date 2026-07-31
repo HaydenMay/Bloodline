@@ -52,7 +52,7 @@ export interface StableSave {
 
 export interface SaveSettings {
   /** DESIGN.md §2 — "Stallion / Mare" vs plain "Male / Female". */
-  sexLabels: 'racing' | 'plain';
+  genderLabels: 'racing' | 'plain';
   /** DESIGN.md §2 — furlong countdown units. */
   distanceUnits: 'yards' | 'metres';
   difficulty: 'relaxed' | 'standard' | 'brutal';
@@ -65,7 +65,7 @@ export interface SaveSettings {
 }
 
 export const defaultSettings = (): SaveSettings => ({
-  sexLabels: 'racing',
+  genderLabels: 'racing',
   distanceUnits: 'yards',
   difficulty: 'standard',
   assists: false,

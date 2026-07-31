@@ -115,7 +115,7 @@ frequent enough that anyone grinds one session chasing a trait.
 
 Session-to-trait mapping lives in [TRAITS.md](TRAITS.md).
 
-### Sex ✅
+### Gender ✅
 Stallions and mares, with **complementary — not vertical — inheritance**. Neither is stronger.
 
 - **Mares** transmit Stamina, Temper and condition more reliably
@@ -136,7 +136,9 @@ That's the whole feature. **No colt, filly, or gelding** — age-based terminolo
 it forces players to look up what a word means every time they see it, which is the exact problem
 this setting exists to solve. Stallion and Mare apply at every age.
 
-One toggle in settings, applied everywhere the game names a horse's sex.
+One toggle in settings, applied everywhere the game names a horse's gender.
+
+*(Codebase note: the field and type are named `gender` throughout, not `sex`.)*
 
 ---
 
@@ -420,7 +422,7 @@ The base never degrades — only the bonus does. Repeats are less exciting, neve
 Any budget bonus is rolled **once per pairing, not per foal**, so rerolling can never farm it.
 
 ### Distribution ✅
-**Fully random, weighted by parents** and by the sex-based inheritance rules. Genetics decides the
+**Fully random, weighted by parents** and by the gender-based inheritance rules. Genetics decides the
 shape; the surprise is the point. The **foal development phase** is where player agency enters.
 
 Budget covers **stats and potentials**. **Traits and distance aptitude inherit separately** through
