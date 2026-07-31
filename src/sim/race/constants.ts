@@ -66,10 +66,32 @@ export const CLEAR_LEAD_GAP = 14;
 /** Fraction of the front cost still paid with a completely clear lead. */
 export const CLEAR_LEAD_RELIEF = 0.3;
 
+/**
+ * Racing your style RIGHT must pay, not merely avoid a fine.
+ *
+ * These four numbers form a two-sided curve around 1.0: a horse perfectly in
+ * its style's slot burns LESS than baseline and recovers MORE, while one out of
+ * position burns more and recovers less. Previously being in position only
+ * meant dodging a penalty, which let a stalker sit on the lead all race for
+ * almost nothing — there was no reward for doing it right and no real
+ * consequence for doing it wrong.
+ */
+/** Drain discount at a perfect fit. */
+export const IN_POSITION_DRAIN_BONUS = 0.22;
 /** Extra drain when badly out of position for your style. */
-export const POSITION_COST_PENALTY = 0.55;
+export const POSITION_COST_PENALTY = 1.1;
 /** Extra recovery when perfectly in position. */
 export const POSITION_RECOVERY_BONUS = 0.35;
+/** Lost recovery when out of position. */
+export const OUT_POSITION_RECOVERY_PENALTY = 0.5;
+
+/**
+ * Positional preference fades out across these two points. Past the end, only
+ * energy and speed decide the race — everyone is committed, and where you
+ * *wanted* to sit no longer applies.
+ */
+export const POSITION_FADE_START = 0.6;
+export const POSITION_FADE_END = 0.8;
 
 /** Recovery multiplier while sitting in another horse's slipstream. */
 export const DRAFT_RECOVERY_BONUS = 0.25;
@@ -180,11 +202,33 @@ export interface StyleProfile {
 }
 
 export const STYLE_PROFILES = {
-  frontRunner: { preferred: 0.06, tolerance: 0.14, kickAt: 0.82, cruiseEffort: 0.5 },
+  frontRunner: { preferred: 0.06, tolerance: 0.18, kickAt: 0.82, cruiseEffort: 0.5 },
   stalker: { preferred: 0.3, tolerance: 0.16, kickAt: 0.8, cruiseEffort: 0.5 },
   midPack: { preferred: 0.52, tolerance: 0.13, kickAt: 0.78, cruiseEffort: 0.5 },
   closer: { preferred: 0.85, tolerance: 0.16, kickAt: 0.7, cruiseEffort: 0.46 },
 } as const satisfies Record<string, StyleProfile>;
+
+/**
+ * PHASE PROFILES — a style's moment in the race, not just its place on the track.
+ *
+ * Position says where a horse belongs; phase says WHEN it shines. Without this a
+ * closer is merely "the horse at the back" rather than "the horse that flies
+ * late". Values are speed multipliers at the centre of each third, smoothly
+ * interpolated between.
+ *
+ * Crucially these are scaled by STYLE FIDELITY — how faithfully the horse has
+ * actually raced its style so far. A closer only gets its finishing surge if it
+ * genuinely sat back and banked energy early. The moment has to be earned.
+ */
+export const PHASE_PROFILES = {
+  //                 early    middle    late
+  // A bonus LATE is worth more than one early, because the race is decided
+  // late. Early-phase numbers are therefore larger to compensate.
+  frontRunner: { early: 0.05, middle: 0.004, late: -0.016 },
+  stalker: { early: 0.002, middle: 0.02, late: 0.009 },
+  midPack: { early: -0.003, middle: 0.014, late: 0.018 },
+  closer: { early: -0.02, middle: 0.001, late: 0.043 },
+} as const satisfies Record<string, { early: number; middle: number; late: number }>;
 
 /**
  * How much of the intrinsic front-running cost each style shrugs off.

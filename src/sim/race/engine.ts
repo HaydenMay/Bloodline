@@ -48,6 +48,10 @@ interface Runner {
   fumbledStart: boolean;
   greenRemaining: number;
 
+  /** Running average of how faithfully this horse has raced its style. */
+  fidelitySum: number;
+  fidelityTicks: number;
+
   /** Continuous performance band — re-rolled on a timer. See constants. */
   variation: number;
   variationTimer: number;
@@ -240,6 +244,8 @@ function createRunner(
     fumbleRemaining: fumbled ? K.FUMBLE_DURATION : 0,
     fumbledStart: fumbled,
     greenRemaining: 0,
+    fidelitySum: 0,
+    fidelityTicks: 0,
     variation: 1,
     variationTimer: 0,
     // Asymmetric: a horse underperforms more easily than it exceeds itself.
@@ -407,9 +413,34 @@ function stepRunner(
   const rawMisfit = Math.abs(r.fieldPosition - profile.preferred);
   let misfit = clamp((rawMisfit - profile.tolerance) / (1 - profile.tolerance), 0, 1);
   if (hasTrait(r.traits, 'tractable')) misfit *= 0.45;
+  const rawMisfitClamped = misfit;
 
-  let costMult = frontCost * (1 + K.POSITION_COST_PENALTY * misfit);
-  let recoveryMult = backRecovery * (1 + K.POSITION_RECOVERY_BONUS * (1 - misfit));
+  // Positional preference only matters while a race is still being SET UP.
+  // Once everyone is committed in the stretch it stops applying — otherwise a
+  // closer is punished for executing its own strategy, since making its run
+  // means leaving the back of the field by definition.
+  const positional = clamp(
+    (K.POSITION_FADE_END - race.progress) / (K.POSITION_FADE_END - K.POSITION_FADE_START),
+    0,
+    1,
+  );
+  misfit *= positional;
+
+  // Style fidelity: how faithfully this horse has raced its own style while
+  // positioning still mattered. Accrued only during the set-up phases.
+  if (positional > 0) {
+    r.fidelitySum += 1 - rawMisfitClamped;
+    r.fidelityTicks++;
+  }
+
+  // Two-sided: a perfect fit earns a genuine DISCOUNT, a bad fit a genuine
+  // penalty. Being in position must pay, not merely avoid a fine.
+  const fit = (1 - misfit) * positional;
+  let costMult =
+    frontCost * (1 + K.POSITION_COST_PENALTY * misfit - K.IN_POSITION_DRAIN_BONUS * fit);
+  let recoveryMult =
+    backRecovery *
+    (1 + K.POSITION_RECOVERY_BONUS * fit - K.OUT_POSITION_RECOVERY_PENALTY * misfit);
 
   if (hasTrait(r.traits, 'railHugger')) costMult *= r.lane === 0 ? 0.94 : 1.05;
   if (hasTrait(r.traits, 'herdAnimal')) recoveryMult *= r.drafting ? 1.15 : 0.92;
@@ -428,7 +459,9 @@ function stepRunner(
   // drained, which let a leader cruise the whole way on full energy and made
   // the entire style trade meaningless.
   const slack = 1 - r.effort;
-  const recovery = r.recoveryRate * slack * slack * recoveryMult;
+  // recoveryMult can go negative when badly out of position; clamp so a horse
+  // never gains energy from being in the wrong place.
+  const recovery = r.recoveryRate * slack * slack * Math.max(0, recoveryMult);
   r.energy = clamp(r.energy + (recovery - drain) * K.DT, 0, K.MAX_ENERGY);
 
   // --- The performance band -------------------------------------------------
@@ -440,8 +473,25 @@ function stepRunner(
     r.variation = 1 + rng.range(-r.bandDown, r.bandUp);
   }
 
+  // --- Phase: the style's MOMENT in the race --------------------------------
+  // Position says where a horse belongs; phase says when it shines. A
+  // front-runner is sharpest out of the gate, a closer over the final third.
+  //
+  // Scaled by style fidelity, so the moment must be EARNED: a closer that
+  // spent the first two-thirds fighting for the lead does not get the surge.
+  const phase = K.PHASE_PROFILES[r.horse.style];
+  const p = race.progress;
+  const phaseBonus =
+    p < 0.5
+      ? phase.early + (phase.middle - phase.early) * (p / 0.5)
+      : phase.middle + (phase.late - phase.middle) * ((p - 0.5) / 0.5);
+
+  const fidelity = r.fidelityTicks > 0 ? r.fidelitySum / r.fidelityTicks : 1;
+  // Penalties always land in full; only the upside has to be earned.
+  const earned = phaseBonus > 0 ? phaseBonus * fidelity : phaseBonus;
+
   // --- Speed ----------------------------------------------------------------
-  let speedCap = r.maxSpeed * r.variation;
+  let speedCap = r.maxSpeed * r.variation * (1 + earned);
 
   // The fade: below the threshold the ceiling collapses, softened by Grit.
   if (r.energy < K.FADE_THRESHOLD) {
