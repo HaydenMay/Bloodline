@@ -1,0 +1,116 @@
+/* Phase 0 boot screen only. The real two-language design system
+   ("at the races" / "at your farm", DESIGN.md §12) arrives in Phase 2. */
+
+:root {
+  --bg: #0e1218;
+  --panel: #161c25;
+  --line: #26303d;
+  --text: #e8edf4;
+  --muted: #8b98a9;
+  --accent: #f2c14e;
+  --ok: #4ec9a0;
+  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+#app {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+}
+
+.boot {
+  width: 100%;
+  max-width: 460px;
+}
+
+.wordmark {
+  font-size: clamp(38px, 13vw, 58px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  margin: 0;
+  line-height: 1;
+}
+
+.wordmark span {
+  color: var(--accent);
+}
+
+.tagline {
+  color: var(--muted);
+  margin: 8px 0 28px;
+  font-size: 14px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.card h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin: 0 0 14px;
+  font-weight: 650;
+}
+
+.check {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+
+.check:first-of-type {
+  border-top: 0;
+}
+
+.check .mark {
+  color: var(--ok);
+  font-weight: 700;
+  flex: none;
+}
+
+.check .name {
+  flex: 1;
+}
+
+.check .detail {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  text-align: right;
+}
+
+.foot {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-family: var(--mono);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
