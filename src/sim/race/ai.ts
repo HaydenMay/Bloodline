@@ -2,6 +2,9 @@ import type { Horse } from '../types.js';
 import type { ControlInput, Controller, RaceView, RunnerView } from './types.js';
 import { hasTrait } from '../../data/traits.js';
 import {
+  ESTABLISH_GAIN,
+  ESTABLISH_UNTIL,
+  HOLD_EFFORT,
   MAX_EFFORT,
   MIN_EFFORT,
   POSITION_CORRECTION_GAIN,
@@ -36,21 +39,35 @@ export function createAiController(horse: Horse): Controller {
   return (self: RunnerView, race: RaceView): ControlInput => {
     const inStretch = race.progress >= kickAt;
 
-    // --- Effort ------------------------------------------------------------
-    let effort: number = profile.cruiseEffort;
-
-    // Correct toward the style's preferred slot. Being further back than wanted
-    // means pushing; being ahead of it means easing — but easing is gentler
-    // than pushing, because a horse that has the position it wants should coast
-    // rather than deliberately drop back.
+    // --- Effort: ESTABLISH -> HOLD -> COMMIT ---------------------------------
+    //
+    // Every horse races the same three beats; position and timing only change
+    // the parameters. The critical one is HOLD: outside its window a horse
+    // conserves and banks, so it arrives with something to spend. Without a
+    // hold phase the AI only knows spend-and-hope, which is no skill gap at all
+    // — and it is exactly why front-runners were empty by the 20% mark.
     const drift = self.fieldPosition - preferred;
-    effort += drift * POSITION_CORRECTION_GAIN * (drift > 0 ? 1 : 0.55);
+    let effort: number;
 
-    // A front-runner has to actually GET to the front, and the only moment it
-    // is cheap to do so is before the field has settled. Break hard, then
-    // settle into an uncontested lead — which is the whole point of the style.
-    if (horse.style === 'frontRunner' && race.progress < 0.22) {
-      effort += 0.17 * (1 - race.progress / 0.22);
+    if (race.progress < ESTABLISH_UNTIL && Math.abs(drift) > profile.tolerance) {
+      // ESTABLISH — a bounded, one-off cost to reach your slot. Expensive for a
+      // front-runner, nearly free for a closer that is already where it wants
+      // to be. Fades out so it never becomes an ongoing drain.
+      const urgency = 1 - race.progress / ESTABLISH_UNTIL;
+      if (drift > 0) {
+        // Behind your slot — go and get it, while it is still cheap to do so.
+        effort = HOLD_EFFORT + drift * ESTABLISH_GAIN * urgency;
+      } else {
+        // Ahead of your slot — actively drop back and let the horses who want
+        // this ground come through. Without this the field never shuffles, the
+        // front-runner never reaches the front, and a stalker inherits a free
+        // lead it never paid for.
+        effort = HOLD_EFFORT * (1 - Math.min(0.4, -drift * 0.7) * urgency);
+      }
+    } else {
+      // HOLD — the minimum needed to keep your slot. In the right place this
+      // nets POSITIVE energy, so the horse banks for its window.
+      effort = HOLD_EFFORT + drift * POSITION_CORRECTION_GAIN * (drift > 0 ? 1 : 0.5);
     }
 
     // Free Runner fights the rider early; high Temper keeps a lid on it.

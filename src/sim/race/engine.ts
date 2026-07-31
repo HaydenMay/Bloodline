@@ -37,6 +37,8 @@ interface Runner {
   kickUsed: boolean;
   kickRemaining: number;
   kickStrength: number;
+  /** 1 = kicked inside the window, lower = mistimed. */
+  kickWindowFit: number;
 
   blockedFor: number;
   troubleTime: number;
@@ -236,6 +238,7 @@ function createRunner(
     kickUsed: false,
     kickRemaining: 0,
     kickStrength: 0,
+    kickWindowFit: 1,
     blockedFor: 0,
     troubleTime: 0,
     wasBlocked: false,
@@ -306,7 +309,17 @@ function stepRunner(
     r.kickUsed = true;
     const reserve = r.energy / K.MAX_ENERGY;
     const gritFactor = 1 + ((r.horse.stats.grit - 50) / 100) * K.KICK_GRIT_INFLUENCE;
-    r.kickStrength = K.KICK_MAX_BONUS * reserve * gritFactor;
+
+    // TIMING IS THE SKILL. Kick inside the horse's window and it lands at full
+    // force — enough to take a race. Kick outside it and you get a fraction of
+    // the surge AND pay extra energy for it: enough to hold your position,
+    // never enough to steal the lead.
+    const centre = K.STYLE_PROFILES[r.horse.style].kickAt;
+    const off = Math.max(0, Math.abs(race.progress - centre) - K.KICK_WINDOW_HALF);
+    const windowFit = clamp(1 - off / K.KICK_WINDOW_FALLOFF, K.KICK_MIN_FIT, 1);
+    r.kickWindowFit = windowFit;
+
+    r.kickStrength = K.KICK_MAX_BONUS * reserve * gritFactor * windowFit;
     r.kickRemaining = K.KICK_BASE_DURATION;
 
     if (hasTrait(r.traits, 'turnOfFoot')) {
@@ -453,7 +466,10 @@ function stepRunner(
 
   // --- Energy: drain when driving, recover when settled --------------------
   const kicking = r.kickRemaining > 0;
-  const drain = r.drainRate * r.effort * r.effort * costMult * (kicking ? K.KICK_DRAIN_MULTIPLIER : 1);
+  const kickCost = kicking
+    ? K.KICK_DRAIN_MULTIPLIER * (1 + (1 - r.kickWindowFit) * K.MISTIMED_KICK_DRAIN)
+    : 1;
+  const drain = r.drainRate * r.effort * r.effort * costMult * kickCost;
   // Recovery is QUADRATIC in slack, not linear. A horse galloping at 90% of
   // race speed is not resting — with a linear curve it recovered faster than it
   // drained, which let a leader cruise the whole way on full energy and made
@@ -488,7 +504,18 @@ function stepRunner(
 
   const fidelity = r.fidelityTicks > 0 ? r.fidelitySum / r.fidelityTicks : 1;
   // Penalties always land in full; only the upside has to be earned.
-  const earned = phaseBonus > 0 ? phaseBonus * fidelity : phaseBonus;
+  let earned = phaseBonus > 0 ? phaseBonus * fidelity : phaseBonus;
+
+  // AUTOMATIC WINDOW LIFT — a floor for not engaging.
+  //
+  // Simply being inside your window lifts you, with no input at all, so an
+  // outclassed field can be beaten on autopilot. A well-timed kick then stacks
+  // on top to roughly double it. The floor keeps auto-race viable; the ceiling
+  // is what rewards paying attention.
+  const centre = K.STYLE_PROFILES[r.horse.style].kickAt;
+  if (Math.abs(race.progress - centre) <= K.KICK_WINDOW_HALF) {
+    earned += K.WINDOW_BASE_LIFT * fidelity;
+  }
 
   // --- Speed ----------------------------------------------------------------
   let speedCap = r.maxSpeed * r.variation * (1 + earned);

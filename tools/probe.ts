@@ -32,7 +32,7 @@ const field = [...horses, ...horses.map((h) => ({ ...h, id: h.id + 'b', name: h.
 
 interface Sample {
   t: number;
-  rows: { name: string; energy: number; pos: number; effort: number; rank: number }[];
+  rows: { name: string; energy: number; pos: number; effort: number; rank: number; speed: number; blocked: boolean }[];
 }
 const samples: Sample[] = [];
 let lastSample = -1;
@@ -55,6 +55,8 @@ const spy =
         pos: self.distance,
         effort: out.effort,
         rank: self.rank,
+        speed: self.speed,
+        blocked: self.blocked,
       });
     }
     return out;

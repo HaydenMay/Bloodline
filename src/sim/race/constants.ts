@@ -20,10 +20,10 @@ export const DT = 1 / TICK_HZ;
 export const BASE_SPEED = 30.5;
 
 /** How much the Speed stat swings top-end velocity, as a fraction. */
-export const SPEED_STAT_INFLUENCE = 0.22;
+export const SPEED_STAT_INFLUENCE = 0.19;
 
 /** A horse coasting in a race still gallops; effort 0 is not a standstill. */
-export const MIN_EFFORT_SPEED = 0.90;
+export const MIN_EFFORT_SPEED = 0.78;
 
 /** Acceleration in yards/sec² at burst 50. */
 export const BASE_ACCEL = 5.2;
@@ -39,11 +39,11 @@ export const BURST_ACCEL_INFLUENCE = 0.5;
 export const MAX_ENERGY = 100;
 
 /** Energy per second burned at full effort by a stamina-50 horse in position. */
-export const BASE_DRAIN = 6.2;
+export const BASE_DRAIN = 7.4;
 export const STAMINA_DRAIN_INFLUENCE = 0.45;
 
 /** Energy per second recovered at zero effort, in the style's happy place. */
-export const BASE_RECOVERY = 2.2;
+export const BASE_RECOVERY = 2.7;
 
 /**
  * Leading is INTRINSICALLY expensive — no slipstream, and you set the tempo.
@@ -54,9 +54,9 @@ export const BASE_RECOVERY = 2.2;
  * A front-runner does not escape this cost. Its style merely lets it carry the
  * cost without falling apart, in exchange for never having ground to make up.
  */
-export const FRONT_COST_PENALTY = 0.38;
+export const FRONT_COST_PENALTY = 0.3;
 /** Sitting at the back is cheap and restful — but leaves ground to cover. */
-export const BACK_RECOVERY_BONUS = 0.5;
+export const BACK_RECOVERY_BONUS = 0.22;
 
 /**
  * Yards of clear air needed before a lead counts as uncontested.
@@ -77,11 +77,11 @@ export const CLEAR_LEAD_RELIEF = 0.3;
  * consequence for doing it wrong.
  */
 /** Drain discount at a perfect fit. */
-export const IN_POSITION_DRAIN_BONUS = 0.22;
+export const IN_POSITION_DRAIN_BONUS = 0.28;
 /** Extra drain when badly out of position for your style. */
 export const POSITION_COST_PENALTY = 1.1;
 /** Extra recovery when perfectly in position. */
-export const POSITION_RECOVERY_BONUS = 0.35;
+export const POSITION_RECOVERY_BONUS = 0.5;
 /** Lost recovery when out of position. */
 export const OUT_POSITION_RECOVERY_PENALTY = 0.5;
 
@@ -116,11 +116,27 @@ export const APTITUDE_DRAIN_PENALTY = 0.5;
 // leader can still defend.
 // ---------------------------------------------------------------------------
 
-export const KICK_MAX_BONUS = 0.12;
+export const KICK_MAX_BONUS = 0.085;
 export const KICK_GRIT_INFLUENCE = 0.35;
 export const KICK_BASE_DURATION = 9.0;
 /** Kick costs energy on top of the effort it implies. */
 export const KICK_DRAIN_MULTIPLIER = 1.35;
+
+/**
+ * Automatic lift for being inside your window, with no input at all.
+ * A floor so an outclassed field can be beaten on autopilot; a well-timed
+ * kick stacks on top to roughly double it.
+ */
+export const WINDOW_BASE_LIFT = 0.05;
+
+/** Half-width of the window where the kick lands at full force. */
+export const KICK_WINDOW_HALF = 0.09;
+/** How fast effectiveness falls away outside the window. */
+export const KICK_WINDOW_FALLOFF = 0.22;
+/** Floor: a badly mistimed kick still holds position, never steals a race. */
+export const KICK_MIN_FIT = 0.35;
+/** Extra energy burned by a mistimed kick, on top of the normal kick cost. */
+export const MISTIMED_KICK_DRAIN = 0.9;
 
 // ---------------------------------------------------------------------------
 // Traffic (DESIGN.md §4)
@@ -138,8 +154,15 @@ export const BASE_ESCAPE_RATE = 0.9;
 export const JOCKEY_ESCAPE_INFLUENCE = 0.8;
 export const TEMPER_ESCAPE_INFLUENCE = 0.35;
 export const GRIT_ESCAPE_INFLUENCE = 0.3;
-/** Speed multiplier while genuinely shut off. */
-export const BLOCKED_SPEED_FACTOR = 0.94;
+/**
+ * Speed while shut off, as a fraction of the blocking horse's speed.
+ *
+ * Must be ~1.0. At 0.94 a blocked horse ran 6% SLOWER than the horse in front,
+ * so it fell away, unblocked, closed again and re-blocked — bleeding ground on
+ * every cycle. Being stuck behind a rival means matching its pace, not
+ * reversing away from it.
+ */
+export const BLOCKED_SPEED_FACTOR = 0.995;
 /** Seconds shut off before it counts as genuine trouble worth reporting. */
 export const TROUBLE_THRESHOLD = 1.2;
 
@@ -169,8 +192,8 @@ export const GREEN_MOMENT_DURATION = 1.1;
  * high-Consistency fields precise. Because AI horses in higher divisions are
  * generated with higher Consistency, elite racing tightens up emergently.
  */
-export const BAND_DOWN = 0.13;
-export const BAND_UP = 0.09;
+export const BAND_DOWN = 0.17;
+export const BAND_UP = 0.115;
 export const VARIATION_INTERVAL_MIN = 0.5;
 export const VARIATION_INTERVAL_MAX = 2;
 
@@ -224,10 +247,10 @@ export const PHASE_PROFILES = {
   //                 early    middle    late
   // A bonus LATE is worth more than one early, because the race is decided
   // late. Early-phase numbers are therefore larger to compensate.
-  frontRunner: { early: 0.05, middle: 0.004, late: -0.016 },
+  frontRunner: { early: 0.044, middle: 0.004, late: -0.016 },
   stalker: { early: 0.002, middle: 0.02, late: 0.009 },
-  midPack: { early: -0.003, middle: 0.014, late: 0.018 },
-  closer: { early: -0.02, middle: 0.001, late: 0.043 },
+  midPack: { early: -0.002, middle: 0.022, late: 0.028 },
+  closer: { early: -0.024, middle: 0, late: 0.038 },
 } as const satisfies Record<string, { early: number; middle: number; late: number }>;
 
 /**
@@ -240,6 +263,20 @@ export const FRONT_COST_RELIEF = {
   midPack: 0.9,
   closer: 1,
 } as const satisfies Record<string, number>;
+
+/**
+ * The three beats every horse races: ESTABLISH, then HOLD, then COMMIT.
+ *
+ * HOLD_EFFORT is the cruise a horse settles into once it has its slot. In the
+ * right place this MUST net positive energy — that is what lets a horse bank
+ * for its window. Without a hold phase the AI only knows spend-and-hope, which
+ * is no skill gap at all, and it is why front-runners were empty by the 20%
+ * mark: they never stopped paying to be where they already were.
+ */
+export const HOLD_EFFORT = 0.55;
+/** Establishing position is a bounded one-off cost, never an ongoing drain. */
+export const ESTABLISH_UNTIL = 0.28;
+export const ESTABLISH_GAIN = 1.9;
 
 /** How hard the AI corrects toward its preferred position. */
 export const POSITION_CORRECTION_GAIN = 0.5;
