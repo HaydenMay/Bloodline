@@ -10,8 +10,13 @@ deliberate.
 
 ---
 
-## Phase 0 — Foundation
-**~1 session**
+## Phase 0 — Foundation ✅ COMPLETE
+**~1 session** · live at https://haydenmay.github.io/Bloodline/
+
+Delivered: Vite + TS scaffold, ESLint-enforced `sim/` isolation (verified against a
+deliberate violation), seeded deterministic RNG, versioned save schema with migrations and
+export/import, GitHub Actions deploy gated on lint + test + build, LICENSE and CREDITS.
+16 tests passing, 0 vulnerabilities. Production build confirmed serving from `/Bloodline/`.
 
 - Vite + TypeScript scaffold, strict mode, the `sim` / `render` / `ui` / `data` / `save` layout
 - The architectural constraint enforced from commit one: **`sim/` may never import from `render/`
