@@ -8,6 +8,7 @@ import {
   yardToScreen,
   type Camera,
 } from '../render/track.js';
+import { createAiController } from '../sim/race/ai.js';
 import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
 import { STYLE_PROFILES, TICK_HZ } from '../sim/race/constants.js';
 import type { ControlInput, RaceConfig, RaceEntrant } from '../sim/race/types.js';
@@ -23,9 +24,25 @@ import type { Horse } from '../sim/types.js';
 
 const YARDS_PER_FURLONG = 220;
 
+/**
+ * A horse is about 2.7 yards nose to tail, and the rig is drawn 100 local units
+ * long. Tying the two together is what stops the treadmill effect: previously
+ * the horse was drawn roughly eight times too big for the track scale, so it
+ * crossed barely one body length a second while its legs cycled three times.
+ */
+const HORSE_YARDS = 2.7;
+const RIG_UNITS = 100;
+
+/** Yards covered per stride. Real gallop is ~3 body lengths. */
+const STRIDE_YARDS = HORSE_YARDS * 3;
+
 interface PlayerInput {
-  driving: boolean;
-  kick: boolean;
+  /** Hold to take a pull — settle, drop back, and recover. */
+  takingBack: boolean;
+  /** Timestamp (ms) until which the current urge is still pushing. */
+  urgeUntil: number;
+  /** Fires the engine's one big kick, on the first urge inside the window. */
+  kickPending: boolean;
   kickUsed: boolean;
 }
 
@@ -42,26 +59,51 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const { host, field, playerHorseId, playerSilks, config } = opts;
 
   const surface = createSurface(host);
-  const input: PlayerInput = { driving: false, kick: false, kickUsed: false };
+  const input: PlayerInput = {
+    takingBack: false,
+    urgeUntil: 0,
+    kickPending: false,
+    kickUsed: false,
+  };
 
-  // The player's horse takes its effort from the DRIVE control. Everything else
-  // — the kick window, the energy economy — is handled by the engine exactly as
-  // it is for the AI, so the player is not playing a different game.
   const playerHorse = field.find((h) => h.id === playerHorseId)!;
   const playerProfile = STYLE_PROFILES[playerHorse.style];
+
+  /**
+   * The player's jockey rides the horse's style by default, exactly as the AI
+   * would. Input MODULATES that ride rather than replacing it:
+   *
+   *   nothing   ride to style, and recover energy while settled
+   *   tap       urge forward — a short burst, repeatable, each one costs
+   *   hold      take a pull — settle back, lose ground, recover faster
+   *
+   * Doing it this way means letting go of the controls is a valid ride rather
+   * than a horse that forgets how to race, which is what made energy
+   * unrecoverable before.
+   */
+  const baseRide = createAiController(playerHorse);
 
   const entrants: RaceEntrant[] = field.map((horse) => {
     if (horse.id !== playerHorseId) return { horse };
     return {
       horse,
-      controller: (self): ControlInput => {
-        const kick = input.kick && !input.kickUsed;
-        if (kick) input.kickUsed = true;
-        return {
-          effort: input.driving ? 1 : 0.4,
-          kick,
-          targetLane: self.lane,
-        };
+      controller: (self, race): ControlInput => {
+        const base = baseRide(self, race);
+        let effort = base.effort;
+
+        if (input.takingBack) {
+          effort = Math.min(effort, 0.26);
+        } else if (performance.now() < input.urgeUntil) {
+          effort = Math.min(1, effort + 0.4);
+        }
+
+        const kick = input.kickPending && !input.kickUsed;
+        if (kick) {
+          input.kickPending = false;
+          input.kickUsed = true;
+        }
+
+        return { effort, kick, targetLane: base.targetLane };
       },
     };
   });
@@ -117,7 +159,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     calloutUntil = performance.now() + 2200;
   };
 
-  const draw = (alpha: number): void => {
+  const draw = (alpha: number, dt: number): void => {
     const { ctx, width, height } = surface;
     const lerp = (a: number, b: number): number => a + (b - a) * alpha;
 
@@ -134,37 +176,61 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
     const player = runners.find((r) => r.id === playerHorseId)!;
 
-    // Camera keeps the player a third of the way in, so there is room to see
-    // what is coming without losing sight of what is behind.
-    cam.pixelsPerYard = Math.max(1.1, Math.min(2.2, width / 620));
-    const target = player.distance - (width * 0.34) / cam.pixelsPerYard;
-    cam.scrollYards += (target - cam.scrollYards) * 0.12;
+    // Show a fixed window of TRACK, not a fixed number of pixels — so the
+    // relationship between a horse's size and the ground it covers stays
+    // correct at any screen size. That relationship is what sells the speed.
+    const visibleYards = 46;
+    cam.pixelsPerYard = width / visibleYards;
+
+    const target = player.distance - (width * 0.36) / cam.pixelsPerYard;
+    cam.scrollYards += (target - cam.scrollYards) * 0.1;
 
     drawBackdrop(ctx, width, height, cam, config.hype);
     drawDistanceMarkers(ctx, height, cam, totalYards);
 
     // Lane 0 is the rail (furthest from camera), so higher lanes draw nearer
     // and larger. Sorting by lane keeps the overlap correct.
-    const laneY = (lane: number): number => height * 0.60 + lane * (height * 0.052);
-    const laneScale = (lane: number): number => 0.34 + lane * 0.017;
+    const laneY = (lane: number): number => height * 0.58 + lane * (height * 0.055);
+    // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
+    const baseScale = (HORSE_YARDS * cam.pixelsPerYard) / RIG_UNITS;
+    const laneScale = (lane: number): number => baseScale * (0.88 + lane * 0.04);
 
     for (const r of [...runners].sort((a, b) => a.lane - b.lane)) {
       const x = yardToScreen(r.distance, cam);
       if (x < -140 || x > width + 140) continue;
 
       const y = laneY(r.lane);
-      const scale = laneScale(r.lane) * (height / 420);
+      const scale = laneScale(r.lane);
 
-      // Advance the stride from ground speed so the gait matches the motion.
-      const phase = (stride.get(r.id) ?? 0) + (r.speed * 0.0016);
-      stride.set(r.id, phase % 1);
+      // Stride is driven by DISTANCE COVERED, not by frame count. Hooves stay
+      // planted on the ground instead of spinning, and the gait runs at the
+      // same rate regardless of refresh rate.
+      const travelled = r.speed * dt;
+      const phase = ((stride.get(r.id) ?? 0) + travelled / STRIDE_YARDS) % 1;
+      stride.set(r.id, phase);
+
+      const isPlayer = r.id === playerHorseId;
+
+      // Spotlight the player's horse on the track itself — a small arrow above
+      // it was far too easy to lose in a pack of eight.
+      if (isPlayer) {
+        ctx.save();
+        const glow = ctx.createRadialGradient(x, y - 8, 4, x, y - 8, 70 * (scale / baseScale) + 46);
+        glow.addColorStop(0, 'rgba(242,193,78,0.30)');
+        glow.addColorStop(1, 'rgba(242,193,78,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(x, y - 8, 70 * (scale / baseScale) + 46, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
 
       drawHorseShadow(ctx, x, y + 2, scale);
       drawHorse(ctx, x, y, {
         coat: r.coat,
         silks: silksFor.get(r.id)!,
         pose: {
-          phase: phase % 1,
+          phase,
           intensity: Math.min(1, Math.max(0, (r.speed - 18) / 14)),
           drive: r.effort,
         },
@@ -172,14 +238,22 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         faded: r.finished,
       });
 
-      if (r.id === playerHorseId) {
+      if (isPlayer) {
+        const markerY = y - 118 * scale;
+        const bounce = Math.sin(performance.now() / 260) * 3;
+
         ctx.fillStyle = '#F2C14E';
         ctx.beginPath();
-        ctx.moveTo(x, y - 92 * scale);
-        ctx.lineTo(x - 6, y - 104 * scale);
-        ctx.lineTo(x + 6, y - 104 * scale);
+        ctx.moveTo(x, markerY + bounce);
+        ctx.lineTo(x - 9, markerY - 13 + bounce);
+        ctx.lineTo(x + 9, markerY - 13 + bounce);
         ctx.closePath();
         ctx.fill();
+
+        ctx.fillStyle = '#F2C14E';
+        ctx.font = '700 12px ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('YOU', x, markerY - 19 + bounce);
       }
     }
 
@@ -260,11 +334,17 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.textAlign = 'left';
     ctx.fillText('ENERGY', barX + 12, barY + 17);
 
-    if (!input.kickUsed) {
-      const inWindow = Math.abs(curr.progress - playerProfile.kickAt) <= 0.09;
-      ctx.fillStyle = inWindow ? '#F2C14E' : 'rgba(232,237,244,0.45)';
-      ctx.textAlign = 'right';
-      ctx.fillText(inWindow ? 'KICK NOW' : 'kick ready', barX + barW - 12, barY + 17);
+    const inWindow = Math.abs(curr.progress - playerProfile.kickAt) <= 0.09;
+    ctx.textAlign = 'right';
+    if (input.takingBack) {
+      ctx.fillStyle = '#4EC9A0';
+      ctx.fillText('TAKING A PULL', barX + barW - 12, barY + 17);
+    } else if (inWindow && !input.kickUsed) {
+      ctx.fillStyle = '#F2C14E';
+      ctx.fillText('YOUR MOMENT', barX + barW - 12, barY + 17);
+    } else if (performance.now() < input.urgeUntil) {
+      ctx.fillStyle = '#E8A33D';
+      ctx.fillText('URGING', barX + barW - 12, barY + 17);
     }
 
     // ---- Call-outs ---------------------------------------------------------
@@ -289,27 +369,50 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   };
 
   // ---- Input --------------------------------------------------------------
+  //
+  // Tap repeatedly to urge, like a jockey asking again and again. Hold to take
+  // a pull. A tap inside the horse's window also spends the one big kick.
+  const URGE_MS = 550;
+  const HOLD_MS = 220; // press longer than this and it's a pull, not an urge
+
+  let pressedAt = 0;
+  let holdTimer = 0;
+
+  const urge = (): void => {
+    input.urgeUntil = performance.now() + URGE_MS;
+    const inWindow = Math.abs(curr.progress - playerProfile.kickAt) <= 0.09;
+    if (inWindow && !input.kickUsed) input.kickPending = true;
+  };
+
   const down = (e: Event): void => {
     e.preventDefault();
-    input.driving = true;
+    pressedAt = performance.now();
+    holdTimer = window.setTimeout(() => {
+      input.takingBack = true;
+    }, HOLD_MS);
   };
+
   const up = (): void => {
-    input.driving = false;
-  };
-  const kick = (): void => {
-    if (!input.kickUsed) input.kick = true;
+    window.clearTimeout(holdTimer);
+    const held = performance.now() - pressedAt;
+    input.takingBack = false;
+    if (held < HOLD_MS) urge();
   };
 
   host.addEventListener('pointerdown', down);
   window.addEventListener('pointerup', up);
-  host.addEventListener('dblclick', kick);
+  window.addEventListener('pointercancel', up);
 
   const key = (e: KeyboardEvent): void => {
+    if (e.repeat) return;
     if (e.code === 'Space' || e.code === 'ArrowUp') {
       e.preventDefault();
-      input.driving = e.type === 'keydown';
+      if (e.type === 'keydown') urge();
     }
-    if (e.code === 'ShiftLeft' && e.type === 'keydown') kick();
+    if (e.code === 'ArrowDown' || e.code === 'ShiftLeft') {
+      e.preventDefault();
+      input.takingBack = e.type === 'keydown';
+    }
   };
   window.addEventListener('keydown', key);
   window.addEventListener('keyup', key);
@@ -319,9 +422,10 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   return (): void => {
     loop.stop();
     surface.destroy();
+    window.clearTimeout(holdTimer);
     host.removeEventListener('pointerdown', down);
     window.removeEventListener('pointerup', up);
-    host.removeEventListener('dblclick', kick);
+    window.removeEventListener('pointercancel', up);
     window.removeEventListener('keydown', key);
     window.removeEventListener('keyup', key);
   };

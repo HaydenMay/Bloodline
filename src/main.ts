@@ -57,7 +57,7 @@ function startRace(seed: string): void {
       <span class="rb-name">${player.name}</span>
       <span class="rb-style">${styleLabel(player.style)}</span>
     </div>
-    <div class="rb-hint">Hold anywhere to <b>DRIVE</b> · double-tap to <b>KICK</b></div>
+    <div class="rb-hint">Tap to <b>URGE</b> · hold to <b>TAKE A PULL</b></div>
     <button class="rb-again">New race</button>
   `;
   app.appendChild(bar);
