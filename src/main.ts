@@ -2,36 +2,17 @@ import './style.css';
 import { createRng } from './sim/index.js';
 import { createStable, exportToString, importFromString, CURRENT_VERSION } from './save/index.js';
 import { WORLD_POPULATION, FIELD_SIZE } from './data/index.js';
+import { mountRoadmap } from './ui/roadmap.js';
 
 /**
- * Build status screen.
+ * Placeholder screen, replaced by the real game in Phase 2.
  *
- * Stands in until Phase 2 replaces it with the real game. Two jobs:
+ * Runs live system checks on load, so opening it on a phone proves the pipeline
+ * works ON THAT DEVICE rather than just that a page rendered.
  *
- *  1. Show which build phases are done, so the deployed site reflects the
- *     actual state of the project rather than going stale.
- *  2. Run live system checks on load, so opening it on a phone proves the
- *     pipeline works ON THAT DEVICE — not just that a page rendered.
- *
- * To update: flip `done` on a phase below. That's it.
+ * Build progress lives in ui/roadmap.ts as a collapsed corner panel, so it
+ * stays out of the way and survives this screen being replaced.
  */
-
-interface Phase {
-  n: number;
-  name: string;
-  summary: string;
-  done: boolean;
-}
-
-const PHASES: Phase[] = [
-  { n: 0, name: 'Foundation', summary: 'Tooling & deploy', done: true },
-  { n: 1, name: 'Race simulation', summary: 'Engine & balance', done: true },
-  { n: 2, name: 'Playable race', summary: 'Renderer & controls', done: false },
-  { n: 3, name: 'Full career', summary: 'Training & divisions', done: false },
-  { n: 4, name: 'The stable', summary: 'Money & facilities', done: false },
-  { n: 5, name: 'Breeding', summary: 'Genetics & pedigree', done: false },
-  { n: 6, name: 'Polish', summary: 'Audio & mobile', done: false },
-];
 
 interface Check {
   name: string;
@@ -100,7 +81,6 @@ function runChecks(): Check[] {
 function render(): void {
   const checks = runChecks();
   const allOk = checks.every((c) => c.ok);
-  const doneCount = PHASES.filter((p) => p.done).length;
 
   const app = document.querySelector<HTMLDivElement>('#app');
   if (!app) throw new Error('#app not found');
@@ -109,19 +89,6 @@ function render(): void {
     <div class="boot">
       <h1 class="wordmark">Blood<span>line</span></h1>
       <p class="tagline">Horse racing, training &amp; breeding</p>
-
-      <div class="card">
-        <h2>Build progress <span class="count">${doneCount} of ${PHASES.length}</span></h2>
-        ${PHASES.map(
-          (p) => `
-          <div class="phase ${p.done ? 'done' : ''}">
-            <span class="box">${p.done ? '✓' : ''}</span>
-            <span class="num">${p.n}</span>
-            <span class="name">${p.name}</span>
-            <span class="summary">${p.summary}</span>
-          </div>`,
-        ).join('')}
-      </div>
 
       <div class="card">
         <h2>System checks</h2>
@@ -146,4 +113,5 @@ function render(): void {
 }
 
 render();
+mountRoadmap();
 window.addEventListener('resize', render);

@@ -70,6 +70,116 @@ body {
   margin-top: 14px;
 }
 
+/* --- Build progress panel -------------------------------------------------
+   Persistent chrome. Collapsed to a pill so it never covers the game. */
+
+#roadmap {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 900;
+  font-family: var(--font);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.rm-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 11px;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1;
+}
+
+.rm-toggle:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.rm-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex: none;
+}
+
+.rm-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  width: min(290px, calc(100vw - 24px));
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+.rm-title {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin: 0 0 11px;
+  font-weight: 650;
+}
+
+.rm-phase {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.rm-phase:first-of-type {
+  border-top: 0;
+}
+
+.rm-box {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  border: 1.5px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--bg);
+}
+
+.rm-phase.is-done .rm-box {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.rm-name {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.rm-phase.is-done .rm-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.rm-summary {
+  font-size: 10.5px;
+  color: var(--muted);
+  opacity: 0.7;
+  text-align: right;
+}
+
 .card h2 {
   font-size: 11px;
   text-transform: uppercase;
