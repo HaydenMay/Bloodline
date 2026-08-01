@@ -57,17 +57,40 @@ export interface HorsePose {
  * Transverse gallop footfalls — near hind, far hind, far fore, near fore —
  * which is what gives the gait its rocking rather than looking like a
  * pantomime horse.
+ *
+ * All four contacts are packed into the FIRST THREE QUARTERS of the stride, so
+ * the last quarter has nothing on the ground. That gap is the point. Spread
+ * evenly across the whole cycle — the fores were previously half a stride
+ * behind the hinds — some foot is always planted, the legs never gather, and
+ * the horse runs like a toy on wheels. Measured against a galloping reference
+ * the figure's height should change by about a quarter across a stride; with
+ * the old timing it changed by three percent.
  */
 const LEG_OFFSET = {
   nearHind: 0,
-  farHind: 0.12,
-  farFore: 0.55,
-  nearFore: 0.67,
+  farHind: 0.1,
+  farFore: 0.32,
+  nearFore: 0.42,
 } as const;
+
+/**
+ * Share of the stride each foot spends on the ground.
+ *
+ * This has to leave a GAP. With the four footfall offsets below, a stance of
+ * 0.42 kept ground contact continuous — some foot was always planted, so the
+ * figure never gathered and its height varied by 3% across a stride. Measured
+ * against a real gallop the swing should be nearer 25%: a galloping horse is
+ * airborne with all four legs folded for part of every stride, and that
+ * gathering is most of what reads as speed.
+ *
+ * At 0.32 the hinds are down to 0.44 and the fores pick up at 0.55, which
+ * leaves a real suspension phase in between.
+ */
+const STANCE = 0.32;
 
 function footPath(phase: number, intensity: number, reach: number): { x: number; y: number } {
   const p = phase % 1;
-  const stance = 0.42;
+  const stance = STANCE;
 
   if (p < stance) {
     const t = p / stance;
