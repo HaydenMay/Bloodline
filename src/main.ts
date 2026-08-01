@@ -37,7 +37,10 @@ function buildField(seed: string): { field: Horse[]; playerId: string } {
     return horse;
   });
 
-  return { field, playerId: field[0]!.id };
+  // Draw the player at random, otherwise field[0] always lands on the first
+  // style in the list and you are a front-runner in every single race.
+  const playerIndex = Math.floor(rng.next() * field.length);
+  return { field, playerId: field[playerIndex]!.id };
 }
 
 function startRace(seed: string): void {
@@ -84,19 +87,6 @@ function startRace(seed: string): void {
     playerHorseId: playerId,
     playerSilks: { primary: '#F2C14E', secondary: '#12222B' },
     config: { furlongs: 8, going: 'good', hype: 0.65, seed: `${seed}-run` },
-    onFinish: (placings) => {
-      const list = placings
-        .slice(0, 4)
-        .map(
-          (r, i) =>
-            `<li${r.id === playerId ? ' class="me"' : ''}><span>${i + 1}</span>${r.name}</li>`,
-        )
-        .join('');
-      const results = document.createElement('ol');
-      results.className = 'results';
-      results.innerHTML = list;
-      bar.prepend(results);
-    },
   });
 }
 

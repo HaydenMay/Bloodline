@@ -21,6 +21,8 @@ html,
 body {
   margin: 0;
   padding: 0;
+  height: 100%;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
@@ -326,11 +328,12 @@ body {
   height: 62px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 0 max(14px, env(safe-area-inset-left)) max(0px, env(safe-area-inset-bottom))
-    max(14px, env(safe-area-inset-right));
+  gap: 18px;
+  padding: 0 max(14px, env(safe-area-inset-left)) 0 max(14px, env(safe-area-inset-right));
   background: var(--panel);
   border-top: 1px solid var(--line);
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .rb-horse {
@@ -353,10 +356,13 @@ body {
 }
 
 .rb-hint {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 11.5px;
   color: var(--muted);
   text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rb-hint b {
@@ -409,8 +415,14 @@ body {
   font-weight: 650;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .rb-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .rb-moment .rb-track {
     display: none;
   }
 }
@@ -420,7 +432,7 @@ body {
   display: flex;
   align-items: center;
   gap: 9px;
-  flex: none;
+  flex: 0 0 auto;
 }
 
 .rb-moment-label {

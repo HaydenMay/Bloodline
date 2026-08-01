@@ -432,17 +432,62 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       ctx.fillText(callout, width / 2, height * 0.2);
     }
 
-    if (!running) {
-      ctx.fillStyle = 'rgba(14,18,24,0.55)';
-      ctx.fillRect(0, 0, width, height);
-      ctx.fillStyle = '#E8EDF4';
-      ctx.font = '800 34px ui-sans-serif, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${ordinal(player.rank)}`, width / 2, height / 2 - 6);
-      ctx.font = '600 14px ui-sans-serif, system-ui, sans-serif';
-      ctx.fillStyle = '#8B98A9';
-      ctx.fillText('tap to continue', width / 2, height / 2 + 24);
+    if (!running) drawFinish(ctx, width, height, player, runners);
+  };
+
+  /** Full result, on the canvas where there is room for it. */
+  const drawFinish = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    player: RunnerSnapshot,
+    runners: RunnerSnapshot[],
+  ): void => {
+    ctx.fillStyle = 'rgba(14,18,24,0.86)';
+    ctx.fillRect(0, 0, width, height);
+
+    const placings = [...runners].sort(
+      (a, b) => (a.finishTime ?? 1e9) - (b.finishTime ?? 1e9) || b.distance - a.distance,
+    );
+
+    const won = player.rank === 1;
+    const cx = width / 2;
+    const rows = Math.min(placings.length, 8);
+    const rowH = 26;
+    const top = Math.max(70, height / 2 - (rows * rowH) / 2 - 34);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = won ? '#F2C14E' : '#E8EDF4';
+    ctx.font = '800 30px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillText(won ? 'WINNER' : `${ordinal(player.rank)} of ${runners.length}`, cx, top);
+
+    const listTop = top + 26;
+    for (let i = 0; i < rows; i++) {
+      const r = placings[i]!;
+      const y = listTop + i * rowH;
+      const me = r.id === playerHorseId;
+
+      if (me) {
+        ctx.fillStyle = 'rgba(242,193,78,0.14)';
+        roundRect(ctx, cx - 156, y - 1, 312, rowH - 4, 7);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = me ? '#F2C14E' : '#8B98A9';
+      ctx.font = `${me ? 700 : 500} 13px ui-sans-serif, system-ui, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.fillText(String(i + 1), cx - 144, y + 15);
+      ctx.fillText(r.name, cx - 122, y + 15);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = me ? 'rgba(242,193,78,0.75)' : 'rgba(139,152,169,0.6)';
+      ctx.fillText(r.finishTime ? `${r.finishTime.toFixed(2)}s` : '—', cx + 144, y + 15);
     }
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#8B98A9';
+    ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillText('New race to run again', cx, listTop + rows * rowH + 22);
   };
 
   // ---- Input --------------------------------------------------------------
