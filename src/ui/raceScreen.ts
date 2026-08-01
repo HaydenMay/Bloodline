@@ -159,12 +159,14 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let calloutUntil = 0;
   let finishedAt = 0;
   let lastEnergy = 100;
+  /** Races wait for you rather than starting the moment the page loads. */
+  let started = false;
   const firedCallouts = new Set<string>();
 
   const cam: Camera = { scrollYards: 0, pixelsPerYard: 1.6 };
 
   const tick = (): void => {
-    if (!running) return;
+    if (!started || !running) return;
     prev = curr;
     running = race.step();
     curr = race.snapshot();
@@ -449,7 +451,41 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       ctx.fillText(callout, width / 2, height * 0.2);
     }
 
-    if (!running) drawFinish(ctx, width, height, player, runners);
+    if (!started) drawStart(ctx, width, height);
+    else if (!running) drawFinish(ctx, width, height, player, runners);
+  };
+
+  /** Pre-race card, so a race begins when you are ready rather than on load. */
+  const drawStart = (ctx: CanvasRenderingContext2D, width: number, height: number): void => {
+    ctx.fillStyle = 'rgba(14,18,24,0.82)';
+    ctx.fillRect(0, 0, width, height);
+
+    const cx = width / 2;
+    const cy = height / 2;
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#E8EDF4';
+    ctx.font = '800 26px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillText(playerHorse.name, cx, cy - 46);
+
+    ctx.fillStyle = '#8B98A9';
+    ctx.font = '600 13px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillText(
+      `${config.furlongs}f · ${config.going} going · field of ${field.length}`,
+      cx,
+      cy - 24,
+    );
+
+    ctx.fillStyle = '#F2C14E';
+    roundRect(ctx, cx - 82, cy + 2, 164, 44, 22);
+    ctx.fill();
+    ctx.fillStyle = '#12222B';
+    ctx.font = '800 15px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillText('START RACE', cx, cy + 30);
+
+    ctx.fillStyle = 'rgba(139,152,169,0.85)';
+    ctx.font = '500 12px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillText('Tap to URGE · hold to TAKE A PULL', cx, cy + 70);
   };
 
   /** Full result, on the canvas where there is room for it. */
@@ -525,6 +561,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   const down = (e: Event): void => {
     e.preventDefault();
+    if (!started) {
+      started = true;
+      pressedAt = 0;
+      return;
+    }
     pressedAt = performance.now();
     holdTimer = window.setTimeout(() => {
       input.takingBack = true;
@@ -533,6 +574,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   const up = (): void => {
     window.clearTimeout(holdTimer);
+    if (pressedAt === 0) return;
     const held = performance.now() - pressedAt;
     input.takingBack = false;
     if (held < HOLD_MS) urge();
@@ -546,7 +588,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     if (e.repeat) return;
     if (e.code === 'Space' || e.code === 'ArrowUp') {
       e.preventDefault();
-      if (e.type === 'keydown') urge();
+      if (e.type !== 'keydown') return;
+      if (!started) started = true;
+      else urge();
     }
     if (e.code === 'ArrowDown' || e.code === 'ShiftLeft') {
       e.preventDefault();
