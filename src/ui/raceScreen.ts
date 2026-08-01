@@ -62,6 +62,22 @@ const SIM_SPEED_INFLATION = 1.43;
 const STRIDE_YARDS = HORSE_YARDS * 3 * SIM_SPEED_INFLATION;
 
 /**
+ * Ceiling on how often the legs turn over, in stride cycles per second.
+ *
+ * A galloping horse does not go faster by running its legs quicker. Cadence
+ * stays roughly flat across a wide range of speed and the extra ground comes
+ * from a LONGER stride — which is why an accelerating horse looks powerful
+ * rather than frantic. Deriving the rate from speed alone got that backwards:
+ * it held up at the start, then wound tighter and tighter as the field came up
+ * to racing pace, until the gait read as a wind-up toy.
+ *
+ * Capped, extra speed simply slides the horse further per cycle. Judged by eye
+ * at the size horses actually appear on screen, which is lower than the ~2.3
+ * a real thoroughbred turns over at — small and fast reads quicker than life.
+ */
+const MAX_STRIDE_RATE = 1.3;
+
+/**
  * Sprite pixels per rig unit, so both draw the same horse at the same size.
  *
  * The rig spans about 123 of its own units nose to tail-tip; the sprite spans
@@ -325,7 +341,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         drawSpeed = pu.speed;
       }
 
-      const phase = ((stride.get(r.id) ?? 0) + (drawSpeed * dt) / STRIDE_YARDS) % 1;
+      const strideRate = Math.min(drawSpeed / STRIDE_YARDS, MAX_STRIDE_RATE);
+      const phase = ((stride.get(r.id) ?? 0) + strideRate * dt) % 1;
       stride.set(r.id, phase);
 
       const isPlayer = r.id === playerHorseId;
