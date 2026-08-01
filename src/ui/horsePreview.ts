@@ -22,11 +22,14 @@ export function mountHorsePreview(host: HTMLElement): () => void {
   controls.innerHTML = `
     <button data-act="anim">Pause</button>
     <label>Speed <input type="range" min="0" max="100" value="70" data-act="speed"></label>
-    <span class="pv-note">Top row: one stride, frozen at eight points. Below: every coat.</span>
+    <span class="pv-note">Top row: one stride, frozen at eight points. Below: click a coat to preview it.</span>
   `;
   host.appendChild(controls);
 
   let intensity = 0.7;
+  let selectedCoat = 'bay';
+  /** Hit boxes for the coat row, rebuilt every frame. */
+  let coatHits: { id: string; x0: number; x1: number; y0: number; y1: number }[] = [];
   controls.querySelector('[data-act="anim"]')!.addEventListener('click', (e) => {
     animate = !animate;
     (e.target as HTMLButtonElement).textContent = animate ? 'Pause' : 'Play';
@@ -35,6 +38,16 @@ export function mountHorsePreview(host: HTMLElement): () => void {
     intensity = Number((e.target as HTMLInputElement).value) / 100;
   });
 
+  const onClick = (e: MouseEvent): void => {
+    const r = surface.canvas.getBoundingClientRect();
+    const cx = e.clientX - r.left;
+    const cy = e.clientY - r.top;
+    const hit = coatHits.find((c) => cx >= c.x0 && cx <= c.x1 && cy >= c.y0 && cy <= c.y1);
+    if (hit) selectedCoat = hit.id;
+  };
+  surface.canvas.addEventListener('click', onClick);
+  surface.canvas.style.cursor = 'pointer';
+
   const loop = startLoop(
     30,
     () => {
@@ -42,94 +55,95 @@ export function mountHorsePreview(host: HTMLElement): () => void {
     },
     () => {
       const { ctx, width, height } = surface;
+      const phase = (time * (0.9 + intensity)) % 1;
 
       ctx.fillStyle = '#171C24';
       ctx.fillRect(0, 0, width, height);
 
-      // Ground line, so hoof contact can actually be judged.
-      const bigY = Math.min(height * 0.42, 260);
-      ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, bigY);
-      ctx.lineTo(width, bigY);
-      ctx.stroke();
+      const label = (text: string, y: number): void => {
+        ctx.fillStyle = 'rgba(232,237,244,0.45)';
+        ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(text, 12, y);
+      };
+      const rule = (y: number): void => {
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      };
 
-      // ---- One large horse, for judging the drawing itself ----------------
-      const bigScale = Math.min(3.4, width / 210);
-      const phase = (time * (0.9 + intensity)) % 1;
-      drawHorseShadow(ctx, width * 0.5, bigY, bigScale);
-      drawHorse(ctx, width * 0.5, bigY, {
-        coat: 'bay',
-        silks: RIVAL_SILKS[0]!,
-        pose: { phase, intensity, drive: 0.5 },
-        scale: bigScale,
+      // ---- Coats, at the top and clickable ---------------------------------
+      const coatY = 96;
+      label('COATS — click to preview', coatY - 62);
+      rule(coatY);
+
+      const cw = width / COAT_IDS.length;
+      const cs = Math.min(0.85, cw / 165);
+      coatHits = [];
+      COAT_IDS.forEach((id, i) => {
+        const x = cw * (i + 0.5);
+        coatHits.push({ id, x0: cw * i, x1: cw * (i + 1), y0: coatY - 60, y1: coatY + 24 });
+        if (id === selectedCoat) {
+          ctx.fillStyle = 'rgba(242,193,78,0.10)';
+          ctx.fillRect(cw * i + 2, coatY - 60, cw - 4, 84);
+        }
+        drawHorseShadow(ctx, x, coatY, cs);
+        drawHorse(ctx, x, coatY, {
+          coat: id,
+          silks: RIVAL_SILKS[i % RIVAL_SILKS.length]!,
+          pose: { phase, intensity, drive: 0.4 },
+          scale: cs,
+        });
+        ctx.fillStyle = id === selectedCoat ? '#F2C14E' : 'rgba(232,237,244,0.5)';
+        ctx.font = `${id === selectedCoat ? 700 : 500} 10px ui-sans-serif, system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(coatFor(id).name, x, coatY + 18);
       });
 
-      // ---- The stride, frozen at eight points ------------------------------
-      const stripY = bigY + 116;
+      // ---- One stride, frozen ----------------------------------------------
+      const stripY = coatY + 118;
+      label('ONE STRIDE', stripY - 62);
+      rule(stripY);
+
       const cols = 8;
       const cellW = width / cols;
-      const smallScale = Math.min(1.05, cellW / 130);
-
-      ctx.fillStyle = 'rgba(232,237,244,0.45)';
-      ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('ONE STRIDE', 12, stripY - 74);
-
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-      ctx.beginPath();
-      ctx.moveTo(0, stripY);
-      ctx.lineTo(width, stripY);
-      ctx.stroke();
-
+      const smallScale = Math.min(0.85, cellW / 165);
       for (let i = 0; i < cols; i++) {
-        const p = i / cols;
         const x = cellW * (i + 0.5);
         drawHorseShadow(ctx, x, stripY, smallScale);
         drawHorse(ctx, x, stripY, {
-          coat: 'bay',
+          coat: selectedCoat,
           silks: RIVAL_SILKS[0]!,
-          pose: { phase: p, intensity, drive: 0.5 },
+          pose: { phase: i / cols, intensity, drive: 0.5 },
           scale: smallScale,
         });
       }
 
-      // ---- Every coat ------------------------------------------------------
-      const coatY = stripY + 118;
-      if (coatY < height - 10) {
-        ctx.fillStyle = 'rgba(232,237,244,0.45)';
-        ctx.textAlign = 'left';
-        ctx.fillText('COATS', 12, coatY - 74);
+      // ---- The large horse, centred in what is left ------------------------
+      // Sits in the middle of the page with the reference rows above it, and
+      // biased left because the rig reaches a long way forward of its origin —
+      // centred on the canvas, the head ran off the right edge.
+      const bigTop = stripY + 40;
+      const bigY = bigTop + (height - bigTop) * 0.62;
+      const bigScale = Math.min(3.0, width / 250, (height - bigTop) * 0.0088);
 
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-        ctx.beginPath();
-        ctx.moveTo(0, coatY);
-        ctx.lineTo(width, coatY);
-        ctx.stroke();
-
-        const cw = width / COAT_IDS.length;
-        const cs = Math.min(1.0, cw / 130);
-        COAT_IDS.forEach((id, i) => {
-          const x = cw * (i + 0.5);
-          drawHorseShadow(ctx, x, coatY, cs);
-          drawHorse(ctx, x, coatY, {
-            coat: id,
-            silks: RIVAL_SILKS[i % RIVAL_SILKS.length]!,
-            pose: { phase, intensity, drive: 0.4 },
-            scale: cs,
-          });
-          ctx.fillStyle = 'rgba(232,237,244,0.5)';
-          ctx.font = '500 10px ui-sans-serif, system-ui, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(coatFor(id).name, x, coatY + 20);
-        });
-      }
+      rule(bigY);
+      drawHorseShadow(ctx, width * 0.4, bigY, bigScale);
+      drawHorse(ctx, width * 0.4, bigY, {
+        coat: selectedCoat,
+        silks: RIVAL_SILKS[0]!,
+        pose: { phase, intensity, drive: 0.5 },
+        scale: bigScale,
+      });
     },
   );
 
   return (): void => {
     loop.stop();
+    surface.canvas.removeEventListener('click', onClick);
     surface.destroy();
     controls.remove();
   };

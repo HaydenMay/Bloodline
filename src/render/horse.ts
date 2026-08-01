@@ -239,13 +239,30 @@ export function drawHorse(
   drawLeg(ctx, SHOULDER_X - 2, shoulderY, phase + LEG_OFFSET.farFore, intensity, reach, 1, far, farPoint, 6.5);
 
   // ---- Tail ---------------------------------------------------------------
-  const swing = Math.sin(phase * Math.PI * 2 + 1.2) * 4;
+  const swing = Math.sin(phase * Math.PI * 2 + 1.2) * 3.5;
+  const dockX = HIP_X - 4;
+  const dockY = BODY_Y - BARREL_HALF * 1.1;
+  const tipX = HIP_X - 44;
+  const tipY = BODY_Y - 6 + swing * 2;
+
   const tail = new Path2D();
-  tail.moveTo(HIP_X - 6, BODY_Y - BARREL_HALF * 1.2);
-  tail.quadraticCurveTo(HIP_X - 26, BODY_Y - 14 + swing, HIP_X - 48, BODY_Y - 8 + swing * 1.8);
-  tail.quadraticCurveTo(HIP_X - 26, BODY_Y - 4 + swing, HIP_X - 7, BODY_Y);
+  tail.moveTo(dockX, dockY - 2);
+  tail.bezierCurveTo(dockX - 14, dockY - 4 + swing, tipX + 12, tipY - 7, tipX, tipY - 2);
+  tail.bezierCurveTo(tipX + 10, tipY + 1, dockX - 12, dockY + 7 + swing, dockX, dockY + 5);
   tail.closePath();
-  shade(ctx, tail, [HIP_X - 42, BODY_Y - 14, HIP_X, BODY_Y + 6], coat.hair, 0.8);
+  shade(ctx, tail, [tipX, tipY - 8, dockX, dockY + 6], coat.hair, 0.7);
+
+  // A couple of loose strands so the edge is not a clean curve.
+  ctx.strokeStyle = dark(coat.hair, 0.15);
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 2; i++) {
+    const off = 3 + i * 4;
+    ctx.beginPath();
+    ctx.moveTo(dockX - 3, dockY + off * 0.4);
+    ctx.quadraticCurveTo(dockX - 22, dockY + off + swing, tipX + 4, tipY + off * 0.7);
+    ctx.stroke();
+  }
 
   // ---- Neck and head, drawn BEFORE the body -------------------------------
   // Drawing the neck first lets the body silhouette cover its base, exactly as
@@ -425,29 +442,40 @@ export function drawHorse(
   ctx.translate(11, BODY_Y - BARREL_HALF * 1.15 + crouch);
   ctx.rotate(-0.4 - 0.14 * drive);
 
+  // Arched back, low and forward over the withers.
   const torso = new Path2D();
-  torso.ellipse(0, 0, 12, 8, 0, 0, Math.PI * 2);
-  shade(ctx, torso, [-12, -8, 12, 8], opts.silks.primary, 0.8);
+  torso.moveTo(-11, 4);
+  torso.bezierCurveTo(-10, -6, -2, -11, 7, -11);
+  torso.bezierCurveTo(12, -11, 15, -8, 15, -4);
+  torso.bezierCurveTo(15, 0, 10, 3, 3, 4);
+  torso.closePath();
+  shade(ctx, torso, [-11, -11, 15, 5], opts.silks.primary, 0.75);
 
-  const sleeve = new Path2D();
-  sleeve.ellipse(7, 2, 5.5, 4.2, -0.3, 0, Math.PI * 2);
-  shade(ctx, sleeve, [1, -2, 13, 6], opts.silks.secondary, 0.7);
-
-  ctx.strokeStyle = '#2A2320';
-  ctx.lineWidth = 5;
+  // Arms reaching down the neck to the rein.
+  ctx.strokeStyle = dark(opts.silks.secondary, 0.2);
+  ctx.lineWidth = 3.4;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(-2, 5);
-  ctx.lineTo(-1, 13);
+  ctx.moveTo(9, -6);
+  ctx.lineTo(18, 1);
   ctx.stroke();
 
+  // Tucked knee and boot.
+  ctx.strokeStyle = '#2A2320';
+  ctx.lineWidth = 4.4;
+  ctx.beginPath();
+  ctx.moveTo(-4, 1);
+  ctx.lineTo(-7, 8);
+  ctx.stroke();
+
+  // Head, low and forward — not perched on top.
   const helmet = new Path2D();
-  helmet.arc(9, -8, 5.8, 0, Math.PI * 2);
-  shade(ctx, helmet, [3, -14, 15, -2], opts.silks.primary, 0.7);
+  helmet.ellipse(15, -10, 5.2, 4.6, 0.25, 0, Math.PI * 2);
+  shade(ctx, helmet, [10, -15, 20, -5], opts.silks.primary, 0.65);
 
   const peak = new Path2D();
-  peak.ellipse(13.5, -7, 4, 1.9, 0.2, 0, Math.PI * 2);
-  shade(ctx, peak, [9, -9, 18, -5], opts.silks.secondary, 0.6);
+  peak.ellipse(19.5, -8.5, 3.4, 1.7, 0.3, 0, Math.PI * 2);
+  shade(ctx, peak, [16, -10, 23, -7], opts.silks.secondary, 0.55);
 
   ctx.restore();
 
