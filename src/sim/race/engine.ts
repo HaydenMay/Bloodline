@@ -102,8 +102,16 @@ export function simulateRace(entrants: RaceEntrant[], config: RaceConfig): RaceO
   const fieldSize = entrants.length;
   const events: RaceEvent[] = [];
 
+  // THE GATE DRAW.
+  //
+  // Lanes and starting order must be drawn, not inherited from array order.
+  // Without this the first entrant always begins on the rail at the head of the
+  // field and never has to establish position — worth around +9 percentage
+  // points of win rate for free, in every race and every test.
+  const draw = rng.shuffle(entrants.map((_, i) => i));
+
   const runners: Runner[] = entrants.map((entrant, i) =>
-    createRunner(entrant, i, rng, config, band, fieldSize),
+    createRunner(entrant, draw[i]!, rng, config, band, fieldSize),
   );
 
   for (const r of runners) {
@@ -228,7 +236,9 @@ function createRunner(
     horse,
     controller: entrant.controller ?? createAiController(horse),
     traits,
-    distance: 0,
+    // A few inches of scatter off the gate, so ties in the opening tick break
+    // randomly rather than by array order.
+    distance: rng.range(0, 0.4),
     speed: 0,
     energy: K.MAX_ENERGY,
     lane: index % K.LANE_COUNT,
@@ -418,9 +428,21 @@ function stepRunner(
     return gap < best ? gap : best;
   }, Number.POSITIVE_INFINITY);
   const contest = clamp(1 - nearest / K.CLEAR_LEAD_GAP, 0, 1);
-  const contestFactor = K.CLEAR_LEAD_RELIEF + (1 - K.CLEAR_LEAD_RELIEF) * contest;
 
-  const frontCost = 1 + K.FRONT_COST_PENALTY * Math.pow(forwardness, 1.5) * relief * contestFactor;
+  // Two separate costs, deliberately decoupled.
+  //
+  // The BASELINE cost of being up front is discounted by running style — that
+  // is what lets a front-runner hold a lead cheaply. The CONTEST cost of being
+  // pressed is not: being hounded hurts everyone the same. Previously one
+  // number did both jobs, so making front-runners efficient also made them
+  // immune to being contested, which quietly disabled the whole upset mechanism.
+  const frontCost =
+    1 +
+    Math.pow(forwardness, 1.5) *
+      K.FRONT_COST_PENALTY * relief +
+    // Sharper exponent: being pressed should punish the horses actually
+    // fighting for the lead, not everyone stuck in mid-field traffic.
+    Math.pow(forwardness, 3) * K.CONTESTED_LEAD_COST * contest;
   const backRecovery = 1 + K.BACK_RECOVERY_BONUS * r.fieldPosition;
 
   const rawMisfit = Math.abs(r.fieldPosition - profile.preferred);

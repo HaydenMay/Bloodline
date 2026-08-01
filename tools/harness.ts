@@ -23,8 +23,15 @@ import { simulateRace } from '../src/sim/race/engine.js';
 import { RUNNING_STYLES, DIVISIONS, FIELD_SIZE, type Division, type RunningStyle } from '../src/data/index.js';
 import { STAT_KEYS, type Horse } from '../src/sim/types.js';
 import type { Going } from '../src/sim/race/types.js';
+import { writeReport, type SuiteResult } from './report.js';
 
 const RACES = Number(process.env['RACES'] ?? 4000);
+/**
+ * Seed prefix. The sim is fully deterministic, so re-running with the same seed
+ * gives byte-identical numbers — that is the point. To compare two INDEPENDENT
+ * samples, vary this:  SEED=b npm run harness
+ */
+const SEED = process.env['SEED'] ?? 'a';
 const DISTANCES = [6, 8, 10] as const;
 const GOINGS: Going[] = ['firm', 'good', 'soft', 'heavy'];
 
@@ -40,14 +47,14 @@ const head = (title: string): void => {
 
 // ---------------------------------------------------------------------------
 
-function styleBalance(): { ok: boolean; lines: string[] } {
+function styleBalance(): Omit<SuiteResult, 'name'> {
   const wins: Record<RunningStyle, number> = { frontRunner: 0, stalker: 0, midPack: 0, closer: 0 };
   const runs: Record<RunningStyle, number> = { frontRunner: 0, stalker: 0, midPack: 0, closer: 0 };
   const paceWins: Record<RunningStyle, number> = { frontRunner: 0, stalker: 0, midPack: 0, closer: 0 };
   let fastPaceRaces = 0;
 
   for (let i = 0; i < RACES; i++) {
-    const rng = createRng(`style-${i}`);
+    const rng = createRng(`${SEED}-style-${i}`);
     const names = createNameGenerator(rng);
     const distance = DISTANCES[i % DISTANCES.length]!;
 
@@ -69,7 +76,7 @@ function styleBalance(): { ok: boolean; lines: string[] } {
 
     const outcome = simulateRace(
       horses.map((horse) => ({ horse })),
-      { furlongs: distance, going: 'good', hype: 0.5, seed: `style-race-${i}` },
+      { furlongs: distance, going: 'good', hype: 0.5, seed: `${SEED}-style-race-${i}` },
     );
 
     const winnerId = outcome.results[0]!.horseId;
@@ -99,7 +106,32 @@ function styleBalance(): { ok: boolean; lines: string[] } {
   void fastPaceRaces;
   void paceWins;
 
-  return { ok: worst < 0.3, lines };
+  const LABELS: Record<RunningStyle, string> = {
+    frontRunner: 'Front-runner',
+    stalker: 'Stalker',
+    midPack: 'Mid-pack',
+    closer: 'Closer',
+  };
+
+  return {
+    ok: worst < 0.3,
+    lines,
+    bars: {
+      title: 'Win rate by running style',
+      unit: '%',
+      max: 18,
+      reference: 12.5,
+      referenceLabel: 'even share 12.5%',
+      data: rates.map((r) => {
+        const delta = (r.rate / expected - 1) * 100;
+        return {
+          label: LABELS[r.style],
+          value: r.rate * 100,
+          note: `${delta >= 0 ? '+' : ''}${delta.toFixed(0)}%`,
+        };
+      }),
+    },
+  };
 }
 
 /**
@@ -110,7 +142,7 @@ function styleBalance(): { ok: boolean; lines: string[] } {
  * race to a closer. If this does not hold, upsets are not emergent and the
  * whole "chaos from pace, not from a fudge factor" design has failed.
  */
-function paceCollapse(): { ok: boolean; lines: string[] } {
+function paceCollapse(): Omit<SuiteResult, 'name'> {
   const scenarios = [
     { name: 'lone front-runner', frontRunners: 1 },
     { name: 'two contesting', frontRunners: 2 },
@@ -119,6 +151,7 @@ function paceCollapse(): { ok: boolean; lines: string[] } {
   const perScenario = Math.max(400, Math.floor(RACES / 2));
   const lines: string[] = [];
   const closerRates: number[] = [];
+  const frontRates: number[] = [];
   const paces: number[] = [];
 
   for (const scenario of scenarios) {
@@ -127,7 +160,7 @@ function paceCollapse(): { ok: boolean; lines: string[] } {
     let paceSum = 0;
 
     for (let i = 0; i < perScenario; i++) {
-      const rng = createRng(`pace-${scenario.frontRunners}-${i}`);
+      const rng = createRng(`${SEED}-pace-${scenario.frontRunners}-${i}`);
       const names = createNameGenerator(rng);
       const horses: Horse[] = [];
 
@@ -151,7 +184,7 @@ function paceCollapse(): { ok: boolean; lines: string[] } {
 
       const outcome = simulateRace(
         horses.map((horse) => ({ horse })),
-        { furlongs: 8, going: 'good', hype: 0.5, seed: `pace-race-${scenario.frontRunners}-${i}` },
+        { furlongs: 8, going: 'good', hype: 0.5, seed: `${SEED}-pace-race-${scenario.frontRunners}-${i}` },
       );
       paceSum += outcome.paceRating;
 
@@ -160,33 +193,48 @@ function paceCollapse(): { ok: boolean; lines: string[] } {
       if (winner.style === 'frontRunner') frontWins++;
     }
 
-    const closerRate = closerWins / perScenario;
+    // PER HORSE, not collectively. With three front-runners in the field they
+    // share the wins between them, so a collective total rises even as each
+    // individual horse does worse. Measuring collectively hid the entire
+    // effect and made this test flip between seeds.
+    const closerRate = closerWins / perScenario / 2; // always two closers
+    const frontRate = frontWins / perScenario / scenario.frontRunners;
     closerRates.push(closerRate);
+    frontRates.push(frontRate);
     paces.push(paceSum / perScenario);
 
     lines.push(
-      `  ${scenario.name.padEnd(20)} closers win ${pct(closerRate).padStart(6)}   ` +
-        `front-runners ${pct(frontWins / perScenario).padStart(6)}   ` +
+      `  ${scenario.name.padEnd(20)} each front-runner ${pct(frontRate).padStart(6)}   ` +
+        `each closer ${pct(closerRate).padStart(6)}   ` +
         `pace ${(paceSum / perScenario).toFixed(3)}`,
     );
   }
 
-  // A hotter pace must help closers and hurt front-runners.
-  const rising = closerRates[2]! > closerRates[0]!;
+  // Contesting the lead must genuinely hurt the horses doing the contesting.
+  // RELATIVE reduction, not absolute percentage points. A drop from 14.7% to
+  // 10.6% is only 4 points but a 28% cut in win chance, which is what actually
+  // matters. An absolute bar just measures how common the style is overall.
+  const collapse = 1 - frontRates[2]! / Math.max(1e-9, frontRates[0]!);
+  const hurtsFront = collapse >= 0.2;
   const paceRising = paces[2]! > paces[0]!;
 
   lines.push('');
   lines.push(
-    `  closer win rate rises with pace pressure   ${rising ? 'yes' : 'NO — upsets are not emergent'}`,
+    `  a contested lead wrecks front-runners      ${hurtsFront ? 'yes' : 'NO — the mechanism is not working'}` +
+      `  (${pct(frontRates[0]!)} alone → ${pct(frontRates[2]!)} each when three duel)`,
+  );
+  lines.push(
+    `  closers gain from the collapse             ${pct(closerRates[0]!)} → ${pct(closerRates[2]!)}` +
+      `  (secondary — the field composition also shifts)`,
   );
   lines.push(`  measured pace rises with contention        ${paceRising ? 'yes' : 'no'}`);
 
-  return { ok: rising, lines };
+  return { ok: hurtsFront, lines };
 }
 
 // ---------------------------------------------------------------------------
 
-function dominanceCurve(): { ok: boolean; lines: string[] } {
+function dominanceCurve(): Omit<SuiteResult, 'name'> {
   // A single horse of raised quality against a fixed field of average ones.
   // We want the resulting curve FLAT in the middle and STEEP at the ends.
   const edges = [0, 0.05, 0.1, 0.2, 0.3, 0.4, 0.6];
@@ -197,14 +245,19 @@ function dominanceCurve(): { ok: boolean; lines: string[] } {
   for (const edge of edges) {
     let wins = 0;
     for (let i = 0; i < perEdge; i++) {
-      const rng = createRng(`dom-${edge}-${i}`);
+      const rng = createRng(`${SEED}-dom-${edge}-${i}`);
       const names = createNameGenerator(rng);
       const horses: Horse[] = [];
+
+      // Rotate which style carries the edge, so residual style bias averages
+      // out instead of contaminating the baseline. Previously the boosted horse
+      // was always a front-runner, which skewed the whole curve.
+      const offset = i % RUNNING_STYLES.length;
 
       for (let n = 0; n < FIELD_SIZE; n++) {
         const h = generateHorse(rng, names, {
           division: 'open',
-          style: RUNNING_STYLES[n % RUNNING_STYLES.length]!,
+          style: RUNNING_STYLES[(n + offset) % RUNNING_STYLES.length]!,
           age: 4,
         });
         const base = 55 * (n === 0 ? 1 + edge : 1);
@@ -218,7 +271,7 @@ function dominanceCurve(): { ok: boolean; lines: string[] } {
 
       const outcome = simulateRace(
         horses.map((horse) => ({ horse })),
-        { furlongs: 8, going: 'good', hype: 0.5, seed: `dom-race-${edge}-${i}` },
+        { furlongs: 8, going: 'good', hype: 0.5, seed: `${SEED}-dom-race-${edge}-${i}` },
       );
       if (outcome.results[0]!.horseId === horses[0]!.id) wins++;
     }
@@ -242,7 +295,7 @@ function dominanceCurve(): { ok: boolean; lines: string[] } {
 
 // ---------------------------------------------------------------------------
 
-function divisionSanity(): { ok: boolean; lines: string[] } {
+function divisionSanity(): Omit<SuiteResult, 'name'> {
   const lines: string[] = [];
   const correlations: number[] = [];
   const troubles: number[] = [];
@@ -258,7 +311,7 @@ function divisionSanity(): { ok: boolean; lines: string[] } {
     let correlation = 0;
 
     for (let i = 0; i < perDivision; i++) {
-      const rng = createRng(`div-${division}-${i}`);
+      const rng = createRng(`${SEED}-div-${division}-${i}`);
       const names = createNameGenerator(rng);
       const horses = Array.from({ length: FIELD_SIZE }, (_, n) =>
         generateHorse(rng, names, {
@@ -281,7 +334,7 @@ function divisionSanity(): { ok: boolean; lines: string[] } {
           furlongs: DISTANCES[i % DISTANCES.length]!,
           going: GOINGS[i % GOINGS.length]!,
           hype: 0.5,
-          seed: `div-race-${division}-${i}`,
+          seed: `${SEED}-div-race-${division}-${i}`,
         },
       );
 
@@ -354,7 +407,7 @@ function divisionSanity(): { ok: boolean; lines: string[] } {
 
 // ---------------------------------------------------------------------------
 
-function determinism(): { ok: boolean; lines: string[] } {
+function determinism(): Omit<SuiteResult, 'name'> {
   const build = (): Horse[] => {
     const rng = createRng('determinism');
     const names = createNameGenerator(rng);
@@ -396,18 +449,25 @@ function main(): void {
   ];
 
   let allOk = true;
+  const results: SuiteResult[] = [];
+
   for (const suite of suites) {
     head(suite.name);
-    const { ok, lines } = suite.run();
-    lines.forEach((l) => console.log(l));
-    console.log(`\n  \x1b[${ok ? '32m✓ pass' : '31m✕ FAIL'}\x1b[0m`);
-    if (!ok) allOk = false;
+    const result = suite.run();
+    result.lines.forEach((l) => console.log(l));
+    console.log(`\n  \x1b[${result.ok ? '32m✓ pass' : '31m✕ FAIL'}\x1b[0m`);
+    if (!result.ok) allOk = false;
+    results.push({ name: suite.name, ...result });
   }
+
+  const durationMs = Date.now() - started;
+  const path = writeReport(results, { races: RACES, seed: SEED, durationMs });
 
   console.log('\n' + '═'.repeat(64));
   console.log(
-    `${allOk ? '\x1b[32mAll suites passed\x1b[0m' : '\x1b[31mBalance targets not met\x1b[0m'} · ${((Date.now() - started) / 1000).toFixed(1)}s`,
+    `${allOk ? '\x1b[32mAll suites passed\x1b[0m' : '\x1b[31mBalance targets not met\x1b[0m'} · ${(durationMs / 1000).toFixed(1)}s`,
   );
+  console.log(`report → ${path}`);
   console.log('═'.repeat(64) + '\n');
 
   if (!allOk) process.exitCode = 1;

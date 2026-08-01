@@ -56,15 +56,19 @@ export const BASE_RECOVERY = 2.7;
  */
 export const FRONT_COST_PENALTY = 0.3;
 /** Sitting at the back is cheap and restful — but leaves ground to cover. */
-export const BACK_RECOVERY_BONUS = 0.22;
+export const BACK_RECOVERY_BONUS = 0.10;
 
 /**
  * Yards of clear air needed before a lead counts as uncontested.
  * Inside this, the horse is being pressed and pays the full front cost.
  */
 export const CLEAR_LEAD_GAP = 14;
-/** Fraction of the front cost still paid with a completely clear lead. */
-export const CLEAR_LEAD_RELIEF = 0.3;
+/**
+ * Cost of being PRESSED, applied on top of the baseline front cost and NOT
+ * discounted by running style. Being hounded hurts everyone equally — that is
+ * what makes contesting a lead a real weapon, and what Pace Pusher exploits.
+ */
+export const CONTESTED_LEAD_COST = 0.34;
 
 /**
  * Racing your style RIGHT must pay, not merely avoid a fine.
@@ -247,10 +251,10 @@ export const PHASE_PROFILES = {
   //                 early    middle    late
   // A bonus LATE is worth more than one early, because the race is decided
   // late. Early-phase numbers are therefore larger to compensate.
-  frontRunner: { early: 0.044, middle: 0.004, late: -0.016 },
-  stalker: { early: 0.002, middle: 0.02, late: 0.009 },
-  midPack: { early: -0.002, middle: 0.022, late: 0.028 },
-  closer: { early: -0.024, middle: 0, late: 0.038 },
+  frontRunner: { early: 0.085, middle: 0.007, late: -0.013 },
+  stalker: { early: 0.003, middle: 0.0245, late: 0.012 },
+  midPack: { early: -0.003, middle: 0.0195, late: 0.0255 },
+  closer: { early: -0.027, middle: -0.001, late: 0.0345 },
 } as const satisfies Record<string, { early: number; middle: number; late: number }>;
 
 /**
@@ -258,7 +262,7 @@ export const PHASE_PROFILES = {
  * 1 = pays it in full. This is where a front-runner earns its identity.
  */
 export const FRONT_COST_RELIEF = {
-  frontRunner: 0.04,
+  frontRunner: 0.02,
   stalker: 0.78,
   midPack: 0.9,
   closer: 1,
@@ -276,7 +280,7 @@ export const FRONT_COST_RELIEF = {
 export const HOLD_EFFORT = 0.55;
 /** Establishing position is a bounded one-off cost, never an ongoing drain. */
 export const ESTABLISH_UNTIL = 0.28;
-export const ESTABLISH_GAIN = 1.9;
+export const ESTABLISH_GAIN = 2.2;
 
 /** How hard the AI corrects toward its preferred position. */
 export const POSITION_CORRECTION_GAIN = 0.5;
