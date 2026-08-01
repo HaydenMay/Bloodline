@@ -123,6 +123,53 @@ it doesn't, we change it now, and we will have spent five sessions finding out i
 
 ---
 
+## Phase 4.5 — Re-balance and physics
+**~2–3 sessions** · *a correction pass, not a feature*
+
+Numbered 4.5 deliberately. It ships no new systems, and renumbering the phases
+after it would strand every `Phase 5` reference already written into the code.
+
+Everything below is a known, **measured** defect. This phase is where the bill
+comes due for shipping a race that felt good before it was calibrated.
+
+- **The speed scale.** A winning 8f is 64.4s against a real ~96s — 25.0 m/s
+  where a thoroughbred tops out near 17.5. Do this one first and alone: a margin
+  is a time gap times speed, so it deflates every margin in the game by 1.43×
+  before anything else is touched, and every other constant is calibrated on top
+  of it.
+- **The energy floor.** An empty horse currently keeps losing ground at a rate
+  nothing in racing does. It should fade, not collapse. This is what turns the
+  tail of the field from 74 lengths into something a person would recognise.
+- **The full re-balance at lower noise**, as diagnosed in the known issue below:
+  daily form and the consistency band come down together, then the phase
+  profiles and position costs are re-tuned against the quieter baseline.
+- **A parameter sweep in the harness**, so the above is done by evidence rather
+  than by hand. Sweeping two or three constants across a grid and reading the
+  dominance curve off the result is the only honest way to do it.
+- **Re-verify Gate 1.** No running style dominates, every division is winnable,
+  the curve is flat in the middle and steep at the ends, pace collapses still
+  produce upsets. All of it, at the new noise level.
+- **Reconcile the animation with the simulation.** The gallop sheet is 24 frames
+  of one gait; the sim has `intensity` and `drive` that it currently cannot
+  express. Stride length is also derived from speed, so correcting the speed
+  scale moves it.
+
+**Deliverable:** finishes you would believe. Photo finishes at the front, a
+beaten field that is beaten rather than distanced, and a harness run that proves
+it rather than a screenshot that suggests it.
+
+### Why here, and not sooner
+
+Sooner and you are balancing a race with no career around it — no divisions to
+be winnable, no eighteen-start season over which "fair" is even measurable, and
+nothing at stake in losing. By the end of Phase 4 all of that exists, so the
+racing can be judged as the thing players actually experience.
+
+Later and it is worse: breeding multiplies every balance decision by inheritance,
+and re-tuning after foals exist means re-tuning the genetics too.
+
+---
+
 ## Phase 5 — Breeding
 **~3–4 sessions** · *the payoff*
 
@@ -190,8 +237,9 @@ Fixing the speed scale alone would take last place from 74L to about 51L. It is
 not sufficient, but it is the cheapest single correction and it should come
 first, because everything else is calibrated on top of it.
 
-**Not urgent for Gate 2** — riding still feels different race to race — but it is
-the first thing to fix afterwards.
+**Owned by Phase 4.5.** Not urgent for Gate 2 — riding still feels different race
+to race — but nothing above gets better on its own, and every constant added
+between now and then is calibrated against numbers we already know are wrong.
 
 Deliberately shelved, not forgotten: it is reported on every harness run so it
 cannot quietly persist.
@@ -223,9 +271,10 @@ own focused pass, ideally with a parameter sweep rather than by hand.
 | 2 · Playable race | ~3–4 | 🚦 Is it fun? |
 | 3 · Full career | ~3–4 | |
 | 4 · The stable | ~2–3 | |
+| 4.5 · Re-balance & physics | ~2–3 | |
 | 5 · Breeding | ~3–4 | |
 | 6 · Polish | ~3+ | |
-| **Total** | **~18–22** | |
+| **Total** | **~20–25** | |
 
 ---
 
