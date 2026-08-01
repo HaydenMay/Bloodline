@@ -71,11 +71,12 @@ const STRIDE_YARDS = HORSE_YARDS * 3 * SIM_SPEED_INFLATION;
  * it held up at the start, then wound tighter and tighter as the field came up
  * to racing pace, until the gait read as a wind-up toy.
  *
- * Capped, extra speed simply slides the horse further per cycle. Judged by eye
- * at the size horses actually appear on screen, which is lower than the ~2.3
- * a real thoroughbred turns over at — small and fast reads quicker than life.
+ * Capped, extra speed simply slides the horse further per cycle. Set by eye at
+ * the size horses actually appear on screen, and deliberately well under the
+ * ~2.3 a real thoroughbred turns over at: small and fast reads quicker than
+ * life, and at this scale anything near the true cadence looks frantic.
  */
-const MAX_STRIDE_RATE = 1.3;
+const MAX_STRIDE_RATE = 0.9;
 
 /**
  * Sprite pixels per rig unit, so both draw the same horse at the same size.
