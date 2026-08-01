@@ -87,6 +87,20 @@ const MAX_STRIDE_RATE = 0.9;
  */
 const SPRITE_PER_RIG_UNIT = 123 / 181;
 
+/**
+ * How much bigger than life the horses are drawn.
+ *
+ * Strictly, a horse should span exactly its own 2.7 yards of track, and that is
+ * what the scale chain below computes. Drawn honestly it is also small: with 46
+ * yards across the screen a horse is about a seventeenth of the width, and on a
+ * phone that is a smudge with a coloured dot on top — you cannot read your silks
+ * or tell a bay from a dark bay, which is most of what the art is for.
+ *
+ * So they are deliberately oversized. It is a legibility cheat, not a bug, and
+ * it is a single number so it can be argued with.
+ */
+const HORSE_SCALE = 1.55;
+
 /** Track sections, by the leader's progress. Each fires once. */
 const CALLOUTS = [
   { at: 0.24, text: 'Down the backstretch' },
@@ -319,7 +333,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // and larger. Sorting by lane keeps the overlap correct.
     const laneY = (lane: number): number => height * 0.58 + lane * (height * 0.055);
     // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
-    const baseScale = (HORSE_YARDS * cam.pixelsPerYard) / RIG_UNITS;
+    const baseScale = (HORSE_YARDS * cam.pixelsPerYard * HORSE_SCALE) / RIG_UNITS;
     const laneScale = (lane: number): number => baseScale * (0.88 + lane * 0.04);
 
     for (const r of [...runners].sort((a, b) => a.lane - b.lane)) {
