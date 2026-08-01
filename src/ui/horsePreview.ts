@@ -1,6 +1,7 @@
 import { createSurface, startLoop } from '../render/canvas.js';
 import { drawHorse, drawHorseShadow } from '../render/horse.js';
 import { COAT_IDS, coatFor, RIVAL_SILKS } from '../render/palette.js';
+import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
 
 /**
  * Horse preview.
@@ -14,6 +15,9 @@ import { COAT_IDS, coatFor, RIVAL_SILKS } from '../render/palette.js';
  */
 export function mountHorsePreview(host: HTMLElement): () => void {
   const surface = createSurface(host);
+  // Fire and forget: frames draw as soon as the sheet is decoded, and the drawn
+  // rig carries the view until then.
+  void loadSprites();
   let time = 0;
   let animate = true;
 
@@ -75,13 +79,35 @@ export function mountHorsePreview(host: HTMLElement): () => void {
         ctx.stroke();
       };
 
+      // ---- The sprite sheet, tinted per coat --------------------------------
+      // Top of the page because this is the art that ships; the drawn rig below
+      // is the fallback and the reference.
+      const spriteY = 92;
+      label('SPRITE — every coat, tinted from one grey sheet', spriteY - 58);
+      rule(spriteY);
+
+      const sw = width / COAT_IDS.length;
+      COAT_IDS.forEach((id, i) => {
+        const x = sw * (i + 0.5);
+        drawSpriteHorse(ctx, x, spriteY, {
+          coat: id,
+          silks: RIVAL_SILKS[i % RIVAL_SILKS.length]!,
+          phase,
+          scale: Math.min(0.62, sw / 300),
+        });
+        ctx.fillStyle = 'rgba(232,237,244,0.5)';
+        ctx.font = '500 10px ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(coatFor(id).name, x, spriteY + 16);
+      });
+
       // ---- Coats, at the top and clickable ---------------------------------
-      const coatY = 96;
-      label('COATS — click to preview', coatY - 62);
+      const coatY = spriteY + 130;
+      label('DRAWN RIG — click a coat to preview', coatY - 62);
       rule(coatY);
 
       const cw = width / COAT_IDS.length;
-      const cs = Math.min(0.85, cw / 165);
+      const cs = Math.min(0.8, cw / 175);
       coatHits = [];
       COAT_IDS.forEach((id, i) => {
         const x = cw * (i + 0.5);
