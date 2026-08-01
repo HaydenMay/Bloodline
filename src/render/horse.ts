@@ -1,4 +1,5 @@
 import { coatFor, dark, lite, type Silks } from './palette.js';
+import { BODY, EAR, HOOF, LEG, MANE, NECK_HEAD, TAIL, path } from './horseArt.js';
 
 /**
  * The horse rig.
@@ -8,36 +9,40 @@ import { coatFor, dark, lite, type Silks } from './palette.js';
  * cleanly, and a cosmetic added later is one more layer rather than a re-draw
  * of every frame.
  *
+ * FORM lives in horseArt.ts; this file only moves it. Everything below is
+ * skeleton, gait and shading.
+ *
  * SHADING. Every shape is a gradient fill plus a thin outline in a DARKENED
  * TONE OF ITS OWN FILL COLOUR — never black, never a flat fill. That one rule
  * is the difference between shapes that read as an animal and shapes that read
  * as coloured blobs, and it costs nothing. Tones are derived from a single base
  * colour so any coat genetics produces later will shade correctly.
  *
- * Drawn in a local space 100 units long, ground at y = 0, facing right.
+ * Drawn in a local space roughly 100 units long, ground at y = 0, facing right.
  */
 
 const GROUND = 0;
 
+/** Centre of the barrel. The art layer is authored around this point. */
+const BODY_Y = -40;
+
 /**
- * PROPORTIONS, measured off photographs of galloping thoroughbreds rather than
- * guessed. Checking the previous rig against reference, it was 35% too short in
- * the body and nearly twice as deep through the barrel — a stocky pony, which
- * is why it never read as a racehorse however it was shaded.
- *
- * Against height at the withers (H), a thoroughbred is roughly:
- *   body length, point of shoulder to point of buttock   ~1.0 H
- *   barrel depth                                         ~0.33 H
- *   ground to elbow                                      ~0.55 H
- *   neck                                                 ~0.40 H
- *   head                                                 ~0.28 H
+ * Leg pivots, placed INSIDE the shoulder and haunch masses rather than on the
+ * body's outline. A pivot on the edge lets the top of the leg swing out past
+ * the silhouette, which is what put pale wedges over the shoulder and quarters.
  */
-const BODY_Y = -40; // barrel centre
-const BARREL_HALF = 11; // ~0.33 H total depth
-const SHOULDER_X = 25;
-const HIP_X = -26; // body length ~51, against a withers height of ~51
-const UPPER = 17;
-const LOWER = 20;
+const SHOULDER = { x: 18, y: BODY_Y + 2 };
+const HIP = { x: -20, y: BODY_Y + 1 };
+
+/**
+ * Bone lengths. Deliberately a little LONGER than the drop to the ground, so a
+ * standing leg carries a natural bend.
+ *
+ * When the bones exactly spanned the drop, the IK clamped to full extension on
+ * every stance frame and the legs went dead straight — stilts, not limbs.
+ */
+const FORE = { upper: 18, lower: 22 };
+const HIND = { upper: 20, lower: 22 };
 
 export interface HorsePose {
   /** 0-1 through the stride cycle. */
@@ -95,12 +100,14 @@ function solveKnee(
   footX: number,
   footY: number,
   bend: 1 | -1,
+  upper: number,
+  lower: number,
 ): { x: number; y: number } {
   const dx = footX - hipX;
   const dy = footY - hipY;
-  const d = Math.max(0.001, Math.min(Math.hypot(dx, dy), UPPER + LOWER - 0.001));
-  const a = (UPPER * UPPER - LOWER * LOWER + d * d) / (2 * d);
-  const h = Math.sqrt(Math.max(0, UPPER * UPPER - a * a));
+  const d = Math.max(0.001, Math.min(Math.hypot(dx, dy), upper + lower - 0.001));
+  const a = (upper * upper - lower * lower + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(0, upper * upper - a * a));
   const mx = hipX + (dx * a) / d;
   const my = hipY + (dy * a) / d;
 
@@ -118,25 +125,26 @@ function solveKnee(
 /** Gradient fill plus a thin outline in a darker tone of the same colour. */
 function shade(
   ctx: CanvasRenderingContext2D,
-  path: Path2D,
+  p: Path2D,
   bounds: [number, number, number, number],
   base: string,
   outline = 1,
+  contrast = 1,
 ): void {
   const [x0, y0, x1, y1] = bounds;
   const g = ctx.createLinearGradient(x0, y0, x1, y1);
-  g.addColorStop(0, lite(base, 0.26));
+  g.addColorStop(0, lite(base, 0.26 * contrast));
   g.addColorStop(0.48, base);
-  g.addColorStop(1, dark(base, 0.24));
+  g.addColorStop(1, dark(base, 0.24 * contrast));
 
   ctx.fillStyle = g;
-  ctx.fill(path);
+  ctx.fill(p);
 
   if (outline > 0) {
     ctx.strokeStyle = dark(base, 0.45);
     ctx.lineWidth = 1.6 * outline;
     ctx.lineJoin = 'round';
-    ctx.stroke(path);
+    ctx.stroke(p);
   }
 }
 
@@ -148,14 +156,34 @@ function perp(ax: number, ay: number, bx: number, by: number): { x: number; y: n
   return { x: -dy / len, y: dx / len };
 }
 
+interface LegSpec {
+  top: number;
+  mid: number;
+  knee: number;
+  fetlock: number;
+}
+
 /**
- * One leg as a single TAPERED SILHOUETTE with one outline.
+ * How far down the upper bone the leg actually starts being DRAWN.
  *
- * Previously this was two stroked lines with round caps, which left a visible
- * circle at the knee and a dark band where the outline stroke showed past the
- * thinner cannon. A real leg narrows from a heavy gaskin to a fine cannon bone,
- * so it has to be a filled shape that tapers — and like the body, only the
- * outer edge is ever stroked.
+ * The joint still solves from the true pivot — this only moves where the shape
+ * begins. It exists because a leg drawn from the pivot puts its widest, lightest
+ * end on top of the barrel, and `shade` runs its gradient light-end-first, so
+ * the top of every near leg landed on the body as a pale outlined wedge. No
+ * amount of re-shading fixes that; the top of a leg simply should not be a
+ * visible shape. The shoulder and haunch masses of the body carry that volume
+ * instead, exactly as they do in life, and the leg emerges from under them.
+ *
+ * Hind legs need more of it than fore legs: the hip sits close to the point of
+ * buttock, so at full rear extension a hind leg swings out past the back of the
+ * body and takes its cut top with it, where a fore leg stays tucked under the
+ * shoulder throughout.
+ */
+const LEG_START = { fore: 0.4, hind: 0.5 } as const;
+
+/**
+ * One leg as a single TAPERED SILHOUETTE with one outline, starting under the
+ * body mass.
  */
 function drawLeg(
   ctx: CanvasRenderingContext2D,
@@ -165,67 +193,66 @@ function drawLeg(
   intensity: number,
   reach: number,
   bend: 1 | -1,
+  bone: { upper: number; lower: number },
+  spec: LegSpec,
+  start: number,
   colour: string,
   point: string,
-  width: number,
 ): void {
   const foot = footPath(phase, intensity, reach);
   const footX = hipX + foot.x;
   const footY = foot.y;
-  const knee = solveKnee(hipX, hipY, footX, footY, bend);
-
-  const wHip = width * 1.05;
-  const wKnee = width * 0.32;
-  const wFoot = width * 0.19;
+  const knee = solveKnee(hipX, hipY, footX, footY, bend, bone.upper, bone.lower);
 
   const pUpper = perp(hipX, hipY, knee.x, knee.y);
   const pLower = perp(knee.x, knee.y, footX, footY);
   // Average the two at the knee so the joint bends instead of notching.
-  const pKnee = {
-    x: (pUpper.x + pLower.x) / 2,
-    y: (pUpper.y + pLower.y) / 2,
-  };
+  const pKnee = { x: (pUpper.x + pLower.x) / 2, y: (pUpper.y + pLower.y) / 2 };
   const kLen = Math.max(0.001, Math.hypot(pKnee.x, pKnee.y));
   pKnee.x /= kLen;
   pKnee.y /= kLen;
 
-  // Mid-thigh, so the taper curves like muscle instead of coning like a spike.
-  const midX = (hipX + knee.x) / 2;
-  const midY = (hipY + knee.y) / 2;
-  const wMid = width * 0.66;
+  // The shape starts under the body, not at the pivot.
+  const topX = hipX + (knee.x - hipX) * start;
+  const topY = hipY + (knee.y - hipY) * start;
+  const wTop = spec.top + (spec.knee - spec.top) * start;
+
+  // Mid-way down what is actually drawn, so the taper curves like muscle
+  // instead of coning like a spike.
+  const midX = (topX + knee.x) / 2;
+  const midY = (topY + knee.y) / 2;
 
   const leg = new Path2D();
-  leg.moveTo(hipX + pUpper.x * wHip, hipY + pUpper.y * wHip);
-  // Rounded cap over the top of the leg, so the join is a shoulder rather than
-  // a wedge poking out of the body.
+  leg.moveTo(topX + pUpper.x * wTop, topY + pUpper.y * wTop);
   leg.quadraticCurveTo(
-    midX + pUpper.x * wMid * 1.15,
-    midY + pUpper.y * wMid * 1.15,
-    knee.x + pKnee.x * wKnee,
-    knee.y + pKnee.y * wKnee,
+    midX + pUpper.x * spec.mid,
+    midY + pUpper.y * spec.mid,
+    knee.x + pKnee.x * spec.knee,
+    knee.y + pKnee.y * spec.knee,
   );
-  leg.lineTo(footX + pLower.x * wFoot, footY + pLower.y * wFoot);
-  leg.lineTo(footX - pLower.x * wFoot, footY - pLower.y * wFoot);
-  leg.lineTo(knee.x - pKnee.x * wKnee, knee.y - pKnee.y * wKnee);
+  leg.lineTo(footX + pLower.x * spec.fetlock, footY + pLower.y * spec.fetlock);
+  leg.lineTo(footX - pLower.x * spec.fetlock, footY - pLower.y * spec.fetlock);
+  leg.lineTo(knee.x - pKnee.x * spec.knee, knee.y - pKnee.y * spec.knee);
   leg.quadraticCurveTo(
-    midX - pUpper.x * wMid * 0.75,
-    midY - pUpper.y * wMid * 0.75,
-    hipX - pUpper.x * wHip,
-    hipY - pUpper.y * wHip,
+    midX - pUpper.x * spec.mid * 0.8,
+    midY - pUpper.y * spec.mid * 0.8,
+    topX - pUpper.x * wTop,
+    topY - pUpper.y * wTop,
   );
-  {
-    const ux = (knee.x - hipX) / Math.max(0.001, Math.hypot(knee.x - hipX, knee.y - hipY));
-    const uy = (knee.y - hipY) / Math.max(0.001, Math.hypot(knee.x - hipX, knee.y - hipY));
-    leg.quadraticCurveTo(
-      hipX - ux * wHip * 0.9,
-      hipY - uy * wHip * 0.9,
-      hipX + pUpper.x * wHip,
-      hipY + pUpper.y * wHip,
-    );
-  }
   leg.closePath();
 
-  shade(ctx, leg, [hipX - wHip, hipY, footX + wFoot, footY], colour, 0.75);
+  // Gradient runs ACROSS the leg rather than down it, so the light edge is a
+  // highlight along the bone instead of a pale patch at the top. Held at low
+  // contrast as well: a leg lit as strongly as the barrel separates from it and
+  // reads as a pasted-on triangle where the two meet.
+  shade(
+    ctx,
+    leg,
+    [topX + pUpper.x * wTop, topY + pUpper.y * wTop, topX - pUpper.x * wTop, topY - pUpper.y * wTop],
+    colour,
+    0.7,
+    0.55,
+  );
 
   // The dark "points" run up the cannon — painted INSIDE the leg silhouette,
   // never as its own outlined shape.
@@ -233,18 +260,23 @@ function drawLeg(
   ctx.clip(leg);
   ctx.fillStyle = point;
   ctx.beginPath();
-  ctx.moveTo(knee.x + pKnee.x * wKnee * 1.6, knee.y + pKnee.y * wKnee * 1.6);
-  ctx.lineTo(footX + pLower.x * wFoot * 2.4, footY + pLower.y * wFoot * 2.4);
-  ctx.lineTo(footX - pLower.x * wFoot * 2.4, footY - pLower.y * wFoot * 2.4);
-  ctx.lineTo(knee.x - pKnee.x * wKnee * 1.6, knee.y - pKnee.y * wKnee * 1.6);
+  ctx.moveTo(knee.x + pKnee.x * spec.knee * 2, knee.y + pKnee.y * spec.knee * 2);
+  ctx.lineTo(footX + pLower.x * spec.fetlock * 3, footY + pLower.y * spec.fetlock * 3);
+  ctx.lineTo(footX - pLower.x * spec.fetlock * 3, footY - pLower.y * spec.fetlock * 3);
+  ctx.lineTo(knee.x - pKnee.x * spec.knee * 2, knee.y - pKnee.y * spec.knee * 2);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
 
-  // Hoof.
+  // Hoof, angled to the cannon rather than always upright.
+  const angle = Math.atan2(footY - knee.y, footX - knee.x) - Math.PI / 2;
+  ctx.save();
+  ctx.translate(footX, footY - HOOF.h * 0.6);
+  ctx.rotate(angle);
   const hoof = new Path2D();
-  hoof.ellipse(footX, footY - 1, width * 0.32, width * 0.26, 0, 0, Math.PI * 2);
-  shade(ctx, hoof, [footX - 4, footY - 4, footX + 4, footY + 2], dark(point, 0.25), 0.6);
+  hoof.ellipse(0, 0, HOOF.w, HOOF.h, 0, 0, Math.PI * 2);
+  shade(ctx, hoof, [-HOOF.w, -HOOF.h, HOOF.w, HOOF.h], dark(point, 0.3), 0.5);
+  ctx.restore();
 }
 
 export interface DrawHorseOptions {
@@ -276,249 +308,202 @@ export function drawHorse(
   ctx.rotate(-0.05 * drive);
 
   const reach = 22 + 20 * intensity;
-  const shoulderY = BODY_Y + BARREL_HALF * 0.1;
-  const hipY = BODY_Y - BARREL_HALF * 0.2;
 
   // ---- Far legs, pushed back in tone so the near side reads forward -------
   const far = dark(body, 0.3);
   const farPoint = dark(coat.points, 0.25);
-  drawLeg(ctx, HIP_X - 2, hipY, phase + LEG_OFFSET.farHind, intensity, reach, -1, far, farPoint, 6);
-  drawLeg(ctx, SHOULDER_X - 4, shoulderY, phase + LEG_OFFSET.farFore, intensity, reach, 1, far, farPoint, 5.4);
+  drawLeg(ctx, HIP.x - 3, HIP.y, phase + LEG_OFFSET.farHind, intensity, reach, -1, HIND, LEG.hind, LEG_START.hind, far, farPoint);
+  drawLeg(ctx, SHOULDER.x - 4, SHOULDER.y, phase + LEG_OFFSET.farFore, intensity, reach, 1, FORE, LEG.fore, LEG_START.fore, far, farPoint);
 
   // ---- Tail ---------------------------------------------------------------
-  const swing = Math.sin(phase * Math.PI * 2 + 1.2) * 3.5;
-  const dockX = HIP_X - 4;
-  const dockY = BODY_Y - BARREL_HALF * 1.1;
-  const tipX = HIP_X - 44;
-  const tipY = BODY_Y - 6 + swing * 2;
-
-  const tail = new Path2D();
-  tail.moveTo(dockX, dockY - 2);
-  tail.bezierCurveTo(dockX - 14, dockY - 4 + swing, tipX + 12, tipY - 7, tipX, tipY - 2);
-  tail.bezierCurveTo(tipX + 10, tipY + 1, dockX - 12, dockY + 7 + swing, dockX, dockY + 5);
-  tail.closePath();
-  shade(ctx, tail, [tipX, tipY - 8, dockX, dockY + 6], coat.hair, 0.7);
-
-  // A couple of loose strands so the edge is not a clean curve.
-  ctx.strokeStyle = dark(coat.hair, 0.15);
-  ctx.lineWidth = 1.6;
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 2; i++) {
-    const off = 3 + i * 4;
-    ctx.beginPath();
-    ctx.moveTo(dockX - 3, dockY + off * 0.4);
-    ctx.quadraticCurveTo(dockX - 22, dockY + off + swing, tipX + 4, tipY + off * 0.7);
-    ctx.stroke();
-  }
+  // Swung as a whole from the dock. Animating the tip alone made it flap; a
+  // tail trails from where it is attached.
+  const swing = Math.sin(phase * Math.PI * 2 + 1.2) * 0.09;
+  ctx.save();
+  ctx.translate(HIP.x - 8, BODY_Y - 13);
+  ctx.rotate(swing - 0.12 * intensity);
+  const tail = path(TAIL);
+  shade(ctx, tail, [-42, -8, 0, 10], coat.hair, 0.6);
+  ctx.restore();
 
   // ---- Neck and head, drawn BEFORE the body -------------------------------
   // Drawing the neck first lets the body silhouette cover its base, exactly as
   // a shoulder overlaps a neck in life. Drawn after, the join showed as a seam.
-  const headBob = Math.sin(phase * Math.PI * 2 + 0.4) * (2 + 2.5 * intensity);
+  const headBob = Math.sin(phase * Math.PI * 2 + 0.4) * (0.03 + 0.035 * intensity);
 
   ctx.save();
-  ctx.translate(SHOULDER_X - 1, BODY_Y - BARREL_HALF * 1.1);
-  ctx.rotate(-0.14 - 0.1 * drive);
-  ctx.translate(0, headBob * 0.3);
+  // Pivot at the withers, and the neck reaches LOW and FORWARD at the gallop.
+  ctx.translate(SHOULDER.x - 3, BODY_Y - 12);
+  ctx.rotate(0.16 + headBob + 0.12 * drive);
 
-  const NECK_C = 20;
   // Ear, behind the head so its base is hidden by it.
-  const ear = new Path2D();
-  ear.moveTo(NECK_C - 4, -9);
-  ear.lineTo(NECK_C - 2, -18);
-  ear.lineTo(NECK_C + 2, -10);
-  ear.closePath();
-  shade(ctx, ear, [NECK_C - 4, -18, NECK_C + 2, -8], body, 0.6);
+  ctx.save();
+  ctx.translate(23, -15);
+  ctx.rotate(-0.25);
+  shade(ctx, path(EAR), [-1, -8, 4, 0], dark(body, 0.12), 0.5);
+  ctx.restore();
 
-  // NECK AND HEAD AS ONE SILHOUETTE.
-  //
-  // Proportions matter more here than anywhere: neck ~0.4 of withers height,
-  // head ~0.28, and the neck TAPERS hard from a deep base to a fine throat.
-  // Previously it was as deep as the barrel and half again too long, which is
-  // why it read as a wedge with a small head stuck on the end.
-  const NECK = 20;
-  const HEAD = 18;
-  const NOSE = NECK + HEAD;
-  const neck = new Path2D();
-  neck.moveTo(-8, 11); // base at the withers
-  // crest, tapering up to the poll
-  neck.bezierCurveTo(-1, 1, NECK - 9, -7, NECK - 1, -10);
-  // poll, then down the face — the profile is nearly straight
-  neck.bezierCurveTo(NECK + 4, -12, NOSE - 6, -9, NOSE - 1, -5);
-  // muzzle, blunt rather than pointed
-  neck.bezierCurveTo(NOSE + 2, -3, NOSE + 2, 1, NOSE - 2, 2);
-  // back along the jaw to the JOWL — the deep cheek that makes a head read as
-  // a head instead of the neck tapering to a point
-  neck.bezierCurveTo(NOSE - 7, 3, NECK + 5, 5, NECK + 1, 7);
-  // throat, cut away sharply, then down into the chest
-  neck.bezierCurveTo(NECK - 6, 6, -1, 10, -6, 17);
-  neck.closePath();
-  shade(ctx, neck, [-8, -12, NOSE + 2, 17], body, 0.85);
+  const neck = path(NECK_HEAD);
+  shade(ctx, neck, [-6, -16, 36, 10], body, 0.8);
 
   // Everything inside the neck is shading only — no outlines, no seams.
   ctx.save();
   ctx.clip(neck);
 
-  // Muzzle, in the points colour.
-  ctx.fillStyle = coat.points;
-  ctx.globalAlpha = 0.85;
-  ctx.beginPath();
-  ctx.ellipse(NOSE - 3, -1.5, 4, 3, 0.25, 0, Math.PI * 2);
-  ctx.fill();
-
   // One soft gradient down the neck instead of discrete blobs, so no shading
   // shape can show its own edge.
-  const ng = ctx.createLinearGradient(0, -10, 6, 16);
-  ng.addColorStop(0, lite(body, 0.2));
+  const ng = ctx.createLinearGradient(0, -14, 5, 12);
+  ng.addColorStop(0, lite(body, 0.22));
   ng.addColorStop(0.5, 'rgba(0,0,0,0)');
-  ng.addColorStop(1, dark(body, 0.26));
-  ctx.globalAlpha = 0.85;
+  ng.addColorStop(1, dark(body, 0.28));
   ctx.fillStyle = ng;
-  ctx.fillRect(-12, -16, NOSE + 16, 36);
+  ctx.fillRect(-10, -20, 52, 36);
+
+  // Muzzle, in the points colour.
+  ctx.fillStyle = coat.points;
+  ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.ellipse(33, -4, 4, 3.2, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
 
   // Mane along the crest.
-  ctx.globalAlpha = 1;
   ctx.fillStyle = coat.hair;
-  ctx.beginPath();
-  ctx.moveTo(-9, 8);
-  ctx.bezierCurveTo(-2, 0, NECK - 9, -7, NECK - 1, -10);
-  ctx.bezierCurveTo(NECK - 7, -3 - headBob * 0.3, -1, 3, -9, 3);
-  ctx.closePath();
-  ctx.fill();
+  ctx.fill(path(MANE));
 
   ctx.restore();
 
-  // Eye, on top of everything.
+  // Eye, on top of everything. Small, and set high and well back on the face —
+  // a large forward eye is the difference between a horse and a cartoon.
   ctx.fillStyle = '#120C08';
   ctx.beginPath();
-  ctx.ellipse(NECK + 4, -6, 1.7, 1.9, 0, 0, Math.PI * 2);
+  ctx.ellipse(26, -11, 1.3, 1.5, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
 
   // ---- Body: ONE silhouette, one outline ----------------------------------
-  // Haunch, barrel and shoulder are a single continuous path. Drawn as three
-  // overlapping ellipses they each carried their own outline, so you could see
-  // the circles inside the horse. Internal form below is shading ONLY, never
-  // stroked — an outline inside a body always reads as a seam.
-  const D = BARREL_HALF;
-  const silhouette = new Path2D();
-  // point of shoulder
-  silhouette.moveTo(SHOULDER_X + 6, BODY_Y + D * 0.2);
-  // up the shoulder to the withers — the highest point of the topline
-  silhouette.bezierCurveTo(
-    SHOULDER_X + 4, BODY_Y - D * 0.7,
-    SHOULDER_X - 4, BODY_Y - D * 1.25,
-    SHOULDER_X - 11, BODY_Y - D * 1.3,
-  );
-  // long, near-level back with a shallow dip
-  silhouette.bezierCurveTo(
-    4, BODY_Y - D * 1.15,
-    HIP_X + 14, BODY_Y - D * 1.1,
-    HIP_X + 5, BODY_Y - D * 1.35,
-  );
-  // croup, then down over the quarters
-  silhouette.bezierCurveTo(
-    HIP_X - 3, BODY_Y - D * 1.5,
-    HIP_X - 11, BODY_Y - D * 0.9,
-    HIP_X - 11, BODY_Y + D * 0.1,
-  );
-  // buttock and stifle
-  silhouette.bezierCurveTo(
-    HIP_X - 11, BODY_Y + D * 0.9,
-    HIP_X - 6, BODY_Y + D * 1.15,
-    HIP_X + 2, BODY_Y + D * 0.95,
-  );
-  // belly, tucked up through the flank
-  silhouette.bezierCurveTo(
-    HIP_X + 12, BODY_Y + D * 0.8,
-    -2, BODY_Y + D * 0.85,
-    SHOULDER_X - 12, BODY_Y + D * 1.05,
-  );
-  // deep girth behind the elbow
-  silhouette.bezierCurveTo(
-    SHOULDER_X - 5, BODY_Y + D * 1.2,
-    SHOULDER_X + 4, BODY_Y + D * 1.0,
-    SHOULDER_X + 6, BODY_Y + D * 0.2,
-  );
-  silhouette.closePath();
-  shade(
-    ctx,
-    silhouette,
-    [HIP_X - 11, BODY_Y - D * 1.5, SHOULDER_X + 6, BODY_Y + D * 1.2],
-    body,
-  );
+  // Internal form below is shading ONLY, never stroked — an outline inside a
+  // body always reads as a seam.
+  ctx.save();
+  ctx.translate(0, BODY_Y);
+  const silhouette = path(BODY);
+  shade(ctx, silhouette, [-30, -17, 27, 13], body);
 
-  // Internal form, clipped to the silhouette so nothing spills over the edge.
   ctx.save();
   ctx.clip(silhouette);
 
-  const bg = ctx.createLinearGradient(0, BODY_Y - D * 1.6, 0, BODY_Y + D * 1.4);
+  const bg = ctx.createLinearGradient(0, -18, 0, 14);
   bg.addColorStop(0, lite(body, 0.24));
   bg.addColorStop(0.42, 'rgba(0,0,0,0)');
   bg.addColorStop(1, dark(body, 0.3));
   ctx.fillStyle = bg;
-  ctx.fillRect(HIP_X - 16, BODY_Y - D * 1.8, SHOULDER_X - HIP_X + 30, D * 3.4);
+  ctx.fillRect(-32, -20, 62, 36);
 
-  // The one piece of internal form worth keeping: the flank crease where the
-  // barrel tucks up. Soft, and vertical, so it never reads as a circle.
-  const fg = ctx.createLinearGradient(HIP_X + 6, 0, HIP_X + 20, 0);
-  fg.addColorStop(0, 'rgba(0,0,0,0)');
-  fg.addColorStop(0.5, dark(body, 0.18));
-  fg.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.globalAlpha = 0.5;
-  ctx.fillStyle = fg;
-  ctx.fillRect(HIP_X + 6, BODY_Y - D, 14, D * 2);
-  ctx.globalAlpha = 1;
+  // Two pieces of internal form worth keeping, both soft and both vertical so
+  // neither can read as a circle: the flank crease where the barrel tucks up,
+  // and the shoulder groove behind the point of shoulder.
+  const crease = (cx: number, w: number, amount: number): void => {
+    const g = ctx.createLinearGradient(cx - w, 0, cx + w, 0);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(0.5, dark(body, amount));
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - w, -18, w * 2, 34);
+    ctx.globalAlpha = 1;
+  };
+  crease(-12, 6, 0.2);
+  crease(15, 5, 0.16);
 
+  ctx.restore();
   ctx.restore();
 
   // ---- Jockey -------------------------------------------------------------
-  const crouch = Math.sin(phase * Math.PI * 2 + 0.8) * 1.4;
+  drawJockey(ctx, phase, intensity, drive, opts.silks);
+
+  // ---- Near legs ----------------------------------------------------------
+  drawLeg(ctx, HIP.x + 2, HIP.y, phase + LEG_OFFSET.nearHind, intensity, reach, -1, HIND, LEG.hind, LEG_START.hind, body, coat.points);
+  drawLeg(ctx, SHOULDER.x + 1, SHOULDER.y, phase + LEG_OFFSET.nearFore, intensity, reach, 1, FORE, LEG.fore, LEG_START.fore, body, coat.points);
+
+  ctx.restore();
+}
+
+/**
+ * The jockey: folded over the withers, not sitting on the horse.
+ *
+ * A race seat is knees up, backside off the saddle, head down over the neck.
+ * The previous version was a rounded torso with one stick arm, which read as a
+ * coloured teardrop. What makes it legible is the bent near leg — the tucked
+ * knee and boot are the silhouette everyone recognises.
+ */
+function drawJockey(
+  ctx: CanvasRenderingContext2D,
+  phase: number,
+  intensity: number,
+  drive: number,
+  silks: Silks,
+): void {
+  const crouch = Math.sin(phase * Math.PI * 2 + 0.8) * (0.8 + 0.8 * intensity);
+
   ctx.save();
-  ctx.translate(11, BODY_Y - BARREL_HALF * 1.15 + crouch);
-  ctx.rotate(-0.4 - 0.14 * drive);
+  ctx.translate(6, BODY_Y - 14 + crouch);
+  ctx.rotate(-0.34 - 0.12 * drive);
+
+  // Near leg first, so the torso overlaps its top. Kept SHORT and tucked in
+  // under the body of the rider — drawn long and pale it read as a bar sticking
+  // out of the jockey's side rather than a folded knee.
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = dark(silks.primary, 0.4);
+  ctx.lineWidth = 3.8;
+  ctx.beginPath();
+  ctx.moveTo(1, 1);
+  ctx.lineTo(-1, 5); // knee, tucked up and forward
+  ctx.stroke();
+
+  // Boot, in the stirrup. Kept fine — a thick dark stroke here reads as a
+  // smudge on the horse's back rather than a foot.
+  ctx.strokeStyle = '#2C2522';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(-1, 5);
+  ctx.lineTo(2, 7.5);
+  ctx.stroke();
 
   // Arched back, low and forward over the withers.
   const torso = new Path2D();
-  torso.moveTo(-11, 4);
-  torso.bezierCurveTo(-10, -6, -2, -11, 7, -11);
-  torso.bezierCurveTo(12, -11, 15, -8, 15, -4);
-  torso.bezierCurveTo(15, 0, 10, 3, 3, 4);
+  torso.moveTo(-10, 3);
+  torso.bezierCurveTo(-10, -5, -3, -10, 6, -10);
+  torso.bezierCurveTo(11, -10, 14, -7, 14, -3);
+  torso.bezierCurveTo(14, 1, 9, 3, 2, 3);
   torso.closePath();
-  shade(ctx, torso, [-11, -11, 15, 5], opts.silks.primary, 0.75);
+  shade(ctx, torso, [-10, -10, 14, 4], silks.primary, 0.7);
 
-  // Arms reaching down the neck to the rein.
-  ctx.strokeStyle = dark(opts.silks.secondary, 0.2);
-  ctx.lineWidth = 3.4;
-  ctx.lineCap = 'round';
+  // Arm reaching down the neck to the rein.
+  ctx.strokeStyle = dark(silks.primary, 0.3);
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(9, -6);
-  ctx.lineTo(18, 1);
-  ctx.stroke();
-
-  // Tucked knee and boot.
-  ctx.strokeStyle = '#2A2320';
-  ctx.lineWidth = 4.4;
-  ctx.beginPath();
-  ctx.moveTo(-4, 1);
-  ctx.lineTo(-7, 8);
+  ctx.moveTo(8, -5);
+  ctx.lineTo(17, 1);
   ctx.stroke();
 
   // Head, low and forward — not perched on top.
   const helmet = new Path2D();
-  helmet.ellipse(15, -10, 5.2, 4.6, 0.25, 0, Math.PI * 2);
-  shade(ctx, helmet, [10, -15, 20, -5], opts.silks.primary, 0.65);
+  helmet.ellipse(15, -8, 4.6, 4.1, 0.25, 0, Math.PI * 2);
+  shade(ctx, helmet, [10, -12, 20, -4], silks.primary, 0.6);
 
+  // Peak, and the goggle strap that makes it read as a helmet.
   const peak = new Path2D();
-  peak.ellipse(19.5, -8.5, 3.4, 1.7, 0.3, 0, Math.PI * 2);
-  shade(ctx, peak, [16, -10, 23, -7], opts.silks.secondary, 0.55);
+  peak.ellipse(19, -7, 3, 1.5, 0.3, 0, Math.PI * 2);
+  shade(ctx, peak, [16, -9, 22, -5], silks.secondary, 0.5);
 
-  ctx.restore();
-
-  // ---- Near legs ----------------------------------------------------------
-  drawLeg(ctx, HIP_X + 1, hipY, phase + LEG_OFFSET.nearHind, intensity, reach, -1, body, coat.points, 6.6);
-  drawLeg(ctx, SHOULDER_X - 1, shoulderY, phase + LEG_OFFSET.nearFore, intensity, reach, 1, body, coat.points, 6);
+  ctx.strokeStyle = dark(silks.secondary, 0.1);
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(12, -9);
+  ctx.lineTo(18, -10);
+  ctx.stroke();
 
   ctx.restore();
 }
