@@ -36,8 +36,18 @@ const RIG_UNITS = 100;
 /** Yards covered per stride. Real gallop is ~3 body lengths. */
 const STRIDE_YARDS = HORSE_YARDS * 3;
 
-/** Ceiling on the default ride, so the reserve is always yours to spend. */
-const PLAYER_CRUISE_CAP = 0.66;
+/**
+ * Ceiling on the default ride.
+ *
+ * Deliberately low enough that doing nothing BANKS energy rather than burning
+ * it. At 0.66 the jockey bled roughly 1.8 a second before the player touched
+ * anything, so the reserve was gone by the straight — energy has to be yours to
+ * spend, not something quietly spent for you.
+ *
+ * The trade is that a conserving ride drifts backwards through the field. That
+ * is the point: urge to hold your place, or take a pull and save.
+ */
+const PLAYER_CRUISE_CAP = 0.47;
 
 interface PlayerInput {
   /** Hold to take a pull — settle, drop back, and recover. */
@@ -141,6 +151,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let callout = '';
   let calloutUntil = 0;
   let finishedAt = 0;
+  let lastEnergy = 100;
 
   const cam: Camera = { scrollYards: 0, pixelsPerYard: 1.6 };
 
@@ -389,6 +400,16 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('ENERGY', barX + 12, barY + 17);
+
+    // Whether energy is going up or down, so it is never a mystery why.
+    const drift = player.energy - lastEnergy;
+    lastEnergy = player.energy;
+    if (Math.abs(drift) > 0.004) {
+      const gaining = drift > 0;
+      ctx.fillStyle = gaining ? '#0E1218' : 'rgba(14,18,24,0.65)';
+      ctx.font = '700 12px ui-sans-serif, system-ui, sans-serif';
+      ctx.fillText(gaining ? '▲' : '▼', barX + 62, barY + 17);
+    }
 
     const inWindow = Math.abs(curr.progress - playerProfile.kickAt) <= 0.09;
     ctx.textAlign = 'right';
