@@ -5,6 +5,7 @@ import { generateHorse } from './sim/horse.js';
 import { COAT_IDS } from './render/palette.js';
 import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
 import { STYLE_PROFILES } from './sim/race/constants.js';
+import { attachHorseCard } from './ui/horseCard.js';
 import { mountRaceScreen } from './ui/raceScreen.js';
 import { mountRoadmap } from './ui/roadmap.js';
 import type { Horse } from './sim/types.js';
@@ -75,6 +76,8 @@ function startRace(seed: string): void {
     <button class="rb-again">New race</button>
   `;
   app.appendChild(bar);
+
+  attachHorseCard(bar.querySelector<HTMLElement>('.rb-horse')!, player);
 
   bar.querySelector('.rb-again')!.addEventListener('click', (e) => {
     e.stopPropagation();

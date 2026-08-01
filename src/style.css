@@ -473,3 +473,198 @@ body {
     display: none;
   }
 }
+
+/* --- Horse card ----------------------------------------------------------- */
+
+.horse-card {
+  position: fixed;
+  z-index: 950;
+  width: 290px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 14px 16px;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
+  font-family: var(--font);
+  pointer-events: none;
+}
+
+.hc-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.hc-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 2px solid;
+  flex: none;
+}
+
+.hc-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hc-sub {
+  margin: 1px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.hc-row {
+  display: flex;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.hc-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hc-k {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.hc-v {
+  font-size: 11.5px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.hc-accent {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.hc-section {
+  margin: 12px 0 7px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.hc-stat {
+  display: grid;
+  grid-template-columns: 68px 1fr 16px 22px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.hc-stat-name {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.hc-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: #0e1218;
+  overflow: hidden;
+}
+
+.hc-bar i {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+  border-radius: 999px;
+}
+
+.hc-grade {
+  font-size: 11.5px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.hc-num {
+  font-size: 10.5px;
+  font-family: var(--mono);
+  color: var(--muted);
+  text-align: right;
+}
+
+.hc-gS { color: #f2c14e; }
+.hc-gA { color: #4ec9a0; }
+.hc-gB { color: #6fb3e0; }
+.hc-gC { color: #8b98a9; }
+.hc-gD { color: #b06a62; }
+
+.hc-hint {
+  margin: 8px 0 0;
+  font-size: 10.5px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.hc-apts {
+  display: flex;
+  gap: 8px;
+}
+
+.hc-apt {
+  flex: 1;
+  background: #0e1218;
+  border-radius: 8px;
+  padding: 6px;
+  text-align: center;
+}
+
+.hc-apt span {
+  display: block;
+  font-size: 9.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hc-apt b {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.hc-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.hc-trait {
+  font-size: 10.5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(242, 193, 78, 0.13);
+  color: var(--accent);
+  border: 1px solid rgba(242, 193, 78, 0.25);
+}
+
+.hc-trait.hc-none {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.rb-horse {
+  cursor: help;
+}
+
+.rb-horse:hover .rb-name {
+  color: var(--accent);
+}
