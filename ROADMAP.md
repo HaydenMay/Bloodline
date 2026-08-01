@@ -143,6 +143,35 @@ it doesn't, we change it now, and we will have spent five sessions finding out i
 
 ---
 
+---
+
+## Known issue — winning margins are too wide
+
+**Currently 6–7 lengths between first and second.** Real racing is decided by
+1–3, and 5+ is a rout. Long term this needs to be much closer, with genuine
+photo finishes — that is where the drama of a race actually lives.
+
+Deliberately shelved, not forgotten: it is reported on every harness run so it
+cannot quietly persist.
+
+**The diagnosis, so it does not have to be rediscovered.** Margins and style
+balance are coupled through variance:
+
+- The dominant driver is **daily form** (±4.7% per horse at Temper 50), which is
+  fixed for the whole race and so compounds directly into the finishing gap.
+  The consistency band and the effort-to-speed range matter less than expected —
+  narrowing the speed range actually made margins *worse*.
+- Cutting that variance does tighten finishes (6.4L → 5.2L when tried) **but
+  lets systematic style advantages dominate**: with less noise to wash them out,
+  closers jumped to 22% and stalkers collapsed to 5.7%.
+
+So this is not a one-constant fix. It needs a **full re-balance at a lower noise
+level** — reduce daily form and the consistency band together, then re-tune the
+phase profiles and position costs against the quieter baseline. Best done as its
+own focused pass, ideally with a parameter sweep rather than by hand.
+
+---
+
 ## Summary
 
 | Phase | Sessions | Gate |
