@@ -67,16 +67,24 @@ weeks.
 ---
 
 ## Phase 2 — One playable race
-**~3–4 sessions** · **Milestone 1**
+**~3–4 sessions** · **Milestone 1** · *all deliverables landed; awaiting Gate 2*
 
-- Skeletal horse rig, layered parts, clean vector art
-- Coat genetics driving runtime tinting
-- Track, scrolling camera, oval minimap, crowd
-- HUD: energy bar with the style safe-zone, distance countdown, phase call-outs
-- **DRIVE** input — touch and keyboard — plus the kick
-- Post-race recap with the narrative explanation of what happened
+- ✅ Skeletal horse rig, layered parts, clean vector art
+- ✅ Coat genetics driving runtime tinting
+- ✅ Track, scrolling camera, oval minimap, crowd
+- ✅ HUD: energy bar with the style safe-zone, distance countdown, phase call-outs
+- ✅ **DRIVE** input — touch and keyboard — plus the kick
+- ✅ Post-race recap with the narrative explanation of what happened
 
 **Deliverable: you can play a race on your phone.**
+
+Racing now runs on a commissioned 24-frame gallop sheet, split into materials
+by `tools/bake-sprites.ts` and recoloured per runner at load — so a bred coat
+and a rival's silks both come out of one grey sheet. The drawn rig stays behind
+it for the poses the sheet does not contain, and as the reference the sheet was
+measured against.
+
+**Phase 2 is not ticked off until you have played it and answered Gate 2.**
 
 ### 🚦 Gate 2 — Is it fun?
 The one that matters. Everything after this is built on the assumption that racing feels good. If
@@ -112,6 +120,53 @@ it doesn't, we change it now, and we will have spent five sessions finding out i
 - Wagering on your own horse
 
 **Deliverable:** careers connect. Run 2 opens stronger than run 1.
+
+---
+
+## Phase 4.5 — Re-balance and physics
+**~2–3 sessions** · *a correction pass, not a feature*
+
+Numbered 4.5 deliberately. It ships no new systems, and renumbering the phases
+after it would strand every `Phase 5` reference already written into the code.
+
+Everything below is a known, **measured** defect. This phase is where the bill
+comes due for shipping a race that felt good before it was calibrated.
+
+- **The speed scale.** A winning 8f is 64.4s against a real ~96s — 25.0 m/s
+  where a thoroughbred tops out near 17.5. Do this one first and alone: a margin
+  is a time gap times speed, so it deflates every margin in the game by 1.43×
+  before anything else is touched, and every other constant is calibrated on top
+  of it.
+- **The energy floor.** An empty horse currently keeps losing ground at a rate
+  nothing in racing does. It should fade, not collapse. This is what turns the
+  tail of the field from 74 lengths into something a person would recognise.
+- **The full re-balance at lower noise**, as diagnosed in the known issue below:
+  daily form and the consistency band come down together, then the phase
+  profiles and position costs are re-tuned against the quieter baseline.
+- **A parameter sweep in the harness**, so the above is done by evidence rather
+  than by hand. Sweeping two or three constants across a grid and reading the
+  dominance curve off the result is the only honest way to do it.
+- **Re-verify Gate 1.** No running style dominates, every division is winnable,
+  the curve is flat in the middle and steep at the ends, pace collapses still
+  produce upsets. All of it, at the new noise level.
+- **Reconcile the animation with the simulation.** The gallop sheet is 24 frames
+  of one gait; the sim has `intensity` and `drive` that it currently cannot
+  express. Stride length is also derived from speed, so correcting the speed
+  scale moves it.
+
+**Deliverable:** finishes you would believe. Photo finishes at the front, a
+beaten field that is beaten rather than distanced, and a harness run that proves
+it rather than a screenshot that suggests it.
+
+### Why here, and not sooner
+
+Sooner and you are balancing a race with no career around it — no divisions to
+be winnable, no eighteen-start season over which "fair" is even measurable, and
+nothing at stake in losing. By the end of Phase 4 all of that exists, so the
+racing can be judged as the thing players actually experience.
+
+Later and it is worse: breeding multiplies every balance decision by inheritance,
+and re-tuning after foals exist means re-tuning the genetics too.
 
 ---
 
@@ -151,6 +206,41 @@ it doesn't, we change it now, and we will have spent five sessions finding out i
 1–3, and 5+ is a rout. Long term this needs to be much closer, with genuine
 photo finishes — that is where the drama of a race actually lives.
 
+### The tail is worse than the front, and that is the bigger problem
+
+Measured over 200 races, 8f, open division — median margin behind the winner:
+
+| Place | 2nd | 3rd | 4th | 5th | 6th | 7th | 8th |
+|---|---|---|---|---|---|---|---|
+| Behind | 4.4L | 7.9L | 11.3L | 16.7L | 23.9L | 38.4L | **73.8L** |
+
+The first four are close to plausible. From fifth back it detonates: the gap
+between consecutive horses runs 3.5L, 3.5L, 5.4L, 7.2L, **14.5L, 35.4L**. A real
+eight-runner field finishes inside about twenty lengths end to end; ours strings
+out over seventy. Horses that run out of energy are not fading, they are
+collapsing.
+
+This matters more than the winning margin because it is what a player actually
+sees. A beaten horse is routinely reported as *distanced*, which reads as a
+broken game rather than a bad ride.
+
+**Two contributing causes, both measured:**
+
+1. **The tail collapse above** — the energy model has no floor, so an empty horse
+   keeps losing ground at a rate nothing in racing does.
+2. **The whole sim runs 1.43× too fast.** A winning 8f time is 64.4s against a
+   real ~96s, which is 25.0 m/s where a thoroughbred tops out near 17.5. Since a
+   margin is a time gap multiplied by speed, every margin is inflated by that
+   factor before any of the variance above is applied.
+
+Fixing the speed scale alone would take last place from 74L to about 51L. It is
+not sufficient, but it is the cheapest single correction and it should come
+first, because everything else is calibrated on top of it.
+
+**Owned by Phase 4.5.** Not urgent for Gate 2 — riding still feels different race
+to race — but nothing above gets better on its own, and every constant added
+between now and then is calibrated against numbers we already know are wrong.
+
 Deliberately shelved, not forgotten: it is reported on every harness run so it
 cannot quietly persist.
 
@@ -181,9 +271,10 @@ own focused pass, ideally with a parameter sweep rather than by hand.
 | 2 · Playable race | ~3–4 | 🚦 Is it fun? |
 | 3 · Full career | ~3–4 | |
 | 4 · The stable | ~2–3 | |
+| 4.5 · Re-balance & physics | ~2–3 | |
 | 5 · Breeding | ~3–4 | |
 | 6 · Polish | ~3+ | |
-| **Total** | **~18–22** | |
+| **Total** | **~20–25** | |
 
 ---
 

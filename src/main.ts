@@ -2,7 +2,6 @@ import './style.css';
 import { createRng } from './sim/index.js';
 import { createNameGenerator } from './data/names.js';
 import { generateHorse } from './sim/horse.js';
-import { COAT_IDS } from './render/palette.js';
 import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
 import { STYLE_PROFILES } from './sim/race/constants.js';
 import { attachInfoBox } from './ui/infoBox.js';
@@ -35,7 +34,6 @@ function buildField(seed: string): { field: Horse[]; playerId: string } {
       style: RUNNING_STYLES[i % RUNNING_STYLES.length]!,
       age: 4,
     });
-    horse.coat = COAT_IDS[Math.floor(rng.next() * COAT_IDS.length)]!;
     return horse;
   });
 

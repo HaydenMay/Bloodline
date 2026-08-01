@@ -19,6 +19,26 @@ export type DistanceBand = (typeof DISTANCE_BANDS)[number];
 /** Field size for every race (DESIGN.md §4). */
 export const FIELD_SIZE = 8;
 
+/**
+ * Coat genes.
+ *
+ * The ID is game DATA — inherited, saved, and bred in Phase 5. The colours it
+ * maps to are a rendering concern and live in render/palette.ts. The list has
+ * to sit here rather than beside the colours because `sim/` may never import
+ * from `render/`, and a horse cannot be given a coat it is not allowed to name.
+ */
+export const COAT_IDS = [
+  'bay',
+  'chestnut',
+  'black',
+  'grey',
+  'palomino',
+  'buckskin',
+  'roan',
+  'darkBay',
+] as const;
+export type CoatId = (typeof COAT_IDS)[number];
+
 /** Starting AI world population, pyramid-weighted (DESIGN.md §9). */
 export const WORLD_POPULATION: Record<Division, number> = {
   maiden: 20,

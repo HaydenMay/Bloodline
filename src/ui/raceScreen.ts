@@ -1,5 +1,6 @@
 import { createSurface, startLoop, type Loop, type Surface } from '../render/canvas.js';
 import { drawHorse, drawHorseShadow } from '../render/horse.js';
+import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
 import { RIVAL_SILKS, type Silks } from '../render/palette.js';
 import {
   drawBackdrop,
@@ -11,6 +12,7 @@ import {
 import { createAiController } from '../sim/race/ai.js';
 import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
 import { STYLE_PROFILES, TICK_HZ } from '../sim/race/constants.js';
+import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../sim/race/recap.js';
 import type { ControlInput, RaceConfig, RaceEntrant } from '../sim/race/types.js';
 import type { Horse } from '../sim/types.js';
 
@@ -35,6 +37,15 @@ const RIG_UNITS = 100;
 
 /** Yards covered per stride. Real gallop is ~3 body lengths. */
 const STRIDE_YARDS = HORSE_YARDS * 3;
+
+/**
+ * Sprite pixels per rig unit, so both draw the same horse at the same size.
+ *
+ * The rig spans about 123 of its own units nose to tail-tip; the sprite spans
+ * about 181 pixels across the same animal. Scaling the sprite by the rig's
+ * scale alone would draw it half again too big.
+ */
+const SPRITE_PER_RIG_UNIT = 123 / 181;
 
 /** Track sections, by the leader's progress. Each fires once. */
 const CALLOUTS = [
@@ -79,6 +90,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const { host, field, playerHorseId, playerSilks, config } = opts;
 
   const surface = createSurface(host);
+  // Decoding and tinting happen off the critical path; the rig covers the
+  // opening frames, so a race never waits on the art.
+  void loadSprites();
   const input: PlayerInput = {
     takingBack: false,
     urgeUntil: 0,
@@ -137,10 +151,26 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const race: LiveRace = createRace(entrants, config);
   const totalYards = race.totalYards;
 
+  // Silks belong to the HORSE, not to its position in the field.
+  //
+  // Assigned by running order, a rival wore blue in one race and green in the
+  // next, which makes recognising an old adversary impossible — and Phase 4
+  // hangs a permanent rival dossier off exactly that recognition. Deriving the
+  // colours from the horse's id instead means a rival keeps its colours for as
+  // long as it races. Collisions inside one field still have to be broken,
+  // because two runners in identical silks is the very thing silks exist to
+  // prevent.
   const silksFor = new Map<string, Silks>();
-  let rivalIndex = 0;
+  const taken = new Set<number>();
   for (const h of field) {
-    silksFor.set(h.id, h.id === playerHorseId ? playerSilks : RIVAL_SILKS[rivalIndex++ % RIVAL_SILKS.length]!);
+    if (h.id === playerHorseId) {
+      silksFor.set(h.id, playerSilks);
+      continue;
+    }
+    let slot = hashId(h.id) % RIVAL_SILKS.length;
+    while (taken.has(slot)) slot = (slot + 1) % RIVAL_SILKS.length;
+    taken.add(slot);
+    silksFor.set(h.id, RIVAL_SILKS[slot]!);
   }
 
   // Stride phase is visual only, advanced from speed so hooves match the ground.
@@ -159,6 +189,10 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let calloutUntil = 0;
   let finishedAt = 0;
   let lastEnergy = 100;
+  // Built once at the wire. The finish screen redraws every frame and
+  // race.outcome() re-sorts and re-measures the whole field each call.
+  let finalRecap: Recap | null = null;
+  let finalRows: RecapRow[] | null = null;
   /** Races wait for you rather than starting the moment the page loads. */
   let started = false;
   const firedCallouts = new Set<string>();
@@ -276,17 +310,32 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       }
 
       drawHorseShadow(ctx, x, y + 2, scale);
-      drawHorse(ctx, x, y, {
-        coat: r.coat,
-        silks: silksFor.get(r.id)!,
-        pose: {
+
+      // The sprite sheet is the shipping art. The drawn rig stays behind it as
+      // the fallback for the frames before the sheet has decoded, and for the
+      // poses the sheet does not contain — standing at the gate, pulling up.
+      const drewSprite =
+        !r.finished &&
+        drawSpriteHorse(ctx, x, y, {
+          coat: r.coat,
+          silks: silksFor.get(r.id)!,
           phase,
-          intensity: Math.min(1, Math.max(0, (drawSpeed - 18) / 14)),
-          drive: r.finished ? 0 : r.effort,
-        },
-        scale,
-        faded: false,
-      });
+          scale: scale * SPRITE_PER_RIG_UNIT,
+        });
+
+      if (!drewSprite) {
+        drawHorse(ctx, x, y, {
+          coat: r.coat,
+          silks: silksFor.get(r.id)!,
+          pose: {
+            phase,
+            intensity: Math.min(1, Math.max(0, (drawSpeed - 18) / 14)),
+            drive: r.finished ? 0 : r.effort,
+          },
+          scale,
+          faded: false,
+        });
+      }
 
       if (isPlayer) {
         const markerY = y - 118 * scale;
@@ -452,7 +501,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     }
 
     if (!started) drawStart(ctx, width, height);
-    else if (!running) drawFinish(ctx, width, height, player, runners);
+    else if (!running) drawFinish(ctx, width, height, player);
   };
 
   /** Pre-race card, so a race begins when you are ready rather than on load. */
@@ -488,59 +537,90 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.fillText('Tap to URGE · hold to TAKE A PULL', cx, cy + 70);
   };
 
-  /** Full result, on the canvas where there is room for it. */
+  /**
+   * The recap.
+   *
+   * A list of names and times tells you that you lost. What decided the race —
+   * a collapsing pace, a gap that never came, a reserve you never spent — is
+   * the part worth reading, so it is set above the placings rather than below
+   * them, and the margins are in lengths because that is what a length is for.
+   */
   const drawFinish = (
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
     player: RunnerSnapshot,
-    runners: RunnerSnapshot[],
   ): void => {
-    ctx.fillStyle = 'rgba(14,18,24,0.86)';
+    ctx.fillStyle = 'rgba(14,18,24,0.9)';
     ctx.fillRect(0, 0, width, height);
 
-    const placings = [...runners].sort(
-      (a, b) => (a.finishTime ?? 1e9) - (b.finishTime ?? 1e9) || b.distance - a.distance,
-    );
+    const recap = finalRecap ?? (finalRecap = buildRecap(race.outcome(), playerHorseId, playerHorse.style));
+    const rows = finalRows ?? (finalRows = recapRows(race.outcome(), playerHorseId));
 
     const won = player.rank === 1;
     const cx = width / 2;
-    const rows = Math.min(placings.length, 8);
-    const rowH = 26;
-    const top = Math.max(70, height / 2 - (rows * rowH) / 2 - 34);
+    const panel = Math.min(420, width - 32);
+    const rowH = 24;
+    const visible = Math.min(rows.length, 8);
 
+    // Lay the whole thing out first so it can be centred as one block, however
+    // many reasons the race produced.
+    ctx.font = '500 13px ui-sans-serif, system-ui, sans-serif';
+    const storyLines: string[] = [];
+    for (const line of recap.story) wrapText(ctx, line, panel - 24, storyLines);
+
+    const blockH = 40 + 22 + storyLines.length * 19 + 18 + visible * rowH + 26;
+    let y = Math.max(56, (height - blockH) / 2);
+
+    // ---- Headline ----------------------------------------------------------
     ctx.textAlign = 'center';
     ctx.fillStyle = won ? '#F2C14E' : '#E8EDF4';
     ctx.font = '800 30px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText(won ? 'WINNER' : `${ordinal(player.rank)} of ${runners.length}`, cx, top);
+    ctx.fillText(recap.headline, cx, y + 28);
+    y += 40;
 
-    const listTop = top + 26;
-    for (let i = 0; i < rows; i++) {
-      const r = placings[i]!;
-      const y = listTop + i * rowH;
-      const me = r.id === playerHorseId;
+    ctx.fillStyle = won ? 'rgba(242,193,78,0.8)' : '#8B98A9';
+    ctx.font = '600 14px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillText(recap.margin, cx, y + 14);
+    y += 22;
 
-      if (me) {
+    // ---- What happened -----------------------------------------------------
+    ctx.font = '500 13px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillStyle = '#C7D0DC';
+    for (const line of storyLines) {
+      ctx.fillText(line, cx, y + 14);
+      y += 19;
+    }
+    y += 18;
+
+    // ---- Placings ----------------------------------------------------------
+    for (let i = 0; i < visible; i++) {
+      const r = rows[i]!;
+      if (r.isPlayer) {
         ctx.fillStyle = 'rgba(242,193,78,0.14)';
-        roundRect(ctx, cx - 156, y - 1, 312, rowH - 4, 7);
+        roundRect(ctx, cx - panel / 2, y - 1, panel, rowH - 3, 7);
         ctx.fill();
       }
 
-      ctx.fillStyle = me ? '#F2C14E' : '#8B98A9';
-      ctx.font = `${me ? 700 : 500} 13px ui-sans-serif, system-ui, sans-serif`;
+      ctx.fillStyle = r.isPlayer ? '#F2C14E' : '#8B98A9';
+      ctx.font = `${r.isPlayer ? 700 : 500} 13px ui-sans-serif, system-ui, sans-serif`;
       ctx.textAlign = 'left';
-      ctx.fillText(String(i + 1), cx - 144, y + 15);
-      ctx.fillText(r.name, cx - 122, y + 15);
+      ctx.fillText(String(r.position), cx - panel / 2 + 12, y + 14);
+      ctx.fillText(r.name, cx - panel / 2 + 34, y + 14);
 
+      // The margin matters more than the clock — a race is won by lengths.
       ctx.textAlign = 'right';
-      ctx.fillStyle = me ? 'rgba(242,193,78,0.75)' : 'rgba(139,152,169,0.6)';
-      ctx.fillText(r.finishTime ? `${r.finishTime.toFixed(2)}s` : '—', cx + 144, y + 15);
+      ctx.fillStyle = r.isPlayer ? 'rgba(242,193,78,0.8)' : 'rgba(139,152,169,0.75)';
+      ctx.fillText(r.margin, cx + panel / 2 - 74, y + 14);
+      ctx.fillStyle = r.isPlayer ? 'rgba(242,193,78,0.55)' : 'rgba(139,152,169,0.45)';
+      ctx.fillText(r.time, cx + panel / 2 - 12, y + 14);
+      y += rowH;
     }
 
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#8B98A9';
+    ctx.fillStyle = 'rgba(139,152,169,0.75)';
     ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('New race to run again', cx, listTop + rows * rowH + 22);
+    ctx.fillText(`${paceLabel(recap.pace)} · New race to run again`, cx, y + 20);
   };
 
   // ---- Input --------------------------------------------------------------
@@ -619,6 +699,50 @@ function safeZoneLow(progress: number, kickAt: number): number {
   if (progress < kickAt - 0.2) return 0.62;
   if (progress < kickAt) return 0.4;
   return 0;
+}
+
+/** How the race was run, in three words, under the placings. */
+function paceLabel(pace: Pace): string {
+  if (pace === 'collapsed') return 'Pace: went too fast';
+  if (pace === 'crawl') return 'Pace: run at a crawl';
+  return 'Pace: evenly run';
+}
+
+/**
+ * Break a sentence to a width, appending to `out`.
+ *
+ * Canvas has no text wrapping of its own, and the recap is prose — a fixed
+ * line count would either clip an explanation or leave a hole where a short
+ * one was.
+ */
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  out: string[],
+): void {
+  const words = text.split(' ');
+  let line = '';
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && ctx.measureText(next).width > maxWidth) {
+      out.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  }
+  if (line) out.push(line);
+}
+
+/** FNV-1a, so a horse's id maps to the same silks in every race it runs. */
+function hashId(id: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
 }
 
 function ordinal(n: number): string {

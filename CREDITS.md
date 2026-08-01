@@ -25,7 +25,10 @@ See [DESIGN.md](DESIGN.md) §15 for the full asset and legal policy.
 
 | Asset | Source | Licence |
 |---|---|---|
-| *(none yet — horse rig and track art land in Phase 2)* | | |
+| `src/assets/racer.png` — 24-frame gallop sprite sheet | Generated at [autosprite.io](https://autosprite.io) from a reference supplied by the project owner | Licensed to the project owner under autosprite.io's terms |
+| `src/assets/racer-mask.png` — material masks | Derived from the above by `tools/bake-sprites.ts` | Same as its source |
+| Horse rig (`src/render/horse.ts`, `horseArt.ts`) | Authored for this project | Project-owned |
+| Track, crowd, HUD (`src/render/track.ts`) | Authored for this project | Project-owned |
 
 ## Audio
 

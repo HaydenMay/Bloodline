@@ -1,3 +1,4 @@
+import { COAT_IDS, type CoatId } from '../data/index.js';
 /**
  * Coat colours, and the palette the whole game draws from.
  *
@@ -53,7 +54,7 @@ export interface Coat {
   points: string;
 }
 
-export const COATS: Record<string, Coat> = {
+export const COATS: Record<CoatId, Coat> = {
   bay: { id: 'bay', name: 'Bay', body: '#8C5A32', hair: '#221509', points: '#2A1A0E' },
   chestnut: { id: 'chestnut', name: 'Chestnut', body: '#A85C2E', hair: '#C88A4E', points: '#8B4A24' },
   black: { id: 'black', name: 'Black', body: '#37312F', hair: '#191617', points: '#1F1B1B' },
@@ -64,10 +65,21 @@ export const COATS: Record<string, Coat> = {
   darkBay: { id: 'darkBay', name: 'Dark Bay', body: '#5C3A22', hair: '#1B1210', points: '#211611' },
 };
 
-export const COAT_IDS = Object.keys(COATS);
+/**
+ * Re-exported so render code has one import for colour work. The list itself is
+ * game data — a coat is a gene before it is a colour — and typing COATS against
+ * it means adding a gene without giving it colours fails to compile rather than
+ * silently rendering as bay.
+ */
+export { COAT_IDS };
 
+/**
+ * Takes a plain string rather than a CoatId on purpose: coats arrive from save
+ * files and, later, from breeding, so an unknown one has to degrade to a
+ * sensible horse instead of throwing in the middle of a race.
+ */
 export function coatFor(id: string): Coat {
-  return COATS[id] ?? COATS['bay']!;
+  return COATS[id as CoatId] ?? COATS.bay;
 }
 
 /**
