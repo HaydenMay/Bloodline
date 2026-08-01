@@ -150,10 +150,26 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const race: LiveRace = createRace(entrants, config);
   const totalYards = race.totalYards;
 
+  // Silks belong to the HORSE, not to its position in the field.
+  //
+  // Assigned by running order, a rival wore blue in one race and green in the
+  // next, which makes recognising an old adversary impossible — and Phase 4
+  // hangs a permanent rival dossier off exactly that recognition. Deriving the
+  // colours from the horse's id instead means a rival keeps its colours for as
+  // long as it races. Collisions inside one field still have to be broken,
+  // because two runners in identical silks is the very thing silks exist to
+  // prevent.
   const silksFor = new Map<string, Silks>();
-  let rivalIndex = 0;
+  const taken = new Set<number>();
   for (const h of field) {
-    silksFor.set(h.id, h.id === playerHorseId ? playerSilks : RIVAL_SILKS[rivalIndex++ % RIVAL_SILKS.length]!);
+    if (h.id === playerHorseId) {
+      silksFor.set(h.id, playerSilks);
+      continue;
+    }
+    let slot = hashId(h.id) % RIVAL_SILKS.length;
+    while (taken.has(slot)) slot = (slot + 1) % RIVAL_SILKS.length;
+    taken.add(slot);
+    silksFor.set(h.id, RIVAL_SILKS[slot]!);
   }
 
   // Stride phase is visual only, advanced from speed so hooves match the ground.
@@ -647,6 +663,16 @@ function safeZoneLow(progress: number, kickAt: number): number {
   if (progress < kickAt - 0.2) return 0.62;
   if (progress < kickAt) return 0.4;
   return 0;
+}
+
+/** FNV-1a, so a horse's id maps to the same silks in every race it runs. */
+function hashId(id: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
 }
 
 function ordinal(n: number): string {

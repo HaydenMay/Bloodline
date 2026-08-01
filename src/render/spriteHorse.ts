@@ -161,7 +161,17 @@ export interface Scheme {
   silks: Silks;
 }
 
+/**
+ * Recoloured sheets, most recently used last.
+ *
+ * CAPPED, because each entry is a full-size canvas — 1280x1280 RGBA is 6.25 MB.
+ * Coats are drawn at random per race and silks vary by runner, so an uncapped
+ * cache climbs toward every coat crossed with every set of silks and takes
+ * hundreds of megabytes with it. A field is eight, so a cap of ten holds a
+ * whole race and still lets consecutive races share anything in common.
+ */
 const tinted = new Map<string, HTMLCanvasElement>();
+const TINT_CACHE_MAX = 10;
 
 /**
  * Build — or reuse — a whole sheet recoloured for one runner.
@@ -173,7 +183,12 @@ export function tintedSheet(scheme: Scheme): HTMLCanvasElement | null {
   if (!loaded) return null;
   const key = `${scheme.coat}|${scheme.silks.primary}|${scheme.silks.secondary}`;
   const hit = tinted.get(key);
-  if (hit) return hit;
+  if (hit) {
+    // Re-insert so the map's order stays least-recently-used first.
+    tinted.delete(key);
+    tinted.set(key, hit);
+    return hit;
+  }
 
   const coat = coatFor(scheme.coat);
   const target: Record<number, [number, number, number]> = {
@@ -220,6 +235,18 @@ export function tintedSheet(scheme: Scheme): HTMLCanvasElement | null {
 
   ctx.putImageData(out, 0, 0);
   tinted.set(key, ctx.canvas);
+  while (tinted.size > TINT_CACHE_MAX) {
+    const oldest = tinted.keys().next().value;
+    if (oldest === undefined) break;
+    const stale = tinted.get(oldest);
+    tinted.delete(oldest);
+    // Collapsing the canvas releases its backing store immediately rather than
+    // leaving several megabytes for the collector to find on its own schedule.
+    if (stale) {
+      stale.width = 0;
+      stale.height = 0;
+    }
+  }
   return ctx.canvas;
 }
 
