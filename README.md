@@ -18,6 +18,7 @@ The horse is a **run**; your stable is the **save file** and never resets.
 | **[TRAITS.md](TRAITS.md)** | Trait catalogue, the eight design rules, and the cut log. |
 | **[ROADMAP.md](ROADMAP.md)** | Build phases, estimates, and the two hard gates. |
 | **[CREDITS.md](CREDITS.md)** | Asset provenance. Nothing ships without a verified licence. |
+| **[ART_BRIEF.md](ART_BRIEF.md)** | Spec to hand an artist for the horse. Layered, flat, riggable. |
 
 ---
 
