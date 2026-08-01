@@ -199,30 +199,9 @@ export function drawHorse(
   tail.closePath();
   shade(ctx, tail, [HIP_X - 42, BODY_Y - 14, HIP_X, BODY_Y + 6], coat.hair, 0.8);
 
-  // ---- Barrel -------------------------------------------------------------
-  // Deeper girth at the shoulder, tucked-up flank behind — a thoroughbred
-  // silhouette rather than a plain oval.
-  const barrel = new Path2D();
-  barrel.moveTo(SHOULDER_X + 6, BODY_Y - 8);
-  barrel.quadraticCurveTo(4, BODY_Y - 19, HIP_X - 6, BODY_Y - 13);
-  barrel.quadraticCurveTo(HIP_X - 15, BODY_Y - 2, HIP_X - 4, BODY_Y + 11);
-  barrel.quadraticCurveTo(-2, BODY_Y + 15, SHOULDER_X + 2, BODY_Y + 13);
-  barrel.quadraticCurveTo(SHOULDER_X + 13, BODY_Y + 4, SHOULDER_X + 6, BODY_Y - 8);
-  barrel.closePath();
-  shade(ctx, barrel, [HIP_X - 15, BODY_Y - 19, SHOULDER_X + 13, BODY_Y + 15], body);
-
-  // Haunch — the big driving muscle, and the most recognisable part of the
-  // outline from side on.
-  const haunch = new Path2D();
-  haunch.ellipse(HIP_X - 3, BODY_Y - 1, 15, 16, -0.12, 0, Math.PI * 2);
-  shade(ctx, haunch, [HIP_X - 18, BODY_Y - 17, HIP_X + 12, BODY_Y + 15], body, 0.85);
-
-  // Shoulder.
-  const shoulder = new Path2D();
-  shoulder.ellipse(SHOULDER_X - 1, BODY_Y + 2, 12, 14, 0.22, 0, Math.PI * 2);
-  shade(ctx, shoulder, [SHOULDER_X - 13, BODY_Y - 12, SHOULDER_X + 11, BODY_Y + 16], body, 0.85);
-
-  // ---- Neck and head ------------------------------------------------------
+  // ---- Neck and head, drawn BEFORE the body -------------------------------
+  // Drawing the neck first lets the body silhouette cover its base, exactly as
+  // a shoulder overlaps a neck in life. Drawn after, the join showed as a seam.
   const headBob = Math.sin(phase * Math.PI * 2 + 0.4) * (2 + 2.5 * intensity);
 
   ctx.save();
@@ -275,6 +254,68 @@ export function drawHorse(
   mane.quadraticCurveTo(11, -14 - headBob * 0.4, -9, 3);
   mane.closePath();
   shade(ctx, mane, [-9, -14, 26, 9], coat.hair, 0.7);
+
+  ctx.restore();
+
+  // ---- Body: ONE silhouette, one outline ----------------------------------
+  // Haunch, barrel and shoulder are a single continuous path. Drawn as three
+  // overlapping ellipses they each carried their own outline, so you could see
+  // the circles inside the horse. Internal form below is shading ONLY, never
+  // stroked — an outline inside a body always reads as a seam.
+  const silhouette = new Path2D();
+  silhouette.moveTo(SHOULDER_X + 11, BODY_Y + 1);
+  // withers and topline
+  silhouette.bezierCurveTo(SHOULDER_X + 7, BODY_Y - 13, SHOULDER_X - 6, BODY_Y - 17, 2, BODY_Y - 17);
+  // back, dipping slightly to the croup
+  silhouette.bezierCurveTo(HIP_X + 8, BODY_Y - 17, HIP_X - 2, BODY_Y - 19, HIP_X - 9, BODY_Y - 13);
+  // rump and haunch
+  silhouette.bezierCurveTo(HIP_X - 18, BODY_Y - 7, HIP_X - 19, BODY_Y + 6, HIP_X - 10, BODY_Y + 13);
+  // stifle down to the belly
+  silhouette.bezierCurveTo(HIP_X - 4, BODY_Y + 17, HIP_X + 6, BODY_Y + 13, -2, BODY_Y + 12);
+  // tucked-up flank, then the girth
+  silhouette.bezierCurveTo(SHOULDER_X - 8, BODY_Y + 12, SHOULDER_X - 2, BODY_Y + 16, SHOULDER_X + 6, BODY_Y + 12);
+  // chest
+  silhouette.bezierCurveTo(SHOULDER_X + 13, BODY_Y + 9, SHOULDER_X + 14, BODY_Y + 5, SHOULDER_X + 11, BODY_Y + 1);
+  silhouette.closePath();
+  shade(ctx, silhouette, [HIP_X - 19, BODY_Y - 19, SHOULDER_X + 14, BODY_Y + 17], body);
+
+  // Internal form, clipped to the silhouette so nothing spills over the edge.
+  ctx.save();
+  ctx.clip(silhouette);
+
+  // Belly shadow.
+  ctx.fillStyle = dark(body, 0.3);
+  ctx.globalAlpha = 0.75;
+  ctx.beginPath();
+  ctx.ellipse(0, BODY_Y + 16, 30, 9, -0.03, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Light along the back.
+  ctx.fillStyle = lite(body, 0.24);
+  ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  ctx.ellipse(-3, BODY_Y - 16, 22, 5, -0.03, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Haunch mass — a soft crease, not an outlined circle.
+  ctx.fillStyle = lite(body, 0.16);
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  ctx.ellipse(HIP_X - 5, BODY_Y - 2, 12, 13, -0.12, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = dark(body, 0.22);
+  ctx.globalAlpha = 0.35;
+  ctx.beginPath();
+  ctx.ellipse(HIP_X + 10, BODY_Y + 1, 5, 14, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Shoulder plane.
+  ctx.fillStyle = lite(body, 0.14);
+  ctx.globalAlpha = 0.45;
+  ctx.beginPath();
+  ctx.ellipse(SHOULDER_X, BODY_Y + 3, 9, 12, 0.24, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.restore();
 
