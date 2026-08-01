@@ -7,7 +7,7 @@ import { simulateRace } from '../src/sim/race/engine.js';
 import * as K from '../src/sim/race/constants.js';
 
 /** Mirrors PLAYER_CRUISE_CAP in the race screen. */
-const CAP = 0.44;
+const CAP = 0.48;
 import type { ControlInput, RaceEntrant } from '../src/sim/race/types.js';
 import type { Horse } from '../src/sim/types.js';
 
@@ -50,7 +50,7 @@ function run(seed: string, ride: Ride): { pos: number; margin: number; energy: n
       horse,
       controller: (self, race): ControlInput => {
         const b = base(self, race);
-        let effort = Math.min(b.effort, CAP);
+        let effort = race.progress >= K.ESTABLISH_UNTIL ? Math.min(b.effort, CAP) : b.effort;
         const inWindow = Math.abs(race.progress - window) <= 0.09;
         let kick = false;
         if (ride === 'urge the whole way') effort = 1;

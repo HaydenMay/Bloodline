@@ -11,7 +11,7 @@ import {
 } from '../render/track.js';
 import { createAiController } from '../sim/race/ai.js';
 import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
-import { STYLE_PROFILES, TICK_HZ } from '../sim/race/constants.js';
+import { ESTABLISH_UNTIL, STYLE_PROFILES, TICK_HZ } from '../sim/race/constants.js';
 import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../sim/race/recap.js';
 import type { ControlInput, RaceConfig, RaceEntrant } from '../sim/race/types.js';
 import type { Horse } from '../sim/types.js';
@@ -35,8 +35,31 @@ const YARDS_PER_FURLONG = 220;
 const HORSE_YARDS = 2.7;
 const RIG_UNITS = 100;
 
-/** Yards covered per stride. Real gallop is ~3 body lengths. */
-const STRIDE_YARDS = HORSE_YARDS * 3;
+/**
+ * How fast the simulation runs against real racing.
+ *
+ * A winning 8f is 64.4s where a real one is ~96s — 25.0 m/s against a
+ * thoroughbred's ~17.5. Recorded as a known issue in ROADMAP.md and owned by
+ * Phase 4.5; until it is corrected the render layer has to divide it back out
+ * of anything derived from speed, or the horses animate at a pace no animal
+ * moves at.
+ */
+const SIM_SPEED_INFLATION = 1.43;
+
+/**
+ * Yards covered per stride. Real gallop is ~3 body lengths, inflated by however
+ * fast the simulation is currently running.
+ *
+ * Stride RATE is speed divided by this, so the true 8.1 yards gave 3.4 cycles a
+ * second against a real gallop's 2.3. With 24 frames in the sheet that is 81
+ * sprite frames a second on a 60 Hz display — frames were being dropped, so the
+ * gait strobed instead of running. At 11.6 it lands near 2.3 cycles and about
+ * 55 frames a second, under the refresh rate, so the cycle plays whole.
+ *
+ * Delete the inflation when Phase 4.5 fixes the speed scale; the stride length
+ * itself is already correct.
+ */
+const STRIDE_YARDS = HORSE_YARDS * 3 * SIM_SPEED_INFLATION;
 
 /**
  * Sprite pixels per rig unit, so both draw the same horse at the same size.
@@ -55,19 +78,25 @@ const CALLOUTS = [
 ] as const;
 
 /**
- * Ceiling on the default ride — and it sits BELOW the simulation's break-even.
+ * Ceiling on the default ride, once the field has settled.
  *
- * Energy is the player's resource; the HUD calls it "your moment". An automatic
- * ride that can empty the tank before that moment arrives leaves them a bar to
- * watch instead of a decision to make, and that is exactly what happened: the
- * cap was 0.56 while drain and recovery break even at 0.427, so a hands-off
- * horse bled continuously and reached the straight on empty.
+ * Chosen by sweeping it against 150 races at each of six values. 0.48 is the
+ * best point available: it keeps 72 of 100 energy to the wire hands-off, and it
+ * is also where a well-timed ride wins most (28 of 150, against a fair share of
+ * 19). Higher preserves less; lower loses more ground for no extra wins.
  *
- * Set under the break-even, a horse left alone now RECOVERS. It loses ground —
- * doing nothing should never be competitive — but the reserve is intact and
- * still yours when your window comes. Committing it is always your decision.
+ * It cannot preserve ALL of it. Holding the field's pace costs more energy than
+ * break-even allows, so staying in touch is intrinsically expensive — see the
+ * known issue in ROADMAP.md. That is a simulation problem and it belongs to
+ * Phase 4.5; this constant only stops the ride spending what it does not have to.
+ *
+ * It applies only AFTER position is taken up. Capping the opening as well was
+ * the mistake in the first attempt: the jockey could not go and get its slot,
+ * so the horse leaked ground from the gate and arrived 26 lengths adrift with a
+ * full tank and nothing to do with it. Position is the jockey's job. The
+ * reserve is yours.
  */
-const PLAYER_CRUISE_CAP = 0.44;
+const PLAYER_CRUISE_CAP = 0.48;
 
 interface PlayerInput {
   /** Hold to take a pull — settle, drop back, and recover. */
@@ -128,10 +157,14 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
         // The AI empties the tank down the stretch, because that is the right
         // ride when nobody is steering. For a PLAYER that is a bug: it spends
-        // the reserve on your behalf and leaves you nothing to use. So the
-        // default ride is capped at a cruise — positioning still happens, but
-        // committing the reserve is always your decision.
-        let effort = Math.min(base.effort, PLAYER_CRUISE_CAP);
+        // the reserve on your behalf and leaves you nothing to use.
+        //
+        // So the jockey rides the opening exactly as the AI would — taking up
+        // position costs a little and is worth it — and is then held at the
+        // sustainable cruise for the rest. Positioning still happens; committing
+        // the reserve is always your decision.
+        const settled = race.progress >= ESTABLISH_UNTIL;
+        let effort = settled ? Math.min(base.effort, PLAYER_CRUISE_CAP) : base.effort;
 
         if (input.takingBack) {
           effort = Math.min(effort, 0.26);
