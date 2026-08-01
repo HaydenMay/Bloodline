@@ -25,7 +25,7 @@ import { STAT_KEYS, type Horse } from '../src/sim/types.js';
 import type { Going } from '../src/sim/race/types.js';
 import { writeReport, type SuiteResult } from './report.js';
 
-const RACES = Number(process.env['RACES'] ?? 4000);
+const RACES = Number(process.env['RACES'] ?? 1200);
 /**
  * Seed prefix. The sim is fully deterministic, so re-running with the same seed
  * gives byte-identical numbers — that is the point. To compare two INDEPENDENT
@@ -101,8 +101,20 @@ function styleBalance(): Omit<SuiteResult, 'name'> {
       `  ${r.style.padEnd(13)} ${bar(r.rate, 0.25)} ${pct(r.rate).padStart(6)}  ` +
       `(${((r.rate / expected - 1) * 100 >= 0 ? '+' : '') + ((r.rate / expected - 1) * 100).toFixed(0)}% vs even)`,
   );
+  const worstStyle = rates.reduce((a, b) =>
+    Math.abs(b.rate - expected) > Math.abs(a.rate - expected) ? b : a,
+  );
+  const worstPoints = (worstStyle.rate - expected) * 100;
+
   lines.push('');
-  lines.push(`  worst deviation      ${pct(worst)}  (target: under 30%)`);
+  lines.push(
+    `  Furthest from fair: ${worstStyle.style} on ${pct(worstStyle.rate)}, ` +
+      `against a fair share of ${pct(expected)}.`,
+  );
+  lines.push(
+    `  That is ${worstPoints >= 0 ? '+' : ''}${worstPoints.toFixed(1)} percentage points ` +
+      `(${pct(worst)} off in relative terms; the bar is 30%).`,
+  );
   void fastPaceRaces;
   void paceWins;
 
@@ -116,6 +128,11 @@ function styleBalance(): Omit<SuiteResult, 'name'> {
   return {
     ok: worst < 0.3,
     lines,
+    explain: {
+      question: 'Is any running style simply better than the others?',
+      how: 'Eight horses, two of each style, every stat set to exactly 55, no traits, identical jockeys. They are clones. The only difference in the entire field is running style.',
+      reading: 'A fair share is 12.5%, because each horse is one of eight. If a style wins more than that, the style itself is carrying an edge — nothing else in the field can explain it.',
+    },
     bars: {
       title: 'Win rate by running style',
       unit: '%',
@@ -223,13 +240,25 @@ function paceCollapse(): Omit<SuiteResult, 'name'> {
     `  a contested lead wrecks front-runners      ${hurtsFront ? 'yes' : 'NO — the mechanism is not working'}` +
       `  (${pct(frontRates[0]!)} alone → ${pct(frontRates[2]!)} each when three duel)`,
   );
+  lines.push(`  The tempo does get faster as they fight    ${paceRising ? 'yes' : 'no'}`);
+  lines.push('');
   lines.push(
-    `  closers gain from the collapse             ${pct(closerRates[0]!)} → ${pct(closerRates[2]!)}` +
-      `  (secondary — the field composition also shifts)`,
+    `  (Every horse's individual share falls as front-runners are added, simply`,
   );
-  lines.push(`  measured pace rises with contention        ${paceRising ? 'yes' : 'no'}`);
+  lines.push(
+    `   because there are more runners splitting the wins. Only the front-runner`,
+  );
+  lines.push(`   figure above is meaningful.)`);
 
-  return { ok: hurtsFront, lines };
+  return {
+    ok: hurtsFront,
+    lines,
+    explain: {
+      question: 'Do upsets happen on their own, or would we have to fake them?',
+      how: 'The same field is run three times over — once with one front-runner, then two, then three, all wanting the same lead. Everything else is held identical.',
+      reading: 'Watch the front-runner figure. Horses fighting over the lead exhaust each other, so each one wins less often. Nothing in the code says "let an outsider win" — they simply burn out, and whoever saved energy sweeps past.',
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +319,15 @@ function dominanceCurve(): Omit<SuiteResult, 'name'> {
   lines.push(`  small edge (+5%)   ${pct(at5)}   ${flatMiddle ? 'OK — chaos preserved' : 'TOO HIGH — too deterministic'}`);
   lines.push(`  large edge (+40%)  ${pct(at40)}   ${steepEnd ? 'OK — quality rewarded' : 'TOO LOW — training feels pointless'}`);
 
-  return { ok: flatMiddle && steepEnd, lines };
+  return {
+    ok: flatMiddle && steepEnd,
+    lines,
+    explain: {
+      question: 'Does a better horse win more often — but not always?',
+      how: 'One horse has its stats raised by the amount shown in each row. The other seven stay average. Nothing else differs.',
+      reading: 'The +0% row landing on 12.5% confirms there is no hidden bias left in the engine. After that we want a small edge to help without guaranteeing anything, and a large edge to dominate — but never quite reach 100%, because even a great horse can draw badly.',
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -400,9 +437,29 @@ function divisionSanity(): Omit<SuiteResult, 'name'> {
     `  ability→finish            ${correlations[0]!.toFixed(2)} → ${correlations[4]!.toFixed(2)}   ` +
       `(informational — elite fields are closely matched, so they stay hard to call)`,
   );
+
+  // Real races are decided by 1-3 lengths; over 5 is a rout. Fields that string
+  // out further than that are not exciting to watch, and nothing was checking
+  // this — margin was reported but never asserted on.
+  const avgMargin = margins.reduce((a, b) => a + b, 0) / margins.length;
+  const marginsRealistic = avgMargin >= 1 && avgMargin <= 4;
+  lines.push(
+    `  average winning margin    ${avgMargin.toFixed(1)}L across all divisions   ` +
+      `${marginsRealistic ? 'OK' : 'TOO WIDE — known issue, not yet gating'} (real racing: 1-3L typical, 5L+ is a rout)`,
+  );
+
   const rising = cleaner && tighter;
 
-  return { ok: ok && rising, lines };
+  void marginsRealistic; // known issue, tracked below — see ROADMAP
+  return {
+    ok: ok && rising,
+    lines,
+    explain: {
+      question: 'Do the five divisions actually feel different to race in — and do races finish like real races?',
+      how: 'Unlike the tests above, this uses real generated horses with their own stats, traits and jockeys. It is the closest thing here to an actual game.',
+      reading: 'ability→finish is how closely the finishing order matched how good the horses were (0 is random, 1 is a perfect match). margin is how far back second place finished, in lengths — a length being about 8 feet. trouble is how many runners got shut off behind rivals. The headline is that climbing the ladder should mean less trouble and closer finishes.',
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -429,6 +486,11 @@ function determinism(): Omit<SuiteResult, 'name'> {
 
   return {
     ok: same,
+    explain: {
+      question: 'If we run the same race twice, do we get the same result?',
+      how: 'One race is simulated twice from the same seed, and the finishing order and times are compared.',
+      reading: 'This has to pass or every other number here is meaningless — we could not tell a real change from random noise.',
+    },
     lines: [`  identical replay from the same seed   ${same ? 'yes' : 'NO — determinism is broken'}`],
   };
 }

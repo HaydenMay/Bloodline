@@ -18,6 +18,8 @@ export interface SuiteResult {
   name: string;
   ok: boolean;
   lines: string[];
+  /** Plain-English explanation of what this suite tests and how it's rigged. */
+  explain?: { question: string; how: string; reading: string };
   /** Optional bar chart rendered above the text. */
   bars?: { title: string; unit: string; max: number; reference?: number; referenceLabel?: string; data: Bar[] };
 }
@@ -80,6 +82,15 @@ export function writeReport(suites: SuiteResult[], meta: ReportMeta): string {
         <h2>${esc(s.name)}</h2>
         <span class="pill ${s.ok ? 'ok' : 'bad'}">${s.ok ? 'PASS' : 'FAIL'}</span>
       </header>
+      ${
+        s.explain
+          ? `<div class="explain">
+              <p><b>What it asks</b> ${esc(s.explain.question)}</p>
+              <p><b>How it's rigged</b> ${esc(s.explain.how)}</p>
+              <p><b>Reading it</b> ${esc(s.explain.reading)}</p>
+             </div>`
+          : ''
+      }
       ${s.bars ? barChart(s.bars) : ''}
       <pre>${esc(s.lines.map(clean).join('\n'))}</pre>
     </section>`,
@@ -116,6 +127,17 @@ export function writeReport(suites: SuiteResult[], meta: ReportMeta): string {
   .pill.bad{background:rgba(226,86,74,.15);color:var(--bad)}
   pre{margin:0;font-family:var(--mono);font-size:12px;color:var(--muted);
       white-space:pre-wrap;overflow-x:auto}
+  .explain{border-left:3px solid var(--line);padding:2px 0 2px 14px;margin:0 0 16px}
+  .explain p{margin:0 0 7px;font-size:13px;line-height:1.5;color:var(--muted)}
+  .explain p:last-child{margin-bottom:0}
+  .explain b{color:var(--text);font-weight:650;margin-right:6px}
+  .glossary{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+            padding:18px 20px;margin-bottom:16px}
+  .glossary h2{margin-bottom:10px}
+  .glossary dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:7px 16px;
+               font-size:13px;line-height:1.5}
+  .glossary dt{font-weight:650;color:var(--text)}
+  .glossary dd{margin:0;color:var(--muted)}
   .chart{display:block;width:100%;height:auto;margin:4px 0 16px}
   .grid{stroke:var(--muted);stroke-opacity:.16;stroke-width:1}
   .axis{fill:var(--muted);font-size:10px;font-family:ui-sans-serif,system-ui}
@@ -129,6 +151,23 @@ export function writeReport(suites: SuiteResult[], meta: ReportMeta): string {
   <h1>Bloodline — balance report</h1>
   <p class="meta">${meta.races.toLocaleString()} races per suite &nbsp;·&nbsp; seed &ldquo;${esc(meta.seed)}&rdquo; &nbsp;·&nbsp; ${(meta.durationMs / 1000).toFixed(1)}s &nbsp;·&nbsp; ${new Date().toLocaleString()}</p>
   <div class="verdict ${allOk ? 'ok' : 'bad'}">${allOk ? 'ALL SUITES PASSED' : `${suites.length - passed} SUITE(S) FAILED`}</div>
+
+  <div class="glossary">
+    <h2>Glossary</h2>
+    <dl>
+      <dt>L (length)</dt>
+      <dd>One horse-length, about 8 feet. Real races are usually decided by 1&ndash;3 lengths; over 5 is a rout.</dd>
+      <dt>Fair share</dt>
+      <dd>What one horse in a field of eight should win if nothing gave it an edge &mdash; 12.5%.</dd>
+      <dt>Front-runner</dt>
+      <dd>A horse that prefers to <em>lead</em>. Nothing to do with being favourite.</dd>
+      <dt>Trouble</dt>
+      <dd>Share of runners shut off behind rivals for more than a moment.</dd>
+      <dt>Percentage points</dt>
+      <dd>A plain difference between two percentages. 14.1% against 12.5% is +1.6 points.</dd>
+    </dl>
+  </div>
+
   ${body}
 </div></body></html>`;
 
