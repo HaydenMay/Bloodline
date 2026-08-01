@@ -1,13 +1,7 @@
 import type { Rng } from './rng.js';
 import type { Aptitudes, Gender, Horse, Stats } from './types.js';
 import { STAT_KEYS } from './types.js';
-import {
-  DISTANCE_BANDS,
-  RUNNING_STYLES,
-  type Division,
-  type DistanceBand,
-  type RunningStyle,
-} from '../data/index.js';
+import { COAT_IDS, DISTANCE_BANDS, type DistanceBand, type Division, RUNNING_STYLES, type RunningStyle } from '../data/index.js';
 import { RACING_TRAIT_IDS, TRAITS, type TraitId } from '../data/traits.js';
 import type { NameGenerator } from '../data/names.js';
 
@@ -177,7 +171,10 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     wins: 0,
     places: 0,
     shows: 0,
-    coat: 'bay',
+    // Rolled HERE, not by the caller. The demo harness used to overwrite this
+    // afterwards, which meant every horse any other caller made was bay — and
+    // Phase 3 generates seventy of them.
+    coat: rng.pick(COAT_IDS),
     jockeySkill: clamp100(rng.range(band.jockey[0], band.jockey[1])),
   };
 }
