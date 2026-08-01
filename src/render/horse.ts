@@ -101,6 +101,23 @@ function shade(
   }
 }
 
+/** Unit perpendicular to a segment. */
+function perp(ax: number, ay: number, bx: number, by: number): { x: number; y: number } {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len = Math.max(0.001, Math.hypot(dx, dy));
+  return { x: -dy / len, y: dx / len };
+}
+
+/**
+ * One leg as a single TAPERED SILHOUETTE with one outline.
+ *
+ * Previously this was two stroked lines with round caps, which left a visible
+ * circle at the knee and a dark band where the outline stroke showed past the
+ * thinner cannon. A real leg narrows from a heavy gaskin to a fine cannon bone,
+ * so it has to be a filled shape that tapers — and like the body, only the
+ * outer edge is ever stroked.
+ */
 function drawLeg(
   ctx: CanvasRenderingContext2D,
   hipX: number,
@@ -118,38 +135,50 @@ function drawLeg(
   const footY = foot.y;
   const knee = solveKnee(hipX, hipY, footX, footY, bend);
 
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  const wHip = width * 0.62;
+  const wKnee = width * 0.3;
+  const wFoot = width * 0.2;
 
-  // Outline pass first, then the fill on top — a cheap way to get line art on
-  // a stroked limb without drawing the outline as a separate path.
-  ctx.strokeStyle = dark(colour, 0.45);
-  ctx.lineWidth = width + 2.4;
-  ctx.beginPath();
-  ctx.moveTo(hipX, hipY);
-  ctx.lineTo(knee.x, knee.y);
-  ctx.lineTo(footX, footY);
-  ctx.stroke();
+  const pUpper = perp(hipX, hipY, knee.x, knee.y);
+  const pLower = perp(knee.x, knee.y, footX, footY);
+  // Average the two at the knee so the joint bends instead of notching.
+  const pKnee = {
+    x: (pUpper.x + pLower.x) / 2,
+    y: (pUpper.y + pLower.y) / 2,
+  };
+  const kLen = Math.max(0.001, Math.hypot(pKnee.x, pKnee.y));
+  pKnee.x /= kLen;
+  pKnee.y /= kLen;
 
-  ctx.strokeStyle = colour;
-  ctx.lineWidth = width;
-  ctx.beginPath();
-  ctx.moveTo(hipX, hipY);
-  ctx.lineTo(knee.x, knee.y);
-  ctx.stroke();
+  const leg = new Path2D();
+  leg.moveTo(hipX + pUpper.x * wHip, hipY + pUpper.y * wHip);
+  leg.lineTo(knee.x + pKnee.x * wKnee, knee.y + pKnee.y * wKnee);
+  leg.lineTo(footX + pLower.x * wFoot, footY + pLower.y * wFoot);
+  leg.lineTo(footX - pLower.x * wFoot, footY - pLower.y * wFoot);
+  leg.lineTo(knee.x - pKnee.x * wKnee, knee.y - pKnee.y * wKnee);
+  leg.lineTo(hipX - pUpper.x * wHip, hipY - pUpper.y * wHip);
+  leg.closePath();
 
-  // Cannon bone: thinner, and the darker "points" colour.
-  ctx.strokeStyle = point;
-  ctx.lineWidth = width * 0.55;
-  ctx.beginPath();
-  ctx.moveTo(knee.x, knee.y);
-  ctx.lineTo(footX, footY);
-  ctx.stroke();
+  shade(ctx, leg, [hipX - wHip, hipY, footX + wFoot, footY], colour, 0.75);
 
-  ctx.fillStyle = dark(point, 0.3);
+  // The dark "points" run up the cannon — painted INSIDE the leg silhouette,
+  // never as its own outlined shape.
+  ctx.save();
+  ctx.clip(leg);
+  ctx.fillStyle = point;
   ctx.beginPath();
-  ctx.ellipse(footX, footY - 1.5, width * 0.44, width * 0.33, 0, 0, Math.PI * 2);
+  ctx.moveTo(knee.x + pKnee.x * wKnee * 1.6, knee.y + pKnee.y * wKnee * 1.6);
+  ctx.lineTo(footX + pLower.x * wFoot * 2.4, footY + pLower.y * wFoot * 2.4);
+  ctx.lineTo(footX - pLower.x * wFoot * 2.4, footY - pLower.y * wFoot * 2.4);
+  ctx.lineTo(knee.x - pKnee.x * wKnee * 1.6, knee.y - pKnee.y * wKnee * 1.6);
+  ctx.closePath();
   ctx.fill();
+  ctx.restore();
+
+  // Hoof.
+  const hoof = new Path2D();
+  hoof.ellipse(footX, footY - 1, width * 0.32, width * 0.26, 0, 0, Math.PI * 2);
+  shade(ctx, hoof, [footX - 4, footY - 4, footX + 4, footY + 2], dark(point, 0.25), 0.6);
 }
 
 export interface DrawHorseOptions {
@@ -209,51 +238,71 @@ export function drawHorse(
   ctx.rotate(-0.46 - 0.13 * drive);
   ctx.translate(0, headBob * 0.3);
 
-  // Finer neck than a simple wedge: crest above, throat cut away below.
-  const neck = new Path2D();
-  neck.moveTo(-9, 12);
-  neck.quadraticCurveTo(4, 0, 25, -7);
-  neck.lineTo(31, 3);
-  neck.quadraticCurveTo(12, 9, -6, 21);
-  neck.closePath();
-  shade(ctx, neck, [-9, -7, 31, 21], body, 0.9);
-
-  // Head — longer and finer than a blob.
-  ctx.save();
-  ctx.translate(28, -1);
-  ctx.rotate(0.4);
-  const head = new Path2D();
-  head.moveTo(-10, -6);
-  head.quadraticCurveTo(6, -7, 15, -2);
-  head.quadraticCurveTo(18, 1, 14, 4);
-  head.quadraticCurveTo(4, 8, -9, 6);
-  head.closePath();
-  shade(ctx, head, [-10, -7, 18, 8], body, 0.8);
-
-  const muzzle = new Path2D();
-  muzzle.ellipse(13, 1.5, 4, 3.4, 0.1, 0, Math.PI * 2);
-  shade(ctx, muzzle, [9, -2, 17, 5], coat.points, 0.7);
-
+  // Ear, behind the head so its base is hidden by it.
   const ear = new Path2D();
-  ear.moveTo(-8, -5);
-  ear.lineTo(-10, -14);
-  ear.lineTo(-3, -6);
+  ear.moveTo(24, -13);
+  ear.lineTo(25, -22);
+  ear.lineTo(30, -12);
   ear.closePath();
-  shade(ctx, ear, [-10, -14, -3, -5], body, 0.7);
+  shade(ctx, ear, [24, -22, 30, -11], body, 0.7);
 
-  ctx.fillStyle = '#120C08';
+  // NECK AND HEAD AS ONE SILHOUETTE.
+  // Crest from the withers, over the poll, down the face to the muzzle, back
+  // under the jaw and down the throat. Drawn as two pieces the join showed as
+  // a hard line across the throat — the same seam problem as the body.
+  const neck = new Path2D();
+  neck.moveTo(-9, 13); // base at the withers
+  neck.bezierCurveTo(2, 1, 14, -8, 24, -14); // crest
+  neck.bezierCurveTo(31, -18, 39, -14, 42, -7); // poll and forehead
+  neck.bezierCurveTo(45, -2, 44, 2, 40, 3); // face down to the muzzle
+  neck.bezierCurveTo(36, 4, 33, 2, 30, 1); // muzzle underside
+  neck.bezierCurveTo(26, 4, 22, 6, 17, 6); // jaw
+  neck.bezierCurveTo(8, 9, -1, 15, -6, 22); // throat to the chest
+  neck.closePath();
+  shade(ctx, neck, [-9, -18, 45, 22], body, 0.9);
+
+  // Everything inside the neck is shading only — no outlines, no seams.
+  ctx.save();
+  ctx.clip(neck);
+
+  // Muzzle, in the points colour.
+  ctx.fillStyle = coat.points;
+  ctx.globalAlpha = 0.9;
   ctx.beginPath();
-  ctx.ellipse(1, -1.5, 1.6, 1.8, 0, 0, Math.PI * 2);
+  ctx.ellipse(38, 0, 6, 4.5, 0.2, 0, Math.PI * 2);
   ctx.fill();
+
+  // Light down the crest.
+  ctx.fillStyle = lite(body, 0.2);
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  ctx.ellipse(14, -9, 16, 3.5, -0.42, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Shadow under the jaw and along the throat.
+  ctx.fillStyle = dark(body, 0.26);
+  ctx.globalAlpha = 0.45;
+  ctx.beginPath();
+  ctx.ellipse(4, 14, 16, 5, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Mane along the crest, clipped so it never breaks the outline.
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = coat.hair;
+  ctx.beginPath();
+  ctx.moveTo(-9, 10);
+  ctx.bezierCurveTo(2, -2, 14, -11, 26, -17);
+  ctx.bezierCurveTo(20, -8 - headBob * 0.4, 6, -1, -9, 4);
+  ctx.closePath();
+  ctx.fill();
+
   ctx.restore();
 
-  // Mane along the crest.
-  const mane = new Path2D();
-  mane.moveTo(-7, 9);
-  mane.quadraticCurveTo(7, -3, 26, -9);
-  mane.quadraticCurveTo(11, -14 - headBob * 0.4, -9, 3);
-  mane.closePath();
-  shade(ctx, mane, [-9, -14, 26, 9], coat.hair, 0.7);
+  // Eye, on top of everything.
+  ctx.fillStyle = '#120C08';
+  ctx.beginPath();
+  ctx.ellipse(31, -9, 1.7, 1.9, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.restore();
 
