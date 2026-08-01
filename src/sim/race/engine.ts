@@ -7,6 +7,7 @@ import {
   bandFor,
   type ControlInput,
   type Controller,
+  type EnergyFactor,
   type Going,
   type RaceConfig,
   type RaceEntrant,
@@ -45,6 +46,10 @@ interface Runner {
   wasBlocked: boolean;
   hadTrouble: boolean;
   drafting: boolean;
+
+  /** Net energy per second this tick, and which mechanic dominated it. */
+  energyRate: number;
+  energyFactor: EnergyFactor;
 
   fumbleRemaining: number;
   fumbledStart: boolean;
@@ -128,6 +133,9 @@ export interface RunnerSnapshot {
   kicking: boolean;
   blocked: boolean;
   drafting: boolean;
+  /** Net energy per second, and the mechanic currently dominating it. */
+  energyRate: number;
+  energyFactor: EnergyFactor;
   offColour: boolean;
   finished: boolean;
   finishTime: number | null;
@@ -227,6 +235,8 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
           kicking: r.kickRemaining > 0,
           blocked: r.blockedFor > 0,
           drafting: r.drafting,
+          energyRate: r.energyRate,
+          energyFactor: r.energyFactor,
           offColour: r.offColour,
           finished: r.finishTime !== null,
           finishTime: r.finishTime,
@@ -404,6 +414,8 @@ function createRunner(
     wasBlocked: false,
     hadTrouble: false,
     drafting: false,
+    energyRate: 0,
+    energyFactor: 'neutral',
     fumbleRemaining: fumbled ? K.FUMBLE_DURATION : 0,
     fumbledStart: fumbled,
     greenRemaining: 0,
@@ -586,13 +598,11 @@ function stepRunner(
   // pressed is not: being hounded hurts everyone the same. Previously one
   // number did both jobs, so making front-runners efficient also made them
   // immune to being contested, which quietly disabled the whole upset mechanism.
-  const frontCost =
-    1 +
-    Math.pow(forwardness, 1.5) *
-      K.FRONT_COST_PENALTY * relief +
-    // Sharper exponent: being pressed should punish the horses actually
-    // fighting for the lead, not everyone stuck in mid-field traffic.
-    Math.pow(forwardness, 3) * K.CONTESTED_LEAD_COST * contest;
+  const leadCost = Math.pow(forwardness, 1.5) * K.FRONT_COST_PENALTY * relief;
+  // Sharper exponent: being pressed should punish the horses actually
+  // fighting for the lead, not everyone stuck in mid-field traffic.
+  const pressCost = Math.pow(forwardness, 3) * K.CONTESTED_LEAD_COST * contest;
+  const frontCost = 1 + leadCost + pressCost;
   const backRecovery = 1 + K.BACK_RECOVERY_BONUS * r.fieldPosition;
 
   const rawMisfit = Math.abs(r.fieldPosition - profile.preferred);
@@ -634,6 +644,7 @@ function stepRunner(
   if (hasTrait(r.traits, 'gateRusher') && race.progress < 0.125) costMult *= 1.3;
   if (hasTrait(r.traits, 'alert') && race.progress < 0.2) costMult *= 1.1;
   if (hasTrait(r.traits, 'cruiser')) costMult *= r.effort > 0.85 ? 1.3 : 0.8;
+  const recoveryBeforeDraft = recoveryMult;
   if (r.drafting) recoveryMult *= 1 + K.DRAFT_RECOVERY_BONUS;
 
   // --- Energy: drain when driving, recover when settled --------------------
@@ -651,6 +662,58 @@ function stepRunner(
   // never gains energy from being in the wrong place.
   const recovery = r.recoveryRate * slack * slack * Math.max(0, recoveryMult);
   r.energy = clamp(r.energy + (recovery - drain) * K.DT, 0, K.MAX_ENERGY);
+
+  // --- Why the energy moved -------------------------------------------------
+  //
+  // Four multipliers act on the drain and recovery above, and the bar on screen
+  // shows only their sum. Report which one is doing the most work, so the HUD
+  // can name the mechanic rather than leaving the player to infer it.
+  //
+  // Each is measured as the ENERGY PER SECOND it is worth: how far the net rate
+  // would move if that factor alone were switched off. Comparing the raw
+  // constants instead is not like-for-like — a factor that touches both drain
+  // and recovery would win on having two terms rather than on mattering more,
+  // which put "in position" on screen 61% of the time when first tried.
+  //
+  // Reporting only. Nothing here feeds back into the simulation.
+  r.energyRate = recovery - drain;
+  const drainUnit = r.drainRate * r.effort * r.effort * kickCost;
+  const recoveryUnit = r.recoveryRate * slack * slack;
+  const positionBracket = 1 + K.POSITION_COST_PENALTY * misfit - K.IN_POSITION_DRAIN_BONUS * fit;
+  const draftMult = r.drafting ? 1 + K.DRAFT_RECOVERY_BONUS : 1;
+
+  const factors: [EnergyFactor, number][] = [
+    ['pressed', drainUnit * pressCost * positionBracket],
+    ['onTheLead', drainUnit * leadCost * positionBracket],
+    [
+      'outOfPosition',
+      drainUnit * frontCost * K.POSITION_COST_PENALTY * misfit +
+        recoveryUnit * backRecovery * K.OUT_POSITION_RECOVERY_PENALTY * misfit * draftMult,
+    ],
+    [
+      'inPosition',
+      drainUnit * frontCost * K.IN_POSITION_DRAIN_BONUS * fit +
+        recoveryUnit * backRecovery * K.POSITION_RECOVERY_BONUS * fit * draftMult,
+    ],
+    ['drafting', r.drafting ? recoveryUnit * recoveryBeforeDraft * K.DRAFT_RECOVERY_BONUS : 0],
+    // The kick is reported whenever it runs. It is the one factor the player
+    // deliberately caused, and being told what your own input is costing
+    // outranks anything merely circumstantial.
+    ['kicking', kicking ? Number.POSITIVE_INFINITY : 0],
+  ];
+
+  let best: EnergyFactor = 'neutral';
+  // Energy per second below which a factor is not worth a word on screen. A
+  // race is ~64s, so this is a factor that would swing under 6 of 100 energy
+  // across the whole trip.
+  let bestWeight = 0.09;
+  for (const [name, weight] of factors) {
+    if (weight > bestWeight) {
+      best = name;
+      bestWeight = weight;
+    }
+  }
+  r.energyFactor = best;
 
   // --- The performance band -------------------------------------------------
   // Consistency decides how tightly the horse delivers its true ability,

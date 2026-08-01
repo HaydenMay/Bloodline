@@ -13,7 +13,12 @@ import { createAiController } from '../sim/race/ai.js';
 import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
 import { ESTABLISH_UNTIL, STYLE_PROFILES, TICK_HZ } from '../sim/race/constants.js';
 import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../sim/race/recap.js';
-import type { ControlInput, RaceConfig, RaceEntrant } from '../sim/race/types.js';
+import type {
+  ControlInput,
+  EnergyFactor,
+  RaceConfig,
+  RaceEntrant,
+} from '../sim/race/types.js';
 import type { Horse } from '../sim/types.js';
 
 /**
@@ -88,6 +93,39 @@ const MAX_STRIDE_RATE = 0.9;
 const PULL_UP_WALK = 1.9;
 
 /**
+ * Energy per second below which the bar counts as steady rather than moving.
+ *
+ * The chevron bands above it are set from the rates a hands-off ride actually
+ * produces, measured over 60 races: taking up position runs about -2.3/s, the
+ * stretch about -0.9/s, a kick about -1.5/s, and the settled cruise about
+ * +0.1/s. So one chevron is a trickle, two is a real cost, three is only the
+ * opening burst — and the cruise correctly shows none at all.
+ */
+const RATE_HOLDING = 0.15;
+
+/** How long a new dominant factor must hold before the label switches to it. */
+const FACTOR_DWELL_MS = 260;
+
+/**
+ * The energy economy, in the player's words.
+ *
+ * The simulation decides WHICH factor is dominating; this decides what to call
+ * it. Every one of these names a thing the player can act on — drop back, take
+ * a pull, come off the rail — because a cause you cannot answer is decoration.
+ *
+ * `neutral` is deliberately blank: a label that is always lit stops being read.
+ */
+const FACTOR_LABELS: Record<EnergyFactor, { text: string; colour: string } | null> = {
+  pressed: { text: 'BEING PRESSED', colour: '#E2564A' },
+  onTheLead: { text: 'ON THE LEAD', colour: '#E8A33D' },
+  outOfPosition: { text: 'OUT OF POSITION', colour: '#E8A33D' },
+  inPosition: { text: 'IN POSITION', colour: '#4EC9A0' },
+  drafting: { text: 'IN THE SLIPSTREAM', colour: '#4EC9A0' },
+  kicking: { text: 'KICKING', colour: '#F2C14E' },
+  neutral: null,
+};
+
+/**
  * Sprite pixels per rig unit, so both draw the same horse at the same size.
  *
  * The rig spans about 123 of its own units nose to tail-tip; the sprite spans
@@ -121,14 +159,23 @@ const CALLOUTS = [
  * Ceiling on the default ride, once the field has settled.
  *
  * Chosen by sweeping it against 150 races at each of six values. 0.48 is the
- * best point available: it keeps 72 of 100 energy to the wire hands-off, and it
- * is also where a well-timed ride wins most (28 of 150, against a fair share of
- * 19). Higher preserves less; lower loses more ground for no extra wins.
+ * best point available, and it is where a well-timed ride wins most (25 of 150
+ * against a fair share of 19). Higher preserves less; lower loses more ground
+ * for no extra wins.
  *
- * It cannot preserve ALL of it. Holding the field's pace costs more energy than
- * break-even allows, so staying in touch is intrinsically expensive — see the
- * known issue in ROADMAP.md. That is a simulation problem and it belongs to
- * Phase 4.5; this constant only stops the ride spending what it does not have to.
+ * It cannot preserve ALL of it — hands-off reaches the wire with 46 of 100.
+ * But NOT because the cruise bleeds, which is what this note claimed until the
+ * rate was measured per phase over 60 races:
+ *
+ *     taking up position   -2.3/s      the whole reserve, and then some
+ *     settled cruise       +0.1/s      break-even, which is the cap working
+ *     the stretch          -0.9/s      committing, as it should
+ *
+ * Capped and in position the cruise is already break-even. The reserve goes in
+ * the opening 28% — which this constant deliberately does not cap, for the
+ * reason below. So the cost is the price of a slot, not a leak, and raising the
+ * cap would not recover it. What remains a simulation problem for Phase 4.5 is
+ * that the opening is that expensive at all; see the known issue in ROADMAP.md.
  *
  * It applies only AFTER position is taken up. Capping the opening as well was
  * the mistake in the first attempt: the jockey could not go and get its slot,
@@ -263,7 +310,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let callout = '';
   let calloutUntil = 0;
   let finishedAt = 0;
-  let lastEnergy = 100;
+  /** Smoothed energy rate, so the chevrons do not judder tick to tick. */
+  let rateEma = 0;
+  let shownFactor: EnergyFactor = 'neutral';
+  let pendingFactor: EnergyFactor = 'neutral';
+  let pendingSince = 0;
   // Built once at the wire. The finish screen redraws every frame and
   // race.outcome() re-sorts and re-measures the whole field each call.
   let finalRecap: Recap | null = null;
@@ -439,7 +490,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       }
     }
 
-    drawHud(ctx, width, height, player, runners);
+    drawHud(ctx, width, height, player, runners, dt);
   };
 
   const drawHud = (
@@ -448,6 +499,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     height: number,
     player: RunnerSnapshot,
     runners: RunnerSnapshot[],
+    dt: number,
   ): void => {
     const pad = 14;
 
@@ -547,32 +599,102 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       ctx.fill();
     }
 
-    ctx.fillStyle = '#0E1218';
-    ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('ENERGY', barX + 12, barY + 17);
+    /**
+     * Every label on this bar is drawn twice, clipped either side of the fill
+     * edge, in the colour that reads against what is behind it there.
+     *
+     * The labels are dark because they were designed sitting on a full green
+     * bar — but the bar empties, and near-black on the dark track is close to
+     * invisible. Which is precisely backwards: a horse running out of energy is
+     * when the player most needs to read it. Clipping rather than picking one
+     * colour per label also handles a word straddling the edge, which is the
+     * case a threshold gets wrong.
+     */
+    const fillEnd = barX + 3 + (barW - 6) * energy;
+    const barLabel = (
+      text: string,
+      x: number,
+      align: CanvasTextAlign,
+      font: string,
+      onFill: string,
+      offFill: string,
+    ): void => {
+      ctx.font = font;
+      ctx.textAlign = align;
+      const halves: [string, number, number][] = [
+        [onFill, barX, fillEnd],
+        [offFill, fillEnd, barX + barW],
+      ];
+      for (const [colour, from, to] of halves) {
+        if (to - from < 0.5) continue;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(from, barY, to - from, 26);
+        ctx.clip();
+        ctx.fillStyle = colour;
+        ctx.fillText(text, x, barY + 17);
+        ctx.restore();
+      }
+    };
 
-    // Whether energy is going up or down, so it is never a mystery why.
-    const drift = player.energy - lastEnergy;
-    lastEnergy = player.energy;
-    if (Math.abs(drift) > 0.004) {
-      const gaining = drift > 0;
-      ctx.fillStyle = gaining ? '#0E1218' : 'rgba(14,18,24,0.65)';
-      ctx.font = '700 12px ui-sans-serif, system-ui, sans-serif';
-      ctx.fillText(gaining ? '▲' : '▼', barX + 62, barY + 17);
+    const LABEL_FONT = '700 11px ui-sans-serif, system-ui, sans-serif';
+    barLabel('ENERGY', barX + 12, 'left', LABEL_FONT, '#0E1218', 'rgba(233,238,245,0.92)');
+    // Measured rather than assumed: at a hard-coded offset the chevrons sat
+    // flush against the E of ENERGY and read as part of the word.
+    ctx.font = LABEL_FONT;
+    const chevronX = barX + 12 + ctx.measureText('ENERGY').width + 7;
+
+    // HOW FAST the energy is moving, not merely which way.
+    //
+    // A single arrow said "down" whether the horse was trickling away at the
+    // cruise or emptying itself in the straight — two situations that call for
+    // opposite decisions. Chevrons carry the magnitude, and the rate comes from
+    // the simulation rather than from differencing the bar between frames,
+    // which was frame-rate dependent and noisy enough to flicker.
+    rateEma += (player.energyRate - rateEma) * Math.min(1, dt * 6);
+    const mag = Math.abs(rateEma);
+    const chevrons = mag < RATE_HOLDING ? 0 : mag < 1.0 ? 1 : mag < 2.2 ? 2 : 3;
+    if (chevrons > 0) {
+      const gaining = rateEma > 0;
+      barLabel(
+        (gaining ? '▲' : '▼').repeat(chevrons),
+        chevronX,
+        'left',
+        '700 12px ui-sans-serif, system-ui, sans-serif',
+        gaining ? '#0E1218' : 'rgba(14,18,24,0.62)',
+        gaining ? 'rgba(233,238,245,0.92)' : 'rgba(233,238,245,0.66)',
+      );
+    }
+
+    // WHY it is moving. The label is held briefly before it changes: two
+    // factors near-tied would otherwise swap every tick and strobe.
+    const factor = player.energyFactor;
+    if (factor !== shownFactor) {
+      if (factor !== pendingFactor) {
+        pendingFactor = factor;
+        pendingSince = performance.now();
+      } else if (performance.now() - pendingSince > FACTOR_DWELL_MS) {
+        shownFactor = factor;
+      }
+    } else {
+      pendingFactor = factor;
     }
 
     const inWindow = Math.abs(curr.progress - playerProfile.kickAt) <= 0.09;
-    ctx.textAlign = 'right';
+    const tagX = barX + barW - 12;
+    // What YOU are doing outranks what the race is doing to you: those states
+    // are transient, deliberate, and the moment you need to act on.
     if (input.takingBack) {
-      ctx.fillStyle = '#4EC9A0';
-      ctx.fillText('TAKING A PULL', barX + barW - 12, barY + 17);
+      barLabel('TAKING A PULL', tagX, 'right', LABEL_FONT, '#0E1218', '#4EC9A0');
     } else if (inWindow && !input.kickUsed) {
-      ctx.fillStyle = '#F2C14E';
-      ctx.fillText('YOUR MOMENT', barX + barW - 12, barY + 17);
+      barLabel('YOUR MOMENT', tagX, 'right', LABEL_FONT, '#0E1218', '#F2C14E');
     } else if (performance.now() < input.urgeUntil) {
-      ctx.fillStyle = '#E8A33D';
-      ctx.fillText('URGING', barX + barW - 12, barY + 17);
+      barLabel('URGING', tagX, 'right', LABEL_FONT, '#0E1218', '#E8A33D');
+    } else {
+      const tag = FACTOR_LABELS[shownFactor];
+      if (tag) {
+        barLabel(tag.text, tagX, 'right', LABEL_FONT, '#0E1218', tag.colour);
+      }
     }
 
     // ---- Call-outs ---------------------------------------------------------
