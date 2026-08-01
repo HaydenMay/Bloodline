@@ -30,10 +30,19 @@ export interface Recap {
 }
 
 /**
+ * Past this, racing stops counting. Official results say "distanced".
+ *
+ * "Beaten 53 lengths" is not a margin anyone recognises — it is a number where
+ * a verdict should be.
+ */
+const DISTANCED = 30;
+
+/**
  * A margin, said the way a racecourse commentator would.
  *
- * Below a length, racing does not count in lengths at all — it counts in parts
- * of a horse, and "beaten 0.3 lengths" is nobody's idea of a photo finish.
+ * At both ends racing stops counting in lengths. Below one it counts in parts
+ * of a horse, because "beaten 0.3 lengths" is nobody's idea of a photo finish.
+ * Past thirty it stops counting at all.
  */
 export function lengths(m: number): string {
   if (m < 0.03) return 'a dead heat';
@@ -42,6 +51,7 @@ export function lengths(m: number): string {
   if (m < 0.35) return 'a neck';
   if (m < 0.62) return 'half a length';
   if (m < 0.87) return 'three-quarters of a length';
+  if (m >= DISTANCED) return 'a distance';
 
   const q = Math.round(m * 4) / 4;
   if (q <= 1) return 'a length';
@@ -123,6 +133,13 @@ export function buildRecap(
 
   if (me.offColour) {
     add(`${me.name} was below its best today. It happens, and it will not happen every time.`);
+  }
+
+  // Being tailed off is its own verdict. Explaining it in tactical terms — a
+  // pace read, a reserve unspent — dignifies a beating that had no tactics in
+  // it, so it is said plainly and it outranks all of that.
+  if (!won && me.margin >= DISTANCED) {
+    add('You were tailed off and beaten a distance. Nothing that happened in the race explains that.');
   }
 
   if (pace === 'collapsed') {

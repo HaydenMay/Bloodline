@@ -32,6 +32,12 @@ describe('lengths', () => {
     expect(lengths(0.75)).toBe('three-quarters of a length');
   });
 
+  it('stops counting past thirty, the way a result sheet does', () => {
+    expect(lengths(29)).toBe('29 lengths');
+    expect(lengths(30)).toBe('a distance');
+    expect(lengths(53)).toBe('a distance');
+  });
+
   it('counts in quarter lengths above one', () => {
     expect(lengths(1)).toBe('a length');
     expect(lengths(1.25)).toBe('1¼ lengths');
@@ -123,6 +129,14 @@ describe('buildRecap', () => {
     rows[0]!.horseId = 'me';
     const won = buildRecap(outcome(rows), 'me', 'stalker');
     expect(won.story.join(' ')).not.toContain('never asked');
+  });
+
+  it('calls a tailed-off beating what it is, ahead of any tactical read', () => {
+    const rows = field();
+    rows[1] = result({ horseId: 'me', finishPosition: 2, margin: 53, energyLeft: 40 });
+    const r = buildRecap(outcome(rows, { paceRating: 1.3 }), 'me', 'closer');
+    expect(r.margin).toBe('beaten a distance');
+    expect(r.story[0]).toContain('tailed off');
   });
 
   it('survives a horse that was not in the race', () => {
