@@ -159,6 +159,40 @@ it doesn't, we change it now, and we will have spent five sessions finding out i
 1–3, and 5+ is a rout. Long term this needs to be much closer, with genuine
 photo finishes — that is where the drama of a race actually lives.
 
+### The tail is worse than the front, and that is the bigger problem
+
+Measured over 200 races, 8f, open division — median margin behind the winner:
+
+| Place | 2nd | 3rd | 4th | 5th | 6th | 7th | 8th |
+|---|---|---|---|---|---|---|---|
+| Behind | 4.4L | 7.9L | 11.3L | 16.7L | 23.9L | 38.4L | **73.8L** |
+
+The first four are close to plausible. From fifth back it detonates: the gap
+between consecutive horses runs 3.5L, 3.5L, 5.4L, 7.2L, **14.5L, 35.4L**. A real
+eight-runner field finishes inside about twenty lengths end to end; ours strings
+out over seventy. Horses that run out of energy are not fading, they are
+collapsing.
+
+This matters more than the winning margin because it is what a player actually
+sees. A beaten horse is routinely reported as *distanced*, which reads as a
+broken game rather than a bad ride.
+
+**Two contributing causes, both measured:**
+
+1. **The tail collapse above** — the energy model has no floor, so an empty horse
+   keeps losing ground at a rate nothing in racing does.
+2. **The whole sim runs 1.43× too fast.** A winning 8f time is 64.4s against a
+   real ~96s, which is 25.0 m/s where a thoroughbred tops out near 17.5. Since a
+   margin is a time gap multiplied by speed, every margin is inflated by that
+   factor before any of the variance above is applied.
+
+Fixing the speed scale alone would take last place from 74L to about 51L. It is
+not sufficient, but it is the cheapest single correction and it should come
+first, because everything else is calibrated on top of it.
+
+**Not urgent for Gate 2** — riding still feels different race to race — but it is
+the first thing to fix afterwards.
+
 Deliberately shelved, not forgotten: it is reported on every harness run so it
 cannot quietly persist.
 
