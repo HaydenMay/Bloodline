@@ -196,6 +196,8 @@ function drawLeg(
 
   const leg = new Path2D();
   leg.moveTo(hipX + pUpper.x * wHip, hipY + pUpper.y * wHip);
+  // Rounded cap over the top of the leg, so the join is a shoulder rather than
+  // a wedge poking out of the body.
   leg.quadraticCurveTo(
     midX + pUpper.x * wMid * 1.15,
     midY + pUpper.y * wMid * 1.15,
@@ -211,6 +213,16 @@ function drawLeg(
     hipX - pUpper.x * wHip,
     hipY - pUpper.y * wHip,
   );
+  {
+    const ux = (knee.x - hipX) / Math.max(0.001, Math.hypot(knee.x - hipX, knee.y - hipY));
+    const uy = (knee.y - hipY) / Math.max(0.001, Math.hypot(knee.x - hipX, knee.y - hipY));
+    leg.quadraticCurveTo(
+      hipX - ux * wHip * 0.9,
+      hipY - uy * wHip * 0.9,
+      hipX + pUpper.x * wHip,
+      hipY + pUpper.y * wHip,
+    );
+  }
   leg.closePath();
 
   shade(ctx, leg, [hipX - wHip, hipY, footX + wFoot, footY], colour, 0.75);
@@ -309,13 +321,14 @@ export function drawHorse(
   ctx.rotate(-0.14 - 0.1 * drive);
   ctx.translate(0, headBob * 0.3);
 
+  const NECK_C = 20;
   // Ear, behind the head so its base is hidden by it.
   const ear = new Path2D();
-  ear.moveTo(20, -8);
-  ear.lineTo(21, -16);
-  ear.lineTo(25, -8);
+  ear.moveTo(NECK_C - 4, -9);
+  ear.lineTo(NECK_C - 2, -18);
+  ear.lineTo(NECK_C + 2, -10);
   ear.closePath();
-  shade(ctx, ear, [20, -16, 25, -7], body, 0.6);
+  shade(ctx, ear, [NECK_C - 4, -18, NECK_C + 2, -8], body, 0.6);
 
   // NECK AND HEAD AS ONE SILHOUETTE.
   //
@@ -323,17 +336,24 @@ export function drawHorse(
   // head ~0.28, and the neck TAPERS hard from a deep base to a fine throat.
   // Previously it was as deep as the barrel and half again too long, which is
   // why it read as a wedge with a small head stuck on the end.
-  const NECK = 21;
-  const HEAD = 14;
+  const NECK = 20;
+  const HEAD = 18;
+  const NOSE = NECK + HEAD;
   const neck = new Path2D();
   neck.moveTo(-8, 11); // base at the withers
-  neck.bezierCurveTo(-1, 2, NECK - 8, -5, NECK, -8); // crest, tapering
-  neck.bezierCurveTo(NECK + 5, -10, NECK + 10, -8, NECK + HEAD - 3, -5); // poll and face
-  neck.bezierCurveTo(NECK + HEAD + 1, -4, NECK + HEAD + 2, -1, NECK + HEAD - 1, 0); // muzzle
-  neck.bezierCurveTo(NECK + HEAD - 5, 1, NECK + 8, 1, NECK + 3, 1); // jaw
-  neck.bezierCurveTo(NECK - 5, 4, -2, 10, -6, 17); // throat, into the chest
+  // crest, tapering up to the poll
+  neck.bezierCurveTo(-1, 1, NECK - 9, -7, NECK - 1, -10);
+  // poll, then down the face — the profile is nearly straight
+  neck.bezierCurveTo(NECK + 4, -12, NOSE - 6, -9, NOSE - 1, -5);
+  // muzzle, blunt rather than pointed
+  neck.bezierCurveTo(NOSE + 2, -3, NOSE + 2, 1, NOSE - 2, 2);
+  // back along the jaw to the JOWL — the deep cheek that makes a head read as
+  // a head instead of the neck tapering to a point
+  neck.bezierCurveTo(NOSE - 7, 3, NECK + 5, 5, NECK + 1, 7);
+  // throat, cut away sharply, then down into the chest
+  neck.bezierCurveTo(NECK - 6, 6, -1, 10, -6, 17);
   neck.closePath();
-  shade(ctx, neck, [-8, -10, NECK + HEAD + 2, 17], body, 0.85);
+  shade(ctx, neck, [-8, -12, NOSE + 2, 17], body, 0.85);
 
   // Everything inside the neck is shading only — no outlines, no seams.
   ctx.save();
@@ -343,7 +363,7 @@ export function drawHorse(
   ctx.fillStyle = coat.points;
   ctx.globalAlpha = 0.85;
   ctx.beginPath();
-  ctx.ellipse(NECK + HEAD - 2, -2, 3.6, 2.6, 0.2, 0, Math.PI * 2);
+  ctx.ellipse(NOSE - 3, -1.5, 4, 3, 0.25, 0, Math.PI * 2);
   ctx.fill();
 
   // One soft gradient down the neck instead of discrete blobs, so no shading
@@ -354,15 +374,15 @@ export function drawHorse(
   ng.addColorStop(1, dark(body, 0.26));
   ctx.globalAlpha = 0.85;
   ctx.fillStyle = ng;
-  ctx.fillRect(-12, -14, NECK + HEAD + 16, 34);
+  ctx.fillRect(-12, -16, NOSE + 16, 36);
 
   // Mane along the crest.
   ctx.globalAlpha = 1;
   ctx.fillStyle = coat.hair;
   ctx.beginPath();
   ctx.moveTo(-9, 8);
-  ctx.bezierCurveTo(-2, 0, NECK - 8, -6, NECK + 2, -9);
-  ctx.bezierCurveTo(NECK - 6, -2 - headBob * 0.3, -1, 3, -9, 3);
+  ctx.bezierCurveTo(-2, 0, NECK - 9, -7, NECK - 1, -10);
+  ctx.bezierCurveTo(NECK - 7, -3 - headBob * 0.3, -1, 3, -9, 3);
   ctx.closePath();
   ctx.fill();
 
@@ -371,7 +391,7 @@ export function drawHorse(
   // Eye, on top of everything.
   ctx.fillStyle = '#120C08';
   ctx.beginPath();
-  ctx.ellipse(NECK + 6, -5.5, 1.5, 1.7, 0, 0, Math.PI * 2);
+  ctx.ellipse(NECK + 4, -6, 1.7, 1.9, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
