@@ -687,3 +687,77 @@ body {
   color: var(--accent);
   opacity: 0.8;
 }
+
+/* Trait tooltip inside a pinned info box */
+.ib-trait {
+  position: relative;
+}
+
+.ib-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%);
+  width: 190px;
+  background: #0e1218;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--text);
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s;
+  z-index: 5;
+  pointer-events: none;
+  white-space: normal;
+}
+
+.info-box.is-pinned .ib-trait:hover .ib-tip {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Horse preview (dev view at ?preview) */
+.stage-full {
+  height: 100svh;
+}
+
+.preview-bar {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--muted);
+  z-index: 20;
+}
+
+.preview-bar button {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 5px 13px;
+  cursor: pointer;
+}
+
+.preview-bar label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pv-note {
+  opacity: 0.65;
+}

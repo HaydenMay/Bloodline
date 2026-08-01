@@ -7,6 +7,7 @@ import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
 import { STYLE_PROFILES } from './sim/race/constants.js';
 import { attachInfoBox } from './ui/infoBox.js';
 import { mountRaceScreen } from './ui/raceScreen.js';
+import { mountHorsePreview } from './ui/horsePreview.js';
 import { mountRoadmap } from './ui/roadmap.js';
 import type { Horse } from './sim/types.js';
 
@@ -128,5 +129,14 @@ function styleLabel(style: string): string {
   }
 }
 
-startRace('bloodline-demo');
+// ?preview opens the horse preview instead of a race — a development view for
+// judging the drawing at a size where problems are actually visible.
+if (new URLSearchParams(location.search).has('preview')) {
+  const stage = document.createElement('div');
+  stage.className = 'stage stage-full';
+  app.appendChild(stage);
+  mountHorsePreview(stage);
+} else {
+  startRace('bloodline-demo');
+}
 mountRoadmap();

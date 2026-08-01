@@ -76,7 +76,11 @@ export function renderInfoBox(horse: Horse): string {
 
   const traits = horse.traits.length
     ? horse.traits
-        .map((id) => `<span class="ib-trait" title="${TRAITS[id].description}">${TRAITS[id].name}</span>`)
+        .map(
+          (id) =>
+            `<span class="ib-trait">${TRAITS[id].name}` +
+            `<span class="ib-tip">${TRAITS[id].description}</span></span>`,
+        )
         .join('')
     : '<span class="ib-trait ib-none">None discovered</span>';
 
