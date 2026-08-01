@@ -18,11 +18,26 @@ import { coatFor, dark, lite, type Silks } from './palette.js';
  */
 
 const GROUND = 0;
-const BODY_Y = -46;
-const SHOULDER_X = 19;
-const HIP_X = -21;
-const UPPER = 20;
-const LOWER = 25;
+
+/**
+ * PROPORTIONS, measured off photographs of galloping thoroughbreds rather than
+ * guessed. Checking the previous rig against reference, it was 35% too short in
+ * the body and nearly twice as deep through the barrel — a stocky pony, which
+ * is why it never read as a racehorse however it was shaded.
+ *
+ * Against height at the withers (H), a thoroughbred is roughly:
+ *   body length, point of shoulder to point of buttock   ~1.0 H
+ *   barrel depth                                         ~0.33 H
+ *   ground to elbow                                      ~0.55 H
+ *   neck                                                 ~0.40 H
+ *   head                                                 ~0.28 H
+ */
+const BODY_Y = -40; // barrel centre
+const BARREL_HALF = 11; // ~0.33 H total depth
+const SHOULDER_X = 25;
+const HIP_X = -26; // body length ~51, against a withers height of ~51
+const UPPER = 17;
+const LOWER = 20;
 
 export interface HorsePose {
   /** 0-1 through the stride cycle. */
@@ -209,9 +224,9 @@ export function drawHorse(
   ctx.translate(0, -suspension + bob);
   ctx.rotate(-0.05 * drive);
 
-  const reach = 20 + 14 * intensity;
-  const shoulderY = BODY_Y + 5;
-  const hipY = BODY_Y + 3;
+  const reach = 17 + 13 * intensity;
+  const shoulderY = BODY_Y + BARREL_HALF * 0.5;
+  const hipY = BODY_Y + BARREL_HALF * 0.2;
 
   // ---- Far legs, pushed back in tone so the near side reads forward -------
   const far = dark(body, 0.3);
@@ -234,7 +249,7 @@ export function drawHorse(
   const headBob = Math.sin(phase * Math.PI * 2 + 0.4) * (2 + 2.5 * intensity);
 
   ctx.save();
-  ctx.translate(SHOULDER_X + 5, BODY_Y - 6);
+  ctx.translate(SHOULDER_X - 1, BODY_Y - BARREL_HALF * 1.1);
   ctx.rotate(-0.46 - 0.13 * drive);
   ctx.translate(0, headBob * 0.3);
 
@@ -311,22 +326,53 @@ export function drawHorse(
   // overlapping ellipses they each carried their own outline, so you could see
   // the circles inside the horse. Internal form below is shading ONLY, never
   // stroked — an outline inside a body always reads as a seam.
+  const D = BARREL_HALF;
   const silhouette = new Path2D();
-  silhouette.moveTo(SHOULDER_X + 11, BODY_Y + 1);
-  // withers and topline
-  silhouette.bezierCurveTo(SHOULDER_X + 7, BODY_Y - 13, SHOULDER_X - 6, BODY_Y - 17, 2, BODY_Y - 17);
-  // back, dipping slightly to the croup
-  silhouette.bezierCurveTo(HIP_X + 8, BODY_Y - 17, HIP_X - 2, BODY_Y - 19, HIP_X - 9, BODY_Y - 13);
-  // rump and haunch
-  silhouette.bezierCurveTo(HIP_X - 18, BODY_Y - 7, HIP_X - 19, BODY_Y + 6, HIP_X - 10, BODY_Y + 13);
-  // stifle down to the belly
-  silhouette.bezierCurveTo(HIP_X - 4, BODY_Y + 17, HIP_X + 6, BODY_Y + 13, -2, BODY_Y + 12);
-  // tucked-up flank, then the girth
-  silhouette.bezierCurveTo(SHOULDER_X - 8, BODY_Y + 12, SHOULDER_X - 2, BODY_Y + 16, SHOULDER_X + 6, BODY_Y + 12);
-  // chest
-  silhouette.bezierCurveTo(SHOULDER_X + 13, BODY_Y + 9, SHOULDER_X + 14, BODY_Y + 5, SHOULDER_X + 11, BODY_Y + 1);
+  // point of shoulder
+  silhouette.moveTo(SHOULDER_X + 6, BODY_Y + D * 0.2);
+  // up the shoulder to the withers — the highest point of the topline
+  silhouette.bezierCurveTo(
+    SHOULDER_X + 4, BODY_Y - D * 0.7,
+    SHOULDER_X - 4, BODY_Y - D * 1.25,
+    SHOULDER_X - 11, BODY_Y - D * 1.3,
+  );
+  // long, near-level back with a shallow dip
+  silhouette.bezierCurveTo(
+    4, BODY_Y - D * 1.15,
+    HIP_X + 14, BODY_Y - D * 1.1,
+    HIP_X + 5, BODY_Y - D * 1.35,
+  );
+  // croup, then down over the quarters
+  silhouette.bezierCurveTo(
+    HIP_X - 3, BODY_Y - D * 1.5,
+    HIP_X - 11, BODY_Y - D * 0.9,
+    HIP_X - 11, BODY_Y + D * 0.1,
+  );
+  // buttock and stifle
+  silhouette.bezierCurveTo(
+    HIP_X - 11, BODY_Y + D * 0.9,
+    HIP_X - 6, BODY_Y + D * 1.15,
+    HIP_X + 2, BODY_Y + D * 0.95,
+  );
+  // belly, tucked up through the flank
+  silhouette.bezierCurveTo(
+    HIP_X + 12, BODY_Y + D * 0.8,
+    -2, BODY_Y + D * 0.85,
+    SHOULDER_X - 12, BODY_Y + D * 1.05,
+  );
+  // deep girth behind the elbow
+  silhouette.bezierCurveTo(
+    SHOULDER_X - 5, BODY_Y + D * 1.2,
+    SHOULDER_X + 4, BODY_Y + D * 1.0,
+    SHOULDER_X + 6, BODY_Y + D * 0.2,
+  );
   silhouette.closePath();
-  shade(ctx, silhouette, [HIP_X - 19, BODY_Y - 19, SHOULDER_X + 14, BODY_Y + 17], body);
+  shade(
+    ctx,
+    silhouette,
+    [HIP_X - 11, BODY_Y - D * 1.5, SHOULDER_X + 6, BODY_Y + D * 1.2],
+    body,
+  );
 
   // Internal form, clipped to the silhouette so nothing spills over the edge.
   ctx.save();
@@ -334,36 +380,37 @@ export function drawHorse(
 
   // Belly shadow.
   ctx.fillStyle = dark(body, 0.3);
-  ctx.globalAlpha = 0.75;
+  ctx.globalAlpha = 0.7;
   ctx.beginPath();
-  ctx.ellipse(0, BODY_Y + 16, 30, 9, -0.03, 0, Math.PI * 2);
+  ctx.ellipse(0, BODY_Y + D * 1.3, 30, D * 0.8, -0.02, 0, Math.PI * 2);
   ctx.fill();
 
   // Light along the back.
-  ctx.fillStyle = lite(body, 0.24);
-  ctx.globalAlpha = 0.6;
+  ctx.fillStyle = lite(body, 0.22);
+  ctx.globalAlpha = 0.55;
   ctx.beginPath();
-  ctx.ellipse(-3, BODY_Y - 16, 22, 5, -0.03, 0, Math.PI * 2);
+  ctx.ellipse(-2, BODY_Y - D * 1.25, 24, D * 0.4, -0.02, 0, Math.PI * 2);
   ctx.fill();
 
-  // Haunch mass — a soft crease, not an outlined circle.
-  ctx.fillStyle = lite(body, 0.16);
-  ctx.globalAlpha = 0.5;
-  ctx.beginPath();
-  ctx.ellipse(HIP_X - 5, BODY_Y - 2, 12, 13, -0.12, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = dark(body, 0.22);
-  ctx.globalAlpha = 0.35;
-  ctx.beginPath();
-  ctx.ellipse(HIP_X + 10, BODY_Y + 1, 5, 14, 0.1, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Shoulder plane.
+  // Quarters — a soft mass over the hip, never an outlined circle.
   ctx.fillStyle = lite(body, 0.14);
   ctx.globalAlpha = 0.45;
   ctx.beginPath();
-  ctx.ellipse(SHOULDER_X, BODY_Y + 3, 9, 12, 0.24, 0, Math.PI * 2);
+  ctx.ellipse(HIP_X - 1, BODY_Y - D * 0.25, 11, D * 1.15, -0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Flank crease, where the barrel tucks up.
+  ctx.fillStyle = dark(body, 0.2);
+  ctx.globalAlpha = 0.3;
+  ctx.beginPath();
+  ctx.ellipse(HIP_X + 13, BODY_Y + D * 0.3, 4, D * 1.1, 0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Shoulder plane.
+  ctx.fillStyle = lite(body, 0.13);
+  ctx.globalAlpha = 0.4;
+  ctx.beginPath();
+  ctx.ellipse(SHOULDER_X - 5, BODY_Y + D * 0.1, 8, D * 1.05, 0.3, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
@@ -371,7 +418,7 @@ export function drawHorse(
   // ---- Jockey -------------------------------------------------------------
   const crouch = Math.sin(phase * Math.PI * 2 + 0.8) * 1.4;
   ctx.save();
-  ctx.translate(1, BODY_Y - 15 + crouch);
+  ctx.translate(6, BODY_Y - BARREL_HALF * 1.35 + crouch);
   ctx.rotate(-0.24 - 0.12 * drive);
 
   const torso = new Path2D();
