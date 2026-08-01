@@ -9,15 +9,44 @@
  * of what it returns will not change.
  */
 
+/**
+ * Warm dark used for all shading and line art.
+ *
+ * Shading toward a warm near-black rather than pure black is what stops
+ * shadows reading as grubby grey — a technique worth stealing outright.
+ */
+export const INK = '#262126';
+
+const hexToRgb = (hex: string): [number, number, number] => {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+const mix = (a: string, b: string, t: number): string => {
+  const [r1, g1, b1] = hexToRgb(a);
+  const [r2, g2, b2] = hexToRgb(b);
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const bl = Math.round(b1 + (b2 - b1) * t);
+  return `rgb(${r},${g},${bl})`;
+};
+
+/** Toward white. */
+export const lite = (c: string, amount: number): string => mix(c, '#FFFFFF', amount);
+/** Toward the warm ink, never toward black. */
+export const dark = (c: string, amount: number): string => mix(c, INK, amount);
+
+/**
+ * A coat is three MATERIALS, each just a base colour. Light and dark tones are
+ * derived at draw time rather than hand-specified, so any colour genetics
+ * produces in Phase 5 shades correctly without needing a hand-authored palette
+ * entry for every possible outcome.
+ */
 export interface Coat {
   id: string;
   name: string;
   /** Main body colour. */
   body: string;
-  /** Shaded underside and muscle definition. */
-  shade: string;
-  /** Highlight along the back and haunch. */
-  light: string;
   /** Mane and tail. */
   hair: string;
   /** Lower legs, muzzle and ear tips — the "points". */
@@ -25,69 +54,14 @@ export interface Coat {
 }
 
 export const COATS: Record<string, Coat> = {
-  bay: {
-    id: 'bay',
-    name: 'Bay',
-    body: '#8C5A32',
-    shade: '#5E3A1F',
-    light: '#A9723F',
-    hair: '#22150C',
-    points: '#2A1A0E',
-  },
-  chestnut: {
-    id: 'chestnut',
-    name: 'Chestnut',
-    body: '#A85C2E',
-    shade: '#7A3F1D',
-    light: '#C4783F',
-    hair: '#C88A4E',
-    points: '#8B4A24',
-  },
-  black: {
-    id: 'black',
-    name: 'Black',
-    body: '#2F2B2C',
-    shade: '#1B1819',
-    light: '#463F41',
-    hair: '#141213',
-    points: '#181516',
-  },
-  grey: {
-    id: 'grey',
-    name: 'Grey',
-    body: '#B9B7B8',
-    shade: '#8E8B8D',
-    light: '#D6D4D5',
-    hair: '#EDECEC',
-    points: '#6E6B6D',
-  },
-  palomino: {
-    id: 'palomino',
-    name: 'Palomino',
-    body: '#C99A56',
-    shade: '#A2763A',
-    light: '#E0B879',
-    hair: '#F2E7D2',
-    points: '#B2843F',
-  },
-  buckskin: {
-    id: 'buckskin',
-    name: 'Buckskin',
-    body: '#C29B63',
-    shade: '#9C7642',
-    light: '#DCBB8B',
-    hair: '#241A11',
-    points: '#2B2016',
-  },
-  roan: {
-    id: 'roan',
-    name: 'Strawberry Roan',
-    body: '#A97F72',
-    shade: '#835F55',
-    light: '#C49E92',
-    hair: '#6E4A40',
-    points: '#7A5449',
-  },
+  bay: { id: 'bay', name: 'Bay', body: '#8C5A32', hair: '#221509', points: '#2A1A0E' },
+  chestnut: { id: 'chestnut', name: 'Chestnut', body: '#A85C2E', hair: '#C88A4E', points: '#8B4A24' },
+  black: { id: 'black', name: 'Black', body: '#37312F', hair: '#191617', points: '#1F1B1B' },
+  grey: { id: 'grey', name: 'Grey', body: '#B9B7B8', hair: '#EDECEC', points: '#6E6B6D' },
+  palomino: { id: 'palomino', name: 'Palomino', body: '#C99A56', hair: '#F2E7D2', points: '#B2843F' },
+  buckskin: { id: 'buckskin', name: 'Buckskin', body: '#C29B63', hair: '#241A11', points: '#2B2016' },
+  roan: { id: 'roan', name: 'Strawberry Roan', body: '#A97F72', hair: '#6E4A40', points: '#7A5449' },
+  darkBay: { id: 'darkBay', name: 'Dark Bay', body: '#5C3A22', hair: '#1B1210', points: '#211611' },
 };
 
 export const COAT_IDS = Object.keys(COATS);

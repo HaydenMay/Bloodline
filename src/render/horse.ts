@@ -1,4 +1,4 @@
-import { coatFor, type Silks } from './palette.js';
+import { coatFor, dark, lite, type Silks } from './palette.js';
 
 /**
  * The horse rig.
@@ -8,83 +8,97 @@ import { coatFor, type Silks } from './palette.js';
  * cleanly, and a cosmetic added later is one more layer rather than a re-draw
  * of every frame.
  *
- * Drawn in a local space roughly 100 units long with the ground at y = 0 and
- * the horse facing right, then scaled to fit. All measurements below are in
- * that space.
+ * SHADING. Every shape is a gradient fill plus a thin outline in a DARKENED
+ * TONE OF ITS OWN FILL COLOUR — never black, never a flat fill. That one rule
+ * is the difference between shapes that read as an animal and shapes that read
+ * as coloured blobs, and it costs nothing. Tones are derived from a single base
+ * colour so any coat genetics produces later will shade correctly.
+ *
+ * Drawn in a local space 100 units long, ground at y = 0, facing right.
  */
 
 const GROUND = 0;
-const BODY_Y = -46; // barrel centre above the ground
-const SHOULDER_X = 20;
-const HIP_X = -22;
-const UPPER = 20; // shoulder/hip to knee/hock
-const LOWER = 24; // knee/hock to hoof
+const BODY_Y = -46;
+const SHOULDER_X = 19;
+const HIP_X = -21;
+const UPPER = 20;
+const LOWER = 25;
 
 export interface HorsePose {
   /** 0-1 through the stride cycle. */
   phase: number;
-  /** 0-1, blends the stride between a relaxed canter and a flat-out gallop. */
+  /** 0-1, blends between a relaxed canter and a flat-out gallop. */
   intensity: number;
-  /** Slight forward lean while driving. */
+  /** Forward lean while being asked for effort. */
   drive: number;
 }
 
 /**
- * Where each leg sits in the stride.
- *
- * Offsets follow a transverse gallop — near hind, far hind, far fore, near fore
- * — which is what gives the gait its characteristic rocking rather than looking
- * like a pantomime horse.
+ * Transverse gallop footfalls — near hind, far hind, far fore, near fore —
+ * which is what gives the gait its rocking rather than looking like a
+ * pantomime horse.
  */
 const LEG_OFFSET = {
-  farHind: 0.12,
   nearHind: 0,
+  farHind: 0.12,
   farFore: 0.55,
   nearFore: 0.67,
 } as const;
 
-/** Foot position for a leg at a given point in the stride, relative to its hip. */
 function footPath(phase: number, intensity: number, reach: number): { x: number; y: number } {
   const p = phase % 1;
-  const stance = 0.42; // fraction of the cycle with the hoof on the ground
+  const stance = 0.42;
 
   if (p < stance) {
-    // Planted: the hoof is still while the body travels over it, so in local
-    // space it slides backwards.
     const t = p / stance;
     return { x: reach * (1 - 2 * t), y: GROUND };
   }
 
-  // Swing: lift, fold, and reach forward again.
   const t = (p - stance) / (1 - stance);
   const lift = Math.sin(t * Math.PI) * (10 + 16 * intensity);
-  const x = -reach + 2 * reach * t;
-  return { x, y: GROUND - lift };
+  return { x: -reach + 2 * reach * t, y: GROUND - lift };
 }
 
-/** Two-bone IK. Returns the joint position between hip and foot. */
 function solveKnee(
   hipX: number,
   hipY: number,
   footX: number,
   footY: number,
-  upper: number,
-  lower: number,
   bend: 1 | -1,
 ): { x: number; y: number } {
   const dx = footX - hipX;
   const dy = footY - hipY;
-  const dist = Math.max(0.001, Math.min(Math.hypot(dx, dy), upper + lower - 0.001));
+  const d = Math.max(0.001, Math.min(Math.hypot(dx, dy), UPPER + LOWER - 0.001));
+  const a = (UPPER * UPPER - LOWER * LOWER + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(0, UPPER * UPPER - a * a));
+  const mx = hipX + (dx * a) / d;
+  const my = hipY + (dy * a) / d;
+  return { x: mx + (bend * h * dy) / d, y: my - (bend * h * dx) / d };
+}
 
-  const a = (upper * upper - lower * lower + dist * dist) / (2 * dist);
-  const h = Math.sqrt(Math.max(0, upper * upper - a * a));
+/** Gradient fill plus a thin outline in a darker tone of the same colour. */
+function shade(
+  ctx: CanvasRenderingContext2D,
+  path: Path2D,
+  bounds: [number, number, number, number],
+  base: string,
+  outline = 1,
+): void {
+  const [x0, y0, x1, y1] = bounds;
+  const g = ctx.createLinearGradient(x0, y0, x1, y1);
+  g.addColorStop(0, lite(base, 0.26));
+  g.addColorStop(0.48, base);
+  g.addColorStop(1, dark(base, 0.24));
 
-  const mx = hipX + (dx * a) / dist;
-  const my = hipY + (dy * a) / dist;
+  ctx.fillStyle = g;
+  ctx.fill(path);
 
-  // Perpendicular, flipped by `bend` so forelegs and hind legs articulate the
-  // opposite way — which is what makes a horse read as a horse.
-  return { x: mx + (bend * h * dy) / dist, y: my - (bend * h * dx) / dist };
+  if (outline > 0) {
+    ctx.strokeStyle = dark(base, 0.45);
+    ctx.lineWidth = 1.6 * outline;
+    ctx.lineJoin = 'round';
+    ctx.stroke(path);
+  }
 }
 
 function drawLeg(
@@ -96,18 +110,27 @@ function drawLeg(
   reach: number,
   bend: 1 | -1,
   colour: string,
-  pointColour: string,
+  point: string,
   width: number,
 ): void {
   const foot = footPath(phase, intensity, reach);
   const footX = hipX + foot.x;
   const footY = foot.y;
-  const knee = solveKnee(hipX, hipY, footX, footY, UPPER, LOWER, bend);
+  const knee = solveKnee(hipX, hipY, footX, footY, bend);
 
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  // Upper bone, thicker.
+  // Outline pass first, then the fill on top — a cheap way to get line art on
+  // a stroked limb without drawing the outline as a separate path.
+  ctx.strokeStyle = dark(colour, 0.45);
+  ctx.lineWidth = width + 2.4;
+  ctx.beginPath();
+  ctx.moveTo(hipX, hipY);
+  ctx.lineTo(knee.x, knee.y);
+  ctx.lineTo(footX, footY);
+  ctx.stroke();
+
   ctx.strokeStyle = colour;
   ctx.lineWidth = width;
   ctx.beginPath();
@@ -115,18 +138,17 @@ function drawLeg(
   ctx.lineTo(knee.x, knee.y);
   ctx.stroke();
 
-  // Cannon bone, thinner and darker — the "points" of the coat.
-  ctx.strokeStyle = pointColour;
-  ctx.lineWidth = width * 0.62;
+  // Cannon bone: thinner, and the darker "points" colour.
+  ctx.strokeStyle = point;
+  ctx.lineWidth = width * 0.55;
   ctx.beginPath();
   ctx.moveTo(knee.x, knee.y);
   ctx.lineTo(footX, footY);
   ctx.stroke();
 
-  // Hoof.
-  ctx.fillStyle = pointColour;
+  ctx.fillStyle = dark(point, 0.3);
   ctx.beginPath();
-  ctx.ellipse(footX, footY - 1.5, width * 0.42, width * 0.34, 0, 0, Math.PI * 2);
+  ctx.ellipse(footX, footY - 1.5, width * 0.44, width * 0.33, 0, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -134,9 +156,7 @@ export interface DrawHorseOptions {
   coat: string;
   silks: Silks;
   pose: HorsePose;
-  /** Pixels per local unit. */
   scale: number;
-  /** Dim horses that have already crossed the line. */
   faded?: boolean;
 }
 
@@ -146,143 +166,132 @@ export function drawHorse(
   y: number,
   opts: DrawHorseOptions,
 ): void {
-  const { coat: coatId, silks, pose, scale } = opts;
-  const coat = coatFor(coatId);
-  const { phase, intensity, drive } = pose;
+  const coat = coatFor(opts.coat);
+  const { phase, intensity, drive } = opts.pose;
+  const body = coat.body;
 
   ctx.save();
   ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  if (opts.faded) ctx.globalAlpha = 0.45;
+  ctx.scale(opts.scale, opts.scale);
+  if (opts.faded) ctx.globalAlpha = 0.5;
 
-  // The barrel rises and falls twice per stride, and the whole horse lifts
-  // through the moment of suspension.
-  const bob = Math.sin(phase * Math.PI * 2) * (1.5 + 2 * intensity);
+  const bob = Math.sin(phase * Math.PI * 2) * (1.4 + 2 * intensity);
   const suspension = Math.max(0, Math.sin(phase * Math.PI * 2 - 0.9)) * 4 * intensity;
   ctx.translate(0, -suspension + bob);
   ctx.rotate(-0.05 * drive);
 
   const reach = 20 + 14 * intensity;
-  const shoulderY = BODY_Y + 6;
-  const hipY = BODY_Y + 4;
+  const shoulderY = BODY_Y + 5;
+  const hipY = BODY_Y + 3;
 
-  // ---- Far side legs, drawn behind the body and darkened for depth --------
-  ctx.globalAlpha *= 1;
-  const farShade = coat.shade;
-  drawLeg(ctx, HIP_X, hipY, phase + LEG_OFFSET.farHind, intensity, reach, -1, farShade, coat.points, 8);
-  drawLeg(ctx, SHOULDER_X, shoulderY, phase + LEG_OFFSET.farFore, intensity, reach, 1, farShade, coat.points, 7.5);
+  // ---- Far legs, pushed back in tone so the near side reads forward -------
+  const far = dark(body, 0.3);
+  const farPoint = dark(coat.points, 0.25);
+  drawLeg(ctx, HIP_X - 2, hipY, phase + LEG_OFFSET.farHind, intensity, reach, -1, far, farPoint, 7);
+  drawLeg(ctx, SHOULDER_X - 2, shoulderY, phase + LEG_OFFSET.farFore, intensity, reach, 1, far, farPoint, 6.5);
 
   // ---- Tail ---------------------------------------------------------------
-  const tailSwing = Math.sin(phase * Math.PI * 2 + 1.2) * 4;
-  ctx.fillStyle = coat.hair;
-  ctx.beginPath();
-  ctx.moveTo(HIP_X - 6, BODY_Y - 6);
-  ctx.quadraticCurveTo(HIP_X - 26, BODY_Y - 12 + tailSwing, HIP_X - 40, BODY_Y + 6 + tailSwing * 1.6);
-  ctx.quadraticCurveTo(HIP_X - 26, BODY_Y + 2 + tailSwing, HIP_X - 8, BODY_Y + 6);
-  ctx.closePath();
-  ctx.fill();
+  const swing = Math.sin(phase * Math.PI * 2 + 1.2) * 4;
+  const tail = new Path2D();
+  tail.moveTo(HIP_X - 4, BODY_Y - 8);
+  tail.quadraticCurveTo(HIP_X - 24, BODY_Y - 14 + swing, HIP_X - 42, BODY_Y + 4 + swing * 1.7);
+  tail.quadraticCurveTo(HIP_X - 24, BODY_Y + 1 + swing, HIP_X - 6, BODY_Y + 5);
+  tail.closePath();
+  shade(ctx, tail, [HIP_X - 42, BODY_Y - 14, HIP_X, BODY_Y + 6], coat.hair, 0.8);
 
   // ---- Barrel -------------------------------------------------------------
-  ctx.fillStyle = coat.body;
-  ctx.beginPath();
-  ctx.ellipse(-1, BODY_Y, 34, 17, -0.04, 0, Math.PI * 2);
-  ctx.fill();
+  // Deeper girth at the shoulder, tucked-up flank behind — a thoroughbred
+  // silhouette rather than a plain oval.
+  const barrel = new Path2D();
+  barrel.moveTo(SHOULDER_X + 6, BODY_Y - 8);
+  barrel.quadraticCurveTo(4, BODY_Y - 19, HIP_X - 6, BODY_Y - 13);
+  barrel.quadraticCurveTo(HIP_X - 15, BODY_Y - 2, HIP_X - 4, BODY_Y + 11);
+  barrel.quadraticCurveTo(-2, BODY_Y + 15, SHOULDER_X + 2, BODY_Y + 13);
+  barrel.quadraticCurveTo(SHOULDER_X + 13, BODY_Y + 4, SHOULDER_X + 6, BODY_Y - 8);
+  barrel.closePath();
+  shade(ctx, barrel, [HIP_X - 15, BODY_Y - 19, SHOULDER_X + 13, BODY_Y + 15], body);
 
-  // Haunch and shoulder mass, so the silhouette is not a plain oval.
-  ctx.beginPath();
-  ctx.ellipse(HIP_X - 4, BODY_Y - 1, 15, 15, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(SHOULDER_X - 2, BODY_Y + 1, 13, 14, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // Haunch — the big driving muscle, and the most recognisable part of the
+  // outline from side on.
+  const haunch = new Path2D();
+  haunch.ellipse(HIP_X - 3, BODY_Y - 1, 15, 16, -0.12, 0, Math.PI * 2);
+  shade(ctx, haunch, [HIP_X - 18, BODY_Y - 17, HIP_X + 12, BODY_Y + 15], body, 0.85);
 
-  // Underside shading.
-  ctx.fillStyle = coat.shade;
-  ctx.beginPath();
-  ctx.ellipse(-2, BODY_Y + 9, 28, 7, -0.03, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Topline highlight.
-  ctx.fillStyle = coat.light;
-  ctx.beginPath();
-  ctx.ellipse(-4, BODY_Y - 11, 24, 4.5, -0.05, 0, Math.PI * 2);
-  ctx.fill();
+  // Shoulder.
+  const shoulder = new Path2D();
+  shoulder.ellipse(SHOULDER_X - 1, BODY_Y + 2, 12, 14, 0.22, 0, Math.PI * 2);
+  shade(ctx, shoulder, [SHOULDER_X - 13, BODY_Y - 12, SHOULDER_X + 11, BODY_Y + 16], body, 0.85);
 
   // ---- Neck and head ------------------------------------------------------
   const headBob = Math.sin(phase * Math.PI * 2 + 0.4) * (2 + 2.5 * intensity);
-  const neckAngle = -0.42 - 0.12 * drive;
 
   ctx.save();
-  ctx.translate(SHOULDER_X + 4, BODY_Y - 4);
-  ctx.rotate(neckAngle);
+  ctx.translate(SHOULDER_X + 5, BODY_Y - 6);
+  ctx.rotate(-0.46 - 0.13 * drive);
   ctx.translate(0, headBob * 0.3);
 
-  ctx.fillStyle = coat.body;
-  ctx.beginPath();
-  ctx.moveTo(-8, 10);
-  ctx.quadraticCurveTo(6, 2, 26, -4);
-  ctx.lineTo(30, 8);
-  ctx.quadraticCurveTo(10, 14, -6, 20);
-  ctx.closePath();
-  ctx.fill();
+  // Finer neck than a simple wedge: crest above, throat cut away below.
+  const neck = new Path2D();
+  neck.moveTo(-9, 12);
+  neck.quadraticCurveTo(4, 0, 25, -7);
+  neck.lineTo(31, 3);
+  neck.quadraticCurveTo(12, 9, -6, 21);
+  neck.closePath();
+  shade(ctx, neck, [-9, -7, 31, 21], body, 0.9);
 
-  // Head
+  // Head — longer and finer than a blob.
   ctx.save();
-  ctx.translate(28, 1);
-  ctx.rotate(0.36);
-  ctx.fillStyle = coat.body;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 13, 7, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = coat.points;
-  ctx.beginPath();
-  ctx.ellipse(11, 1.5, 4.5, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Ear
-  ctx.fillStyle = coat.shade;
-  ctx.beginPath();
-  ctx.moveTo(-9, -5);
-  ctx.lineTo(-11, -13);
-  ctx.lineTo(-4, -6);
-  ctx.closePath();
-  ctx.fill();
-  // Eye
+  ctx.translate(28, -1);
+  ctx.rotate(0.4);
+  const head = new Path2D();
+  head.moveTo(-10, -6);
+  head.quadraticCurveTo(6, -7, 15, -2);
+  head.quadraticCurveTo(18, 1, 14, 4);
+  head.quadraticCurveTo(4, 8, -9, 6);
+  head.closePath();
+  shade(ctx, head, [-10, -7, 18, 8], body, 0.8);
+
+  const muzzle = new Path2D();
+  muzzle.ellipse(13, 1.5, 4, 3.4, 0.1, 0, Math.PI * 2);
+  shade(ctx, muzzle, [9, -2, 17, 5], coat.points, 0.7);
+
+  const ear = new Path2D();
+  ear.moveTo(-8, -5);
+  ear.lineTo(-10, -14);
+  ear.lineTo(-3, -6);
+  ear.closePath();
+  shade(ctx, ear, [-10, -14, -3, -5], body, 0.7);
+
   ctx.fillStyle = '#120C08';
   ctx.beginPath();
-  ctx.ellipse(2, -1.5, 1.5, 1.7, 0, 0, Math.PI * 2);
+  ctx.ellipse(1, -1.5, 1.6, 1.8, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  // Mane, streaming with the stride.
-  ctx.fillStyle = coat.hair;
-  ctx.beginPath();
-  ctx.moveTo(-6, 8);
-  ctx.quadraticCurveTo(8, -2, 26, -6);
-  ctx.quadraticCurveTo(12, -12 - headBob * 0.4, -8, 2);
-  ctx.closePath();
-  ctx.fill();
+  // Mane along the crest.
+  const mane = new Path2D();
+  mane.moveTo(-7, 9);
+  mane.quadraticCurveTo(7, -3, 26, -9);
+  mane.quadraticCurveTo(11, -14 - headBob * 0.4, -9, 3);
+  mane.closePath();
+  shade(ctx, mane, [-9, -14, 26, 9], coat.hair, 0.7);
 
   ctx.restore();
 
   // ---- Jockey -------------------------------------------------------------
   const crouch = Math.sin(phase * Math.PI * 2 + 0.8) * 1.4;
   ctx.save();
-  ctx.translate(2, BODY_Y - 14 + crouch);
-  ctx.rotate(-0.22 - 0.1 * drive);
+  ctx.translate(1, BODY_Y - 15 + crouch);
+  ctx.rotate(-0.24 - 0.12 * drive);
 
-  // Torso in the stable's primary colour.
-  ctx.fillStyle = silks.primary;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 13, 8.5, 0, 0, Math.PI * 2);
-  ctx.fill();
+  const torso = new Path2D();
+  torso.ellipse(0, 0, 12, 8, 0, 0, Math.PI * 2);
+  shade(ctx, torso, [-12, -8, 12, 8], opts.silks.primary, 0.8);
 
-  // Sleeve in the secondary.
-  ctx.fillStyle = silks.secondary;
-  ctx.beginPath();
-  ctx.ellipse(7, 2, 6, 4.5, -0.3, 0, Math.PI * 2);
-  ctx.fill();
+  const sleeve = new Path2D();
+  sleeve.ellipse(7, 2, 5.5, 4.2, -0.3, 0, Math.PI * 2);
+  shade(ctx, sleeve, [1, -2, 13, 6], opts.silks.secondary, 0.7);
 
-  // Boot and stirrup leg.
   ctx.strokeStyle = '#2A2320';
   ctx.lineWidth = 5;
   ctx.lineCap = 'round';
@@ -291,26 +300,23 @@ export function drawHorse(
   ctx.lineTo(-1, 13);
   ctx.stroke();
 
-  // Helmet.
-  ctx.fillStyle = silks.primary;
-  ctx.beginPath();
-  ctx.arc(9, -8, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = silks.secondary;
-  ctx.beginPath();
-  ctx.ellipse(13, -7, 4, 2, 0.2, 0, Math.PI * 2);
-  ctx.fill();
+  const helmet = new Path2D();
+  helmet.arc(9, -8, 5.8, 0, Math.PI * 2);
+  shade(ctx, helmet, [3, -14, 15, -2], opts.silks.primary, 0.7);
+
+  const peak = new Path2D();
+  peak.ellipse(13.5, -7, 4, 1.9, 0.2, 0, Math.PI * 2);
+  shade(ctx, peak, [9, -9, 18, -5], opts.silks.secondary, 0.6);
 
   ctx.restore();
 
-  // ---- Near side legs, in front of everything -----------------------------
-  drawLeg(ctx, HIP_X + 3, hipY, phase + LEG_OFFSET.nearHind, intensity, reach, -1, coat.body, coat.points, 9);
-  drawLeg(ctx, SHOULDER_X + 2, shoulderY, phase + LEG_OFFSET.nearFore, intensity, reach, 1, coat.body, coat.points, 8.5);
+  // ---- Near legs ----------------------------------------------------------
+  drawLeg(ctx, HIP_X + 3, hipY, phase + LEG_OFFSET.nearHind, intensity, reach, -1, body, coat.points, 8.5);
+  drawLeg(ctx, SHOULDER_X + 2, shoulderY, phase + LEG_OFFSET.nearFore, intensity, reach, 1, body, coat.points, 8);
 
   ctx.restore();
 }
 
-/** Soft contact shadow, drawn on the track before the horse. */
 export function drawHorseShadow(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -318,10 +324,10 @@ export function drawHorseShadow(
   scale: number,
 ): void {
   ctx.save();
-  ctx.globalAlpha = 0.22;
+  ctx.globalAlpha = 0.24;
   ctx.fillStyle = '#000';
   ctx.beginPath();
-  ctx.ellipse(x, y, 42 * scale, 6 * scale, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y, 44 * scale, 6 * scale, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
