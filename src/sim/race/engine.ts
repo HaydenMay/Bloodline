@@ -89,6 +89,156 @@ const goingBias = (going: Going): number => {
 };
 
 /**
+ * A race that can be advanced one tick at a time.
+ *
+ * The harness wants to run thousands of races instantly; the renderer wants to
+ * watch one unfold at 30 ticks a second. Same engine, two consumers — so the
+ * race is exposed as a steppable object and `simulateRace` is just a loop over
+ * it. Neither knows the other exists.
+ */
+export interface LiveRace {
+  /** Advance one tick. Returns false once every horse has finished. */
+  step(): boolean;
+  /** Read-only snapshot for drawing. */
+  snapshot(): RaceSnapshot;
+  /** Only valid once step() has returned false. */
+  outcome(): RaceOutcome;
+  readonly totalYards: number;
+  readonly config: RaceConfig;
+}
+
+export interface RaceSnapshot {
+  elapsed: number;
+  progress: number;
+  leaderDistance: number;
+  runners: RunnerSnapshot[];
+  /** Events since the previous snapshot, for call-outs and sound. */
+  fresh: RaceEvent[];
+}
+
+export interface RunnerSnapshot {
+  id: string;
+  name: string;
+  distance: number;
+  speed: number;
+  energy: number;
+  lane: number;
+  rank: number;
+  effort: number;
+  kicking: boolean;
+  blocked: boolean;
+  drafting: boolean;
+  offColour: boolean;
+  finished: boolean;
+  finishTime: number | null;
+  coat: string;
+}
+
+export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRace {
+  const rng = createRng(config.seed);
+  const totalYards = config.furlongs * K.YARDS_PER_FURLONG;
+  const band = bandFor(config.furlongs);
+  const fieldSize = entrants.length;
+  const events: RaceEvent[] = [];
+
+  // THE GATE DRAW — see the note in the original implementation below.
+  const draw = rng.shuffle(entrants.map((_, i) => i));
+  const runners: Runner[] = entrants.map((entrant, i) =>
+    createRunner(entrant, draw[i]!, rng, config, band, fieldSize),
+  );
+
+  for (const r of runners) {
+    if (r.fumbledStart) {
+      events.push({ at: 0, kind: 'fumbledStart', horseId: r.horse.id, detail: 'Broke slowly' });
+    }
+    if (r.offColour) {
+      events.push({ at: 0, kind: 'phase', horseId: r.horse.id, detail: 'Below its best today' });
+    }
+  }
+  events.push({ at: 0, kind: 'start', horseId: '', detail: 'They are away' });
+
+  let tick = 0;
+  let elapsed = 0;
+  let finished = 0;
+  let reported = 0;
+  const maxTicks = K.TICK_HZ * 400;
+
+  const step = (): boolean => {
+    if (finished >= fieldSize || tick >= maxTicks) return false;
+
+    elapsed = tick * K.DT;
+    tick++;
+
+    updateRanks(runners, fieldSize);
+    const leaderDistance = Math.max(...runners.map((r) => r.distance));
+    const progress = clamp(leaderDistance / totalYards, 0, 1);
+
+    const pacePressure = runners.some(
+      (r) => r.finishTime === null && r.rank <= 2 && hasTrait(r.traits, 'pacePusher'),
+    )
+      ? 1
+      : 0;
+
+    const race: RaceView = {
+      progress,
+      elapsed,
+      totalYards,
+      fieldSize,
+      leaderDistance,
+      pacePressure,
+    };
+
+    for (const r of runners) {
+      if (r.finishTime !== null) continue;
+      stepRunner(r, runners, race, rng, events, elapsed, totalYards);
+
+      if (r.distance >= totalYards) {
+        const overshoot = r.distance - totalYards;
+        r.finishTime = elapsed - (r.speed > 0 ? overshoot / r.speed : 0);
+        finished++;
+        events.push({ at: r.finishTime, kind: 'finish', horseId: r.horse.id });
+      }
+    }
+
+    return finished < fieldSize;
+  };
+
+  return {
+    step,
+    totalYards,
+    config,
+    snapshot(): RaceSnapshot {
+      const fresh = events.slice(reported);
+      reported = events.length;
+      return {
+        elapsed,
+        progress: clamp(Math.max(...runners.map((r) => r.distance)) / totalYards, 0, 1),
+        leaderDistance: Math.max(...runners.map((r) => r.distance)),
+        fresh,
+        runners: runners.map((r) => ({
+          id: r.horse.id,
+          name: r.horse.name,
+          distance: r.distance,
+          speed: r.speed,
+          energy: r.energy,
+          lane: r.lane,
+          rank: r.rank,
+          effort: r.effort,
+          kicking: r.kickRemaining > 0,
+          blocked: r.blockedFor > 0,
+          drafting: r.drafting,
+          offColour: r.offColour,
+          finished: r.finishTime !== null,
+          finishTime: r.finishTime,
+          coat: r.horse.coat,
+        })),
+      };
+    },
+    outcome: () => buildOutcome(runners, events, elapsed, totalYards),
+  };
+}
+
+/**
  * Runs a complete race, deterministically, from a seed.
  *
  * Pure logic — no DOM, no rendering, no timers. The same seed and the same

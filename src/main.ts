@@ -1,117 +1,106 @@
 import './style.css';
 import { createRng } from './sim/index.js';
-import { createStable, exportToString, importFromString, CURRENT_VERSION } from './save/index.js';
-import { WORLD_POPULATION, FIELD_SIZE } from './data/index.js';
+import { createNameGenerator } from './data/names.js';
+import { generateHorse } from './sim/horse.js';
+import { COAT_IDS } from './render/palette.js';
+import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
+import { mountRaceScreen } from './ui/raceScreen.js';
 import { mountRoadmap } from './ui/roadmap.js';
+import type { Horse } from './sim/types.js';
 
 /**
- * Placeholder screen, replaced by the real game in Phase 2.
+ * Phase 2 harness screen.
  *
- * Runs live system checks on load, so opening it on a phone proves the pipeline
- * works ON THAT DEVICE rather than just that a page rendered.
- *
- * Build progress lives in ui/roadmap.ts as a collapsed corner panel, so it
- * stays out of the way and survives this screen being replaced.
+ * Builds a field and drops you straight into a race, so the renderer and the
+ * DRIVE control can be judged on their own before careers exist to wrap them.
+ * Replaced by the real career flow in Phase 3.
  */
 
-interface Check {
-  name: string;
-  detail: string;
-  ok: boolean;
+const appEl = document.querySelector<HTMLDivElement>('#app');
+if (!appEl) throw new Error('#app not found');
+const app: HTMLDivElement = appEl;
+
+let teardown: (() => void) | null = null;
+
+function buildField(seed: string): { field: Horse[]; playerId: string } {
+  const rng = createRng(seed);
+  const names = createNameGenerator(rng);
+
+  const field: Horse[] = Array.from({ length: FIELD_SIZE }, (_, i) => {
+    const horse = generateHorse(rng, names, {
+      division: 'open',
+      style: RUNNING_STYLES[i % RUNNING_STYLES.length]!,
+      age: 4,
+    });
+    horse.coat = COAT_IDS[Math.floor(rng.next() * COAT_IDS.length)]!;
+    return horse;
+  });
+
+  return { field, playerId: field[0]!.id };
 }
 
-function runChecks(): Check[] {
-  const checks: Check[] = [];
+function startRace(seed: string): void {
+  teardown?.();
+  app.innerHTML = '';
 
-  // Determinism — the property the whole balance harness depends on.
-  const a = createRng('bloodline');
-  const b = createRng('bloodline');
-  const seqA = Array.from({ length: 8 }, () => a.next());
-  const seqB = Array.from({ length: 8 }, () => b.next());
-  checks.push({
-    name: 'Seeded RNG is deterministic',
-    detail: seqA[0]!.toFixed(6),
-    ok: seqA.every((v, i) => v === seqB[i]),
-  });
+  const { field, playerId } = buildField(seed);
+  const player = field.find((h) => h.id === playerId)!;
 
-  // Save round-trip through the versioned envelope.
-  let saveOk: boolean;
-  try {
-    const stable = createStable('Test Stable', 'seed-0001');
-    stable.cash = 1234;
-    const restored = importFromString(exportToString(stable));
-    saveOk = restored.stableName === 'Test Stable' && restored.cash === 1234;
-  } catch {
-    saveOk = false;
-  }
-  checks.push({ name: 'Save round-trip', detail: `schema v${CURRENT_VERSION}`, ok: saveOk });
+  const stage = document.createElement('div');
+  stage.className = 'stage';
+  app.appendChild(stage);
 
-  // localStorage availability (private browsing can disable it).
-  let storageOk: boolean;
-  try {
-    localStorage.setItem('bloodline.probe', '1');
-    localStorage.removeItem('bloodline.probe');
-    storageOk = true;
-  } catch {
-    storageOk = false;
-  }
-  checks.push({ name: 'Local storage available', detail: storageOk ? 'yes' : 'blocked', ok: storageOk });
-
-  // Canvas 2D — the entire renderer depends on it.
-  const ctx = document.createElement('canvas').getContext('2d');
-  checks.push({ name: 'Canvas 2D context', detail: ctx ? 'ready' : 'missing', ok: !!ctx });
-
-  // Asset base path resolved correctly (the GitHub Pages subpath trap).
-  checks.push({
-    name: 'Asset base path',
-    detail: import.meta.env.BASE_URL,
-    ok: typeof import.meta.env.BASE_URL === 'string',
-  });
-
-  const worldTotal = Object.values(WORLD_POPULATION).reduce((s, n) => s + n, 0);
-  checks.push({
-    name: 'Game data loaded',
-    detail: `${worldTotal} rivals · fields of ${FIELD_SIZE}`,
-    ok: worldTotal > 0,
-  });
-
-  return checks;
-}
-
-function render(): void {
-  const checks = runChecks();
-  const allOk = checks.every((c) => c.ok);
-
-  const app = document.querySelector<HTMLDivElement>('#app');
-  if (!app) throw new Error('#app not found');
-
-  app.innerHTML = `
-    <div class="boot">
-      <h1 class="wordmark">Blood<span>line</span></h1>
-      <p class="tagline">Horse racing, training &amp; breeding</p>
-
-      <div class="card">
-        <h2>System checks</h2>
-        ${checks
-          .map(
-            (c) => `
-          <div class="check">
-            <span class="mark">${c.ok ? '✓' : '✕'}</span>
-            <span class="name">${c.name}</span>
-            <span class="detail">${c.detail}</span>
-          </div>`,
-          )
-          .join('')}
-      </div>
-
-      <div class="foot">
-        <span>${allOk ? 'pipeline ok' : 'checks failed'}</span>
-        <span>${window.innerWidth}×${window.innerHeight}</span>
-      </div>
+  const bar = document.createElement('div');
+  bar.className = 'racebar';
+  bar.innerHTML = `
+    <div class="rb-horse">
+      <span class="rb-name">${player.name}</span>
+      <span class="rb-style">${styleLabel(player.style)}</span>
     </div>
+    <div class="rb-hint">Hold anywhere to <b>DRIVE</b> · double-tap to <b>KICK</b></div>
+    <button class="rb-again">New race</button>
   `;
+  app.appendChild(bar);
+
+  bar.querySelector('.rb-again')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    startRace(`race-${Math.floor(Math.random() * 1e9)}`);
+  });
+
+  teardown = mountRaceScreen({
+    host: stage,
+    field,
+    playerHorseId: playerId,
+    playerSilks: { primary: '#F2C14E', secondary: '#12222B' },
+    config: { furlongs: 8, going: 'good', hype: 0.65, seed: `${seed}-run` },
+    onFinish: (placings) => {
+      const list = placings
+        .slice(0, 4)
+        .map(
+          (r, i) =>
+            `<li${r.id === playerId ? ' class="me"' : ''}><span>${i + 1}</span>${r.name}</li>`,
+        )
+        .join('');
+      const results = document.createElement('ol');
+      results.className = 'results';
+      results.innerHTML = list;
+      bar.prepend(results);
+    },
+  });
 }
 
-render();
+function styleLabel(style: string): string {
+  switch (style) {
+    case 'frontRunner':
+      return 'Front-runner';
+    case 'stalker':
+      return 'Stalker';
+    case 'midPack':
+      return 'Mid-pack';
+    default:
+      return 'Closer';
+  }
+}
+
+startRace('bloodline-demo');
 mountRoadmap();
-window.addEventListener('resize', render);
