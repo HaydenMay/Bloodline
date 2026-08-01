@@ -4,14 +4,14 @@ import { STYLE_PROFILES } from '../sim/race/constants.js';
 import { coatFor } from '../render/palette.js';
 
 /**
- * The horse card.
+ * The info box.
  *
  * Letter grades for scanning, exact numbers alongside for when you are actually
  * planning (DESIGN.md §3). Potential is deliberately shown as a RANGE, never a
  * number — it is the thing that unfolds over a career, and spoiling it removes
  * the reason to keep training.
  *
- * Used here as a hover card on the race bar; Phase 3 reuses it wherever a horse
+ * Used here as a hover box on the race bar; Phase 3 reuses it wherever a horse
  * needs describing.
  */
 
@@ -47,7 +47,7 @@ function potentialBand(current: number, potential: number): string {
   return 'barely scratched';
 }
 
-export function renderHorseCard(horse: Horse): string {
+export function renderInfoBox(horse: Horse): string {
   const style = STYLE_LABELS[horse.style] ?? STYLE_LABELS['closer']!;
   const profile = STYLE_PROFILES[horse.style];
   const coat = coatFor(horse.coat);
@@ -56,65 +56,65 @@ export function renderHorseCard(horse: Horse): string {
     const value = horse.stats[key];
     const grade = toGrade(value);
     return `
-      <div class="hc-stat">
-        <span class="hc-stat-name">${STAT_LABELS[key]}</span>
-        <span class="hc-bar"><i style="width:${value}%"></i></span>
-        <span class="hc-grade hc-g${grade}">${grade}</span>
-        <span class="hc-num">${value}</span>
+      <div class="ib-stat">
+        <span class="ib-stat-name">${STAT_LABELS[key]}</span>
+        <span class="ib-bar"><i style="width:${value}%"></i></span>
+        <span class="ib-grade ib-g${grade}">${grade}</span>
+        <span class="ib-num">${value}</span>
       </div>`;
   }).join('');
 
   const aptitudes = (['sprint', 'mile', 'route'] as const)
     .map(
       (band) => `
-      <div class="hc-apt">
+      <div class="ib-apt">
         <span>${band}</span>
-        <b class="hc-g${toGrade(horse.aptitudes[band])}">${toGrade(horse.aptitudes[band])}</b>
+        <b class="ib-g${toGrade(horse.aptitudes[band])}">${toGrade(horse.aptitudes[band])}</b>
       </div>`,
     )
     .join('');
 
   const traits = horse.traits.length
     ? horse.traits
-        .map((id) => `<span class="hc-trait" title="${TRAITS[id].description}">${TRAITS[id].name}</span>`)
+        .map((id) => `<span class="ib-trait" title="${TRAITS[id].description}">${TRAITS[id].name}</span>`)
         .join('')
-    : '<span class="hc-trait hc-none">None discovered</span>';
+    : '<span class="ib-trait ib-none">None discovered</span>';
 
   const speedRoom = potentialBand(horse.stats.speed, horse.potential.speed);
 
   return `
-    <div class="hc-head">
-      <span class="hc-swatch" style="background:${coat.body};border-color:${coat.hair}"></span>
+    <div class="ib-head">
+      <span class="ib-swatch" style="background:${coat.body};border-color:${coat.hair}"></span>
       <div>
-        <p class="hc-name">${horse.name}</p>
-        <p class="hc-sub">${coat.name} ${horse.gender === 'stallion' ? 'colt' : 'filly'} · ${horse.age}yo</p>
+        <p class="ib-name">${horse.name}</p>
+        <p class="ib-sub">${coat.name} ${horse.gender === 'stallion' ? 'colt' : 'filly'} · ${horse.age}yo</p>
       </div>
     </div>
 
-    <div class="hc-row">
-      <div><span class="hc-k">Style</span><span class="hc-v">${style.name}</span></div>
-      <div><span class="hc-k">Runs</span><span class="hc-v">${style.seat.toLowerCase()}</span></div>
-      <div><span class="hc-k">Moment</span><span class="hc-v hc-accent">${momentLabel(profile.kickAt)}</span></div>
+    <div class="ib-row">
+      <div><span class="ib-k">Style</span><span class="ib-v">${style.name}</span></div>
+      <div><span class="ib-k">Runs</span><span class="ib-v">${style.seat.toLowerCase()}</span></div>
+      <div><span class="ib-k">Moment</span><span class="ib-v ib-accent">${momentLabel(profile.kickAt)}</span></div>
     </div>
 
-    <p class="hc-section">Attributes</p>
+    <p class="ib-section">Attributes</p>
     ${stats}
-    <p class="hc-hint">Potential: ${speedRoom}</p>
+    <p class="ib-hint">Potential: ${speedRoom}</p>
 
-    <p class="hc-section">Distance</p>
-    <div class="hc-apts">${aptitudes}</div>
+    <p class="ib-section">Distance</p>
+    <div class="ib-apts">${aptitudes}</div>
 
-    <p class="hc-section">Traits</p>
-    <div class="hc-traits">${traits}</div>
+    <p class="ib-section">Traits</p>
+    <div class="ib-traits">${traits}</div>
   `;
 }
 
 /** Attaches a hover/tap card to a trigger element. */
-export function attachHorseCard(trigger: HTMLElement, horse: Horse): () => void {
+export function attachInfoBox(trigger: HTMLElement, horse: Horse): () => void {
   const card = document.createElement('div');
-  card.className = 'horse-card';
+  card.className = 'info-box';
   card.hidden = true;
-  card.innerHTML = renderHorseCard(horse);
+  card.innerHTML = renderInfoBox(horse);
   document.body.appendChild(card);
 
   const place = (): void => {
@@ -130,7 +130,7 @@ export function attachHorseCard(trigger: HTMLElement, horse: Horse): () => void 
   };
 
   // Hovering peeks; clicking PINS it open so you can read it properly without
-  // holding the cursor still. Pinned cards accept the mouse so links and
+  // holding the cursor still. Pinned boxes accept the mouse so links and
   // tooltips inside them work.
   let pinned = false;
 
