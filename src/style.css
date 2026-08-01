@@ -66,6 +66,10 @@ body {
   padding: 18px;
 }
 
+.card + .card {
+  margin-top: 14px;
+}
+
 .card h2 {
   font-size: 11px;
   text-transform: uppercase;
@@ -73,6 +77,75 @@ body {
   color: var(--muted);
   margin: 0 0 14px;
   font-weight: 650;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.card h2 .count {
+  font-family: var(--mono);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--accent);
+}
+
+/* --- Build progress ------------------------------------------------------ */
+
+.phase {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+
+.phase:first-of-type {
+  border-top: 0;
+}
+
+.phase .box {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  border: 1.5px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--bg);
+}
+
+.phase.done .box {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.phase .num {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  width: 10px;
+}
+
+.phase .name {
+  flex: 1;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.phase.done .name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.phase .summary {
+  font-size: 11.5px;
+  color: var(--muted);
+  opacity: 0.75;
+  text-align: right;
 }
 
 .check {
