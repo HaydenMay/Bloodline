@@ -44,6 +44,34 @@ export interface RunnerView {
   offColour: boolean;
 }
 
+/**
+ * Why a runner's energy is moving the way it is.
+ *
+ * The energy economy is four multipliers deep — front cost, contest, positional
+ * fit, drafting — and a bar alone cannot say which of them is currently doing
+ * the work. Reporting the dominant one turns "the bar went up" into "the bar
+ * went up BECAUSE I dropped into the slipstream", which is the difference
+ * between a mystery and a lesson.
+ *
+ * The simulation picks the factor because which one dominates is a fact about
+ * the model; the wording on screen belongs to the UI.
+ */
+export type EnergyFactor =
+  /** Being hounded for the lead. The expensive one, and nobody is spared it. */
+  | 'pressed'
+  /** Paying the baseline cost of racing up front, discounted by style. */
+  | 'onTheLead'
+  /** Racing somewhere the style does not want to be. */
+  | 'outOfPosition'
+  /** In the style's slot, drawing the discount and the recovery bonus. */
+  | 'inPosition'
+  /** Sitting in a rival's slipstream. */
+  | 'drafting'
+  /** Spending the reserve, on purpose. */
+  | 'kicking'
+  /** Nothing dominant — the drift is just effort against recovery. */
+  | 'neutral';
+
 export interface RaceView {
   /** 0-1 through the race. */
   progress: number;

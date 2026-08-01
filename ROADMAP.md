@@ -132,27 +132,90 @@ after it would strand every `Phase 5` reference already written into the code.
 Everything below is a known, **measured** defect. This phase is where the bill
 comes due for shipping a race that felt good before it was calibrated.
 
-- **The speed scale.** A winning 8f is 64.4s against a real ~96s — 25.0 m/s
-  where a thoroughbred tops out near 17.5. Do this one first and alone: a margin
-  is a time gap times speed, so it deflates every margin in the game by 1.43×
-  before anything else is touched, and every other constant is calibrated on top
-  of it.
-- **The energy floor.** An empty horse currently keeps losing ground at a rate
-  nothing in racing does. It should fade, not collapse. This is what turns the
-  tail of the field from 74 lengths into something a person would recognise.
-- **The full re-balance at lower noise**, as diagnosed in the known issue below:
-  daily form and the consistency band come down together, then the phase
-  profiles and position costs are re-tuned against the quieter baseline.
-- **A parameter sweep in the harness**, so the above is done by evidence rather
-  than by hand. Sweeping two or three constants across a grid and reading the
-  dominance curve off the result is the only honest way to do it.
-- **Re-verify Gate 1.** No running style dominates, every division is winnable,
-  the curve is flat in the middle and steep at the ends, pace collapses still
-  produce upsets. All of it, at the new noise level.
+- **The speed scale.** ✅ **Done.** A winning 8f ran 64.4s against a real ~96s —
+  25.0 yd/s where a thoroughbred tops out near 17.5. Every constant measured in
+  real seconds (`BASE_SPEED`, `BASE_ACCEL`, drain, recovery, kick/fumble/green
+  durations, the escape rate) now derives from one `TIME_SCALE = 1.43` lever in
+  `constants.ts`, rather than the render layer dividing the error back out —
+  which it no longer needs to. `npm run harness`: style balance and margins
+  unchanged from baseline (within the harness's own fixed-seed noise), clock
+  now 87–97s across divisions.
+  <br><br>
+  **This did NOT shrink margins**, correcting what this line originally
+  claimed. That estimate assumed scaling `BASE_SPEED` *alone* — which would
+  have been a balance-breaking partial fix, since every per-second drain/
+  recovery rate would then apply for 1.43× longer real seconds per race. Done
+  consistently instead (rates divide by `TIME_SCALE`, durations multiply by
+  it, so behaviour per unit of race PROGRESS is unchanged), margin in lengths
+  is `time_gap_seconds × speed_yd/s` — and both terms move oppositely by the
+  same factor and cancel. Measured directly: 8th-place margin 74.7L before,
+  75.2L after (`npm run margin-profile`). **The tail collapse below is
+  entirely untouched by this step** — it is the energy floor's job, not the
+  clock's.
+  <br><br>
+  One trap found and fixed by the harness, worth recording: `BASE_ACCEL` is
+  yards/sec² — order-2 in time — so it needs `TIME_SCALE²`, not `TIME_SCALE`.
+  Dividing it by the bare factor first let horses reach full speed over fewer
+  yards than before, shrinking the fraction of the race spent scrambling for
+  position, and frontRunner's win share quietly moved from 12.9% to 14.3%
+  before the exponent was corrected. Reproduce either measurement with
+  `npm run margin-profile` (`tools/margin-profile.ts`) and
+  `npm run harness`.
+- **The energy floor.** ✅ **Done, and it wasn't the floor curve itself.**
+  Traced the worst seed in `margin-profile` directly
+  (`tools/margin-profile.ts` still reproduces it): a front-runner crashed from
+  93 to 0 energy by 12% of the race, then spent the remaining 88% locked
+  between 0 and 14, permanently `outOfPosition` — 106 lengths behind at the
+  wire. Not fading. Trapped. Two structural causes, both fixed in `engine.ts`:
+  <br><br>
+  1. The establish scramble was charged twice for the same thing — `ai.ts`
+     already prices reaching your slot as a bounded effort spike
+     (`ESTABLISH_GAIN`, up to `MAX_EFFORT`), and the misfit-driven drain
+     penalty was charging the SAME distance again, at full strength, from
+     tick one. `positional` now fades IN across `ESTABLISH_UNTIL` instead of
+     snapping to full strength at the gate.
+  2. Misfit cost the same whether a horse had 60 energy or 5 — so a horse
+     that lost its slot AND its energy paid full price on both axes with no
+     way back: too broke to afford fighting to position, denied the recovery
+     to ever afford it, because being out of position was what suppressed
+     that recovery. New `MISFIT_ENERGY_RELIEF_FLOOR` discounts the misfit
+     PENALTY (not the in-position reward) once a horse is already this deep
+     in trouble — inert above `FADE_THRESHOLD`, so it cannot change any race
+     that never gets this bad.
+  <br><br>
+  A third, non-engine cause compounded both: `ai.ts`'s own reserve clause was
+  subtracting up to a full 1.0 from effort as energy approached zero — a
+  jockey on a beaten horse riding at literal minimum effort rather than
+  moderating. Halved.
+- **The full re-balance at lower noise.** ✅ **Done.** `BAND_DOWN`/`BAND_UP`
+  (consistency) and `FORM_BASE_SPREAD`/`FORM_TEMPER_AMPLIFY` (daily form) cut
+  by a third together, exactly as this line specified, followed by a
+  compensating retune — because cutting noise alone reproduced precisely the
+  failure this line predicts: style balance broke (frontRunner 10.1%, stalker
+  8.3% FAIL, midPack 16.0%, closer 15.6%) as the patient styles' late-race
+  edge stopped being washed out by chaos. `PHASE_PROFILES` re-tuned against
+  the quieter baseline restored it — frontRunner 10.6%, stalker 11.3%,
+  midPack 14.2%, closer 13.9%, all inside the harness's 30% bar. See the
+  known issue below for the full before/after margin table.
+- **A parameter sweep**, done by hand against a fast proxy rather than a grid
+  script. A full `npm run harness` run costs ~115s regardless of the `RACES`
+  env var (division sanity and pace-collapse don't scale with it), so a
+  standalone copy of the harness's own `styleBalance()` method
+  (same seed prefix, so numbers are directly comparable) at `RACES=250` gave
+  a ~20s iteration loop for tuning `PHASE_PROFILES`, with the full harness run
+  only to confirm the final choice. Not committed as a tool — it exists to
+  answer "does this specific change move style balance," not as a permanent
+  probe like `energy-profile` or `margin-profile`.
+- **Re-verify Gate 1.** ✅ **Done**, at the new noise level. `npm run
+  harness`: no running style dominates (all four within the 30% bar), every
+  division winnable, dominance curve flat in the middle and steep at the ends
+  (+5% edge → 27.5%, +40% edge → 92.0%), pace collapses still produce upsets
+  (a lone front-runner's 20.2% collapses to 9.3% each when three duel).
 - **Reconcile the animation with the simulation.** The gallop sheet is 24 frames
   of one gait; the sim has `intensity` and `drive` that it currently cannot
-  express. Stride length is also derived from speed, so correcting the speed
-  scale moves it.
+  express. Stride length no longer needs a render-side correction — it was
+  derived from speed, and speed is now correct at the source — but the sheet
+  still can't show a horse straining versus coasting at the same speed.
 
 **Deliverable:** finishes you would believe. Photo finishes at the front, a
 beaten field that is beaten rather than distanced, and a harness run that proves
@@ -186,6 +249,20 @@ The player-facing symptom is in `PLAYER_CRUISE_CAP` (`ui/raceScreen.ts`), swept
 to the best value the current economy allows. It is a tourniquet, not a fix:
 holding the field's pace still costs more than break-even permits, so a hands-off
 horse still bleeds — just slowly enough to have something left at its window.
+
+**What actually landed, and why it didn't repeat this table.** Every attempt
+above tried to make the economy MORE SUSTAINABLE — which is exactly what
+breaks it, because a closer's whole win condition is that the horses in front
+of it fade. The energy-floor fix above did the opposite of that on purpose: it
+never touches how much a horse in good shape drains or recovers, only the
+horses already past `FADE_THRESHOLD` in a death spiral with no way out — inert
+for the 90%+ of a race that never gets that bad. Confirmed it didn't repeat
+the pattern: pace-collapse still passes exactly as before (a lone front-runner
+at 20.2% collapses to 9.3% each when three duel — fading is still real and
+still the upset mechanism). The noise cut is a separate lever again, and it
+DID move style balance, in the direction this section predicts (patient
+styles up once chaos stopped washing out their late-race edge) — the
+compensating `PHASE_PROFILES` retune above is what put it back.
 
 ### Why here, and not sooner
 
@@ -231,63 +308,144 @@ and re-tuning after foals exist means re-tuning the genetics too.
 
 ## Known issue — winning margins are too wide
 
-**Currently 6–7 lengths between first and second.** Real racing is decided by
-1–3, and 5+ is a rout. Long term this needs to be much closer, with genuine
-photo finishes — that is where the drama of a race actually lives.
+**Currently ~6 lengths between first and second**, down from 6–7. Real racing
+is decided by 1–3, and 5+ is a rout. Still too wide, and the harness still
+gates on it honestly — but every number below moved in the right direction
+this pass, which is the first time that's been true rather than a trade of
+one problem for another.
 
-### The tail is worse than the front, and that is the bigger problem
+### The tail is still the bigger problem, and it is meaningfully better
 
-Measured over 200 races, 8f, open division — median margin behind the winner:
+Median margin behind the winner, 200 races, 8f open — reproducible with
+`npm run margin-profile` (`tools/margin-profile.ts`):
 
 | Place | 2nd | 3rd | 4th | 5th | 6th | 7th | 8th |
 |---|---|---|---|---|---|---|---|
-| Behind | 4.4L | 7.9L | 11.3L | 16.7L | 23.9L | 38.4L | **73.8L** |
+| Original baseline | 4.1L | 8.9L | 13.0L | 17.4L | 24.6L | 42.1L | **74.7L** |
+| After the speed-scale fix alone | 4.6L | 7.8L | 11.9L | 18.0L | 26.0L | 42.7L | **75.2L** |
+| After the death-spiral fix, before noise cut | 5.6L | 9.6L | 13.6L | 18.8L | 27.8L | 45.1L | 65.0L |
+| **After the full rebalance** | **3.7L** | **7.7L** | **11.8L** | **15.7L** | **23.8L** | **40.7L** | **60.0L** |
 
-The first four are close to plausible. From fifth back it detonates: the gap
-between consecutive horses runs 3.5L, 3.5L, 5.4L, 7.2L, **14.5L, 35.4L**. A real
-eight-runner field finishes inside about twenty lengths end to end; ours strings
-out over seventy. Horses that run out of energy are not fading, they are
-collapsing.
+Last place down from 74.7L to 60.0L — about 20% — and every other place
+tightened too, including the winning margin itself (4.1L → 3.7L). A real
+eight-runner field still finishes inside about twenty lengths end to end;
+ours strings out over sixty. Better, not solved.
 
 This matters more than the winning margin because it is what a player actually
 sees. A beaten horse is routinely reported as *distanced*, which reads as a
 broken game rather than a bad ride.
 
-**Two contributing causes, both measured:**
+**Both causes this section named are now addressed — see Phase 4.5.** The
+speed scale was corrected first, and on its own it does NOT shrink margins
+(margin is `time_gap × speed`, and both move oppositely by the same factor
+under a consistent rescale) — that row above is the record of a prior,
+now-corrected estimate on this page that claimed otherwise. The energy floor
+turned out not to be the fade curve itself: traced directly, a front-runner
+crashed to 0 energy by 12% of a race and spent 88% of it trapped, not fading —
+see Phase 4.5 for the two structural causes and the fix. The daily-form /
+consistency-band noise reduction the diagnosis below calls for is done too,
+with the compensating style-balance retune it warned would be necessary.
 
-1. **The tail collapse above** — the energy model has no floor, so an empty horse
-   keeps losing ground at a rate nothing in racing does.
-2. **The whole sim runs 1.43× too fast.** A winning 8f time is 64.4s against a
-   real ~96s, which is 25.0 m/s where a thoroughbred tops out near 17.5. Since a
-   margin is a time gap multiplied by speed, every margin is inflated by that
-   factor before any of the variance above is applied.
+**What's left to close the gap further** is not a new cause, just more of the
+same kind of work: this pass corrected specific bugs (the double charge, the
+bottomless recovery penalty, the AI's over-caution) and did one noise-and-retune
+pass. A genuinely tighter target (2–3L) likely needs another iteration of the
+same loop — cut noise further, re-verify style balance, re-check the tail — not
+a new mechanism.
 
-Fixing the speed scale alone would take last place from 74L to about 51L. It is
-not sufficient, but it is the cheapest single correction and it should come
-first, because everything else is calibrated on top of it.
+Deliberately not re-shelved after this pass: still reported on every harness
+run so any regression is caught immediately, not rediscovered from scratch.
 
-**Owned by Phase 4.5.** Not urgent for Gate 2 — riding still feels different race
-to race — but nothing above gets better on its own, and every constant added
-between now and then is calibrated against numbers we already know are wrong.
+**The diagnosis that got us here, kept for the next iteration.** Margins and
+style balance are coupled through variance:
 
-Deliberately shelved, not forgotten: it is reported on every harness run so it
-cannot quietly persist.
+- The dominant driver is **daily form**, fixed for the whole race and so
+  compounding directly into the finishing gap. The consistency band and the
+  effort-to-speed range matter less than expected — narrowing the speed range
+  actually made margins *worse* in earlier testing.
+- Cutting that variance tightens finishes but **lets systematic style
+  advantages dominate** — confirmed again this pass: cutting `BAND_DOWN`/
+  `BAND_UP` and `FORM_BASE_SPREAD`/`FORM_TEMPER_AMPLIFY` by a third alone (no
+  compensation) broke style balance exactly as this line predicts (patient
+  styles jumped once chaos stopped washing out their late-race edge; see
+  Phase 4.5 for the numbers), and needed a `PHASE_PROFILES` retune to recover.
+- That retune was done by hand against a fast style-balance proxy (Phase 4.5),
+  not a true multi-parameter grid sweep. The next cut of noise should expect
+  the same coupling and budget for the same retune-and-verify loop.
 
-**The diagnosis, so it does not have to be rediscovered.** Margins and style
-balance are coupled through variance:
+---
 
-- The dominant driver is **daily form** (±4.7% per horse at Temper 50), which is
-  fixed for the whole race and so compounds directly into the finishing gap.
-  The consistency band and the effort-to-speed range matter less than expected —
-  narrowing the speed range actually made margins *worse*.
-- Cutting that variance does tighten finishes (6.4L → 5.2L when tried) **but
-  lets systematic style advantages dominate**: with less noise to wash them out,
-  closers jumped to 22% and stalkers collapsed to 5.7%.
+## Known issue — position costs more than it returns
 
-So this is not a one-constant fix. It needs a **full re-balance at a lower noise
-level** — reduce daily form and the consistency band together, then re-tune the
-phase profiles and position costs against the quieter baseline. Best done as its
-own focused pass, ideally with a parameter sweep rather than by hand.
+✅ **Fixed in Phase 4.5** (the establish double-charge, the misfit energy
+relief, and the softened AI reserve clause — see there for the code-level
+fix). Kept here as the diagnosis record, with before/after numbers.
+
+**The player-facing symptom was: stamina drains hard in the opening, and never
+really comes back.** It read as a broken control, not a pacing decision — you
+did not fail to hold your position, holding it simply did not pay for what
+reaching it cost. Reproduce with `npm run energy-profile`
+(`tools/energy-profile.ts`) — hands-off ride, 120 races, 8f open:
+
+| style | 5% | 10% | 20% | 28% | 40% | 60% | 80% | 100% |
+|---|---|---|---|---|---|---|---|---|
+| **Before** — frontRunner | 55 | 39 | 32 | 32 | 33 | 34 | 32 | 24 |
+| **After** — frontRunner | 65 | 49 | 30 | 28 | 27 | 27 | 23 | 18 |
+| **Before** — stalker | 72 | 60 | 48 | 45 | 44 | 44 | 40 | 30 |
+| **After** — stalker | 72 | 59 | 42 | 37 | 36 | 35 | 30 | 21 |
+| **Before** — closer | 95 | 92 | 86 | 81 | 84 | 86 | 83 | 74 |
+| **After** — closer | 93 | 88 | 80 | 74 | 77 | 83 | 81 | 73 |
+
+Net energy/sec by phase, across all styles — **before**: establish −2.42/s,
+cruise +0.09/s, stretch −0.64/s. **After**: establish −1.91/s, cruise **−0.01/s**
+(the AI's own ride, not just the player's capped one — essentially break-even
+now), stretch −0.48/s.
+
+Front-runner holds noticeably more early (49 vs 39 at the 10% mark — the
+double-charge fix) but finishes with less in reserve (18 vs 24) than before.
+That is not a regression: fewer horses are getting trapped in the death spiral
+and coasting out the back at minimum effort with energy left unspent: more of
+them are genuinely racing all the way to the wire, which is what the reserve
+figure should look like in a field that's actually contesting the finish.
+
+**Two causes, both structural, not a tuning miss — the diagnosis, and what
+fixed each:**
+
+1. **The establish phase was charged twice for the same thing.** In `ai.ts`, a
+   horse starting outside its preferred slot gets
+   `effort = HOLD_EFFORT + drift × ESTABLISH_GAIN × urgency`, which clamps to
+   `MAX_EFFORT` (1.0) for anything badly out of position. But the engine had no
+   notion of "establishing" as a special case — it just saw high effort while
+   `misfit` was still high, so `POSITION_COST_PENALTY` (extra drain for being
+   out of position) charged *at the same time* as the effort spike. Fixed by
+   fading `positional` IN across `ESTABLISH_UNTIL` in `engine.ts`, instead of
+   it snapping to full strength at the gate.
+
+2. **The cruise did not refund the reserve, even executed perfectly.** Worked
+   by hand for a front-runner sitting in position, uncontested, at
+   `HOLD_EFFORT` (0.55): drain ≈1.62/s, recovery ≈1.25/s — net **−0.37/s**, not
+   the "must net positive" the comment above `HOLD_EFFORT` in `constants.ts`
+   claimed. `BASE_DRAIN` (7.4) and `BASE_RECOVERY` (4.1) were far enough apart
+   that even a full positional bonus stack didn't close the gap at that
+   effort. Traced further to its worst case (`margin-profile`'s worst seed): a
+   front-runner crashed to 0 energy by 12% of the race and spent 88% of it
+   trapped at 0–14, permanently `outOfPosition` — not fading, unable to
+   afford fighting back to its slot, and denied the recovery to ever afford
+   it, because being out of position was what suppressed that recovery. Fixed
+   with `MISFIT_ENERGY_RELIEF_FLOOR` in `constants.ts`: discounts the misfit
+   PENALTY (not the in-position reward) once a horse is already below
+   `FADE_THRESHOLD`, inert above it so no race that never gets this bad is
+   affected.
+
+A third cause, found while fixing the second: `ai.ts`'s own reserve clause was
+subtracting up to a full 1.0 from effort as energy approached zero — riding a
+beaten horse at literal minimum effort rather than moderating. Halved.
+
+**So "getting into position" was never the broken step — a horse got there.**
+What was broken is that position never paid back what it cost to reach, and
+that a bad trip had no way back from it. Fixed together, verified against the
+harness at each step rather than asserted — see Phase 4.5 for the full
+before/after margin table this produced.
 
 ---
 

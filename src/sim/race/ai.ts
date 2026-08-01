@@ -93,10 +93,17 @@ export function createAiController(horse: Horse): Controller {
 
     // Don't burn the tank before the real running starts. A better jockey
     // judges this more accurately.
+    //
+    // Halved from a full 1-for-1 subtraction: at empty that used to floor
+    // effort outright, and at a merely moderate shortfall (13 energy against
+    // a ~38 reserve) it was already cutting effort by two-thirds. A jockey on
+    // a horse that has lost the race moderates the ride; it does not idle —
+    // riding at near-zero effort for the rest of the trip was a big part of
+    // why a bad start became a 100+ length beating instead of a bad one.
     if (!inStretch) {
       const reserve = 32 + (1 - skill) * 12;
       if (self.energy < reserve) {
-        effort -= (reserve - self.energy) / reserve;
+        effort -= 0.5 * ((reserve - self.energy) / reserve);
       }
       effort = Math.min(effort, 0.86);
     } else {

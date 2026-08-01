@@ -13,7 +13,12 @@ import { createAiController } from '../sim/race/ai.js';
 import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
 import { ESTABLISH_UNTIL, STYLE_PROFILES, TICK_HZ } from '../sim/race/constants.js';
 import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../sim/race/recap.js';
-import type { ControlInput, RaceConfig, RaceEntrant } from '../sim/race/types.js';
+import type {
+  ControlInput,
+  EnergyFactor,
+  RaceConfig,
+  RaceEntrant,
+} from '../sim/race/types.js';
 import type { Horse } from '../sim/types.js';
 
 /**
@@ -36,30 +41,20 @@ const HORSE_YARDS = 2.7;
 const RIG_UNITS = 100;
 
 /**
- * How fast the simulation runs against real racing.
+ * Yards covered per stride. Real gallop is ~3 body lengths.
  *
- * A winning 8f is 64.4s where a real one is ~96s — 25.0 m/s against a
- * thoroughbred's ~17.5. Recorded as a known issue in ROADMAP.md and owned by
- * Phase 4.5; until it is corrected the render layer has to divide it back out
- * of anything derived from speed, or the horses animate at a pace no animal
- * moves at.
+ * Stride RATE is speed divided by this: 8.1 yards against the sim's own speed
+ * gives ~2.3 cycles a second once TIME_SCALE (`sim/race/constants.ts`)
+ * corrects the clock — matching a real gallop, and landing at about 55 sprite
+ * frames a second on a 60 Hz display, under the refresh rate so the cycle
+ * plays whole rather than strobing.
+ *
+ * This used to carry its own inflation factor to divide the sim's known-fast
+ * clock back out. Now that the clock is corrected at the source (the sim's own
+ * BASE_SPEED, BASE_DRAIN etc. are scaled by TIME_SCALE), a genuine speed value
+ * arrives here and this is just the real number — nothing left to compensate.
  */
-const SIM_SPEED_INFLATION = 1.43;
-
-/**
- * Yards covered per stride. Real gallop is ~3 body lengths, inflated by however
- * fast the simulation is currently running.
- *
- * Stride RATE is speed divided by this, so the true 8.1 yards gave 3.4 cycles a
- * second against a real gallop's 2.3. With 24 frames in the sheet that is 81
- * sprite frames a second on a 60 Hz display — frames were being dropped, so the
- * gait strobed instead of running. At 11.6 it lands near 2.3 cycles and about
- * 55 frames a second, under the refresh rate, so the cycle plays whole.
- *
- * Delete the inflation when Phase 4.5 fixes the speed scale; the stride length
- * itself is already correct.
- */
-const STRIDE_YARDS = HORSE_YARDS * 3 * SIM_SPEED_INFLATION;
+const STRIDE_YARDS = HORSE_YARDS * 3;
 
 /**
  * Ceiling on how often the legs turn over, in stride cycles per second.
@@ -77,6 +72,48 @@ const STRIDE_YARDS = HORSE_YARDS * 3 * SIM_SPEED_INFLATION;
  * life, and at this scale anything near the true cadence looks frantic.
  */
 const MAX_STRIDE_RATE = 0.9;
+
+/**
+ * Speed a finished horse settles to after the wire, in yards/sec.
+ *
+ * Non-zero on purpose: the stride rate is derived from speed, so a horse that
+ * decays to a standstill also freezes its own gait, and the sheet holds whatever
+ * gallop frame it happened to land on. Walking on keeps the cycle turning over.
+ */
+const PULL_UP_WALK = 1.9;
+
+/**
+ * Energy per second below which the bar counts as steady rather than moving.
+ *
+ * The chevron bands above it are set from the rates a hands-off ride actually
+ * produces, measured over 60 races: taking up position runs about -2.3/s, the
+ * stretch about -0.9/s, a kick about -1.5/s, and the settled cruise about
+ * +0.1/s. So one chevron is a trickle, two is a real cost, three is only the
+ * opening burst — and the cruise correctly shows none at all.
+ */
+const RATE_HOLDING = 0.15;
+
+/** How long a new dominant factor must hold before the label switches to it. */
+const FACTOR_DWELL_MS = 260;
+
+/**
+ * The energy economy, in the player's words.
+ *
+ * The simulation decides WHICH factor is dominating; this decides what to call
+ * it. Every one of these names a thing the player can act on — drop back, take
+ * a pull, come off the rail — because a cause you cannot answer is decoration.
+ *
+ * `neutral` is deliberately blank: a label that is always lit stops being read.
+ */
+const FACTOR_LABELS: Record<EnergyFactor, { text: string; colour: string } | null> = {
+  pressed: { text: 'BEING PRESSED', colour: '#E2564A' },
+  onTheLead: { text: 'ON THE LEAD', colour: '#E8A33D' },
+  outOfPosition: { text: 'OUT OF POSITION', colour: '#E8A33D' },
+  inPosition: { text: 'IN POSITION', colour: '#4EC9A0' },
+  drafting: { text: 'IN THE SLIPSTREAM', colour: '#4EC9A0' },
+  kicking: { text: 'KICKING', colour: '#F2C14E' },
+  neutral: null,
+};
 
 /**
  * Sprite pixels per rig unit, so both draw the same horse at the same size.
@@ -112,14 +149,23 @@ const CALLOUTS = [
  * Ceiling on the default ride, once the field has settled.
  *
  * Chosen by sweeping it against 150 races at each of six values. 0.48 is the
- * best point available: it keeps 72 of 100 energy to the wire hands-off, and it
- * is also where a well-timed ride wins most (28 of 150, against a fair share of
- * 19). Higher preserves less; lower loses more ground for no extra wins.
+ * best point available, and it is where a well-timed ride wins most (25 of 150
+ * against a fair share of 19). Higher preserves less; lower loses more ground
+ * for no extra wins.
  *
- * It cannot preserve ALL of it. Holding the field's pace costs more energy than
- * break-even allows, so staying in touch is intrinsically expensive — see the
- * known issue in ROADMAP.md. That is a simulation problem and it belongs to
- * Phase 4.5; this constant only stops the ride spending what it does not have to.
+ * It cannot preserve ALL of it — hands-off reaches the wire with 46 of 100.
+ * But NOT because the cruise bleeds, which is what this note claimed until the
+ * rate was measured per phase over 60 races:
+ *
+ *     taking up position   -2.3/s      the whole reserve, and then some
+ *     settled cruise       +0.1/s      break-even, which is the cap working
+ *     the stretch          -0.9/s      committing, as it should
+ *
+ * Capped and in position the cruise is already break-even. The reserve goes in
+ * the opening 28% — which this constant deliberately does not cap, for the
+ * reason below. So the cost is the price of a slot, not a leak, and raising the
+ * cap would not recover it. What remains a simulation problem for Phase 4.5 is
+ * that the opening is that expensive at all; see the known issue in ROADMAP.md.
  *
  * It applies only AFTER position is taken up. Capping the opening as well was
  * the mistake in the first attempt: the jockey could not go and get its slot,
@@ -254,7 +300,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let callout = '';
   let calloutUntil = 0;
   let finishedAt = 0;
-  let lastEnergy = 100;
+  /** Smoothed energy rate, so the chevrons do not judder tick to tick. */
+  let rateEma = 0;
+  let shownFactor: EnergyFactor = 'neutral';
+  let pendingFactor: EnergyFactor = 'neutral';
+  let pendingSince = 0;
   // Built once at the wire. The finish screen redraws every frame and
   // race.outcome() re-sorts and re-measures the whole field each call.
   let finalRecap: Recap | null = null;
@@ -350,7 +400,10 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       let drawSpeed = r.speed;
       if (r.finished) {
         const pu = pullUp.get(r.id) ?? { extra: 0, speed: r.speed };
-        pu.speed = Math.max(0, pu.speed - 11 * dt);
+        // Pull up to a WALK, not to a standstill. Decaying to zero froze the
+        // stride rate at zero with it, leaving the horse as a statue held in a
+        // mid-gallop frame — the same "reset" read, arriving two seconds later.
+        pu.speed = Math.max(PULL_UP_WALK, pu.speed - 11 * dt);
         pu.extra += pu.speed * dt;
         pullUp.set(r.id, pu);
         drawSpeed = pu.speed;
@@ -380,15 +433,19 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
       // The sprite sheet is the shipping art. The drawn rig stays behind it as
       // the fallback for the frames before the sheet has decoded, and for the
-      // poses the sheet does not contain — standing at the gate, pulling up.
-      const drewSprite =
-        !r.finished &&
-        drawSpriteHorse(ctx, x, y, {
-          coat: r.coat,
-          silks: silksFor.get(r.id)!,
-          phase,
-          scale: scale * SPRITE_PER_RIG_UNIT,
-        });
+      // poses the sheet does not contain — standing at the gate.
+      //
+      // Crossing the wire is NOT one of those poses. Dropping the sheet at the
+      // line swapped the horse for the rig mid-stride, in the one moment the
+      // player is looking straight at it, and it read as the model resetting.
+      // A horse pulling up is still galloping, decaying to a canter — which is
+      // exactly what the sheet run at a decaying stride rate already shows.
+      const drewSprite = drawSpriteHorse(ctx, x, y, {
+        coat: r.coat,
+        silks: silksFor.get(r.id)!,
+        phase,
+        scale: scale * SPRITE_PER_RIG_UNIT,
+      });
 
       if (!drewSprite) {
         drawHorse(ctx, x, y, {
@@ -423,7 +480,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       }
     }
 
-    drawHud(ctx, width, height, player, runners);
+    drawHud(ctx, width, height, player, runners, dt);
   };
 
   const drawHud = (
@@ -432,6 +489,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     height: number,
     player: RunnerSnapshot,
     runners: RunnerSnapshot[],
+    dt: number,
   ): void => {
     const pad = 14;
 
@@ -531,32 +589,102 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       ctx.fill();
     }
 
-    ctx.fillStyle = '#0E1218';
-    ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('ENERGY', barX + 12, barY + 17);
+    /**
+     * Every label on this bar is drawn twice, clipped either side of the fill
+     * edge, in the colour that reads against what is behind it there.
+     *
+     * The labels are dark because they were designed sitting on a full green
+     * bar — but the bar empties, and near-black on the dark track is close to
+     * invisible. Which is precisely backwards: a horse running out of energy is
+     * when the player most needs to read it. Clipping rather than picking one
+     * colour per label also handles a word straddling the edge, which is the
+     * case a threshold gets wrong.
+     */
+    const fillEnd = barX + 3 + (barW - 6) * energy;
+    const barLabel = (
+      text: string,
+      x: number,
+      align: CanvasTextAlign,
+      font: string,
+      onFill: string,
+      offFill: string,
+    ): void => {
+      ctx.font = font;
+      ctx.textAlign = align;
+      const halves: [string, number, number][] = [
+        [onFill, barX, fillEnd],
+        [offFill, fillEnd, barX + barW],
+      ];
+      for (const [colour, from, to] of halves) {
+        if (to - from < 0.5) continue;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(from, barY, to - from, 26);
+        ctx.clip();
+        ctx.fillStyle = colour;
+        ctx.fillText(text, x, barY + 17);
+        ctx.restore();
+      }
+    };
 
-    // Whether energy is going up or down, so it is never a mystery why.
-    const drift = player.energy - lastEnergy;
-    lastEnergy = player.energy;
-    if (Math.abs(drift) > 0.004) {
-      const gaining = drift > 0;
-      ctx.fillStyle = gaining ? '#0E1218' : 'rgba(14,18,24,0.65)';
-      ctx.font = '700 12px ui-sans-serif, system-ui, sans-serif';
-      ctx.fillText(gaining ? '▲' : '▼', barX + 62, barY + 17);
+    const LABEL_FONT = '700 11px ui-sans-serif, system-ui, sans-serif';
+    barLabel('ENERGY', barX + 12, 'left', LABEL_FONT, '#0E1218', 'rgba(233,238,245,0.92)');
+    // Measured rather than assumed: at a hard-coded offset the chevrons sat
+    // flush against the E of ENERGY and read as part of the word.
+    ctx.font = LABEL_FONT;
+    const chevronX = barX + 12 + ctx.measureText('ENERGY').width + 7;
+
+    // HOW FAST the energy is moving, not merely which way.
+    //
+    // A single arrow said "down" whether the horse was trickling away at the
+    // cruise or emptying itself in the straight — two situations that call for
+    // opposite decisions. Chevrons carry the magnitude, and the rate comes from
+    // the simulation rather than from differencing the bar between frames,
+    // which was frame-rate dependent and noisy enough to flicker.
+    rateEma += (player.energyRate - rateEma) * Math.min(1, dt * 6);
+    const mag = Math.abs(rateEma);
+    const chevrons = mag < RATE_HOLDING ? 0 : mag < 1.0 ? 1 : mag < 2.2 ? 2 : 3;
+    if (chevrons > 0) {
+      const gaining = rateEma > 0;
+      barLabel(
+        (gaining ? '▲' : '▼').repeat(chevrons),
+        chevronX,
+        'left',
+        '700 12px ui-sans-serif, system-ui, sans-serif',
+        gaining ? '#0E1218' : 'rgba(14,18,24,0.62)',
+        gaining ? 'rgba(233,238,245,0.92)' : 'rgba(233,238,245,0.66)',
+      );
+    }
+
+    // WHY it is moving. The label is held briefly before it changes: two
+    // factors near-tied would otherwise swap every tick and strobe.
+    const factor = player.energyFactor;
+    if (factor !== shownFactor) {
+      if (factor !== pendingFactor) {
+        pendingFactor = factor;
+        pendingSince = performance.now();
+      } else if (performance.now() - pendingSince > FACTOR_DWELL_MS) {
+        shownFactor = factor;
+      }
+    } else {
+      pendingFactor = factor;
     }
 
     const inWindow = Math.abs(curr.progress - playerProfile.kickAt) <= 0.09;
-    ctx.textAlign = 'right';
+    const tagX = barX + barW - 12;
+    // What YOU are doing outranks what the race is doing to you: those states
+    // are transient, deliberate, and the moment you need to act on.
     if (input.takingBack) {
-      ctx.fillStyle = '#4EC9A0';
-      ctx.fillText('TAKING A PULL', barX + barW - 12, barY + 17);
+      barLabel('TAKING A PULL', tagX, 'right', LABEL_FONT, '#0E1218', '#4EC9A0');
     } else if (inWindow && !input.kickUsed) {
-      ctx.fillStyle = '#F2C14E';
-      ctx.fillText('YOUR MOMENT', barX + barW - 12, barY + 17);
+      barLabel('YOUR MOMENT', tagX, 'right', LABEL_FONT, '#0E1218', '#F2C14E');
     } else if (performance.now() < input.urgeUntil) {
-      ctx.fillStyle = '#E8A33D';
-      ctx.fillText('URGING', barX + barW - 12, barY + 17);
+      barLabel('URGING', tagX, 'right', LABEL_FONT, '#0E1218', '#E8A33D');
+    } else {
+      const tag = FACTOR_LABELS[shownFactor];
+      if (tag) {
+        barLabel(tag.text, tagX, 'right', LABEL_FONT, '#0E1218', tag.colour);
+      }
     }
 
     // ---- Call-outs ---------------------------------------------------------
