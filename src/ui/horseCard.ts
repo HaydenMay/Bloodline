@@ -129,25 +129,43 @@ export function attachHorseCard(trigger: HTMLElement, horse: Horse): () => void 
     card.style.top = `${Math.max(8, r.top - cardRect.height - 10)}px`;
   };
 
-  const show = (): void => place();
+  // Hovering peeks; clicking PINS it open so you can read it properly without
+  // holding the cursor still. Pinned cards accept the mouse so links and
+  // tooltips inside them work.
+  let pinned = false;
+
+  const show = (): void => {
+    if (!pinned) place();
+  };
   const hide = (): void => {
-    card.hidden = true;
+    if (!pinned) card.hidden = true;
+  };
+  const setPinned = (value: boolean): void => {
+    pinned = value;
+    card.classList.toggle('is-pinned', value);
+    card.style.pointerEvents = value ? 'auto' : 'none';
+    if (value) place();
+    else card.hidden = true;
+  };
+
+  const onTriggerClick = (e: Event): void => {
+    e.stopPropagation();
+    setPinned(!pinned);
+  };
+  const onDocClick = (e: Event): void => {
+    if (pinned && !card.contains(e.target as Node)) setPinned(false);
   };
 
   trigger.addEventListener('pointerenter', show);
   trigger.addEventListener('pointerleave', hide);
-  // Touch has no hover, so tapping the name toggles it.
-  trigger.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (card.hidden) place();
-    else hide();
-  });
-  document.addEventListener('click', hide);
+  trigger.addEventListener('click', onTriggerClick);
+  document.addEventListener('click', onDocClick);
 
   return (): void => {
     trigger.removeEventListener('pointerenter', show);
     trigger.removeEventListener('pointerleave', hide);
-    document.removeEventListener('click', hide);
+    trigger.removeEventListener('click', onTriggerClick);
+    document.removeEventListener('click', onDocClick);
     card.remove();
   };
 }

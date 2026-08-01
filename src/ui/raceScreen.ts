@@ -36,18 +36,25 @@ const RIG_UNITS = 100;
 /** Yards covered per stride. Real gallop is ~3 body lengths. */
 const STRIDE_YARDS = HORSE_YARDS * 3;
 
+/** Track sections, by the leader's progress. Each fires once. */
+const CALLOUTS = [
+  { at: 0.24, text: 'Down the backstretch' },
+  { at: 0.56, text: 'Round the turn' },
+  { at: 0.84, text: 'Down the stretch!' },
+] as const;
+
 /**
  * Ceiling on the default ride.
  *
- * Deliberately low enough that doing nothing BANKS energy rather than burning
- * it. At 0.66 the jockey bled roughly 1.8 a second before the player touched
- * anything, so the reserve was gone by the straight — energy has to be yours to
- * spend, not something quietly spent for you.
+ * Set close to the pace the field cruises at, so the default ride HOLDS YOUR
+ * PLACE rather than quietly losing ground. At 0.47 the player was slower than
+ * every rival all race, drifted to the back and needed a miracle finish —
+ * which is a handicap, not a strategy.
  *
- * The trade is that a conserving ride drifts backwards through the field. That
- * is the point: urge to hold your place, or take a pull and save.
+ * The AI still empties its tank down the stretch; the player never does
+ * automatically. Committing the reserve is always your decision.
  */
-const PLAYER_CRUISE_CAP = 0.47;
+const PLAYER_CRUISE_CAP = 0.56;
 
 interface PlayerInput {
   /** Hold to take a pull — settle, drop back, and recover. */
@@ -152,6 +159,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let calloutUntil = 0;
   let finishedAt = 0;
   let lastEnergy = 100;
+  const firedCallouts = new Set<string>();
 
   const cam: Camera = { scrollYards: 0, pixelsPerYard: 1.6 };
 
@@ -165,10 +173,16 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       if (e.kind === 'phase' && e.detail) setCallout(e.detail);
     }
 
-    const remaining = totalYards - curr.leaderDistance;
-    if (remaining <= YARDS_PER_FURLONG && callout !== 'Down the stretch!') setCallout('Down the stretch!');
-    else if (curr.progress >= 0.55 && curr.progress < 0.58) setCallout('Round the turn');
-    else if (curr.progress >= 0.25 && curr.progress < 0.28) setCallout('Down the backstretch');
+    // Each call-out fires ONCE, when the leader first passes that point.
+    // Previously they were re-triggered on every tick inside a progress band,
+    // which kept pushing the timer forward and left them hanging on screen long
+    // after the moment had passed.
+    for (const c of CALLOUTS) {
+      if (!firedCallouts.has(c.text) && curr.progress >= c.at) {
+        firedCallouts.add(c.text);
+        setCallout(c.text);
+      }
+    }
 
     if (!running && finishedAt === 0) {
       finishedAt = performance.now();
@@ -392,9 +406,12 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.fill();
 
     const energy = Math.max(0, Math.min(1, player.energy / 100));
-    ctx.fillStyle = energy > 0.35 ? '#4EC9A0' : energy > 0.18 ? '#E8A33D' : '#E2564A';
-    roundRect(ctx, barX + 3, barY + 3, Math.max(6, (barW - 6) * energy), 20, 10);
-    ctx.fill();
+    if (energy > 0.005) {
+      ctx.fillStyle = energy > 0.35 ? '#4EC9A0' : energy > 0.18 ? '#E8A33D' : '#E2564A';
+      const fw = (barW - 6) * energy;
+      roundRect(ctx, barX + 3, barY + 3, fw, 20, Math.min(10, fw / 2));
+      ctx.fill();
+    }
 
     ctx.fillStyle = '#0E1218';
     ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';

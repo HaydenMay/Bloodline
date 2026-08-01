@@ -43,7 +43,7 @@ export const BASE_DRAIN = 7.4;
 export const STAMINA_DRAIN_INFLUENCE = 0.45;
 
 /** Energy per second recovered at zero effort, in the style's happy place. */
-export const BASE_RECOVERY = 2.7;
+export const BASE_RECOVERY = 4.1;
 
 /**
  * Leading is INTRINSICALLY expensive — no slipstream, and you set the tempo.
@@ -254,7 +254,7 @@ export const PHASE_PROFILES = {
   frontRunner: { early: 0.085, middle: 0.007, late: -0.013 },
   stalker: { early: 0.003, middle: 0.0245, late: 0.012 },
   midPack: { early: -0.003, middle: 0.0195, late: 0.0255 },
-  closer: { early: -0.027, middle: -0.001, late: 0.0345 },
+  closer: { early: -0.027, middle: -0.001, late: 0.042 },
 } as const satisfies Record<string, { early: number; middle: number; late: number }>;
 
 /**
