@@ -158,6 +158,35 @@ comes due for shipping a race that felt good before it was calibrated.
 beaten field that is beaten rather than distanced, and a harness run that proves
 it rather than a screenshot that suggests it.
 
+### Five single-lever attempts, all failed — start from here
+
+Every one of these was tried against the balance harness and rejected. **The
+failure is always the same suite and always the same style**, which is the most
+useful thing known about this problem:
+
+| Attempt | Closer win rate | Fair share |
+|---|---|---|
+| Drain measured from a cruise, recovery from the cruise | 2.7% | 12.5% |
+| ...with recovery restored to measure from full effort | 3.3% | 12.5% |
+| ...with the front-running cost nearly tripled | 2.7% | 12.5% |
+| `HOLD_EFFORT` 0.55 → 0.42, so holding banks | 5.2% | 12.5% |
+| ...with `KICK_MAX_BONUS` 0.085 → 0.15 | 6.8% | 12.5% |
+
+**Why, and it is structural.** A closer wins because the horses in front of it
+**fade**. Every one of these makes the economy sustainable, so nothing fades,
+and the closer's entire win condition disappears with it. Strengthening the kick
+to compensate — the counterweight the design already names — recovered less than
+two points.
+
+So the fade threshold, the kick, the position costs and the AI's effort profile
+have to move **together**, and the sweep is not optional. Any attempt that
+touches one of them alone will land somewhere on the table above.
+
+The player-facing symptom is in `PLAYER_CRUISE_CAP` (`ui/raceScreen.ts`), swept
+to the best value the current economy allows. It is a tourniquet, not a fix:
+holding the field's pace still costs more than break-even permits, so a hands-off
+horse still bleeds — just slowly enough to have something left at its window.
+
 ### Why here, and not sooner
 
 Sooner and you are balancing a race with no career around it — no divisions to
