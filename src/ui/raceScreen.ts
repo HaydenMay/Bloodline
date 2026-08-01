@@ -1,5 +1,6 @@
 import { createSurface, startLoop, type Loop, type Surface } from '../render/canvas.js';
 import { drawHorse, drawHorseShadow } from '../render/horse.js';
+import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
 import { RIVAL_SILKS, type Silks } from '../render/palette.js';
 import {
   drawBackdrop,
@@ -35,6 +36,15 @@ const RIG_UNITS = 100;
 
 /** Yards covered per stride. Real gallop is ~3 body lengths. */
 const STRIDE_YARDS = HORSE_YARDS * 3;
+
+/**
+ * Sprite pixels per rig unit, so both draw the same horse at the same size.
+ *
+ * The rig spans about 123 of its own units nose to tail-tip; the sprite spans
+ * about 181 pixels across the same animal. Scaling the sprite by the rig's
+ * scale alone would draw it half again too big.
+ */
+const SPRITE_PER_RIG_UNIT = 123 / 181;
 
 /** Track sections, by the leader's progress. Each fires once. */
 const CALLOUTS = [
@@ -79,6 +89,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const { host, field, playerHorseId, playerSilks, config } = opts;
 
   const surface = createSurface(host);
+  // Decoding and tinting happen off the critical path; the rig covers the
+  // opening frames, so a race never waits on the art.
+  void loadSprites();
   const input: PlayerInput = {
     takingBack: false,
     urgeUntil: 0,
@@ -276,17 +289,32 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       }
 
       drawHorseShadow(ctx, x, y + 2, scale);
-      drawHorse(ctx, x, y, {
-        coat: r.coat,
-        silks: silksFor.get(r.id)!,
-        pose: {
+
+      // The sprite sheet is the shipping art. The drawn rig stays behind it as
+      // the fallback for the frames before the sheet has decoded, and for the
+      // poses the sheet does not contain — standing at the gate, pulling up.
+      const drewSprite =
+        !r.finished &&
+        drawSpriteHorse(ctx, x, y, {
+          coat: r.coat,
+          silks: silksFor.get(r.id)!,
           phase,
-          intensity: Math.min(1, Math.max(0, (drawSpeed - 18) / 14)),
-          drive: r.finished ? 0 : r.effort,
-        },
-        scale,
-        faded: false,
-      });
+          scale: scale * SPRITE_PER_RIG_UNIT,
+        });
+
+      if (!drewSprite) {
+        drawHorse(ctx, x, y, {
+          coat: r.coat,
+          silks: silksFor.get(r.id)!,
+          pose: {
+            phase,
+            intensity: Math.min(1, Math.max(0, (drawSpeed - 18) / 14)),
+            drive: r.finished ? 0 : r.effort,
+          },
+          scale,
+          faded: false,
+        });
+      }
 
       if (isPlayer) {
         const markerY = y - 118 * scale;
