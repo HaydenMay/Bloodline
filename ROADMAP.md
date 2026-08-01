@@ -291,6 +291,67 @@ own focused pass, ideally with a parameter sweep rather than by hand.
 
 ---
 
+## Known issue — position costs more than it returns
+
+**The player-facing symptom: stamina drains hard in the opening, and never
+really comes back.** It reads as a broken control, not a pacing decision — you
+did not fail to hold your position, holding it simply does not pay for what
+reaching it cost. This is a distinct diagnosis from the margins issue above,
+though it is the same energy economy and belongs to the same Phase 4.5 pass.
+Reproduce with `npm run energy-profile` (`tools/energy-profile.ts`) — hands-off
+ride, 120 races, 8f open:
+
+| style | 5% | 10% | 20% | 28% | 40% | 60% | 80% | 100% |
+|---|---|---|---|---|---|---|---|---|
+| frontRunner | 55 | 39 | 32 | 32 | 33 | 34 | 32 | 24 |
+| stalker | 72 | 60 | 48 | 45 | 44 | 44 | 40 | 30 |
+| midPack | 83 | 73 | 60 | 56 | 57 | 59 | 55 | 45 |
+| closer | 95 | 92 | 86 | 81 | 84 | 86 | 83 | 74 |
+
+A front-runner is down to 39 of 100 by the **10% mark** — before the player has
+made a single decision — then plateaus at 32–34 for the entire middle of the
+race and never recovers. Net energy/sec by phase, across all styles: **establish
+−2.42/s, cruise +0.09/s, stretch −0.64/s.** The hole is dug in the first 28% and
+the cruise essentially cannot refill it.
+
+**Two causes, both structural, not a tuning miss:**
+
+1. **The establish phase is charged twice for the same thing.** In `ai.ts`, a
+   horse starting outside its preferred slot gets
+   `effort = HOLD_EFFORT + drift × ESTABLISH_GAIN × urgency`, which clamps to
+   `MAX_EFFORT` (1.0) for anything badly out of position. But the engine has no
+   notion of "establishing" as a special case — it just sees high effort while
+   `misfit` is still high, so `POSITION_COST_PENALTY` (extra drain for being out
+   of position) is charging *at the same time* as the effort spike. The cost of
+   reaching your slot and the cost of not yet being in it land together instead
+   of one replacing the other.
+
+2. **The cruise does not actually refund the reserve, even executed perfectly.**
+   Worked by hand for a front-runner sitting in position, uncontested, at
+   `HOLD_EFFORT` (0.55): drain ≈1.62/s, recovery ≈1.25/s — net **−0.37/s**, not
+   the "must net positive" the comment above `HOLD_EFFORT` in `constants.ts`
+   claims. `BASE_DRAIN` (7.4) and `BASE_RECOVERY` (4.1) are far enough apart
+   that even a full positional bonus stack doesn't close the gap at that
+   effort. The measured `+0.09/s` cruise above only holds at
+   `PLAYER_CRUISE_CAP` (0.48), which is lower than the AI's own `HOLD_EFFORT` —
+   every AI-ridden horse in the field is cruising at a worse rate than this
+   table shows for the player's slot.
+
+**So "getting into position" is not the broken step — you get there.** What's
+broken is that position never pays back what it cost to reach, which is a
+harsher version of the same asymmetry the five failed single-lever attempts
+above already ran into. Any fix has to touch the establish/hold boundary and
+the drain/recovery baselines together, which is why this is left for the
+Phase 4.5 sweep rather than patched here — the recorded failures are exactly
+what happens when one of these moves alone.
+
+**Owned by Phase 4.5**, same as the margins issue. `npm run energy-profile` is
+the standing check — re-run it once the sweep lands; establish should no
+longer double-charge, and the cruise should measure positive at `HOLD_EFFORT`
+itself, not only at the player's lower cap.
+
+---
+
 ## Summary
 
 | Phase | Sessions | Gate |
