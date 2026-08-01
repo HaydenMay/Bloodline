@@ -78,6 +78,17 @@ function footPath(phase: number, intensity: number, reach: number): { x: number;
   return { x: -reach + 2 * reach * eased + tuck, y: GROUND - lift };
 }
 
+/**
+ * Two-bone IK, with the joint side chosen in WORLD SPACE.
+ *
+ * `bend` is which way the joint points on the track, not which side of the
+ * hip-to-foot line it sits: -1 keeps the joint rearward (a hock, which always
+ * points backwards), +1 keeps it forward (a knee).
+ *
+ * Choosing relative to the leg vector — as this did — flips the joint the
+ * moment the foot swings past the hip and the vector reverses. That is why the
+ * hocks snapped backwards every time a hind leg reset.
+ */
 function solveKnee(
   hipX: number,
   hipY: number,
@@ -92,7 +103,16 @@ function solveKnee(
   const h = Math.sqrt(Math.max(0, UPPER * UPPER - a * a));
   const mx = hipX + (dx * a) / d;
   const my = hipY + (dy * a) / d;
-  return { x: mx + (bend * h * dy) / d, y: my - (bend * h * dx) / d };
+
+  // Both valid solutions, then pick by where the joint ends up on the track.
+  const ax = mx + (h * dy) / d;
+  const ay = my - (h * dx) / d;
+  const bx = mx - (h * dy) / d;
+  const by = my + (h * dx) / d;
+
+  const rearward = ax < bx ? { x: ax, y: ay } : { x: bx, y: by };
+  const forward = ax < bx ? { x: bx, y: by } : { x: ax, y: ay };
+  return bend === -1 ? rearward : forward;
 }
 
 /** Gradient fill plus a thin outline in a darker tone of the same colour. */
