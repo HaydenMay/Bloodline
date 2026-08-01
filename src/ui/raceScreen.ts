@@ -55,17 +55,19 @@ const CALLOUTS = [
 ] as const;
 
 /**
- * Ceiling on the default ride.
+ * Ceiling on the default ride — and it sits BELOW the simulation's break-even.
  *
- * Set close to the pace the field cruises at, so the default ride HOLDS YOUR
- * PLACE rather than quietly losing ground. At 0.47 the player was slower than
- * every rival all race, drifted to the back and needed a miracle finish —
- * which is a handicap, not a strategy.
+ * Energy is the player's resource; the HUD calls it "your moment". An automatic
+ * ride that can empty the tank before that moment arrives leaves them a bar to
+ * watch instead of a decision to make, and that is exactly what happened: the
+ * cap was 0.56 while drain and recovery break even at 0.427, so a hands-off
+ * horse bled continuously and reached the straight on empty.
  *
- * The AI still empties its tank down the stretch; the player never does
- * automatically. Committing the reserve is always your decision.
+ * Set under the break-even, a horse left alone now RECOVERS. It loses ground —
+ * doing nothing should never be competitive — but the reserve is intact and
+ * still yours when your window comes. Committing it is always your decision.
  */
-const PLAYER_CRUISE_CAP = 0.56;
+const PLAYER_CRUISE_CAP = 0.44;
 
 interface PlayerInput {
   /** Hold to take a pull — settle, drop back, and recover. */

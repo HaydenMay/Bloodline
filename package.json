@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "harness": "tsx tools/harness.ts",
     "bake-sprites": "tsx tools/bake-sprites.ts",
+    "ride-probe": "tsx tools/ride-probe.ts",
     "check": "npm run lint && npm run build && npm run test"
   },
   "devDependencies": {
