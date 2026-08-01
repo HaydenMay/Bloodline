@@ -610,12 +610,30 @@ function stepRunner(
   if (hasTrait(r.traits, 'tractable')) misfit *= 0.45;
   const rawMisfitClamped = misfit;
 
-  // Positional preference only matters while a race is still being SET UP.
-  // Once everyone is committed in the stretch it stops applying — otherwise a
-  // closer is punished for executing its own strategy, since making its run
+  // Positional preference only matters while a race is still being SET UP, and
+  // ramps in rather than snapping on at the gate.
+  //
+  // It used to be flat at full strength for the whole first 60% of the race,
+  // which double-charged the establish scramble: ai.ts already prices reaching
+  // your slot as a bounded spike in EFFORT (ESTABLISH_GAIN, up to MAX_EFFORT),
+  // and this misfit penalty was charging the SAME distance again as extra
+  // drain, at the same moment — a horse still two lengths from its slot half a
+  // second after the gate was already being fined for not being there yet.
+  // That double charge could crater a horse to 0 energy inside the first 12%
+  // of the race, permanently out of position with nothing left to fix it —
+  // the death spiral behind the 100+ length tail margins this fixes.
+  //
+  // Fading it in across the same window ai.ts is still willing to pay the
+  // effort-spike for (ESTABLISH_UNTIL) means the drift itself is what's
+  // priced during the scramble, not the scramble AND the drift together.
+  // Once everyone is committed in the stretch it fades OUT again — otherwise
+  // a closer is punished for executing its own strategy, since making its run
   // means leaving the back of the field by definition.
   const positional = clamp(
-    (K.POSITION_FADE_END - race.progress) / (K.POSITION_FADE_END - K.POSITION_FADE_START),
+    Math.min(
+      race.progress / K.ESTABLISH_UNTIL,
+      (K.POSITION_FADE_END - race.progress) / (K.POSITION_FADE_END - K.POSITION_FADE_START),
+    ),
     0,
     1,
   );
@@ -631,11 +649,21 @@ function stepRunner(
   // Two-sided: a perfect fit earns a genuine DISCOUNT, a bad fit a genuine
   // penalty. Being in position must pay, not merely avoid a fine.
   const fit = (1 - misfit) * positional;
+
+  // The misfit PENALTY (not the fit reward, which is untouched) is discounted
+  // once a horse is already critically low on energy — see
+  // MISFIT_ENERGY_RELIEF_FLOOR. A horse with a healthy reserve pays the full
+  // rate; this only engages below FADE_THRESHOLD, where it is already paying
+  // for being out of position via the fade curve and does not also need a
+  // bottomless recovery penalty that leaves no way back.
+  const energyRelief = clamp(r.energy / K.FADE_THRESHOLD, K.MISFIT_ENERGY_RELIEF_FLOOR, 1);
+  const misfitEconomy = misfit * energyRelief;
+
   let costMult =
-    frontCost * (1 + K.POSITION_COST_PENALTY * misfit - K.IN_POSITION_DRAIN_BONUS * fit);
+    frontCost * (1 + K.POSITION_COST_PENALTY * misfitEconomy - K.IN_POSITION_DRAIN_BONUS * fit);
   let recoveryMult =
     backRecovery *
-    (1 + K.POSITION_RECOVERY_BONUS * fit - K.OUT_POSITION_RECOVERY_PENALTY * misfit);
+    (1 + K.POSITION_RECOVERY_BONUS * fit - K.OUT_POSITION_RECOVERY_PENALTY * misfitEconomy);
 
   if (hasTrait(r.traits, 'railHugger')) costMult *= r.lane === 0 ? 0.94 : 1.05;
   if (hasTrait(r.traits, 'herdAnimal')) recoveryMult *= r.drafting ? 1.15 : 0.92;
@@ -679,7 +707,8 @@ function stepRunner(
   r.energyRate = recovery - drain;
   const drainUnit = r.drainRate * r.effort * r.effort * kickCost;
   const recoveryUnit = r.recoveryRate * slack * slack;
-  const positionBracket = 1 + K.POSITION_COST_PENALTY * misfit - K.IN_POSITION_DRAIN_BONUS * fit;
+  const positionBracket =
+    1 + K.POSITION_COST_PENALTY * misfitEconomy - K.IN_POSITION_DRAIN_BONUS * fit;
   const draftMult = r.drafting ? 1 + K.DRAFT_RECOVERY_BONUS : 1;
 
   const factors: [EnergyFactor, number][] = [
@@ -687,8 +716,8 @@ function stepRunner(
     ['onTheLead', drainUnit * leadCost * positionBracket],
     [
       'outOfPosition',
-      drainUnit * frontCost * K.POSITION_COST_PENALTY * misfit +
-        recoveryUnit * backRecovery * K.OUT_POSITION_RECOVERY_PENALTY * misfit * draftMult,
+      drainUnit * frontCost * K.POSITION_COST_PENALTY * misfitEconomy +
+        recoveryUnit * backRecovery * K.OUT_POSITION_RECOVERY_PENALTY * misfitEconomy * draftMult,
     ],
     [
       'inPosition',

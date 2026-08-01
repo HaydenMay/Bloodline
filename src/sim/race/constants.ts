@@ -120,6 +120,28 @@ export const POSITION_RECOVERY_BONUS = 0.5;
 export const OUT_POSITION_RECOVERY_PENALTY = 0.5;
 
 /**
+ * The death spiral, and its floor.
+ *
+ * Misfit used to cost the same whether a horse had 60 energy or 5 — so a horse
+ * that lost its slot AND its energy paid full price on both axes at once, with
+ * no way to break the loop: too broke to afford the drain of fighting back to
+ * position, and denied the recovery to ever afford it later, because the very
+ * act of being out of position was what was suppressing that recovery. Traced
+ * directly (`tools/margin-profile.ts`'s worst seed): a front-runner crashed to
+ * 0 energy by 12% of the race, spent the remaining 88% locked between 0 and 14,
+ * and finished 106 lengths behind — not fading, trapped.
+ *
+ * This discounts the misfit PENALTY (not the reward for being in position,
+ * which stays full price) once a horse is already this deep in trouble, so the
+ * fade curve is the thing punishing it rather than the fade curve and a
+ * bottomless recovery penalty compounding each other. A horse with a healthy
+ * reserve is completely unaffected — the discount only engages below
+ * FADE_THRESHOLD, so this cannot change how any race that never gets this bad
+ * plays out.
+ */
+export const MISFIT_ENERGY_RELIEF_FLOOR = 0.4;
+
+/**
  * Positional preference fades out across these two points. Past the end, only
  * energy and speed decide the race — everyone is committed, and where you
  * *wanted* to sit no longer applies.
@@ -225,9 +247,17 @@ export const GREEN_MOMENT_DURATION = 1.1 * TIME_SCALE;
  * This is the chaos dial: low-Consistency fields are volatile and upset-rich,
  * high-Consistency fields precise. Because AI horses in higher divisions are
  * generated with higher Consistency, elite racing tightens up emergently.
+ *
+ * Cut by roughly a third alongside FORM_BASE_SPREAD/FORM_TEMPER_AMPLIFY below
+ * — see the note there. Moved together deliberately: ROADMAP.md's own record
+ * of this is that cutting noise ALONE previously tightened finishes (6.4L to
+ * 5.2L) but let systematic style advantage dominate once there was less
+ * chaos to wash it out (closer to 22%, stalker to 5.7%). A cut here has to
+ * ship with the compensating STYLE_PROFILES / phase-profile changes below it,
+ * verified together against the harness, not as a lever pulled alone.
  */
-export const BAND_DOWN = 0.17;
-export const BAND_UP = 0.115;
+export const BAND_DOWN = 0.17 * 0.65;
+export const BAND_UP = 0.115 * 0.65;
 export const VARIATION_INTERVAL_MIN = 0.5 * TIME_SCALE;
 export const VARIATION_INTERVAL_MAX = 2 * TIME_SCALE;
 
@@ -238,8 +268,16 @@ export const VARIATION_INTERVAL_MAX = 2 * TIME_SCALE;
 // or worse; it makes it louder.
 // ---------------------------------------------------------------------------
 
-export const FORM_BASE_SPREAD = 0.02;
-export const FORM_TEMPER_AMPLIFY = 0.06;
+/**
+ * Cut by roughly a third from the first-pass values (0.02, 0.06). ROADMAP.md
+ * names this the dominant driver of margin variance — fixed for the whole
+ * race, so it compounds directly into the finishing gap rather than washing
+ * out over 90-odd seconds the way the re-rolled consistency band does.
+ * BAND_DOWN/BAND_UP above are cut by the same proportion, deliberately: see
+ * the note there for why cutting either alone is not safe on its own.
+ */
+export const FORM_BASE_SPREAD = 0.02 * 0.65;
+export const FORM_TEMPER_AMPLIFY = 0.06 * 0.65;
 
 /** Condition scales performance directly. */
 export const CONDITION_INFLUENCE = 0.1;
@@ -277,14 +315,26 @@ export const STYLE_PROFILES = {
  * actually raced its style so far. A closer only gets its finishing surge if it
  * genuinely sat back and banked energy early. The moment has to be earned.
  */
+/**
+ * Re-tuned once against the lower-noise baseline above (BAND_DOWN/UP,
+ * FORM_BASE_SPREAD/FORM_TEMPER_AMPLIFY). Cutting that noise alone — verified
+ * against the harness — left the patient styles overperforming once nothing
+ * washed their late-race edge out (midPack 16.0%, closer 15.6%, against a fair
+ * 12.5%) while the front-loaded styles paid for it (frontRunner 10.1%,
+ * stalker 8.3%, failing the harness's own bar). Stalker and midPack's numbers
+ * were the timid ones in the table — smaller in magnitude than frontRunner's
+ * or closer's committed bets — so stalker's are raised across all three
+ * phases and closer/midPack's LATE number, the biggest lever on the biggest
+ * overperformer, is cut back down.
+ */
 export const PHASE_PROFILES = {
   //                 early    middle    late
   // A bonus LATE is worth more than one early, because the race is decided
   // late. Early-phase numbers are therefore larger to compensate.
   frontRunner: { early: 0.085, middle: 0.007, late: -0.013 },
-  stalker: { early: 0.003, middle: 0.0245, late: 0.012 },
-  midPack: { early: -0.003, middle: 0.0195, late: 0.0255 },
-  closer: { early: -0.027, middle: -0.001, late: 0.042 },
+  stalker: { early: 0.006, middle: 0.025, late: 0.013 },
+  midPack: { early: -0.003, middle: 0.0195, late: 0.021 },
+  closer: { early: -0.027, middle: -0.001, late: 0.038 },
 } as const satisfies Record<string, { early: number; middle: number; late: number }>;
 
 /**
