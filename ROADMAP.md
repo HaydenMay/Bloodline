@@ -67,16 +67,24 @@ weeks.
 ---
 
 ## Phase 2 — One playable race
-**~3–4 sessions** · **Milestone 1**
+**~3–4 sessions** · **Milestone 1** · *all deliverables landed; awaiting Gate 2*
 
-- Skeletal horse rig, layered parts, clean vector art
-- Coat genetics driving runtime tinting
-- Track, scrolling camera, oval minimap, crowd
-- HUD: energy bar with the style safe-zone, distance countdown, phase call-outs
-- **DRIVE** input — touch and keyboard — plus the kick
-- Post-race recap with the narrative explanation of what happened
+- ✅ Skeletal horse rig, layered parts, clean vector art
+- ✅ Coat genetics driving runtime tinting
+- ✅ Track, scrolling camera, oval minimap, crowd
+- ✅ HUD: energy bar with the style safe-zone, distance countdown, phase call-outs
+- ✅ **DRIVE** input — touch and keyboard — plus the kick
+- ✅ Post-race recap with the narrative explanation of what happened
 
 **Deliverable: you can play a race on your phone.**
+
+Racing now runs on a commissioned 24-frame gallop sheet, split into materials
+by `tools/bake-sprites.ts` and recoloured per runner at load — so a bred coat
+and a rival's silks both come out of one grey sheet. The drawn rig stays behind
+it for the poses the sheet does not contain, and as the reference the sheet was
+measured against.
+
+**Phase 2 is not ticked off until you have played it and answered Gate 2.**
 
 ### 🚦 Gate 2 — Is it fun?
 The one that matters. Everything after this is built on the assumption that racing feels good. If
