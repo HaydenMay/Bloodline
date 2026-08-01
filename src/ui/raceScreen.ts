@@ -36,6 +36,9 @@ const RIG_UNITS = 100;
 /** Yards covered per stride. Real gallop is ~3 body lengths. */
 const STRIDE_YARDS = HORSE_YARDS * 3;
 
+/** Ceiling on the default ride, so the reserve is always yours to spend. */
+const PLAYER_CRUISE_CAP = 0.66;
+
 interface PlayerInput {
   /** Hold to take a pull — settle, drop back, and recover. */
   takingBack: boolean;
@@ -89,12 +92,18 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       horse,
       controller: (self, race): ControlInput => {
         const base = baseRide(self, race);
-        let effort = base.effort;
+
+        // The AI empties the tank down the stretch, because that is the right
+        // ride when nobody is steering. For a PLAYER that is a bug: it spends
+        // the reserve on your behalf and leaves you nothing to use. So the
+        // default ride is capped at a cruise — positioning still happens, but
+        // committing the reserve is always your decision.
+        let effort = Math.min(base.effort, PLAYER_CRUISE_CAP);
 
         if (input.takingBack) {
           effort = Math.min(effort, 0.26);
         } else if (performance.now() < input.urgeUntil) {
-          effort = Math.min(1, effort + 0.4);
+          effort = 1;
         }
 
         const kick = input.kickPending && !input.kickUsed;
@@ -120,6 +129,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   // Stride phase is visual only, advanced from speed so hooves match the ground.
   const stride = new Map<string, number>();
   for (const h of field) stride.set(h.id, Math.random());
+
+  // Once a horse crosses the line the simulation stops touching it, but its last
+  // speed is still set — so the renderer would cycle its legs forever. Finished
+  // horses coast on past the wire and pull up instead.
+  const pullUp = new Map<string, { extra: number; speed: number }>();
 
   let prev: RaceSnapshot = race.snapshot();
   let curr: RaceSnapshot = prev;
@@ -196,7 +210,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const laneScale = (lane: number): number => baseScale * (0.88 + lane * 0.04);
 
     for (const r of [...runners].sort((a, b) => a.lane - b.lane)) {
-      const x = yardToScreen(r.distance, cam);
+      const pu0 = pullUp.get(r.id);
+      const x = yardToScreen(r.distance + (pu0?.extra ?? 0), cam);
       if (x < -140 || x > width + 140) continue;
 
       const y = laneY(r.lane);
@@ -205,8 +220,16 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       // Stride is driven by DISTANCE COVERED, not by frame count. Hooves stay
       // planted on the ground instead of spinning, and the gait runs at the
       // same rate regardless of refresh rate.
-      const travelled = r.speed * dt;
-      const phase = ((stride.get(r.id) ?? 0) + travelled / STRIDE_YARDS) % 1;
+      let drawSpeed = r.speed;
+      if (r.finished) {
+        const pu = pullUp.get(r.id) ?? { extra: 0, speed: r.speed };
+        pu.speed = Math.max(0, pu.speed - 11 * dt);
+        pu.extra += pu.speed * dt;
+        pullUp.set(r.id, pu);
+        drawSpeed = pu.speed;
+      }
+
+      const phase = ((stride.get(r.id) ?? 0) + (drawSpeed * dt) / STRIDE_YARDS) % 1;
       stride.set(r.id, phase);
 
       const isPlayer = r.id === playerHorseId;
@@ -231,11 +254,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         silks: silksFor.get(r.id)!,
         pose: {
           phase,
-          intensity: Math.min(1, Math.max(0, (r.speed - 18) / 14)),
-          drive: r.effort,
+          intensity: Math.min(1, Math.max(0, (drawSpeed - 18) / 14)),
+          drive: r.finished ? 0 : r.effort,
         },
         scale,
-        faded: r.finished,
+        faded: false,
       });
 
       if (isPlayer) {
@@ -293,6 +316,39 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(`${ordinal(player.rank)} of ${runners.length}`, pad + 156, pad + 38);
+
+    // ---- Race progress, with YOUR MOMENT marked on it ----------------------
+    // Without this you cannot see when your horse's window is, which makes the
+    // single most important decision in the race pure guesswork.
+    const pw = Math.min(340, width - 220);
+    const px0 = (width - pw) / 2;
+    const py0 = pad + 6;
+
+    ctx.fillStyle = 'rgba(14,18,24,0.72)';
+    roundRect(ctx, px0, py0, pw, 22, 11);
+    ctx.fill();
+
+    const winLo = Math.max(0, playerProfile.kickAt - 0.09);
+    const winHi = Math.min(1, playerProfile.kickAt + 0.09);
+    ctx.fillStyle = 'rgba(242,193,78,0.30)';
+    roundRect(ctx, px0 + 3 + (pw - 6) * winLo, py0 + 3, (pw - 6) * (winHi - winLo), 16, 6);
+    ctx.fill();
+
+    const prog = Math.min(1, player.distance / totalYards);
+    ctx.fillStyle = '#E8EDF4';
+    const dotX = px0 + 3 + (pw - 6) * prog;
+    ctx.beginPath();
+    ctx.arc(dotX, py0 + 11, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#8B98A9';
+    ctx.font = '600 9.5px ui-sans-serif, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      'YOUR MOMENT',
+      px0 + 3 + (pw - 6) * ((winLo + winHi) / 2),
+      py0 + 34,
+    );
 
     // ---- Minimap ----------------------------------------------------------
     drawMinimap(

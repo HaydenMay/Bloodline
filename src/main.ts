@@ -4,6 +4,7 @@ import { createNameGenerator } from './data/names.js';
 import { generateHorse } from './sim/horse.js';
 import { COAT_IDS } from './render/palette.js';
 import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
+import { STYLE_PROFILES } from './sim/race/constants.js';
 import { mountRaceScreen } from './ui/raceScreen.js';
 import { mountRoadmap } from './ui/roadmap.js';
 import type { Horse } from './sim/types.js';
@@ -52,10 +53,20 @@ function startRace(seed: string): void {
 
   const bar = document.createElement('div');
   bar.className = 'racebar';
+  // Where this horse's window sits in the race, as a share of the distance.
+  const win = STYLE_PROFILES[player.style];
+  const lo = Math.round(Math.max(0, win.kickAt - 0.09) * 100);
+  const hi = Math.round(Math.min(1, win.kickAt + 0.09) * 100);
+
   bar.innerHTML = `
     <div class="rb-horse">
       <span class="rb-name">${player.name}</span>
-      <span class="rb-style">${styleLabel(player.style)}</span>
+      <span class="rb-style">${styleLabel(player.style)} · ${seatLabel(player.style)}</span>
+    </div>
+    <div class="rb-moment">
+      <span class="rb-moment-label">Your moment</span>
+      <div class="rb-track"><div class="rb-window" style="left:${lo}%;width:${hi - lo}%"></div></div>
+      <span class="rb-moment-when">${momentLabel(win.kickAt)}</span>
     </div>
     <div class="rb-hint">Tap to <b>URGE</b> · hold to <b>TAKE A PULL</b></div>
     <button class="rb-again">New race</button>
@@ -87,6 +98,28 @@ function startRace(seed: string): void {
       bar.prepend(results);
     },
   });
+}
+
+/** Where this style likes to sit, in plain words. */
+function seatLabel(style: string): string {
+  switch (style) {
+    case 'frontRunner':
+      return 'likes to lead';
+    case 'stalker':
+      return 'tracks the pace';
+    case 'midPack':
+      return 'sits mid-pack';
+    default:
+      return 'comes from behind';
+  }
+}
+
+/** When its window falls, named after the part of the track. */
+function momentLabel(kickAt: number): string {
+  if (kickAt < 0.35) return 'from the gate';
+  if (kickAt < 0.62) return 'down the back';
+  if (kickAt < 0.81) return 'round the turn';
+  return 'in the straight';
 }
 
 function styleLabel(style: string): string {
