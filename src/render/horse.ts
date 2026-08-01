@@ -70,8 +70,12 @@ function footPath(phase: number, intensity: number, reach: number): { x: number;
   }
 
   const t = (p - stance) / (1 - stance);
-  const lift = Math.sin(t * Math.PI) * (10 + 16 * intensity);
-  return { x: -reach + 2 * reach * t, y: GROUND - lift };
+  const lift = Math.sin(t * Math.PI) * (12 + 20 * intensity);
+  // Ease the horizontal travel so the hoof folds in tight under the belly at
+  // mid-swing before reaching out again, instead of sweeping a flat arc.
+  const eased = t * t * (3 - 2 * t);
+  const tuck = Math.sin(t * Math.PI) * reach * 0.28;
+  return { x: -reach + 2 * reach * eased + tuck, y: GROUND - lift };
 }
 
 function solveKnee(
@@ -224,7 +228,7 @@ export function drawHorse(
   ctx.translate(0, -suspension + bob);
   ctx.rotate(-0.05 * drive);
 
-  const reach = 17 + 13 * intensity;
+  const reach = 22 + 20 * intensity;
   const shoulderY = BODY_Y + BARREL_HALF * 0.5;
   const hipY = BODY_Y + BARREL_HALF * 0.2;
 
@@ -237,9 +241,9 @@ export function drawHorse(
   // ---- Tail ---------------------------------------------------------------
   const swing = Math.sin(phase * Math.PI * 2 + 1.2) * 4;
   const tail = new Path2D();
-  tail.moveTo(HIP_X - 4, BODY_Y - 8);
-  tail.quadraticCurveTo(HIP_X - 24, BODY_Y - 14 + swing, HIP_X - 42, BODY_Y + 4 + swing * 1.7);
-  tail.quadraticCurveTo(HIP_X - 24, BODY_Y + 1 + swing, HIP_X - 6, BODY_Y + 5);
+  tail.moveTo(HIP_X - 6, BODY_Y - BARREL_HALF * 1.2);
+  tail.quadraticCurveTo(HIP_X - 26, BODY_Y - 14 + swing, HIP_X - 48, BODY_Y - 8 + swing * 1.8);
+  tail.quadraticCurveTo(HIP_X - 26, BODY_Y - 4 + swing, HIP_X - 7, BODY_Y);
   tail.closePath();
   shade(ctx, tail, [HIP_X - 42, BODY_Y - 14, HIP_X, BODY_Y + 6], coat.hair, 0.8);
 
@@ -250,7 +254,7 @@ export function drawHorse(
 
   ctx.save();
   ctx.translate(SHOULDER_X - 1, BODY_Y - BARREL_HALF * 1.1);
-  ctx.rotate(-0.46 - 0.13 * drive);
+  ctx.rotate(-0.14 - 0.1 * drive);
   ctx.translate(0, headBob * 0.3);
 
   // Ear, behind the head so its base is hidden by it.
@@ -418,8 +422,8 @@ export function drawHorse(
   // ---- Jockey -------------------------------------------------------------
   const crouch = Math.sin(phase * Math.PI * 2 + 0.8) * 1.4;
   ctx.save();
-  ctx.translate(6, BODY_Y - BARREL_HALF * 1.35 + crouch);
-  ctx.rotate(-0.24 - 0.12 * drive);
+  ctx.translate(11, BODY_Y - BARREL_HALF * 1.15 + crouch);
+  ctx.rotate(-0.4 - 0.14 * drive);
 
   const torso = new Path2D();
   torso.ellipse(0, 0, 12, 8, 0, 0, Math.PI * 2);
