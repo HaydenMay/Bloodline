@@ -154,9 +154,9 @@ function drawLeg(
   const footY = foot.y;
   const knee = solveKnee(hipX, hipY, footX, footY, bend);
 
-  const wHip = width * 0.62;
-  const wKnee = width * 0.3;
-  const wFoot = width * 0.2;
+  const wHip = width * 1.05;
+  const wKnee = width * 0.32;
+  const wFoot = width * 0.19;
 
   const pUpper = perp(hipX, hipY, knee.x, knee.y);
   const pLower = perp(knee.x, knee.y, footX, footY);
@@ -169,13 +169,28 @@ function drawLeg(
   pKnee.x /= kLen;
   pKnee.y /= kLen;
 
+  // Mid-thigh, so the taper curves like muscle instead of coning like a spike.
+  const midX = (hipX + knee.x) / 2;
+  const midY = (hipY + knee.y) / 2;
+  const wMid = width * 0.66;
+
   const leg = new Path2D();
   leg.moveTo(hipX + pUpper.x * wHip, hipY + pUpper.y * wHip);
-  leg.lineTo(knee.x + pKnee.x * wKnee, knee.y + pKnee.y * wKnee);
+  leg.quadraticCurveTo(
+    midX + pUpper.x * wMid * 1.15,
+    midY + pUpper.y * wMid * 1.15,
+    knee.x + pKnee.x * wKnee,
+    knee.y + pKnee.y * wKnee,
+  );
   leg.lineTo(footX + pLower.x * wFoot, footY + pLower.y * wFoot);
   leg.lineTo(footX - pLower.x * wFoot, footY - pLower.y * wFoot);
   leg.lineTo(knee.x - pKnee.x * wKnee, knee.y - pKnee.y * wKnee);
-  leg.lineTo(hipX - pUpper.x * wHip, hipY - pUpper.y * wHip);
+  leg.quadraticCurveTo(
+    midX - pUpper.x * wMid * 0.75,
+    midY - pUpper.y * wMid * 0.75,
+    hipX - pUpper.x * wHip,
+    hipY - pUpper.y * wHip,
+  );
   leg.closePath();
 
   shade(ctx, leg, [hipX - wHip, hipY, footX + wFoot, footY], colour, 0.75);
@@ -229,14 +244,14 @@ export function drawHorse(
   ctx.rotate(-0.05 * drive);
 
   const reach = 22 + 20 * intensity;
-  const shoulderY = BODY_Y + BARREL_HALF * 0.5;
-  const hipY = BODY_Y + BARREL_HALF * 0.2;
+  const shoulderY = BODY_Y + BARREL_HALF * 0.1;
+  const hipY = BODY_Y - BARREL_HALF * 0.2;
 
   // ---- Far legs, pushed back in tone so the near side reads forward -------
   const far = dark(body, 0.3);
   const farPoint = dark(coat.points, 0.25);
-  drawLeg(ctx, HIP_X - 2, hipY, phase + LEG_OFFSET.farHind, intensity, reach, -1, far, farPoint, 7);
-  drawLeg(ctx, SHOULDER_X - 2, shoulderY, phase + LEG_OFFSET.farFore, intensity, reach, 1, far, farPoint, 6.5);
+  drawLeg(ctx, HIP_X - 2, hipY, phase + LEG_OFFSET.farHind, intensity, reach, -1, far, farPoint, 6);
+  drawLeg(ctx, SHOULDER_X - 4, shoulderY, phase + LEG_OFFSET.farFore, intensity, reach, 1, far, farPoint, 5.4);
 
   // ---- Tail ---------------------------------------------------------------
   const swing = Math.sin(phase * Math.PI * 2 + 1.2) * 3.5;
@@ -276,26 +291,29 @@ export function drawHorse(
 
   // Ear, behind the head so its base is hidden by it.
   const ear = new Path2D();
-  ear.moveTo(24, -13);
-  ear.lineTo(25, -22);
-  ear.lineTo(30, -12);
+  ear.moveTo(20, -8);
+  ear.lineTo(21, -16);
+  ear.lineTo(25, -8);
   ear.closePath();
-  shade(ctx, ear, [24, -22, 30, -11], body, 0.7);
+  shade(ctx, ear, [20, -16, 25, -7], body, 0.6);
 
   // NECK AND HEAD AS ONE SILHOUETTE.
-  // Crest from the withers, over the poll, down the face to the muzzle, back
-  // under the jaw and down the throat. Drawn as two pieces the join showed as
-  // a hard line across the throat — the same seam problem as the body.
+  //
+  // Proportions matter more here than anywhere: neck ~0.4 of withers height,
+  // head ~0.28, and the neck TAPERS hard from a deep base to a fine throat.
+  // Previously it was as deep as the barrel and half again too long, which is
+  // why it read as a wedge with a small head stuck on the end.
+  const NECK = 21;
+  const HEAD = 14;
   const neck = new Path2D();
-  neck.moveTo(-9, 13); // base at the withers
-  neck.bezierCurveTo(2, 1, 14, -8, 24, -14); // crest
-  neck.bezierCurveTo(31, -18, 39, -14, 42, -7); // poll and forehead
-  neck.bezierCurveTo(45, -2, 44, 2, 40, 3); // face down to the muzzle
-  neck.bezierCurveTo(36, 4, 33, 2, 30, 1); // muzzle underside
-  neck.bezierCurveTo(26, 4, 22, 6, 17, 6); // jaw
-  neck.bezierCurveTo(8, 9, -1, 15, -6, 22); // throat to the chest
+  neck.moveTo(-8, 11); // base at the withers
+  neck.bezierCurveTo(-1, 2, NECK - 8, -5, NECK, -8); // crest, tapering
+  neck.bezierCurveTo(NECK + 5, -10, NECK + 10, -8, NECK + HEAD - 3, -5); // poll and face
+  neck.bezierCurveTo(NECK + HEAD + 1, -4, NECK + HEAD + 2, -1, NECK + HEAD - 1, 0); // muzzle
+  neck.bezierCurveTo(NECK + HEAD - 5, 1, NECK + 8, 1, NECK + 3, 1); // jaw
+  neck.bezierCurveTo(NECK - 5, 4, -2, 10, -6, 17); // throat, into the chest
   neck.closePath();
-  shade(ctx, neck, [-9, -18, 45, 22], body, 0.9);
+  shade(ctx, neck, [-8, -10, NECK + HEAD + 2, 17], body, 0.85);
 
   // Everything inside the neck is shading only — no outlines, no seams.
   ctx.save();
@@ -303,32 +321,28 @@ export function drawHorse(
 
   // Muzzle, in the points colour.
   ctx.fillStyle = coat.points;
-  ctx.globalAlpha = 0.9;
+  ctx.globalAlpha = 0.85;
   ctx.beginPath();
-  ctx.ellipse(38, 0, 6, 4.5, 0.2, 0, Math.PI * 2);
+  ctx.ellipse(NECK + HEAD - 2, -2, 3.6, 2.6, 0.2, 0, Math.PI * 2);
   ctx.fill();
 
-  // Light down the crest.
-  ctx.fillStyle = lite(body, 0.2);
-  ctx.globalAlpha = 0.5;
-  ctx.beginPath();
-  ctx.ellipse(14, -9, 16, 3.5, -0.42, 0, Math.PI * 2);
-  ctx.fill();
+  // One soft gradient down the neck instead of discrete blobs, so no shading
+  // shape can show its own edge.
+  const ng = ctx.createLinearGradient(0, -10, 6, 16);
+  ng.addColorStop(0, lite(body, 0.2));
+  ng.addColorStop(0.5, 'rgba(0,0,0,0)');
+  ng.addColorStop(1, dark(body, 0.26));
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = ng;
+  ctx.fillRect(-12, -14, NECK + HEAD + 16, 34);
 
-  // Shadow under the jaw and along the throat.
-  ctx.fillStyle = dark(body, 0.26);
-  ctx.globalAlpha = 0.45;
-  ctx.beginPath();
-  ctx.ellipse(4, 14, 16, 5, -0.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Mane along the crest, clipped so it never breaks the outline.
+  // Mane along the crest.
   ctx.globalAlpha = 1;
   ctx.fillStyle = coat.hair;
   ctx.beginPath();
-  ctx.moveTo(-9, 10);
-  ctx.bezierCurveTo(2, -2, 14, -11, 26, -17);
-  ctx.bezierCurveTo(20, -8 - headBob * 0.4, 6, -1, -9, 4);
+  ctx.moveTo(-9, 8);
+  ctx.bezierCurveTo(-2, 0, NECK - 8, -6, NECK + 2, -9);
+  ctx.bezierCurveTo(NECK - 6, -2 - headBob * 0.3, -1, 3, -9, 3);
   ctx.closePath();
   ctx.fill();
 
@@ -337,7 +351,7 @@ export function drawHorse(
   // Eye, on top of everything.
   ctx.fillStyle = '#120C08';
   ctx.beginPath();
-  ctx.ellipse(31, -9, 1.7, 1.9, 0, 0, Math.PI * 2);
+  ctx.ellipse(NECK + 6, -5.5, 1.5, 1.7, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
@@ -399,40 +413,23 @@ export function drawHorse(
   ctx.save();
   ctx.clip(silhouette);
 
-  // Belly shadow.
-  ctx.fillStyle = dark(body, 0.3);
-  ctx.globalAlpha = 0.7;
-  ctx.beginPath();
-  ctx.ellipse(0, BODY_Y + D * 1.3, 30, D * 0.8, -0.02, 0, Math.PI * 2);
-  ctx.fill();
+  const bg = ctx.createLinearGradient(0, BODY_Y - D * 1.6, 0, BODY_Y + D * 1.4);
+  bg.addColorStop(0, lite(body, 0.24));
+  bg.addColorStop(0.42, 'rgba(0,0,0,0)');
+  bg.addColorStop(1, dark(body, 0.3));
+  ctx.fillStyle = bg;
+  ctx.fillRect(HIP_X - 16, BODY_Y - D * 1.8, SHOULDER_X - HIP_X + 30, D * 3.4);
 
-  // Light along the back.
-  ctx.fillStyle = lite(body, 0.22);
-  ctx.globalAlpha = 0.55;
-  ctx.beginPath();
-  ctx.ellipse(-2, BODY_Y - D * 1.25, 24, D * 0.4, -0.02, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Quarters — a soft mass over the hip, never an outlined circle.
-  ctx.fillStyle = lite(body, 0.14);
-  ctx.globalAlpha = 0.45;
-  ctx.beginPath();
-  ctx.ellipse(HIP_X - 1, BODY_Y - D * 0.25, 11, D * 1.15, -0.1, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Flank crease, where the barrel tucks up.
-  ctx.fillStyle = dark(body, 0.2);
-  ctx.globalAlpha = 0.3;
-  ctx.beginPath();
-  ctx.ellipse(HIP_X + 13, BODY_Y + D * 0.3, 4, D * 1.1, 0.08, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Shoulder plane.
-  ctx.fillStyle = lite(body, 0.13);
-  ctx.globalAlpha = 0.4;
-  ctx.beginPath();
-  ctx.ellipse(SHOULDER_X - 5, BODY_Y + D * 0.1, 8, D * 1.05, 0.3, 0, Math.PI * 2);
-  ctx.fill();
+  // The one piece of internal form worth keeping: the flank crease where the
+  // barrel tucks up. Soft, and vertical, so it never reads as a circle.
+  const fg = ctx.createLinearGradient(HIP_X + 6, 0, HIP_X + 20, 0);
+  fg.addColorStop(0, 'rgba(0,0,0,0)');
+  fg.addColorStop(0.5, dark(body, 0.18));
+  fg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = fg;
+  ctx.fillRect(HIP_X + 6, BODY_Y - D, 14, D * 2);
+  ctx.globalAlpha = 1;
 
   ctx.restore();
 
@@ -480,8 +477,8 @@ export function drawHorse(
   ctx.restore();
 
   // ---- Near legs ----------------------------------------------------------
-  drawLeg(ctx, HIP_X + 3, hipY, phase + LEG_OFFSET.nearHind, intensity, reach, -1, body, coat.points, 8.5);
-  drawLeg(ctx, SHOULDER_X + 2, shoulderY, phase + LEG_OFFSET.nearFore, intensity, reach, 1, body, coat.points, 8);
+  drawLeg(ctx, HIP_X + 1, hipY, phase + LEG_OFFSET.nearHind, intensity, reach, -1, body, coat.points, 6.6);
+  drawLeg(ctx, SHOULDER_X - 1, shoulderY, phase + LEG_OFFSET.nearFore, intensity, reach, 1, body, coat.points, 6);
 
   ctx.restore();
 }
