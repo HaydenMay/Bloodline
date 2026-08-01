@@ -79,6 +79,15 @@ const STRIDE_YARDS = HORSE_YARDS * 3 * SIM_SPEED_INFLATION;
 const MAX_STRIDE_RATE = 0.9;
 
 /**
+ * Speed a finished horse settles to after the wire, in yards/sec.
+ *
+ * Non-zero on purpose: the stride rate is derived from speed, so a horse that
+ * decays to a standstill also freezes its own gait, and the sheet holds whatever
+ * gallop frame it happened to land on. Walking on keeps the cycle turning over.
+ */
+const PULL_UP_WALK = 1.9;
+
+/**
  * Sprite pixels per rig unit, so both draw the same horse at the same size.
  *
  * The rig spans about 123 of its own units nose to tail-tip; the sprite spans
@@ -350,7 +359,10 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       let drawSpeed = r.speed;
       if (r.finished) {
         const pu = pullUp.get(r.id) ?? { extra: 0, speed: r.speed };
-        pu.speed = Math.max(0, pu.speed - 11 * dt);
+        // Pull up to a WALK, not to a standstill. Decaying to zero froze the
+        // stride rate at zero with it, leaving the horse as a statue held in a
+        // mid-gallop frame — the same "reset" read, arriving two seconds later.
+        pu.speed = Math.max(PULL_UP_WALK, pu.speed - 11 * dt);
         pu.extra += pu.speed * dt;
         pullUp.set(r.id, pu);
         drawSpeed = pu.speed;
@@ -380,15 +392,19 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
       // The sprite sheet is the shipping art. The drawn rig stays behind it as
       // the fallback for the frames before the sheet has decoded, and for the
-      // poses the sheet does not contain — standing at the gate, pulling up.
-      const drewSprite =
-        !r.finished &&
-        drawSpriteHorse(ctx, x, y, {
-          coat: r.coat,
-          silks: silksFor.get(r.id)!,
-          phase,
-          scale: scale * SPRITE_PER_RIG_UNIT,
-        });
+      // poses the sheet does not contain — standing at the gate.
+      //
+      // Crossing the wire is NOT one of those poses. Dropping the sheet at the
+      // line swapped the horse for the rig mid-stride, in the one moment the
+      // player is looking straight at it, and it read as the model resetting.
+      // A horse pulling up is still galloping, decaying to a canter — which is
+      // exactly what the sheet run at a decaying stride rate already shows.
+      const drewSprite = drawSpriteHorse(ctx, x, y, {
+        coat: r.coat,
+        silks: silksFor.get(r.id)!,
+        phase,
+        scale: scale * SPRITE_PER_RIG_UNIT,
+      });
 
       if (!drewSprite) {
         drawHorse(ctx, x, y, {
