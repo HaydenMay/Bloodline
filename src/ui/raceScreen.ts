@@ -41,30 +41,20 @@ const HORSE_YARDS = 2.7;
 const RIG_UNITS = 100;
 
 /**
- * How fast the simulation runs against real racing.
+ * Yards covered per stride. Real gallop is ~3 body lengths.
  *
- * A winning 8f is 64.4s where a real one is ~96s — 25.0 m/s against a
- * thoroughbred's ~17.5. Recorded as a known issue in ROADMAP.md and owned by
- * Phase 4.5; until it is corrected the render layer has to divide it back out
- * of anything derived from speed, or the horses animate at a pace no animal
- * moves at.
+ * Stride RATE is speed divided by this: 8.1 yards against the sim's own speed
+ * gives ~2.3 cycles a second once TIME_SCALE (`sim/race/constants.ts`)
+ * corrects the clock — matching a real gallop, and landing at about 55 sprite
+ * frames a second on a 60 Hz display, under the refresh rate so the cycle
+ * plays whole rather than strobing.
+ *
+ * This used to carry its own inflation factor to divide the sim's known-fast
+ * clock back out. Now that the clock is corrected at the source (the sim's own
+ * BASE_SPEED, BASE_DRAIN etc. are scaled by TIME_SCALE), a genuine speed value
+ * arrives here and this is just the real number — nothing left to compensate.
  */
-const SIM_SPEED_INFLATION = 1.43;
-
-/**
- * Yards covered per stride. Real gallop is ~3 body lengths, inflated by however
- * fast the simulation is currently running.
- *
- * Stride RATE is speed divided by this, so the true 8.1 yards gave 3.4 cycles a
- * second against a real gallop's 2.3. With 24 frames in the sheet that is 81
- * sprite frames a second on a 60 Hz display — frames were being dropped, so the
- * gait strobed instead of running. At 11.6 it lands near 2.3 cycles and about
- * 55 frames a second, under the refresh rate, so the cycle plays whole.
- *
- * Delete the inflation when Phase 4.5 fixes the speed scale; the stride length
- * itself is already correct.
- */
-const STRIDE_YARDS = HORSE_YARDS * 3 * SIM_SPEED_INFLATION;
+const STRIDE_YARDS = HORSE_YARDS * 3;
 
 /**
  * Ceiling on how often the legs turn over, in stride cycles per second.

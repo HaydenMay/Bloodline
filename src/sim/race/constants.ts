@@ -12,12 +12,42 @@ export const TICK_HZ = 30;
 export const DT = 1 / TICK_HZ;
 
 /**
+ * The correction for the sim's known-too-fast clock (ROADMAP.md, "Known issue
+ * — winning margins are too wide"). A winning 8f took 64.4s against a real
+ * ~96s: races ran at 25.0 yd/s against a thoroughbred's ceiling near 17.5.
+ *
+ * Covering the same physical distance now genuinely takes TIME_SCALE times
+ * longer in real seconds, so every constant defined against a real second has
+ * to move to still mean what it meant before: a RATE (yards, energy,
+ * probability per second) divides by it, a DURATION (seconds an event lasts)
+ * multiplies by it. Deriving each through this one lever, rather than writing
+ * a second set of hand-picked numbers, is what makes the change balance-
+ * neutral by construction — verified below, "Re-verify Gate 1 at the new
+ * clock" — instead of a fresh guess sitting next to the old one.
+ *
+ * Progress-based and dimensionless constants (STYLE_PROFILES, ESTABLISH_UNTIL,
+ * the performance bands, every multiplier) are untouched: they were never
+ * measured in seconds, so the clock bug never reached them.
+ *
+ * The exponent matters. A quantity in units/secondⁿ needs TIME_SCALEⁿ, not
+ * TIME_SCALE flat — dividing BASE_ACCEL (yards/sec², n=2) by the bare factor
+ * was tried first and the harness caught it: acceleration is what decides how
+ * many YARDS a horse takes to reach full speed, and dividing it by only
+ * TIME_SCALE let horses reach full speed over fewer yards than before,
+ * shrinking the fraction of the race spent scrambling for position — which
+ * quietly favoured the style that wins that scramble (frontRunner's win share
+ * moved from 12.9% to 14.3%, a real shift, not sampling noise: the harness
+ * runs off a fixed seed). Squaring it restores the same yards-to-full-speed
+ * as before, at the correct real-world clock.
+ */
+export const TIME_SCALE = 1.43;
+
+/**
  * Base gallop speed in yards/sec for an average horse at full effort.
  * Real thoroughbreds average roughly 19-20 yd/s, putting a 6f sprint near 70s
- * and a 10f route near 2 minutes — which lands inside our 45-75s target once
- * the render layer applies its time compression.
+ * and a 10f route near 2 minutes.
  */
-export const BASE_SPEED = 30.5;
+export const BASE_SPEED = 30.5 / TIME_SCALE;
 
 /** How much the Speed stat swings top-end velocity, as a fraction. */
 export const SPEED_STAT_INFLUENCE = 0.19;
@@ -26,7 +56,7 @@ export const SPEED_STAT_INFLUENCE = 0.19;
 export const MIN_EFFORT_SPEED = 0.78;
 
 /** Acceleration in yards/sec² at burst 50. */
-export const BASE_ACCEL = 5.2;
+export const BASE_ACCEL = 5.2 / TIME_SCALE ** 2;
 export const BURST_ACCEL_INFLUENCE = 0.5;
 
 // ---------------------------------------------------------------------------
@@ -39,11 +69,11 @@ export const BURST_ACCEL_INFLUENCE = 0.5;
 export const MAX_ENERGY = 100;
 
 /** Energy per second burned at full effort by a stamina-50 horse in position. */
-export const BASE_DRAIN = 7.4;
+export const BASE_DRAIN = 7.4 / TIME_SCALE;
 export const STAMINA_DRAIN_INFLUENCE = 0.45;
 
 /** Energy per second recovered at zero effort, in the style's happy place. */
-export const BASE_RECOVERY = 4.1;
+export const BASE_RECOVERY = 4.1 / TIME_SCALE;
 
 /**
  * Leading is INTRINSICALLY expensive — no slipstream, and you set the tempo.
@@ -122,7 +152,7 @@ export const APTITUDE_DRAIN_PENALTY = 0.5;
 
 export const KICK_MAX_BONUS = 0.085;
 export const KICK_GRIT_INFLUENCE = 0.35;
-export const KICK_BASE_DURATION = 9.0;
+export const KICK_BASE_DURATION = 9.0 * TIME_SCALE;
 /** Kick costs energy on top of the effort it implies. */
 export const KICK_DRAIN_MULTIPLIER = 1.35;
 
@@ -154,7 +184,7 @@ export const LANE_COUNT = 6;
 /** Yards ahead in the same lane that counts as blocked. */
 export const BLOCK_GAP = 2.4;
 /** Base per-second chance a jockey finds a way out. */
-export const BASE_ESCAPE_RATE = 0.9;
+export const BASE_ESCAPE_RATE = 0.9 / TIME_SCALE;
 export const JOCKEY_ESCAPE_INFLUENCE = 0.8;
 export const TEMPER_ESCAPE_INFLUENCE = 0.35;
 export const GRIT_ESCAPE_INFLUENCE = 0.3;
@@ -168,7 +198,7 @@ export const GRIT_ESCAPE_INFLUENCE = 0.3;
  */
 export const BLOCKED_SPEED_FACTOR = 0.995;
 /** Seconds shut off before it counts as genuine trouble worth reporting. */
-export const TROUBLE_THRESHOLD = 1.2;
+export const TROUBLE_THRESHOLD = 1.2 * TIME_SCALE;
 
 // ---------------------------------------------------------------------------
 // Consistency failures (DESIGN.md §4)
@@ -177,12 +207,12 @@ export const TROUBLE_THRESHOLD = 1.2;
 /** Chance of a fumbled start at consistency 0. */
 export const FUMBLE_BASE_CHANCE = 0.3;
 export const FUMBLE_SPEED_PENALTY = 0.55;
-export const FUMBLE_DURATION = 1.4;
+export const FUMBLE_DURATION = 1.4 * TIME_SCALE;
 
 /** Per-second chance of a green moment at consistency 0. */
-export const GREEN_MOMENT_RATE = 0.045;
+export const GREEN_MOMENT_RATE = 0.045 / TIME_SCALE;
 export const GREEN_MOMENT_PENALTY = 0.93;
-export const GREEN_MOMENT_DURATION = 1.1;
+export const GREEN_MOMENT_DURATION = 1.1 * TIME_SCALE;
 
 /**
  * The continuous performance band.
@@ -198,8 +228,8 @@ export const GREEN_MOMENT_DURATION = 1.1;
  */
 export const BAND_DOWN = 0.17;
 export const BAND_UP = 0.115;
-export const VARIATION_INTERVAL_MIN = 0.5;
-export const VARIATION_INTERVAL_MAX = 2;
+export const VARIATION_INTERVAL_MIN = 0.5 * TIME_SCALE;
+export const VARIATION_INTERVAL_MAX = 2 * TIME_SCALE;
 
 // ---------------------------------------------------------------------------
 // Daily form — amplitude driven by Temper (DESIGN.md §4)

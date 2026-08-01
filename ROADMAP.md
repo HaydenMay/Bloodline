@@ -132,11 +132,35 @@ after it would strand every `Phase 5` reference already written into the code.
 Everything below is a known, **measured** defect. This phase is where the bill
 comes due for shipping a race that felt good before it was calibrated.
 
-- **The speed scale.** A winning 8f is 64.4s against a real ~96s — 25.0 m/s
-  where a thoroughbred tops out near 17.5. Do this one first and alone: a margin
-  is a time gap times speed, so it deflates every margin in the game by 1.43×
-  before anything else is touched, and every other constant is calibrated on top
-  of it.
+- **The speed scale.** ✅ **Done.** A winning 8f ran 64.4s against a real ~96s —
+  25.0 yd/s where a thoroughbred tops out near 17.5. Every constant measured in
+  real seconds (`BASE_SPEED`, `BASE_ACCEL`, drain, recovery, kick/fumble/green
+  durations, the escape rate) now derives from one `TIME_SCALE = 1.43` lever in
+  `constants.ts`, rather than the render layer dividing the error back out —
+  which it no longer needs to. `npm run harness`: style balance and margins
+  unchanged from baseline (within the harness's own fixed-seed noise), clock
+  now 87–97s across divisions.
+  <br><br>
+  **This did NOT shrink margins**, correcting what this line originally
+  claimed. That estimate assumed scaling `BASE_SPEED` *alone* — which would
+  have been a balance-breaking partial fix, since every per-second drain/
+  recovery rate would then apply for 1.43× longer real seconds per race. Done
+  consistently instead (rates divide by `TIME_SCALE`, durations multiply by
+  it, so behaviour per unit of race PROGRESS is unchanged), margin in lengths
+  is `time_gap_seconds × speed_yd/s` — and both terms move oppositely by the
+  same factor and cancel. Measured directly: 8th-place margin 74.7L before,
+  75.2L after (`npm run margin-profile`). **The tail collapse below is
+  entirely untouched by this step** — it is the energy floor's job, not the
+  clock's.
+  <br><br>
+  One trap found and fixed by the harness, worth recording: `BASE_ACCEL` is
+  yards/sec² — order-2 in time — so it needs `TIME_SCALE²`, not `TIME_SCALE`.
+  Dividing it by the bare factor first let horses reach full speed over fewer
+  yards than before, shrinking the fraction of the race spent scrambling for
+  position, and frontRunner's win share quietly moved from 12.9% to 14.3%
+  before the exponent was corrected. Reproduce either measurement with
+  `npm run margin-profile` (`tools/margin-profile.ts`) and
+  `npm run harness`.
 - **The energy floor.** An empty horse currently keeps losing ground at a rate
   nothing in racing does. It should fade, not collapse. This is what turns the
   tail of the field from 74 lengths into something a person would recognise.
@@ -151,8 +175,9 @@ comes due for shipping a race that felt good before it was calibrated.
   produce upsets. All of it, at the new noise level.
 - **Reconcile the animation with the simulation.** The gallop sheet is 24 frames
   of one gait; the sim has `intensity` and `drive` that it currently cannot
-  express. Stride length is also derived from speed, so correcting the speed
-  scale moves it.
+  express. Stride length no longer needs a render-side correction — it was
+  derived from speed, and speed is now correct at the source — but the sheet
+  still can't show a horse straining versus coasting at the same speed.
 
 **Deliverable:** finishes you would believe. Photo finishes at the front, a
 beaten field that is beaten rather than distanced, and a harness run that proves
@@ -237,34 +262,37 @@ photo finishes — that is where the drama of a race actually lives.
 
 ### The tail is worse than the front, and that is the bigger problem
 
-Measured over 200 races, 8f, open division — median margin behind the winner:
+Median margin behind the winner, 200 races, 8f open — reproducible with
+`npm run margin-profile` (`tools/margin-profile.ts`):
 
 | Place | 2nd | 3rd | 4th | 5th | 6th | 7th | 8th |
 |---|---|---|---|---|---|---|---|
-| Behind | 4.4L | 7.9L | 11.3L | 16.7L | 23.9L | 38.4L | **73.8L** |
+| Before the speed-scale fix | 4.1L | 8.9L | 13.0L | 17.4L | 24.6L | 42.1L | **74.7L** |
+| After | 4.6L | 7.8L | 11.9L | 18.0L | 26.0L | 42.7L | **75.2L** |
 
-The first four are close to plausible. From fifth back it detonates: the gap
-between consecutive horses runs 3.5L, 3.5L, 5.4L, 7.2L, **14.5L, 35.4L**. A real
-eight-runner field finishes inside about twenty lengths end to end; ours strings
-out over seventy. Horses that run out of energy are not fading, they are
-collapsing.
+The first four are close to plausible; from fifth back it detonates just the
+same on both rows. A real eight-runner field finishes inside about twenty
+lengths end to end; ours strings out over seventy, **before and after**.
+Horses that run out of energy are not fading, they are collapsing.
 
 This matters more than the winning margin because it is what a player actually
 sees. A beaten horse is routinely reported as *distanced*, which reads as a
 broken game rather than a bad ride.
 
-**Two contributing causes, both measured:**
+**One cause, and it is no longer two.** This used to list a second contributing
+cause — the sim running 1.43× too fast — reasoning that since a margin is a
+time gap multiplied by speed, the whole table was inflated by that factor and
+correcting it would take last place from 74L to about 51L. **That has now been
+done, and the table above shows it was wrong.** The estimate assumed scaling
+speed *alone*; done consistently — every per-second rate scaled with it, so
+behaviour per unit of race progress is unchanged (see Phase 4.5) — margin in
+lengths is `time_gap_seconds × speed_yd/s`, and both terms move oppositely by
+the same factor and cancel. The clock is now correct (~92s for an 8f open race
+against the old 64.6s) and the tail is exactly as wide as before.
 
-1. **The tail collapse above** — the energy model has no floor, so an empty horse
-   keeps losing ground at a rate nothing in racing does.
-2. **The whole sim runs 1.43× too fast.** A winning 8f time is 64.4s against a
-   real ~96s, which is 25.0 m/s where a thoroughbred tops out near 17.5. Since a
-   margin is a time gap multiplied by speed, every margin is inflated by that
-   factor before any of the variance above is applied.
-
-Fixing the speed scale alone would take last place from 74L to about 51L. It is
-not sufficient, but it is the cheapest single correction and it should come
-first, because everything else is calibrated on top of it.
+So the energy floor is not one of two causes — it is the only one. **The
+energy model has no floor, so an empty horse keeps losing ground at a rate
+nothing in racing does**, and nothing short of fixing that moves this number.
 
 **Owned by Phase 4.5.** Not urgent for Gate 2 — riding still feels different race
 to race — but nothing above gets better on its own, and every constant added
