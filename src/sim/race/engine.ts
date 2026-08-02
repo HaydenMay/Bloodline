@@ -51,10 +51,6 @@ interface Runner {
   fumbledStart: boolean;
   greenRemaining: number;
 
-  /** Running average of how faithfully this horse has raced its style. */
-  fidelitySum: number;
-  fidelityTicks: number;
-
   /** Continuous performance band — re-rolled on a timer. See constants. */
   variation: number;
   variationTimer: number;
@@ -414,8 +410,6 @@ function createRunner(
     fumbleRemaining: fumbled ? K.FUMBLE_DURATION : 0,
     fumbledStart: fumbled,
     greenRemaining: 0,
-    fidelitySum: 0,
-    fidelityTicks: 0,
     variation: 1,
     variationTimer: 0,
     // Asymmetric: a horse underperforms more easily than it exceeds itself.
@@ -466,36 +460,106 @@ function stepRunner(
   const input: ControlInput = r.controller(view, race);
   const profile = K.STYLE_PROFILES[r.horse.style];
   r.effort = clamp(input.effort, 0, 1);
+  // The horse's OWN progress toward the finish, not race.progress (the
+  // LEADER's distance over the total) — a horse running behind the pace
+  // hasn't covered as much of ITS OWN race as the leader has of theirs, so
+  // its own timing (kick window, positional fade below) has to be judged
+  // against its own clock, not the leader's.
+  const ownProgress = clamp(r.distance / totalYards, 0, 1);
+  // But floored so it can't lag the leader's clock by more than
+  // MAX_MOMENT_LAG — see the note on that constant. Matches ai.ts's own
+  // momentProgress exactly, so windowFit here agrees with what ai.ts used to
+  // decide the kick was worth firing in the first place.
+  const momentProgress = Math.max(ownProgress, race.progress - K.MAX_MOMENT_LAG);
+
+  // How far up the field, and how CLEAR that spot is — used both by the kick
+  // (complacency discount, right below) and by charge regen further down.
+  // A CLEAR lead refills fine and (new) kicks weaker; a CONTESTED one refills
+  // worse and kicks at full strength — the front-runner's whole trade.
+  const forwardness = 1 - r.fieldPosition; // 1 at the front, 0 at the back
+  const nearest = all.reduce((best, o) => {
+    if (o === r || o.finishTime !== null) return best;
+    const gap = Math.abs(o.distance - r.distance);
+    return gap < best ? gap : best;
+  }, Number.POSITIVE_INFINITY);
+  const contest = clamp(1 - nearest / K.CLEAR_LEAD_GAP, 0, 1);
+
+  // Same idea, but measured against the BACK of the field rather than the
+  // nearest neighbor — a front pack that's mutually boxing itself in never
+  // reads as "clear" by the nearest-rival measure above even while it
+  // collectively pulls hundreds of yards clear of a back-marker (ROADMAP.md:
+  // traced directly — a `late` horse fell 150-200 yards behind before its
+  // own window even opened, while every horse ahead of it stayed "contested"
+  // by nearest-rival terms the whole time). Used only by kick complacency,
+  // not regen — being boxed in by a neighbor and being clear of the whole
+  // field are different things.
+  const furthestBehindGap = all.reduce((worst, o) => {
+    if (o === r || o.finishTime !== null) return worst;
+    const gap = r.distance - o.distance;
+    return gap > worst ? gap : worst;
+  }, 0);
+  // Smooth ramp, not a threshold — see CLEAR_FIELD_SCALE for why.
+  const fieldClearness = 1 - Math.exp(-furthestBehindGap / K.CLEAR_FIELD_SCALE);
 
   // --- The kick -----------------------------------------------------------
-  // Strength scales with GRIT x JOCKEY SKILL — a fixed measure of the horse
-  // and rider, not of how many charges happen to be banked right now. The
-  // bank only gates whether a kick can fire at all.
+  // The ONLY thing that ever pushes a horse above its top speed (constants.ts,
+  // "Effort: HOLD / CRUISE / KICK"). Strength scales with GRIT x BURST x
+  // JOCKEY SKILL — a fixed measure of the horse and rider, not of how many
+  // charges happen to be banked right now. The bank only gates whether a
+  // kick can fire at all.
   if (input.kick && r.kicksRemaining > 0) {
     r.kicksRemaining--;
     const gritFactor = 1 + ((r.horse.stats.grit - 50) / 100) * K.KICK_GRIT_INFLUENCE;
+    const burstFactor = 1 + ((r.horse.stats.burst - 50) / 100) * K.KICK_BURST_INFLUENCE;
     const jockeyFactor = 1 + ((r.horse.jockeySkill - 50) / 100) * K.KICK_JOCKEY_INFLUENCE;
 
     // TIMING IS THE SKILL. Kick anywhere inside the horse's Moment window and
     // it lands at full force — enough to take a race. Kick outside it and you
     // spend the same charge for a fraction of the surge: enough to hold your
     // position, never enough to steal the lead.
-    // Own progress, not the leader's — see the note in the phase-bonus block
-    // below for why the two diverge and why that matters here.
-    const ownProgress = clamp(r.distance / totalYards, 0, 1);
     const [momentLo, momentHi] = K.MOMENT_WINDOWS[r.horse.moment];
-    const off = ownProgress < momentLo ? momentLo - ownProgress : Math.max(0, ownProgress - momentHi);
+    const off =
+      momentProgress < momentLo ? momentLo - momentProgress : Math.max(0, momentProgress - momentHi);
     const windowFit = clamp(1 - off / K.KICK_WINDOW_FALLOFF, K.KICK_MIN_FIT, 1);
     r.kickWindowFit = windowFit;
 
     const styleFactor = 1 + K.KICK_STYLE_BONUS[r.horse.style];
-    r.kickStrength = K.KICK_MAX_BONUS * gritFactor * jockeyFactor * windowFit * styleFactor;
+    // Narrower windows (`early`, `late`) need a stronger kick to make up for
+    // less real time and fewer regen opportunities inside them — see
+    // KICK_MOMENT_BONUS.
+    const momentFactor = 1 + K.KICK_MOMENT_BONUS[r.horse.moment];
+    // COMEBACK: clear of the WHOLE FIELD (fieldClearness, not the nearest
+    // rival) means less urgency — kicking again to extend a lead already
+    // coasting on clear air buys less than kicking under real pressure or
+    // from off the pace. See KICK_COMPLACENCY_PENALTY for the full rationale.
+    const complacency = forwardness * fieldClearness;
+    const complacencyFactor = 1 - K.KICK_COMPLACENCY_PENALTY * complacency;
+    r.kickStrength =
+      K.KICK_MAX_BONUS *
+      gritFactor *
+      burstFactor *
+      jockeyFactor *
+      windowFit *
+      styleFactor *
+      momentFactor *
+      complacencyFactor;
     // Duration scales with the SAME windowFit as strength — a mistimed kick
     // is shorter, not just weaker. Without this, spamming every charge the
     // instant it's available could cover most of a race at reduced strength
     // and out-earn one strong kick held for its ~13s window on raw uptime.
+    //
+    // Also scaled by momentFactor, same as strength above — repeat kicks
+    // fired close together (a narrow window) mostly just refresh this timer
+    // rather than stacking, so a narrow window's real TOTAL boosted time
+    // ends up close to its own window width regardless of how many charges
+    // get spent inside it. A strength bonus alone doesn't fix that: it makes
+    // the boost faster, not longer. Traced directly — `late`'s kicks closed
+    // real ground once they started, just not over enough total TIME to
+    // finish the job (ROADMAP.md).
     r.kickRemaining =
-      K.KICK_BASE_DURATION * (K.KICK_MISTIMED_DURATION_FLOOR + (1 - K.KICK_MISTIMED_DURATION_FLOOR) * windowFit);
+      K.KICK_BASE_DURATION *
+      (K.KICK_MISTIMED_DURATION_FLOOR + (1 - K.KICK_MISTIMED_DURATION_FLOOR) * windowFit) *
+      momentFactor;
 
     if (hasTrait(r.traits, 'turnOfFoot')) {
       r.kickStrength *= 1.55;
@@ -580,20 +644,10 @@ function stepRunner(
   // RECOVERY_FLOOR. A front-runner does not escape the lead's regen penalty —
   // its style merely lets it recharge better than another style would in the
   // same spot, in exchange for never having ground to make up.
+  //
+  // forwardness/nearest/contest computed above, before the kick block —
+  // reused there for the complacency discount on kick strength.
   const relief = K.FRONT_COST_RELIEF[r.horse.style];
-
-  const forwardness = 1 - r.fieldPosition; // 1 at the front, 0 at the back
-
-  // How hard is this horse being pressed? A CLEAR lead refills fine — the
-  // leader dictates a soft tempo. A CONTESTED lead refills much worse. This is
-  // the front-runner's entire win condition, and what gives Pace Pusher
-  // something to punish: contest the lead and the leader can't recharge.
-  const nearest = all.reduce((best, o) => {
-    if (o === r || o.finishTime !== null) return best;
-    const gap = Math.abs(o.distance - r.distance);
-    return gap < best ? gap : best;
-  }, Number.POSITIVE_INFINITY);
-  const contest = clamp(1 - nearest / K.CLEAR_LEAD_GAP, 0, 1);
 
   // Two separate slowdowns, deliberately decoupled.
   //
@@ -616,34 +670,27 @@ function stepRunner(
   const rawMisfit = Math.abs(r.fieldPosition - profile.preferred);
   let misfit = clamp((rawMisfit - profile.tolerance) / (1 - profile.tolerance), 0, 1);
   if (hasTrait(r.traits, 'tractable')) misfit *= 0.45;
-  const rawMisfitClamped = misfit;
 
   // Positional preference only matters while a race is still being SET UP, and
   // ramps in rather than snapping on at the gate.
   //
-  // ai.ts already prices reaching your slot as a bounded spike in EFFORT
-  // (ESTABLISH_GAIN, up to MAX_EFFORT) — fading this in across the same window
-  // (ESTABLISH_UNTIL) means the drift itself is what's priced during the
-  // scramble, not the scramble and the drift together. Once everyone is
-  // committed in the stretch it fades OUT again — otherwise a closer is
-  // punished for executing its own strategy, since making its run means
-  // leaving the back of the field by definition.
+  // ai.ts prices reaching your slot as a bounded spike in EFFORT during the
+  // opening scramble (ESTABLISH_GAIN, up to CRUISE_EFFORT) — fading this in
+  // across the same window (ESTABLISH_UNTIL) means the drift itself is what's
+  // priced during the scramble, not the scramble and the drift together. Once
+  // everyone is committed in the stretch it fades OUT again — otherwise a
+  // closer is punished for executing its own strategy, since making its run
+  // means leaving the back of the field by definition. Own progress, not the
+  // leader's, for the same reason the kick window above uses it.
   const positional = clamp(
     Math.min(
-      race.progress / K.ESTABLISH_UNTIL,
-      (K.POSITION_FADE_END - race.progress) / (K.POSITION_FADE_END - K.POSITION_FADE_START),
+      ownProgress / K.ESTABLISH_UNTIL,
+      (K.POSITION_FADE_END - ownProgress) / (K.POSITION_FADE_END - K.POSITION_FADE_START),
     ),
     0,
     1,
   );
   misfit *= positional;
-
-  // Style fidelity: how faithfully this horse has raced its own style while
-  // positioning still mattered. Accrued only during the set-up phases.
-  if (positional > 0) {
-    r.fidelitySum += 1 - rawMisfitClamped;
-    r.fidelityTicks++;
-  }
 
   // Two-sided: a perfect fit earns a genuine regen BONUS, a bad fit a genuine
   // PENALTY — floored, never negative. Being in position must pay off, not
@@ -669,23 +716,22 @@ function stepRunner(
 
   // --- Charge regen: the only way charges move, other than the kick --------
   //
-  // cruiseEffort is the style's natural baseline. Riding BELOW it — a genuine
-  // pull, not just cruising — is restraint, and boosts regen on top of the
-  // position multiplier above ("holding boosts regen"). Charges never go
-  // down here; spending is the kick's job alone.
+  // Holding (ControlInput.holding, ai.ts) is a deliberate choice to ride
+  // below top speed for a large regen payoff on top of the position
+  // multiplier above — the mirror of a kick. Charges never go down here;
+  // spending is the kick's job alone.
   const kicking = r.kickRemaining > 0;
-  const restraint = Math.max(0, profile.cruiseEffort - r.effort);
   // "Very reactive to good riding" — Thirsty amplifies the payoff for
-  // restraint without changing the baseline, so a well-ridden pull banks
+  // holding without changing the baseline, so a well-ridden pull banks
   // charges much faster and a horse never rested gains nothing extra.
-  const holdGain = K.CHARGE_REGEN_HOLD_GAIN * (hasTrait(r.traits, 'thirsty') ? 1.6 : 1);
-  let regenMult = recoveryMult * (1 + restraint * holdGain);
+  const holdBonus = input.holding ? K.HOLD_REGEN_BONUS * (hasTrait(r.traits, 'thirsty') ? 1.6 : 1) : 1;
+  let regenMult = recoveryMult * holdBonus;
 
   // "Burns extra energy through the first furlong" — Gate Rusher's explosive
   // break now reads as slower regen in that window rather than a drain.
-  if (hasTrait(r.traits, 'gateRusher') && race.progress < 0.125) regenMult *= 0.7;
+  if (hasTrait(r.traits, 'gateRusher') && ownProgress < 0.125) regenMult *= 0.7;
   // "Keyed up and slower to settle, delaying energy recovery early."
-  if (hasTrait(r.traits, 'alert') && race.progress < 0.2) regenMult *= 0.85;
+  if (hasTrait(r.traits, 'alert') && ownProgress < 0.2) regenMult *= 0.85;
   // "Extremely cheap at moderate effort, punishing at maximum."
   if (hasTrait(r.traits, 'cruiser')) regenMult *= r.effort > 0.85 ? 0.7 : 1.3;
 
@@ -708,50 +754,13 @@ function stepRunner(
     r.variation = 1 + rng.range(-r.bandDown, r.bandUp);
   }
 
-  // --- Phase: the horse's MOMENT in the race --------------------------------
-  // Style says where a horse belongs; Moment says when it shines. An `early`
-  // horse is sharpest out of the gate, a `late` one over the final stretch.
-  //
-  // Uses the horse's OWN progress toward the finish (its distance over the
-  // total), not race.progress (the LEADER's distance over the total). Those
-  // two diverge the moment any gap opens: a horse running behind the pace
-  // hasn't covered as much of ITS OWN race as the leader has of theirs, so
-  // keying its Moment window to the leader's position raced its own kick
-  // window, phase curve, and window-lift ahead of where it should be —
-  // stacking with a leader's OWN early advantage into a self-reinforcing
-  // spiral no amount of stat rebalancing could counter (ROADMAP.md, "Moment
-  // win-rate investigation": near-identical finish distances but a massive
-  // win-rate skew was the tell — a systematic bias converts to a huge win
-  // share in a near-tied field even though it barely moves the raw margin).
-  //
-  // Scaled by style fidelity (holding the PACK POSITION style wants), so the
-  // moment must be EARNED: a horse that spent the first two-thirds fighting
-  // for the wrong spot does not get the surge, regardless of its Moment.
-  const ownProgress = clamp(r.distance / totalYards, 0, 1);
-  const phase = K.MOMENT_PROFILES[r.horse.moment];
-  const p = ownProgress;
-  const phaseBonus =
-    p < 0.5
-      ? phase.early + (phase.middle - phase.early) * (p / 0.5)
-      : phase.middle + (phase.late - phase.middle) * ((p - 0.5) / 0.5);
-
-  const fidelity = r.fidelityTicks > 0 ? r.fidelitySum / r.fidelityTicks : 1;
-  // Penalties always land in full; only the upside has to be earned.
-  let earned = phaseBonus > 0 ? phaseBonus * fidelity : phaseBonus;
-
-  // AUTOMATIC WINDOW LIFT — a floor for not engaging.
-  //
-  // Simply being inside your Moment window lifts you, with no input at all,
-  // so an outclassed field can be beaten on autopilot. A well-timed kick then
-  // stacks on top to roughly double it. The floor keeps auto-race viable; the
-  // ceiling is what rewards paying attention.
-  const [momentWindowLo, momentWindowHi] = K.MOMENT_WINDOWS[r.horse.moment];
-  if (ownProgress >= momentWindowLo && ownProgress <= momentWindowHi) {
-    earned += K.WINDOW_BASE_LIFT * fidelity;
-  }
-
   // --- Speed ----------------------------------------------------------------
-  let speedCap = r.maxSpeed * r.variation * (1 + earned);
+  // Style says where a horse belongs; Moment says when it shines — entirely
+  // through the kick now (KICK_MAX_BONUS etc. above), not a passive curve.
+  // Top speed is just maxSpeed x the performance band; a kick is the ONLY
+  // thing that ever pushes a horse above it (constants.ts, "Effort: HOLD /
+  // CRUISE / KICK").
+  let speedCap = r.maxSpeed * r.variation;
 
   if (kicking) {
     speedCap *= 1 + r.kickStrength;
@@ -759,10 +768,10 @@ function stepRunner(
   }
 
   // Heart: surges when in touch with the lead late.
-  if (hasTrait(r.traits, 'heart') && race.progress > 0.8 && r.rank <= 3) speedCap *= 1.02;
+  if (hasTrait(r.traits, 'heart') && ownProgress > 0.8 && r.rank <= 3) speedCap *= 1.02;
 
   // Consistency: green moments, only while the race is being run.
-  if (r.greenRemaining <= 0 && race.progress > 0.1 && race.progress < 0.9) {
+  if (r.greenRemaining <= 0 && ownProgress > 0.1 && ownProgress < 0.9) {
     const rate = K.GREEN_MOMENT_RATE * (1 - r.horse.stats.consistency / 100);
     if (rng.chance(rate * K.DT)) {
       r.greenRemaining = K.GREEN_MOMENT_DURATION;
