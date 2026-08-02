@@ -422,7 +422,9 @@ body {
 }
 
 @media (max-width: 620px) {
-  .rb-moment .rb-track {
+  /* Track + label both hidden below this width; the Moment text itself now
+     lives inline in .rb-style, so there's nothing left in here to show. */
+  .rb-moment {
     display: none;
   }
 }

@@ -518,11 +518,25 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(233,238,245,0.92)';
     ctx.fillText('CHARGES', barX + 12, barY + 17);
+    const labelW = ctx.measureText('CHARGES').width;
+
+    // ---- Regen indicator ---------------------------------------------------
+    // The dots show the bank, but never whether it's currently filling well —
+    // position, drafting, and holding all feed the same regen multiplier, and
+    // none of that was visible before. 1-3 arrows for low/normal/strong regen,
+    // using the dead space this bar already had to spare.
+    const ARROW_FONT = '700 9px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = ARROW_FONT;
+    const arrowsMaxW = ctx.measureText('▲▲▲').width;
+    const regenTier = player.regenMult >= 1.6 ? 3 : player.regenMult >= 0.9 ? 2 : 1;
+    ctx.fillStyle =
+      regenTier === 3 ? '#6FE39B' : regenTier === 2 ? 'rgba(233,238,245,0.75)' : 'rgba(139,152,169,0.6)';
+    ctx.fillText('▲'.repeat(regenTier), barX + 20 + labelW, barY + 17);
 
     const dotR = 6;
     const dotGap = 20;
     const dotsY = barY + 13;
-    const dotsX0 = barX + 12 + ctx.measureText('CHARGES').width + 20;
+    const dotsX0 = barX + 28 + labelW + arrowsMaxW + 12;
     for (let i = 0; i < CHARGE_CAPACITY; i++) {
       const x = dotsX0 + i * dotGap;
       ctx.beginPath();

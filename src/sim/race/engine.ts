@@ -40,6 +40,8 @@ interface Runner {
   kickStrength: number;
   /** 1 = kicked inside the window, lower = mistimed. */
   kickWindowFit: number;
+  /** Charge-regen multiplier this tick — surfaced on screen as the regen indicator. */
+  regenMult: number;
 
   blockedFor: number;
   troubleTime: number;
@@ -125,6 +127,8 @@ export interface RunnerSnapshot {
   kicksRemaining: number;
   /** Progress (0-1) toward the next charge, for a partial-fill indicator. */
   chargeProgress: number;
+  /** Charge-regen multiplier right now — 1 is baseline; drafting/holding raise it. */
+  regenMult: number;
   blocked: boolean;
   drafting: boolean;
   offColour: boolean;
@@ -225,6 +229,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
           kicking: r.kickRemaining > 0,
           kicksRemaining: r.kicksRemaining,
           chargeProgress: r.chargeProgress,
+          regenMult: r.regenMult,
           blocked: r.blockedFor > 0,
           drafting: r.drafting,
           offColour: r.offColour,
@@ -402,6 +407,7 @@ function createRunner(
     kickRemaining: 0,
     kickStrength: 0,
     kickWindowFit: 1,
+    regenMult: 1,
     blockedFor: 0,
     troubleTime: 0,
     wasBlocked: false,
@@ -734,6 +740,8 @@ function stepRunner(
   if (hasTrait(r.traits, 'alert') && ownProgress < 0.2) regenMult *= 0.85;
   // "Extremely cheap at moderate effort, punishing at maximum."
   if (hasTrait(r.traits, 'cruiser')) regenMult *= r.effort > 0.85 ? 0.7 : 1.3;
+
+  r.regenMult = regenMult;
 
   if (r.kicksRemaining < K.CHARGE_CAPACITY) {
     r.chargeProgress += r.chargeRegenRate * regenMult * K.DT;

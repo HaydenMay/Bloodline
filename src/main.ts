@@ -66,12 +66,11 @@ function startRace(seed: string): void {
   bar.innerHTML = `
     <div class="rb-horse">
       <span class="rb-name">${player.name}</span>
-      <span class="rb-style">${styleLabel(player.style)} · ${seatLabel(player.style)}</span>
+      <span class="rb-style">${styleLabel(player.style)} · <span class="rb-moment-when">${momentLabel(player.moment)}</span></span>
     </div>
     <div class="rb-moment">
       <span class="rb-moment-label">Your moment</span>
       <div class="rb-track"><div class="rb-window" style="left:${lo}%;width:${hi - lo}%"></div></div>
-      <span class="rb-moment-when">${momentLabel(player.moment)}</span>
     </div>
     <div class="rb-hint">Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b></div>
     <button class="rb-again">New race</button>
@@ -92,24 +91,6 @@ function startRace(seed: string): void {
     playerSilks: { primary: '#F2C14E', secondary: '#12222B' },
     config: { furlongs: 8, going: 'good', hype: 0.65, seed: `${seed}-run` },
   });
-}
-
-/**
- * Where this style prefers to sit in the field, in plain words. This is about
- * FIELD POSITION only — Moment (labeled separately) is what now controls WHEN
- * a horse's kick window falls, so this must never use timing language.
- */
-function seatLabel(style: string): string {
-  switch (style) {
-    case 'frontRunner':
-      return 'runs up front';
-    case 'stalker':
-      return 'sits just off the pace';
-    case 'midPack':
-      return 'settles mid-field';
-    default:
-      return 'settles at the back';
-  }
 }
 
 /** Named after the part of the track where this Moment's window falls. */
