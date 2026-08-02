@@ -16,10 +16,10 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
 /**
  * The jockey AI.
  *
- * Rides the horse's running style: hold the position the style wants, spend as
- * little energy as possible getting there, and launch the run at the right
- * moment. Skill varies between jockeys, so some ride their style well and
- * others blunder — which is where beatable mistakes come from (DESIGN.md §4).
+ * Rides the horse's running style: reach the position the style wants, hold
+ * it, and launch the run at the right moment. Skill varies between jockeys,
+ * so some ride their style well and others blunder — which is where beatable
+ * mistakes come from (DESIGN.md §4).
  *
  * The player's own races use the same shape of decision, with `effort` coming
  * from the DRIVE control instead.
@@ -35,6 +35,12 @@ export function createAiController(horse: Horse): Controller {
 
   const preferred = clamp(profile.preferred + (hasTrait(traits, 'tractable') ? 0 : 0), 0, 1);
   const kickAt = profile.kickAt + (1 - skill) * 0.05;
+
+  // Fire the kick exactly once. `race.progress >= kickAt` stays true on every
+  // tick after it first crosses — without this guard the AI would ask the
+  // engine to kick every tick it holds true, burning every charge in a
+  // fraction of a second instead of spending one at the right moment.
+  let hasKicked = false;
 
   return (self: RunnerView, race: RaceView): ControlInput => {
     const inStretch = race.progress >= kickAt;
@@ -91,20 +97,11 @@ export function createAiController(horse: Horse): Controller {
       effort += 0.25;
     }
 
-    // Don't burn the tank before the real running starts. A better jockey
-    // judges this more accurately.
-    //
-    // Halved from a full 1-for-1 subtraction: at empty that used to floor
-    // effort outright, and at a merely moderate shortfall (13 energy against
-    // a ~38 reserve) it was already cutting effort by two-thirds. A jockey on
-    // a horse that has lost the race moderates the ride; it does not idle —
-    // riding at near-zero effort for the rest of the trip was a big part of
-    // why a bad start became a 100+ length beating instead of a bad one.
+    // Before the stretch, hold something back — a jockey riding flat out the
+    // whole way has nothing left to spend on the kick when it matters. This
+    // is navigational now, not a resource budget: there is no tank to
+    // conserve, only a moment worth arriving at with room to commit further.
     if (!inStretch) {
-      const reserve = 32 + (1 - skill) * 12;
-      if (self.energy < reserve) {
-        effort -= 0.5 * ((reserve - self.energy) / reserve);
-      }
       effort = Math.min(effort, 0.86);
     } else {
       // Down the stretch: everything left.
@@ -115,14 +112,16 @@ export function createAiController(horse: Horse): Controller {
     effort += (Math.sin(race.elapsed * 3.1 + self.lane) * sloppiness) / 2;
 
     // --- The kick ----------------------------------------------------------
-    // Fire once, at the style's moment. Strength is Grit x jockey skill, gated
-    // by having any fuel left at all — the AI rides its one charge exactly as
-    // before regardless of how many the player's own horse now carries.
+    // Fire once, at the style's moment. Strength is Grit x jockey skill; the
+    // AI spends exactly one of its shared charges here regardless of how many
+    // it or the player's own horse happen to have banked.
     const kick =
+      !hasKicked &&
       self.kicksRemaining > 0 &&
       race.progress >= kickAt &&
       // Turn of Foot has a short kick, so it must be held later.
       (!hasTrait(traits, 'turnOfFoot') || race.progress >= kickAt + 0.06);
+    if (kick) hasKicked = true;
 
     // --- Lane --------------------------------------------------------------
     let targetLane = self.lane;

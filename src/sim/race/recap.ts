@@ -1,5 +1,6 @@
 import type { RaceOutcome, RaceResult } from './types.js';
 import type { RunningStyle } from '../../data/index.js';
+import { CHARGE_CAPACITY } from './constants.js';
 
 /**
  * The post-race recap.
@@ -156,12 +157,12 @@ export function buildRecap(
     );
   }
 
-  if (!won && me.energyLeft > 22) {
-    add('You crossed the line with plenty still in the tank. You asked too late.');
-  } else if (!won && me.energyLeft < 4) {
-    add('You emptied the tank before the line, and there was nothing left when you needed it.');
-  } else if (won && me.energyLeft < 5) {
-    add('You got there with nothing to spare — perfectly timed.');
+  if (!won && me.kicksLeft > CHARGE_CAPACITY / 2) {
+    add('You crossed the line with charges still banked. You asked too late, or not at all.');
+  } else if (!won && me.kicksLeft === 0) {
+    add('You spent everything you had, and it still was not enough.');
+  } else if (won && me.kicksLeft === 0) {
+    add('You got there with nothing left to spend — perfectly timed.');
   }
 
   if (!won && !usedKick) {

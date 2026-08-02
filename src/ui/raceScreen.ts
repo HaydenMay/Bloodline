@@ -11,11 +11,10 @@ import {
 } from '../render/track.js';
 import { createAiController } from '../sim/race/ai.js';
 import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
-import { KICK_CHARGES, STYLE_PROFILES, TICK_HZ } from '../sim/race/constants.js';
+import { CHARGE_CAPACITY, STYLE_PROFILES, TICK_HZ } from '../sim/race/constants.js';
 import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../sim/race/recap.js';
 import type {
   ControlInput,
-  EnergyFactor,
   RaceConfig,
   RaceEntrant,
 } from '../sim/race/types.js';
@@ -83,44 +82,6 @@ const MAX_STRIDE_RATE = 0.9;
 const PULL_UP_WALK = 1.9;
 
 /**
- * Energy per second below which the bar counts as steady rather than moving.
- *
- * The chevron bands above it are set from the rates a hands-off ride actually
- * produces, measured over 60 races: taking up position runs about -2.3/s, the
- * stretch about -0.9/s, a kick about -1.5/s, and the settled cruise about
- * +0.1/s. So one chevron is a trickle, two is a real cost, three is only the
- * opening burst — and the cruise correctly shows none at all.
- */
-const RATE_HOLDING = 0.15;
-
-/** How long a new dominant factor must hold before the label switches to it. */
-const FACTOR_DWELL_MS = 260;
-
-/**
- * The energy economy, in the player's words.
- *
- * The simulation decides WHICH factor is dominating; this decides what to call
- * it. Every one of these names a thing the player can act on — drop back, take
- * a pull, come off the rail — because a cause you cannot answer is decoration.
- *
- * `neutral` is deliberately blank: a label that is always lit stops being read.
- */
-const FACTOR_LABELS: Record<EnergyFactor, { text: string; colour: string } | null> = {
-  // Distinct from the player's own input-driven URGING tag above this one in
-  // the priority chain: this fires when EFFORT is above cruise for a reason
-  // other than the player currently holding the control — the establish
-  // scramble or the forced stretch commitment.
-  urging: { text: 'PUSHING ON', colour: '#E8A33D' },
-  pressed: { text: 'BEING PRESSED', colour: '#E2564A' },
-  onTheLead: { text: 'ON THE LEAD', colour: '#E8A33D' },
-  outOfPosition: { text: 'OUT OF POSITION', colour: '#E8A33D' },
-  inPosition: { text: 'IN POSITION', colour: '#4EC9A0' },
-  drafting: { text: 'IN THE SLIPSTREAM', colour: '#4EC9A0' },
-  kicking: { text: 'KICKING', colour: '#F2C14E' },
-  neutral: null,
-};
-
-/**
  * Sprite pixels per rig unit, so both draw the same horse at the same size.
  *
  * The rig spans about 123 of its own units nose to tail-tip; the sprite spans
@@ -150,19 +111,10 @@ const CALLOUTS = [
   { at: 0.84, text: 'Down the stretch!' },
 ] as const;
 
-/**
- * The double-tap window, in ms, that turns a second tap into a kick request
- * rather than a second urge. See the controller below: a single tap urges
- * (repeatable, cheap), a double tap spends a kick charge (rarer, decisive).
- */
-const KICK_TAP_MS = 350;
-
 interface PlayerInput {
-  /** Hold to take a pull — settle, drop back, and recover. */
+  /** Hold to take a pull — settle back below cruise, regen faster. */
   takingBack: boolean;
-  /** Timestamp (ms) until which the current urge is still pushing. */
-  urgeUntil: number;
-  /** Set by a double-tap; consumed by the controller the next tick it reads it. */
+  /** Set by a tap; consumed by the controller the next tick it reads it. */
   kickPending: boolean;
 }
 
@@ -184,7 +136,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   void loadSprites();
   const input: PlayerInput = {
     takingBack: false,
-    urgeUntil: 0,
     kickPending: false,
   };
 
@@ -193,19 +144,19 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   /**
    * The jockey handles WHICH LANE (still automatic — dodging traffic, hugging
-   * the rail — that is the AI's job, not yours). Everything about EFFORT is
-   * yours:
+   * the rail — that is the AI's job, not yours). Everything about the CHARGE
+   * economy is yours:
    *
-   *   nothing     ride at cruise — never drains, always recovers
-   *   tap         urge forward — a short push above cruise, repeatable, costs
-   *   double-tap  spend a kick charge — the bigger, decisive burst
-   *   hold        take a pull — settle back below cruise, recover faster
+   *   nothing   ride at cruise, regenerating the whole way
+   *   tap       spend one kick charge — the only way to push, at any point
+   *             in the race, not just the finish
+   *   hold      take a pull — settle back below cruise, regen faster
    *
    * The jockey no longer establishes position automatically. Reaching your
-   * slot, and holding it against traffic, is now something you spend urges
-   * and kicks on — same as the finish. Do nothing and you ride safe at
-   * cruise the whole way, recovering the entire time, but you arrive
-   * wherever the gate scatter left you.
+   * slot, and holding it against traffic, is now something you spend charges
+   * on — same as the finish. Do nothing and you ride safe at cruise the whole
+   * way, regenerating the entire time, but you arrive wherever the gate
+   * scatter left you.
    */
   const baseRide = createAiController(playerHorse);
 
@@ -213,18 +164,12 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     if (horse.id !== playerHorseId) return { horse };
     return {
       horse,
-      kickCharges: KICK_CHARGES,
       controller: (self, race): ControlInput => {
         // Lane-seeking only — effort comes from cruiseEffort and your input,
         // never from the AI's own establish/stretch logic.
         const { targetLane } = baseRide(self, race);
 
-        let effort: number = playerProfile.cruiseEffort;
-        if (input.takingBack) {
-          effort = Math.min(effort, 0.26);
-        } else if (performance.now() < input.urgeUntil) {
-          effort = 1;
-        }
+        const effort = input.takingBack ? Math.min(playerProfile.cruiseEffort, 0.26) : playerProfile.cruiseEffort;
 
         const kick = input.kickPending;
         input.kickPending = false;
@@ -274,11 +219,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let callout = '';
   let calloutUntil = 0;
   let finishedAt = 0;
-  /** Smoothed energy rate, so the chevrons do not judder tick to tick. */
-  let rateEma = 0;
-  let shownFactor: EnergyFactor = 'neutral';
-  let pendingFactor: EnergyFactor = 'neutral';
-  let pendingSince = 0;
   // Built once at the wire. The finish screen redraws every frame and
   // race.outcome() re-sorts and re-measures the whole field each call.
   let finalRecap: Recap | null = null;
@@ -335,7 +275,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         ...r,
         distance: p ? lerp(p.distance, r.distance) : r.distance,
         speed: p ? lerp(p.speed, r.speed) : r.speed,
-        energy: p ? lerp(p.energy, r.energy) : r.energy,
       };
     });
 
@@ -454,7 +393,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       }
     }
 
-    drawHud(ctx, width, height, player, runners, dt);
+    drawHud(ctx, width, height, player, runners);
   };
 
   const drawHud = (
@@ -463,7 +402,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     height: number,
     player: RunnerSnapshot,
     runners: RunnerSnapshot[],
-    dt: number,
   ): void => {
     const pad = 14;
 
@@ -539,124 +477,44 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       })),
     );
 
-    // ---- Energy bar with the style safe-zone ------------------------------
-    // The shaded band shows where this horse's style wants its energy to be
-    // right now. Learning to read it is how pacing is taught without a tutorial.
+    // ---- Kick charges — the only resource ----------------------------------
+    // Dots show the bank; the wedge on the next empty one shows progress
+    // toward it regenerating. Spending one early to fight for a slot is a
+    // real choice, so how many are left has to stay visible the whole race,
+    // not only revealed at the window.
     const barW = Math.min(320, width - pad * 2);
     const barX = (width - barW) / 2;
     const barY = height - pad - 34;
-
-    // ---- Kick charges — dots above the bar, filled = still available -------
-    // A charge no longer just means "the finish". Spending one early to fight
-    // for a slot is a real choice, so how many are left has to be visible the
-    // whole race, not only revealed at the window.
-    const dotR = 5;
-    const dotGap = 14;
-    const dotsY = barY - 12;
-    const dotsX0 = (width - (KICK_CHARGES - 1) * dotGap) / 2;
-    for (let i = 0; i < KICK_CHARGES; i++) {
-      ctx.beginPath();
-      ctx.arc(dotsX0 + i * dotGap, dotsY, dotR, 0, Math.PI * 2);
-      ctx.fillStyle = i < player.kicksRemaining ? '#F2C14E' : 'rgba(139,152,169,0.35)';
-      ctx.fill();
-    }
 
     ctx.fillStyle = 'rgba(14,18,24,0.72)';
     roundRect(ctx, barX, barY, barW, 26, 13);
     ctx.fill();
 
-    const safeLo = safeZoneLow(curr.progress, playerProfile.kickAt);
-    ctx.fillStyle = 'rgba(78,201,160,0.20)';
-    roundRect(ctx, barX + 3 + barW * safeLo, barY + 3, barW * (1 - safeLo) - 6, 20, 10);
-    ctx.fill();
-
-    const energy = Math.max(0, Math.min(1, player.energy / 100));
-    if (energy > 0.005) {
-      ctx.fillStyle = energy > 0.35 ? '#4EC9A0' : energy > 0.18 ? '#E8A33D' : '#E2564A';
-      const fw = (barW - 6) * energy;
-      roundRect(ctx, barX + 3, barY + 3, fw, 20, Math.min(10, fw / 2));
-      ctx.fill();
-    }
-
-    /**
-     * Every label on this bar is drawn twice, clipped either side of the fill
-     * edge, in the colour that reads against what is behind it there.
-     *
-     * The labels are dark because they were designed sitting on a full green
-     * bar — but the bar empties, and near-black on the dark track is close to
-     * invisible. Which is precisely backwards: a horse running out of energy is
-     * when the player most needs to read it. Clipping rather than picking one
-     * colour per label also handles a word straddling the edge, which is the
-     * case a threshold gets wrong.
-     */
-    const fillEnd = barX + 3 + (barW - 6) * energy;
-    const barLabel = (
-      text: string,
-      x: number,
-      align: CanvasTextAlign,
-      font: string,
-      onFill: string,
-      offFill: string,
-    ): void => {
-      ctx.font = font;
-      ctx.textAlign = align;
-      const halves: [string, number, number][] = [
-        [onFill, barX, fillEnd],
-        [offFill, fillEnd, barX + barW],
-      ];
-      for (const [colour, from, to] of halves) {
-        if (to - from < 0.5) continue;
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(from, barY, to - from, 26);
-        ctx.clip();
-        ctx.fillStyle = colour;
-        ctx.fillText(text, x, barY + 17);
-        ctx.restore();
-      }
-    };
-
     const LABEL_FONT = '700 11px ui-sans-serif, system-ui, sans-serif';
-    barLabel('ENERGY', barX + 12, 'left', LABEL_FONT, '#0E1218', 'rgba(233,238,245,0.92)');
-    // Measured rather than assumed: at a hard-coded offset the chevrons sat
-    // flush against the E of ENERGY and read as part of the word.
     ctx.font = LABEL_FONT;
-    const chevronX = barX + 12 + ctx.measureText('ENERGY').width + 7;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(233,238,245,0.92)';
+    ctx.fillText('CHARGES', barX + 12, barY + 17);
 
-    // HOW FAST the energy is moving, not merely which way.
-    //
-    // A single arrow said "down" whether the horse was trickling away at the
-    // cruise or emptying itself in the straight — two situations that call for
-    // opposite decisions. Chevrons carry the magnitude, and the rate comes from
-    // the simulation rather than from differencing the bar between frames,
-    // which was frame-rate dependent and noisy enough to flicker.
-    rateEma += (player.energyRate - rateEma) * Math.min(1, dt * 6);
-    const mag = Math.abs(rateEma);
-    const chevrons = mag < RATE_HOLDING ? 0 : mag < 1.0 ? 1 : mag < 2.2 ? 2 : 3;
-    if (chevrons > 0) {
-      const gaining = rateEma > 0;
-      barLabel(
-        (gaining ? '▲' : '▼').repeat(chevrons),
-        chevronX,
-        'left',
-        '700 12px ui-sans-serif, system-ui, sans-serif',
-        gaining ? '#0E1218' : 'rgba(14,18,24,0.62)',
-        gaining ? 'rgba(233,238,245,0.92)' : 'rgba(233,238,245,0.66)',
-      );
-    }
+    const dotR = 6;
+    const dotGap = 20;
+    const dotsY = barY + 13;
+    const dotsX0 = barX + 12 + ctx.measureText('CHARGES').width + 20;
+    for (let i = 0; i < CHARGE_CAPACITY; i++) {
+      const x = dotsX0 + i * dotGap;
+      ctx.beginPath();
+      ctx.arc(x, dotsY, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = i < player.kicksRemaining ? '#F2C14E' : 'rgba(139,152,169,0.3)';
+      ctx.fill();
 
-    // WHY it is moving. The label is held briefly before it changes: two
-    // factors near-tied would otherwise swap every tick and strobe.
-    const factor = player.energyFactor;
-    if (factor !== shownFactor) {
-      if (factor !== pendingFactor) {
-        pendingFactor = factor;
-        pendingSince = performance.now();
-      } else if (performance.now() - pendingSince > FACTOR_DWELL_MS) {
-        shownFactor = factor;
+      if (i === player.kicksRemaining && player.kicksRemaining < CHARGE_CAPACITY) {
+        ctx.beginPath();
+        ctx.moveTo(x, dotsY);
+        ctx.arc(x, dotsY, dotR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * player.chargeProgress);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(242,193,78,0.55)';
+        ctx.fill();
       }
-    } else {
-      pendingFactor = factor;
     }
 
     // The window still marks where a kick lands hardest (timing decides its
@@ -664,20 +522,16 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // kicksRemaining now, a charge you can spend early for position or hold
     // for the finish.
     const inWindow = Math.abs(curr.progress - playerProfile.kickAt) <= 0.09;
-    const tagX = barX + barW - 12;
+    ctx.font = LABEL_FONT;
+    ctx.textAlign = 'right';
     // What YOU are doing outranks what the race is doing to you: those states
     // are transient, deliberate, and the moment you need to act on.
     if (input.takingBack) {
-      barLabel('TAKING A PULL', tagX, 'right', LABEL_FONT, '#0E1218', '#4EC9A0');
+      ctx.fillStyle = '#4EC9A0';
+      ctx.fillText('TAKING A PULL', barX + barW - 12, barY + 17);
     } else if (inWindow && player.kicksRemaining > 0) {
-      barLabel('YOUR MOMENT', tagX, 'right', LABEL_FONT, '#0E1218', '#F2C14E');
-    } else if (performance.now() < input.urgeUntil) {
-      barLabel('URGING', tagX, 'right', LABEL_FONT, '#0E1218', '#E8A33D');
-    } else {
-      const tag = FACTOR_LABELS[shownFactor];
-      if (tag) {
-        barLabel(tag.text, tagX, 'right', LABEL_FONT, '#0E1218', tag.colour);
-      }
+      ctx.fillStyle = '#F2C14E';
+      ctx.fillText('YOUR MOMENT', barX + barW - 12, barY + 17);
     }
 
     // ---- Call-outs ---------------------------------------------------------
@@ -722,7 +576,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
     ctx.fillStyle = 'rgba(139,152,169,0.85)';
     ctx.font = '500 12px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('Tap to URGE · hold to TAKE A PULL', cx, cy + 70);
+    ctx.fillText('Tap to KICK · hold to TAKE A PULL', cx, cy + 70);
   };
 
   /**
@@ -813,24 +667,17 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   // ---- Input --------------------------------------------------------------
   //
-  // Tap repeatedly to urge, like a jockey asking again and again. Hold to take
-  // a pull. Tap TWICE quickly to spend a kick charge instead — a deliberate,
-  // rarer action from the same gesture rather than a new button, usable any
-  // time you have a charge left: early to fight for your slot, late for the
-  // finish. Read `player.kicksRemaining` off the snapshot rather than tracked
-  // locally, since it is now a multi-charge resource the engine owns.
-  const URGE_MS = 550;
-  const HOLD_MS = 220; // press longer than this and it's a pull, not an urge
+  // Tap to spend a kick charge — the only push there is, usable any time you
+  // have one left: early to fight for your slot, late for the finish. Hold to
+  // take a pull instead. Read `player.kicksRemaining` off the snapshot rather
+  // than tracked locally, since it is a resource the engine owns.
+  const HOLD_MS = 220; // press longer than this and it's a pull, not a tap
 
   let pressedAt = 0;
   let holdTimer = 0;
-  let lastTapAt = 0;
 
-  const urge = (): void => {
-    const now = performance.now();
-    input.urgeUntil = now + URGE_MS;
-    if (now - lastTapAt <= KICK_TAP_MS) input.kickPending = true;
-    lastTapAt = now;
+  const tap = (): void => {
+    input.kickPending = true;
   };
 
   const down = (e: Event): void => {
@@ -851,7 +698,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     if (pressedAt === 0) return;
     const held = performance.now() - pressedAt;
     input.takingBack = false;
-    if (held < HOLD_MS) urge();
+    if (held < HOLD_MS) tap();
   };
 
   host.addEventListener('pointerdown', down);
@@ -864,7 +711,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       e.preventDefault();
       if (e.type !== 'keydown') return;
       if (!started) started = true;
-      else urge();
+      else tap();
     }
     if (e.code === 'ArrowDown' || e.code === 'ShiftLeft') {
       e.preventDefault();
@@ -886,13 +733,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     window.removeEventListener('keydown', key);
     window.removeEventListener('keyup', key);
   };
-}
-
-/** Where the safe zone starts: conserve early, spend late. */
-function safeZoneLow(progress: number, kickAt: number): number {
-  if (progress < kickAt - 0.2) return 0.62;
-  if (progress < kickAt) return 0.4;
-  return 0;
 }
 
 /** How the race was run, in three words, under the placings. */

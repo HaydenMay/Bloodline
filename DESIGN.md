@@ -35,9 +35,9 @@ Six stats, 0–100. **Starting horses roll 18–34** — deliberately weak, so g
 | Stat | Role |
 |---|---|
 | **Speed** | Top-end velocity ceiling |
-| **Stamina** | Size of the energy pool; how long peak effort lasts |
+| **Stamina** | How quickly kick charges regenerate between efforts (ROADMAP.md, kick-charge redesign — supersedes the energy-pool description this line used to have) |
 | **Burst** | Acceleration — gate break, and how fast a drive takes effect |
-| **Grit** | Performance on an empty tank; resists the late fade. Drives **Resolve** (§7), and helps a horse fight through traffic |
+| **Grit** | Kick strength, alongside jockey skill. Drives **Resolve** (§7), and helps a horse fight through traffic |
 | **Temper** | Reaction to external pressure — traffic, crowds, big fields, the gate — plus trainability. **Low Temper means bigger swings in mood, morale and daily form**, in both directions |
 | **Consistency** | Delivering your true ability on the day. Owns essentially all in-race variance: clean break, clean acceleration, no mistakes |
 

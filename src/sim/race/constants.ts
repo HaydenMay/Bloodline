@@ -60,43 +60,51 @@ export const BASE_ACCEL = 5.2 / TIME_SCALE ** 2;
 export const BURST_ACCEL_INFLUENCE = 0.5;
 
 // ---------------------------------------------------------------------------
-// The energy economy (DESIGN.md §4)
+// Kick charges — the ONLY resource (DESIGN.md §4, ROADMAP.md)
 //
-// Redesigned from "position costs energy" to "position changes how fast you
-// refill." Energy now only ever DRAINS from deliberate spend — riding above
-// your style's natural cruise, or the kick — and only ever RECOVERS
-// otherwise, at a rate position scales up or down but never below a floor.
-// It is structurally impossible to lose energy just by being in the wrong
-// spot, which is a stronger guarantee than the old model's death-spiral fix
-// (MISFIT_ENERGY_RELIEF_FLOOR, retired here): that discounted a penalty that
-// could still, in principle, drain a horse. This removes the drain entirely.
+// No continuous energy value. A horse banks a small integer number of kick
+// charges; every tap/kick spends exactly one. Charges regenerate always —
+// never stuck, never negative — at a rate Stamina and position scale up or
+// down but never below a floor. Capacity is fixed for every horse; Stamina
+// buys TEMPO (how often you can afford to spend), never a bigger tank — see
+// the note on STAMINA_CHARGE_REGEN_INFLUENCE below for why.
 // ---------------------------------------------------------------------------
 
-export const MAX_ENERGY = 100;
-
-/** Energy per second burned per unit of EXCESS effort (above cruiseEffort), squared. */
-export const BASE_DRAIN = 7.4 / TIME_SCALE;
-export const STAMINA_DRAIN_INFLUENCE = 0.45;
-
-/** Energy per second recovered at full rest, in the style's happy place. */
-export const BASE_RECOVERY = 4.1 / TIME_SCALE;
-
 /**
- * Even riding exactly at cruiseEffort — not resting below it, just racing to
- * style — still recovers at this fraction of BASE_RECOVERY. Without this,
- * only a horse actively taking a pull would refill, and "just ride to style"
- * would sit at a dead break-even rather than genuinely climbing, which is
- * what "should only go up" requires whenever you are not spending.
+ * Fixed for every horse. Not stat-driven: tying capacity to Stamina makes
+ * training only pay off at whatever breakpoint you pick (every N stat points
+ * buys +1 slot) with nothing in between — training feels dead most of the
+ * time. Regen RATE is the continuous lever instead (below), so every point of
+ * Stamina always does something. Set above 3 deliberately: races run
+ * 45-75s+ and scale with distance, so a field needs enough charges across a
+ * whole race — establishing position, a mid-race response, the finish —
+ * without exhausting the resource in the first third of a long route.
  */
-export const REST_RECOVERY_BASE = 0.35;
+export const CHARGE_CAPACITY = 5;
+
+/** Charges regenerated per second at Stamina 50, at the neutral position multiplier. */
+export const BASE_CHARGE_REGEN = 1 / 30;
 
 /**
- * Recovery multiplier never drops below this, however bad the position —
+ * How much Stamina swings charge regen, as a fraction either side of the
+ * baseline (same shape as the old STAMINA_DRAIN_INFLUENCE). Continuous and
+ * uncapped by any threshold — this is where training Stamina always pays,
+ * immediately, unlike a capacity breakpoint would.
+ */
+export const STAMINA_CHARGE_REGEN_INFLUENCE = 0.45;
+
+/**
+ * Riding BELOW your style's cruiseEffort — taking a pull, or an AI horse
+ * genuinely holding back rather than merely cruising — boosts regen on top
+ * of the position multiplier below. Scales with how far below cruise the
+ * horse is riding, so a deeper pull banks charges faster still.
+ */
+export const CHARGE_REGEN_HOLD_GAIN = 1.0;
+
+/**
+ * Regen multiplier never drops below this, however bad the position —
  * leading, contested, badly out of your style's slot. Position can only slow
- * the refill, never stop or reverse it. This is what makes the drain rule
- * above literally true rather than true-except-when-out-of-position: nothing
- * left in this file can push net energy negative outside of excess effort or
- * the kick.
+ * the refill, never stop or reverse it.
  */
 export const RECOVERY_FLOOR = 0.35;
 
@@ -140,36 +148,32 @@ export const POSITION_RECOVERY_BONUS = 0.5;
 export const OUT_POSITION_RECOVERY_PENALTY = 0.5;
 
 /**
- * Positional preference fades out across these two points. Past the end, only
- * energy and speed decide the race — everyone is committed, and where you
+ * Positional preference fades out across these two points. Past the end,
+ * charges and speed decide the race — everyone is committed, and where you
  * *wanted* to sit no longer applies.
  */
 export const POSITION_FADE_START = 0.6;
 export const POSITION_FADE_END = 0.8;
 
-/** Recovery multiplier while sitting in another horse's slipstream. */
+/** Regen multiplier while sitting in another horse's slipstream. */
 export const DRAFT_RECOVERY_BONUS = 0.25;
 /** Yards behind a rival that still counts as a draft. */
 export const DRAFT_GAP = 7;
 
-/** Below this energy the speed ceiling starts collapsing — the fade. */
-export const FADE_THRESHOLD = 35;
-/** Worst-case speed multiplier on an empty tank at grit 0. */
-export const FADE_FLOOR = 0.86;
-/** How much Grit softens the fade. */
-export const GRIT_FADE_RELIEF = 0.08;
-
-/** Poor distance aptitude shows up as energy cost, not as a raw speed cut. */
-export const APTITUDE_DRAIN_PENALTY = 0.5;
+/**
+ * Poor distance aptitude is a direct top-speed penalty now — a sprinter over a
+ * route runs SLOWER, not out of a resource it no longer has. Fraction of
+ * maxSpeed lost at zero aptitude for the distance; scales linearly with how
+ * unsuited the horse is.
+ */
+export const APTITUDE_SPEED_PENALTY = 0.15;
 
 // ---------------------------------------------------------------------------
-// The kick — scales with GRIT × JOCKEY SKILL, gated by the tank (DESIGN.md §4)
+// The kick — scales with GRIT × JOCKEY SKILL, gated by charges (DESIGN.md §4)
 //
-// Deliberately NOT scaled by banked energy. Stamina is the gas tank: it does
-// not make a kick more powerful, it decides how many you can afford — see
-// KICK_CHARGES and the empty-tank gate in engine.ts. A horse with a healthy
-// reserve and one with a single digit left kick with the SAME force; the
-// difference is whether either can still afford to fire one at all.
+// Deliberately NOT scaled by how many charges are banked. A horse with a full
+// bank and one with a single charge left kick with the SAME force; the bank
+// only gates whether either can afford to fire one at all.
 // ---------------------------------------------------------------------------
 
 export const KICK_MAX_BONUS = 0.085;
@@ -177,19 +181,6 @@ export const KICK_GRIT_INFLUENCE = 0.35;
 /** How much jockey skill swings kick strength, on top of Grit. */
 export const KICK_JOCKEY_INFLUENCE = 0.3;
 export const KICK_BASE_DURATION = 9.0 * TIME_SCALE;
-/** Kick costs energy on top of the effort it implies. */
-export const KICK_DRAIN_MULTIPLIER = 1.35;
-
-/**
- * How many kicks the PLAYER starts a race with. Every AI rider, and every
- * harness/test field, still gets exactly one (RaceEntrant.kickCharges
- * defaults to 1 when unset) — this is a player-only mechanic. Establishing
- * position and finishing the race are now two separate, deliberately spent
- * charges of the same resource rather than one automatic ride plus one kick:
- * fight for your slot early, then need to have recovered enough to afford the
- * one that decides the finish.
- */
-export const KICK_CHARGES = 2;
 
 /**
  * Automatic lift for being inside your window, with no input at all.
@@ -204,8 +195,6 @@ export const KICK_WINDOW_HALF = 0.09;
 export const KICK_WINDOW_FALLOFF = 0.22;
 /** Floor: a badly mistimed kick still holds position, never steals a race. */
 export const KICK_MIN_FIT = 0.35;
-/** Extra energy burned by a mistimed kick, on top of the normal kick cost. */
-export const MISTIMED_KICK_DRAIN = 0.9;
 
 // ---------------------------------------------------------------------------
 // Traffic (DESIGN.md §4)
@@ -296,7 +285,7 @@ export const FORM_TEMPER_AMPLIFY = 0.06 * 0.65;
 export const CONDITION_INFLUENCE = 0.1;
 
 // ---------------------------------------------------------------------------
-// Running styles — each is an energy-efficiency profile keyed to pack position.
+// Running styles — each is a pack-position preference plus a charge-regen profile.
 // preferred: 0 = front of field, 1 = back. tolerance: free play either side.
 // ---------------------------------------------------------------------------
 
@@ -306,9 +295,9 @@ export interface StyleProfile {
   /** Where in the race (0-1) this style wants to launch its run. */
   kickAt: number;
   /**
-   * The line between "riding to style" and "urging" (DESIGN.md §4). Effort at
-   * or below this never drains energy — it only recovers, faster or slower
-   * depending on position. Only effort ABOVE this, or the kick, spends.
+   * The style's natural riding baseline. Effort BELOW this counts as taking a
+   * pull — restraint that boosts charge regen (CHARGE_REGEN_HOLD_GAIN) on top
+   * of the position multiplier. Riding at or above it is simply racing.
    */
   cruiseEffort: number;
 }
@@ -330,7 +319,7 @@ export const STYLE_PROFILES = {
  *
  * Crucially these are scaled by STYLE FIDELITY — how faithfully the horse has
  * actually raced its style so far. A closer only gets its finishing surge if it
- * genuinely sat back and banked energy early. The moment has to be earned.
+ * genuinely sat back and held position early. The moment has to be earned.
  */
 /**
  * Re-tuned once against the lower-noise baseline above (BAND_DOWN/UP,
@@ -343,12 +332,25 @@ export const STYLE_PROFILES = {
  * or closer's committed bets — so stalker's are raised across all three
  * phases and closer/midPack's LATE number, the biggest lever on the biggest
  * overperformer, is cut back down.
+ *
+ * Re-tuned a second time for the kick-charge rebuild (ROADMAP.md, "Known
+ * issue — style balance broke with the charge rebuild"). frontRunner's LATE
+ * number was -0.013, tuned back when a continuous energy fade also existed to
+ * reinforce a front-runner's late-race slowdown. Removing fade entirely left
+ * that -0.013 as an UNCOMPENSATED penalty with nothing backing it up, and it
+ * turned out to be the dominant lever: frontRunner fell to 7.7% against a
+ * fair 12.5% (harness), and a fast proxy sweep (tools/harness.ts's own
+ * styleBalance(), same seed prefix, at RACES=250) showed just how sharp the
+ * lever is — +0.02 overshot to 22.2%, +0 landed at a fair 12.2% against the
+ * full 1200-race harness with every other style still inside the 30% bar
+ * (worst is midPack at +12%). Simply zeroing the number, not adding a bonus,
+ * was enough once the fade it used to lean on was gone.
  */
 export const PHASE_PROFILES = {
   //                 early    middle    late
   // A bonus LATE is worth more than one early, because the race is decided
   // late. Early-phase numbers are therefore larger to compensate.
-  frontRunner: { early: 0.085, middle: 0.007, late: -0.013 },
+  frontRunner: { early: 0.085, middle: 0.007, late: 0 },
   stalker: { early: 0.006, middle: 0.025, late: 0.013 },
   midPack: { early: -0.003, middle: 0.0195, late: 0.021 },
   closer: { early: -0.027, middle: -0.001, late: 0.038 },
@@ -368,14 +370,14 @@ export const FRONT_COST_RELIEF = {
 /**
  * The three beats every horse races: ESTABLISH, then HOLD, then COMMIT.
  *
- * HOLD_EFFORT is the cruise a horse settles into once it has its slot. In the
- * right place this MUST net positive energy — that is what lets a horse bank
- * for its window. Without a hold phase the AI only knows spend-and-hope, which
- * is no skill gap at all, and it is why front-runners were empty by the 20%
- * mark: they never stopped paying to be where they already were.
+ * HOLD_EFFORT is the cruise a horse settles into once it has its slot — a
+ * navigational baseline, not a spending decision now that there is no energy
+ * to budget. Without a hold phase the AI has no reason to stay off a full
+ * sprint the moment it reaches its preferred spot, which would collapse every
+ * style into the same shape.
  */
 export const HOLD_EFFORT = 0.55;
-/** Establishing position is a bounded one-off cost, never an ongoing drain. */
+/** Establishing position is a bounded one-off push, not an ongoing effort. */
 export const ESTABLISH_UNTIL = 0.28;
 export const ESTABLISH_GAIN = 2.2;
 

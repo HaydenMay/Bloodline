@@ -7,7 +7,6 @@ import {
   bandFor,
   type ControlInput,
   type Controller,
-  type EnergyFactor,
   type Going,
   type RaceConfig,
   type RaceEntrant,
@@ -29,13 +28,14 @@ interface Runner {
 
   distance: number;
   speed: number;
-  energy: number;
   lane: number;
   rank: number;
   fieldPosition: number;
 
   effort: number;
   kicksRemaining: number;
+  /** Progress (0-1) toward the next charge; converts to kicksRemaining at 1. */
+  chargeProgress: number;
   kickRemaining: number;
   kickStrength: number;
   /** 1 = kicked inside the window, lower = mistimed. */
@@ -46,10 +46,6 @@ interface Runner {
   wasBlocked: boolean;
   hadTrouble: boolean;
   drafting: boolean;
-
-  /** Net energy per second this tick, and which mechanic dominated it. */
-  energyRate: number;
-  energyFactor: EnergyFactor;
 
   fumbleRemaining: number;
   fumbledStart: boolean;
@@ -71,9 +67,8 @@ interface Runner {
 
   maxSpeed: number;
   accel: number;
-  drainRate: number;
-  recoveryRate: number;
-  fadeRelief: number;
+  /** Charges per second at the neutral position/hold multiplier (Stamina-scaled). */
+  chargeRegenRate: number;
 
   finishTime: number | null;
   sectionals: number[];
@@ -126,18 +121,16 @@ export interface RunnerSnapshot {
   name: string;
   distance: number;
   speed: number;
-  energy: number;
   lane: number;
   rank: number;
   effort: number;
   kicking: boolean;
-  /** Kicks not yet fired. The player starts with more than the AI field. */
+  /** Kicks not yet fired, out of CHARGE_CAPACITY. */
   kicksRemaining: number;
+  /** Progress (0-1) toward the next charge, for a partial-fill indicator. */
+  chargeProgress: number;
   blocked: boolean;
   drafting: boolean;
-  /** Net energy per second, and the mechanic currently dominating it. */
-  energyRate: number;
-  energyFactor: EnergyFactor;
   offColour: boolean;
   finished: boolean;
   finishTime: number | null;
@@ -230,16 +223,14 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
           name: r.horse.name,
           distance: r.distance,
           speed: r.speed,
-          energy: r.energy,
           lane: r.lane,
           rank: r.rank,
           effort: r.effort,
           kicking: r.kickRemaining > 0,
           kicksRemaining: r.kicksRemaining,
+          chargeProgress: r.chargeProgress,
           blocked: r.blockedFor > 0,
           drafting: r.drafting,
-          energyRate: r.energyRate,
-          energyFactor: r.energyFactor,
           offColour: r.offColour,
           finished: r.finishTime !== null,
           finishTime: r.finishTime,
@@ -371,19 +362,20 @@ function createRunner(
   if (hasTrait(traits, 'stageFright')) maxSpeed *= 1 - (config.hype - 0.5) * 0.03;
   if (hasTrait(traits, 'crowdFeeder')) maxSpeed *= 1 + (fieldSize - 8) * 0.004;
 
-  // --- Energy ---------------------------------------------------------------
-  // Poor distance aptitude costs ENERGY rather than raw speed: a sprinter over
-  // a route doesn't run slower, it runs out. Keeps everything in one currency.
+  // --- Aptitude: a direct top-speed penalty, not a resource cost -------------
+  // A sprinter over a route runs SLOWER, not out of fuel — there is no fuel
+  // left to run out of.
   const aptitude = horse.aptitudes[band];
-  const aptitudeDrain = 1 + (1 - aptitude / 100) * K.APTITUDE_DRAIN_PENALTY;
+  maxSpeed *= 1 - (1 - aptitude / 100) * K.APTITUDE_SPEED_PENALTY;
 
-  let drainRate = (K.BASE_DRAIN / (1 + ((s.stamina - 50) / 100) * K.STAMINA_DRAIN_INFLUENCE)) * aptitudeDrain;
-  if (hasTrait(traits, 'ironLungs')) drainRate *= 0.9;
-  if (hasTrait(traits, 'thirsty')) drainRate *= 1.22;
-
-  let recoveryRate = K.BASE_RECOVERY;
-  if (hasTrait(traits, 'quickRecovery')) recoveryRate *= 1.2;
-  if (hasTrait(traits, 'thirsty')) recoveryRate *= 1.35;
+  // --- Kick-charge regen rate -------------------------------------------------
+  // Stamina scales this CONTINUOUSLY — no capacity breakpoint, so every point
+  // trained always pays off, immediately. Position and holding (engine.ts,
+  // stepRunner) scale it further tick to tick; this is just the horse's own
+  // baseline going into that.
+  let chargeRegenRate = K.BASE_CHARGE_REGEN * (1 + ((s.stamina - 50) / 100) * K.STAMINA_CHARGE_REGEN_INFLUENCE);
+  if (hasTrait(traits, 'ironLungs')) chargeRegenRate *= 1.1;
+  if (hasTrait(traits, 'quickRecovery')) chargeRegenRate *= 1.2;
 
   // --- Acceleration ---------------------------------------------------------
   let accel = K.BASE_ACCEL * (1 + ((s.burst - 50) / 100) * K.BURST_ACCEL_INFLUENCE);
@@ -403,12 +395,14 @@ function createRunner(
     // randomly rather than by array order.
     distance: rng.range(0, 0.4),
     speed: 0,
-    energy: K.MAX_ENERGY,
     lane: index % K.LANE_COUNT,
     rank: index + 1,
     fieldPosition: index / Math.max(1, fieldSize - 1),
     effort: 0,
-    kicksRemaining: entrant.kickCharges ?? 1,
+    // Every horse starts the race with a full bank — the resource is tempo
+    // across the trip, not a scarcity you arrive with.
+    kicksRemaining: K.CHARGE_CAPACITY,
+    chargeProgress: 0,
     kickRemaining: 0,
     kickStrength: 0,
     kickWindowFit: 1,
@@ -417,8 +411,6 @@ function createRunner(
     wasBlocked: false,
     hadTrouble: false,
     drafting: false,
-    energyRate: 0,
-    energyFactor: 'neutral',
     fumbleRemaining: fumbled ? K.FUMBLE_DURATION : 0,
     fumbledStart: fumbled,
     greenRemaining: 0,
@@ -433,9 +425,7 @@ function createRunner(
     offColour: dailyForm < 0.985,
     maxSpeed,
     accel,
-    drainRate,
-    recoveryRate,
-    fadeRelief: (s.grit / 100) * K.GRIT_FADE_RELIEF,
+    chargeRegenRate,
     finishTime: null,
     sectionals: [],
     nextSectional: K.YARDS_PER_FURLONG,
@@ -464,7 +454,6 @@ function stepRunner(
     name: r.horse.name,
     distance: r.distance,
     speed: r.speed,
-    energy: r.energy,
     lane: r.lane,
     fieldPosition: r.fieldPosition,
     rank: r.rank,
@@ -476,31 +465,21 @@ function stepRunner(
 
   const input: ControlInput = r.controller(view, race);
   const profile = K.STYLE_PROFILES[r.horse.style];
-
-  // The gas tank: empty means the throttle doesn't answer above cruise,
-  // regardless of what was asked for. Without this an empty horse could still
-  // urge at full effort for free, since drain simply clamps at 0 energy but
-  // the speed benefit of a high effort value does not — a horse running on
-  // fumes should not be able to keep flooring it at no cost.
-  const requested = clamp(input.effort, 0, 1);
-  r.effort = r.energy <= 0 ? Math.min(requested, profile.cruiseEffort) : requested;
+  r.effort = clamp(input.effort, 0, 1);
 
   // --- The kick -----------------------------------------------------------
   // Strength scales with GRIT x JOCKEY SKILL — a fixed measure of the horse
-  // and rider, not of how full the tank happens to be right now. Stamina is
-  // the gas tank: it does not make the engine more powerful, it decides how
-  // much running on it you can afford. That gate is the tank check below —
-  // the same empty-tank throttle limit that caps urging, applied to firing a
-  // kick at all.
-  if (input.kick && r.kicksRemaining > 0 && r.energy > 0) {
+  // and rider, not of how many charges happen to be banked right now. The
+  // bank only gates whether a kick can fire at all.
+  if (input.kick && r.kicksRemaining > 0) {
     r.kicksRemaining--;
     const gritFactor = 1 + ((r.horse.stats.grit - 50) / 100) * K.KICK_GRIT_INFLUENCE;
     const jockeyFactor = 1 + ((r.horse.jockeySkill - 50) / 100) * K.KICK_JOCKEY_INFLUENCE;
 
     // TIMING IS THE SKILL. Kick inside the horse's window and it lands at full
-    // force — enough to take a race. Kick outside it and you get a fraction of
-    // the surge AND pay extra energy for it: enough to hold your position,
-    // never enough to steal the lead.
+    // force — enough to take a race. Kick outside it and you spend the same
+    // charge for a fraction of the surge: enough to hold your position, never
+    // enough to steal the lead.
     const centre = K.STYLE_PROFILES[r.horse.style].kickAt;
     const off = Math.max(0, Math.abs(race.progress - centre) - K.KICK_WINDOW_HALF);
     const windowFit = clamp(1 - off / K.KICK_WINDOW_FALLOFF, K.KICK_MIN_FIT, 1);
@@ -584,15 +563,14 @@ function stepRunner(
         Math.abs(o.lane - r.lane) <= 1,
     ) && r.blockedFor === 0;
 
-  // --- Position: changes the REFILL rate, never drains on its own ----------
+  // --- Position: changes the CHARGE REGEN rate, never spends on its own -----
   //
-  // Energy only ever drains from EXCESS effort (above the style's
-  // cruiseEffort) or the kick, below. Position's whole job is to say how fast
-  // you refill otherwise — leading and being out of your style's slot refill
-  // slower, never negative, per RECOVERY_FLOOR. A front-runner does not escape
-  // the lead's refill penalty — its style merely lets it recharge better than
-  // another style would in the same spot, in exchange for never having ground
-  // to make up.
+  // Charges only ever go up here — the only way to spend one is the kick,
+  // above. Position's whole job is to say how fast you regen — leading and
+  // being out of your style's slot regen slower, never negative, per
+  // RECOVERY_FLOOR. A front-runner does not escape the lead's regen penalty —
+  // its style merely lets it recharge better than another style would in the
+  // same spot, in exchange for never having ground to make up.
   const relief = K.FRONT_COST_RELIEF[r.horse.style];
 
   const forwardness = 1 - r.fieldPosition; // 1 at the front, 0 at the back
@@ -655,15 +633,14 @@ function stepRunner(
     r.fidelityTicks++;
   }
 
-  // Two-sided: a perfect fit earns a genuine refill BONUS, a bad fit a genuine
-  // PENALTY — floored, never a drain. Being in position must pay off, not
+  // Two-sided: a perfect fit earns a genuine regen BONUS, a bad fit a genuine
+  // PENALTY — floored, never negative. Being in position must pay off, not
   // merely avoid a fine.
   const fit = (1 - misfit) * positional;
 
   // Never below RECOVERY_FLOOR: leading, contested, and badly out of position
-  // all compound here, but nothing in this stack can push the refill rate to
-  // zero or negative. That is what makes the drain rule below literally true
-  // rather than true-except-in-a-bad-spot.
+  // all compound here, but nothing in this stack can push the regen rate to
+  // zero or negative.
   let recoveryMult = clamp(
     (backRecovery * (1 + K.POSITION_RECOVERY_BONUS * fit - K.OUT_POSITION_RECOVERY_PENALTY * misfit)) /
       frontPenalty,
@@ -678,70 +655,36 @@ function stepRunner(
   if (r.drafting) recoveryMult *= 1 + K.DRAFT_RECOVERY_BONUS;
   recoveryMult = Math.max(K.RECOVERY_FLOOR, recoveryMult);
 
-  // --- Energy: drain only from EXCESS effort or the kick --------------------
+  // --- Charge regen: the only way charges move, other than the kick --------
   //
-  // cruiseEffort is the line between "riding to style" and "urging". At or
-  // below it, energy only ever recovers — position (above) decides how fast,
-  // never whether. Above it, only the EXCESS drains, quadratically, same
-  // shape as before but measured from the style's own baseline instead of
-  // from zero, so a style that naturally cruises harder doesn't pay for
-  // simply existing at its own baseline.
+  // cruiseEffort is the style's natural baseline. Riding BELOW it — a genuine
+  // pull, not just cruising — is restraint, and boosts regen on top of the
+  // position multiplier above ("holding boosts regen"). Charges never go
+  // down here; spending is the kick's job alone.
   const kicking = r.kickRemaining > 0;
-  const kickCost = kicking
-    ? K.KICK_DRAIN_MULTIPLIER * (1 + (1 - r.kickWindowFit) * K.MISTIMED_KICK_DRAIN)
-    : 1;
+  const restraint = Math.max(0, profile.cruiseEffort - r.effort);
+  // "Very reactive to good riding" — Thirsty amplifies the payoff for
+  // restraint without changing the baseline, so a well-ridden pull banks
+  // charges much faster and a horse never rested gains nothing extra.
+  const holdGain = K.CHARGE_REGEN_HOLD_GAIN * (hasTrait(r.traits, 'thirsty') ? 1.6 : 1);
+  let regenMult = recoveryMult * (1 + restraint * holdGain);
 
-  let urgeMult = 1;
-  if (hasTrait(r.traits, 'gateRusher') && race.progress < 0.125) urgeMult *= 1.3;
-  if (hasTrait(r.traits, 'alert') && race.progress < 0.2) urgeMult *= 1.1;
-  if (hasTrait(r.traits, 'cruiser')) urgeMult *= r.effort > 0.85 ? 1.3 : 0.8;
+  // "Burns extra energy through the first furlong" — Gate Rusher's explosive
+  // break now reads as slower regen in that window rather than a drain.
+  if (hasTrait(r.traits, 'gateRusher') && race.progress < 0.125) regenMult *= 0.7;
+  // "Keyed up and slower to settle, delaying energy recovery early."
+  if (hasTrait(r.traits, 'alert') && race.progress < 0.2) regenMult *= 0.85;
+  // "Extremely cheap at moderate effort, punishing at maximum."
+  if (hasTrait(r.traits, 'cruiser')) regenMult *= r.effort > 0.85 ? 0.7 : 1.3;
 
-  const excess = Math.max(0, r.effort - profile.cruiseEffort);
-  const rest = Math.max(0, profile.cruiseEffort - r.effort);
-  const urging = excess > 0;
-
-  const drain = r.drainRate * excess * excess * urgeMult * kickCost;
-  // Recovery only applies while NOT urging — riding at or below cruiseEffort.
-  // REST_RECOVERY_BASE means simply racing to style already refills; resting
-  // further BELOW cruiseEffort (taking a pull) adds to that quadratically,
-  // same shape the old slack-based recovery had.
-  const recovery = urging
-    ? 0
-    : r.recoveryRate * (K.REST_RECOVERY_BASE + rest * rest) * recoveryMult;
-  r.energy = clamp(r.energy + (recovery - drain) * K.DT, 0, K.MAX_ENERGY);
-
-  // --- Why the energy moved -------------------------------------------------
-  //
-  // Reporting only. Nothing here feeds back into the simulation. Draining and
-  // recovering are mutually exclusive by construction now, so the report only
-  // has to rank within whichever one is actually happening this tick.
-  r.energyRate = recovery - drain;
-
-  if (drain > 0) {
-    // The kick outranks urging — it's the bigger, deliberate spend, and the
-    // one the player explicitly chose to fire.
-    r.energyFactor = kicking ? 'kicking' : 'urging';
-  } else {
-    const draftMult = r.drafting ? 1 + K.DRAFT_RECOVERY_BONUS : 1;
-    const factors: [EnergyFactor, number][] = [
-      ['pressed', recovery * (1 - 1 / (1 + pressCost))],
-      ['onTheLead', recovery * (1 - 1 / (1 + leadCost))],
-      ['outOfPosition', recovery * K.OUT_POSITION_RECOVERY_PENALTY * misfit],
-      ['inPosition', recovery * K.POSITION_RECOVERY_BONUS * fit],
-      ['drafting', r.drafting ? recovery * (1 - 1 / draftMult) : 0],
-    ];
-    let best: EnergyFactor = 'neutral';
-    // Energy per second below which a factor is not worth a word on screen. A
-    // race is ~64s, so this is a factor that would swing under 6 of 100 energy
-    // across the whole trip.
-    let bestWeight = 0.09;
-    for (const [name, weight] of factors) {
-      if (weight > bestWeight) {
-        best = name;
-        bestWeight = weight;
-      }
+  if (r.kicksRemaining < K.CHARGE_CAPACITY) {
+    r.chargeProgress += r.chargeRegenRate * regenMult * K.DT;
+    if (r.chargeProgress >= 1) {
+      r.chargeProgress -= 1;
+      r.kicksRemaining++;
     }
-    r.energyFactor = best;
+  } else {
+    r.chargeProgress = 0;
   }
 
   // --- The performance band -------------------------------------------------
@@ -783,13 +726,6 @@ function stepRunner(
 
   // --- Speed ----------------------------------------------------------------
   let speedCap = r.maxSpeed * r.variation * (1 + earned);
-
-  // The fade: below the threshold the ceiling collapses, softened by Grit.
-  if (r.energy < K.FADE_THRESHOLD) {
-    const depth = 1 - r.energy / K.FADE_THRESHOLD;
-    const floor = K.FADE_FLOOR + r.fadeRelief;
-    speedCap *= 1 - depth * (1 - floor);
-  }
 
   if (kicking) {
     speedCap *= 1 + r.kickStrength;
@@ -866,7 +802,7 @@ function buildOutcome(
       finishPosition: i + 1,
       time,
       margin: Math.max(0, behind / YARDS_PER_LENGTH),
-      energyLeft: r.energy,
+      kicksLeft: r.kicksRemaining,
       sectionals: r.sectionals,
       hadTrouble: r.hadTrouble,
       fumbledStart: r.fumbledStart,

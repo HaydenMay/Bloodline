@@ -31,7 +31,6 @@ export interface RunnerView {
   /** Yards travelled. */
   distance: number;
   speed: number;
-  energy: number;
   lane: number;
   /** 0 = leading, 1 = last. */
   fieldPosition: number;
@@ -39,41 +38,11 @@ export interface RunnerView {
   rank: number;
   blocked: boolean;
   drafting: boolean;
-  /** Kicks not yet fired. AI riders get one; the player gets more — see RaceEntrant.kickCharges. */
+  /** Kicks not yet fired. Regenerates over the race — see CHARGE_CAPACITY. */
   kicksRemaining: number;
   /** True while running below true ability — surfaced on screen, never silent. */
   offColour: boolean;
 }
-
-/**
- * Why a runner's energy is moving the way it is.
- *
- * The energy economy is four multipliers deep — front cost, contest, positional
- * fit, drafting — and a bar alone cannot say which of them is currently doing
- * the work. Reporting the dominant one turns "the bar went up" into "the bar
- * went up BECAUSE I dropped into the slipstream", which is the difference
- * between a mystery and a lesson.
- *
- * The simulation picks the factor because which one dominates is a fact about
- * the model; the wording on screen belongs to the UI.
- */
-export type EnergyFactor =
-  /** Pushing above the style's cruise effort — the only way to drain outside a kick. */
-  | 'urging'
-  /** Spending the reserve on the kick, on purpose. */
-  | 'kicking'
-  /** Being hounded for the lead. Refills slower, and nobody is spared it. */
-  | 'pressed'
-  /** Refilling slower for holding the lead, discounted by style. */
-  | 'onTheLead'
-  /** Refilling slower for racing somewhere the style does not want to be. */
-  | 'outOfPosition'
-  /** In the style's slot, refilling faster. */
-  | 'inPosition'
-  /** Sitting in a rival's slipstream. */
-  | 'drafting'
-  /** Nothing dominant — riding to style, refilling at the baseline rate. */
-  | 'neutral';
 
 export interface RaceView {
   /** 0-1 through the race. */
@@ -117,7 +86,8 @@ export interface RaceResult {
   time: number;
   /** Lengths behind the winner. */
   margin: number;
-  energyLeft: number;
+  /** Kick charges still banked, unspent, at the wire. */
+  kicksLeft: number;
   /** Sectional times per furlong, for the post-race analysis. */
   sectionals: number[];
   hadTrouble: boolean;
@@ -136,14 +106,6 @@ export interface RaceOutcome {
 export interface RaceEntrant {
   horse: Horse;
   controller?: Controller;
-  /**
-   * How many kicks this runner starts the race with. Defaults to 1 (every AI
-   * rider, and every test/harness field) — unchanged from the original
-   * one-shot kick. The player's own entrant sets this higher: establishing
-   * position and finishing the race are now two separate, player-spent
-   * charges of the same resource, not one automatic ride plus one kick.
-   */
-  kickCharges?: number;
 }
 
 /** Which aptitude band a distance falls into. */

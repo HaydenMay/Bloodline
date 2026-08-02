@@ -15,7 +15,6 @@
     "harness": "tsx tools/harness.ts",
     "bake-sprites": "tsx tools/bake-sprites.ts",
     "ride-probe": "tsx tools/ride-probe.ts",
-    "energy-profile": "tsx tools/energy-profile.ts",
     "margin-profile": "tsx tools/margin-profile.ts",
     "check": "npm run lint && npm run build && npm run test"
   },

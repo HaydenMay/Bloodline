@@ -4,11 +4,13 @@ Companion to [DESIGN.md](DESIGN.md) and [TRAITS.md](TRAITS.md).
 
 ---
 
-## 🚧 IN PROGRESS — the energy economy is being replaced with kick charges
+## 🚧 IN PROGRESS — the energy economy has been replaced with kick charges
 
-**Read this before touching `sim/race/` energy code.** Mid-redesign, paused deliberately to
-preserve context across a chat reset rather than mid-file. The owner's own words, most recent
-first — these supersede anything below in this doc that still describes the old model:
+**Read this before touching `sim/race/` code.** The rebuild below is DONE, compiles/lints/tests
+clean, and style balance passes again after a retune — see the three "Known issue" sections further
+down for what's still open (elite divisions not tightening up, and the player's own ride not yet
+re-verified). The owner's own words, kept for context — these supersede anything below in this doc
+that still describes the old model:
 
 > Stamina should be like a gas tank. It doesn't provide more power the more gas is in the tank.
 > It's the amount of how far the effort can go. It should allow for maximum kicks and urges rather
@@ -39,42 +41,101 @@ first — these supersede anything below in this doc that still describes the ol
 - **Holding (take a pull)** still settles the horse back (costs ground, as before) and now ALSO
   gives an extra boost to charge regen on top of the position bonus — a deliberate "bank a charge"
   move.
-- **Stamina (the stat) sets the TANK SIZE** — max charge capacity — not power and not regen rate.
-  A high-Stamina horse can bank more charges; position/holding decide how fast it fills toward that
-  cap. This is the one piece not yet fully decided in conversation but is the natural reading of
-  "gas tank" — confirm before locking in a formula.
+- **Stamina (the stat) sets REGEN RATE, continuously — not tank size.** Reversed from the first
+  reading of "gas tank" above: capacity as an integer breakpoint (every N Stamina points = +1
+  charge) makes training feel dead everywhere except the breakpoint itself. Regen rate is
+  continuous instead, so every point of Stamina always pays off immediately — same shape as
+  `STAMINA_CHARGE_REGEN_INFLUENCE` used to scale `BASE_DRAIN`. Capacity (`CHARGE_CAPACITY`) is a
+  **fixed constant for every horse**, set to 5 rather than 3 — races run 45–75s+ and scale with
+  distance, so a field needs enough charges across establishing position, a mid-race response, and
+  the finish without exhausting the resource early in a long route. Both numbers are first-pass and
+  named explicitly in "Known issue" below for retuning.
 - **No more "fade."** `FADE_THRESHOLD`/`FADE_FLOOR`/`GRIT_FADE_RELIEF` (speed collapsing on low
   energy) have no meaning without a continuous energy value — remove them, don't repurpose them.
 - **Aptitude needs a new home.** It used to cost energy ("a sprinter over a route runs out, not
   slower"). With no energy, the cleanest replacement is a direct `maxSpeed` penalty for a badly
   suited distance — untested, just the obvious mapping.
 
-**What's actually committed right now** (the last checkpoint pushed before the reset): kicks became
-a multi-charge resource (`RaceEntrant.kickCharges`, `Runner.kicksRemaining`, defaults to 1 for every
-AI/harness entrant, player gets `KICK_CHARGES = 2`), kick strength moved to `Grit × jockeySkill`
-(`KICK_JOCKEY_INFLUENCE`), and an empty-tank gate was added so urging/kicking can't fire for free at
-0 energy. **This is a stepping-stone, not the target** — it still has the full continuous energy
-bar, drain/recovery, urging, and the energy HUD (bar/chevrons/cause-tags) sitting underneath it,
-none of which the owner wants anymore per the quotes above. The next session's job is to strip all
-of that out and rebuild around charges as described above, not to keep layering on top of it.
+**What's done now, matching the target design above:** the continuous energy value is gone entirely
+— `MAX_ENERGY`/`BASE_DRAIN`/`BASE_RECOVERY`/`REST_RECOVERY_BASE`/`FADE_*`/`APTITUDE_DRAIN_PENALTY`
+all removed from `constants.ts`. `Runner.energy`/`drainRate`/`recoveryRate`/`fadeRelief`/
+`energyRate`/`energyFactor` are gone from `engine.ts`; `stepRunner`'s energy section is rewritten
+around `chargeProgress` (a 0–1 float per horse that converts into a `kicksRemaining` integer at 1,
+capped at `CHARGE_CAPACITY`). `EnergyFactor` is removed from `types.ts` entirely — no HUD "why is it
+moving" reporting in a charges-only model. `ai.ts`'s energy-reserve effort throttle is gone (the
+establish/hold position-correction logic stays — it is navigational, not a budget, now).
+`recap.ts`'s `energyLeft` narrative became `kicksLeft`, same "banked but unspent" idea.
+`raceScreen.ts` dropped the energy bar/chevrons/cause-tags and the whole urge mechanic — **every tap
+now spends a kick charge, at any point in the race**, exactly as the owner specified; hold still
+takes a pull. The five traits that referenced drain/recovery (**Iron Lungs**, **Quick Recovery**,
+**Thirsty**, **Cruiser**, **Alert**) plus **Gate Rusher**'s early cost got charge-regen equivalents
+— see TRAITS.md, "The charge economy". Aptitude is now a direct `maxSpeed` penalty
+(`APTITUDE_SPEED_PENALTY`) rather than an energy cost.
 
-**Full blast radius, mapped before the reset so it doesn't have to be re-traced:**
-`sim/race/constants.ts` (the whole energy-economy block, `MAX_ENERGY`/`BASE_DRAIN`/
-`BASE_RECOVERY`/`REST_RECOVERY_BASE`/`FADE_*`/`APTITUDE_DRAIN_PENALTY` all go), `sim/race/engine.ts`
-(`Runner.energy`/`drainRate`/`recoveryRate`/`fadeRelief`/`energyRate`/`energyFactor` all go;
-`stepRunner`'s whole energy section rewrites around a charge float; `RunnerSnapshot`/`RunnerView`
-lose `energy`, keep/extend `kicksRemaining`), `sim/race/types.ts` (`EnergyFactor` likely removed
-entirely — the elaborate "why is energy moving" HUD reporting doesn't have a place in a
-charges-only model), `sim/race/ai.ts` (effort computation collapses to ~always-1 now that urging is
-gone — most of `HOLD_EFFORT`/`ESTABLISH_GAIN`/the reserve-preservation logic becomes dead code),
-`sim/race/recap.ts` (`energyLeft` narrative → `kicksLeft`, same "banked but unspent" idea),
-`ui/raceScreen.ts` (drop the energy bar/chevrons/factor tags; tap-to-kick + hold-to-settle is the
-whole control surface), and traits that referenced drain/recovery (**Iron Lungs**, **Quick
-Recovery**, **Thirsty**, **Cruiser**, **Alert** — see TRAITS.md) each need a charge-regen-rate
-equivalent, worked out fresh rather than assumed.
+Found and fixed along the way: the AI's kick condition (`race.progress >= kickAt`) stayed true every
+tick once crossed, with no "already kicked" guard in the engine — every AI horse would have burned
+its whole charge bank in a fraction of a second on entering its kick window rather than spending
+one. Fixed with a one-shot guard in `ai.ts`'s closure. The player side was never affected — the UI
+already consumed `kickPending` immediately per tap.
 
-Verify with the usual discipline once rebuilt: `npm run harness` for Gate 1, `tools/margin-profile.ts`
-and a fresh trace script for the tail, before declaring it done.
+### Known issue — style balance broke with the charge rebuild
+
+✅ **Fixed.** `npm run harness`, first run against the new model: frontRunner **FAILED**, 7.7%
+against a fair 12.5% (-39% relative, the bar is 30%).
+
+The first hypothesis here (charge regen's "restraint" bonus rarely engaging for a front-loaded
+style) did not hold up — traced with `tools/probe.ts`'s effort table and it turns out EVERY style
+rides at or above its own `cruiseEffort` almost the whole race under default AI control
+(`HOLD_EFFORT` = 0.55 sits above every style's `cruiseEffort`), so the restraint bonus barely
+engages for anyone, not just frontRunner. Not the cause.
+
+The real cause: `PHASE_PROFILES.frontRunner.late` was `-0.013`, tuned back in the original Phase 4.5
+pass when a continuous energy fade ALSO existed to reinforce a front-runner's late-race slowdown.
+Removing fade entirely (this rebuild) left that `-0.013` as an uncompensated penalty with nothing
+backing it up anymore, while every other style's positive late number went on working unopposed. A
+fast proxy sweep (a standalone copy of `tools/harness.ts`'s own `styleBalance()`, same seed prefix,
+at `RACES=250` — same method Phase 4.5 used) showed how sharp the lever is: `+0.02` overshot to
+22.2%, `late: 0` — not a bonus, just removing the now-unbacked penalty — landed at 12.2% against
+the full 1200-race harness, with every other style still inside the 30% bar (worst is midPack at
++12%, stalker -10%, closer +1%). `tools/margin-profile.ts` unchanged by this fix (27.9L vs 28.2L at
+8th) — a style-balance-specific fix, not a tail-margin one.
+
+### Known issue — elite divisions no longer tighten up
+
+Surfaced by the same harness run, separate from the style-balance fix above: division sanity now
+**FAILS** on "elite racing is tighter" (championship margin 8.3L vs maiden 8.2L — essentially flat,
+where the harness wants tighter). This check passed before this rebuild (7.4L → 5.2L). Average
+winning margin is 8.5L across divisions, wider than the pre-rebuild 6.3L — both numbers are already
+inside the pre-existing "winning margins are too wide" known issue below, which the harness treats
+as informational rather than gating, but the elite-tightens-up check specifically regressed from a
+pass to a fail and has not been diagnosed yet. Likely related to removing the fade mechanic (which
+was where elite fields' higher Consistency used to visibly pay off — no fade left to be spared from
+means less separation between a clean elite field and a division that has more genuine trouble).
+Not traced to a specific cause the way the style-balance issue above was — that is next.
+
+### Known issue — the player's own ride, not yet re-verified after the rebuild
+
+`npm run ride-probe` surfaced a likely pre-existing issue, worth checking against the pre-charge
+build before assuming this rebuild caused it: the player's own controller (`ui/raceScreen.ts`) rides
+at a FLAT `cruiseEffort` for the entire race, never ramping into the stretch commitment AI riders
+get (`ai.ts`'s `commitment = 0.82 + ...`). Effort feeds speed via
+`effortSpeed = MIN_EFFORT_SPEED + (1 - MIN_EFFORT_SPEED) * effort` — at `MIN_EFFORT_SPEED = 0.78`,
+riding the stretch at `cruiseEffort` (~0.5) versus an AI's commitment (~1.0) costs roughly 11% of
+top speed, which `KICK_MAX_BONUS` (8.5% at full strength) cannot fully buy back. Measured: even
+"kick in window" (a single well-timed tap) wins only 4/150 races against a fair share of 19/150,
+barely above "hands off" doing nothing at all. This same flat-cruise shape existed in the
+pre-charge code too (via `PLAYER_CRUISE_CAP`), so it may not be new — but it was not re-verified
+after this rebuild and is now the most player-facing number in this whole pass. Worth tracing
+before anything else next session: either the player needs some form of stretch ramp back, or the
+kick needs to be worth substantially more than 8.5% to be the sole answer to an ~11% deficit.
+
+**Not yet done, deliberately left rather than guessed at now:** `CHARGE_CAPACITY` (5) and
+`BASE_CHARGE_REGEN` are still first-pass values, untested against the harness beyond "style balance
+passes with them." The elite-division and player-ride issues above are open. A full retune loop —
+trace a worst-case seed the way `margin-profile`'s worst seed was traced in Phase 4.5, fix each
+structural cause, re-verify style balance and the tail together — is not finished.
+
+`npm run check` (lint + build + test) passes clean. **The harness does not — see below.**
 
 ---
 

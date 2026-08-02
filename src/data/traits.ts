@@ -100,24 +100,24 @@ const t = (
 export const TRAITS: Record<TraitId, Trait> = {
   // ---- Gate & start ----
   fastGate: t('fastGate', 'Fast Gate', 'upside', 'gate', 'Breaks a length quicker; less likely to fumble the start.'),
-  gateRusher: t('gateRusher', 'Gate Rusher', 'trade', 'gate', 'Explosive break — but burns extra energy through the first furlong.'),
+  gateRusher: t('gateRusher', 'Gate Rusher', 'trade', 'gate', 'Explosive break — but kick-charge regen is slowed through the first furlong.'),
   coiled: t('coiled', 'Coiled', 'trade', 'gate', 'Slow away, exceptional burst once rolling.'),
-  alert: t('alert', 'Alert', 'trade', 'gate', 'Never fumbles a start — but is keyed up and slower to settle.'),
+  alert: t('alert', 'Alert', 'trade', 'gate', 'Never fumbles a start — but is keyed up and slower to settle, delaying charge regen early.'),
 
   // ---- Pace & position ----
-  tractable: t('tractable', 'Tractable', 'upside', 'pace', 'Settles anywhere; much smaller out-of-position energy penalty.'),
+  tractable: t('tractable', 'Tractable', 'upside', 'pace', 'Settles anywhere; much smaller out-of-position regen penalty.'),
   freeRunner: t('freeRunner', 'Free Runner', 'trade', 'pace', 'Fights to go faster early — wasteful unless Temper is high, but sets a fierce pace.'),
   pacePusher: t('pacePusher', 'Pace Pusher', 'trade', 'pace', 'Forces a faster early pace when leading, burning rivals and itself.', true),
-  railHugger: t('railHugger', 'Rail Hugger', 'trade', 'pace', 'Cheaper energy on the inside, more expensive forced wide.'),
+  railHugger: t('railHugger', 'Rail Hugger', 'trade', 'pace', 'Faster charge regen on the inside, slower forced wide.'),
   wideRunner: t('wideRunner', 'Wide Runner', 'trade', 'pace', 'Avoids traffic almost entirely, but travels further.'),
-  herdAnimal: t('herdAnimal', 'Herd Animal', 'trade', 'pace', 'Recovers faster surrounded by horses, worse isolated in front.'),
+  herdAnimal: t('herdAnimal', 'Herd Animal', 'trade', 'pace', 'Regens faster surrounded by horses, worse isolated in front.'),
   loner: t('loner', 'Loner', 'trade', 'pace', 'Weaker in a tight pack, excellent with clear air.'),
 
-  // ---- Energy economy ----
-  ironLungs: t('ironLungs', 'Iron Lungs', 'upside', 'energy', 'Slower drain at every effort level.'),
-  quickRecovery: t('quickRecovery', 'Quick Recovery', 'upside', 'energy', 'Regenerates faster when settled.'),
-  thirsty: t('thirsty', 'Thirsty', 'trade', 'energy', 'Drains fast, recovers fast. Very reactive to good riding.'),
-  cruiser: t('cruiser', 'Cruiser', 'trade', 'energy', 'Extremely cheap at moderate effort, punishing at maximum.'),
+  // ---- The charge economy ----
+  ironLungs: t('ironLungs', 'Iron Lungs', 'upside', 'energy', 'Faster kick-charge regen at every effort level.'),
+  quickRecovery: t('quickRecovery', 'Quick Recovery', 'upside', 'energy', 'Regenerates charges faster when settled.'),
+  thirsty: t('thirsty', 'Thirsty', 'trade', 'energy', 'Regen swings harder with how you ride — very reactive to good riding.'),
+  cruiser: t('cruiser', 'Cruiser', 'trade', 'energy', 'Regens charges cheaply at moderate effort, badly at maximum.'),
 
   // ---- The finish ----
   heart: t('heart', 'Heart', 'upside', 'finish', 'Surges when within a length of the lead in the stretch.'),

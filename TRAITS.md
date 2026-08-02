@@ -33,30 +33,30 @@ Companion to [DESIGN.md](DESIGN.md) §2.
 | Trait | Effect |
 |---|---|
 | **Fast Gate** ➕ | Breaks a length quicker; reduces Consistency fumble chance |
-| **Gate Rusher** ⚖️ | Explosive break — but burns extra energy through the first furlong |
+| **Gate Rusher** ⚖️ | Explosive break — but kick-charge regen is slowed through the first furlong |
 | **Coiled** ⚖️ | Slow away, exceptional Burst once rolling |
-| **Alert** ⚖️ | Never fumbles a start regardless of Consistency — but is keyed up and slower to settle, delaying energy recovery early |
+| **Alert** ⚖️ | Never fumbles a start regardless of Consistency — but is keyed up and slower to settle, delaying charge regen early |
 
 ## Pace & position
 
 | Trait | Effect |
 |---|---|
-| **Tractable** ➕ | Settles anywhere; much smaller out-of-position energy penalty. Style-flexible |
-| **Free Runner** ⚖️ | Fights to go faster early — wastes energy unless Temper is high, but sets a fierce pace |
+| **Tractable** ➕ | Settles anywhere; much smaller out-of-position regen penalty. Style-flexible |
+| **Free Runner** ⚖️ | Fights to go faster early — wastes ground unless Temper is high, but sets a fierce pace |
 | **Pace Pusher** ⚖️🔗 | Forces a faster early pace when leading, burning rivals *and* itself |
-| **Rail Hugger** ⚖️ | Cheaper energy on the inside, more expensive forced wide |
+| **Rail Hugger** ⚖️ | Faster charge regen on the inside, slower forced wide |
 | **Wide Runner** ⚖️ | Avoids traffic almost entirely, but physically travels further |
-| **Herd Animal** ⚖️ | Recovers faster surrounded by horses, worse isolated in front |
+| **Herd Animal** ⚖️ | Regens faster surrounded by horses, worse isolated in front |
 | **Loner** ⚖️ | Weaker in a tight pack, excellent with clear air |
 
-## Energy economy
+## The charge economy
 
 | Trait | Effect |
 |---|---|
-| **Iron Lungs** ➕ | Slower drain at every effort level |
-| **Quick Recovery** ➕ | Regenerates faster when settled |
-| **Thirsty** ⚖️ | Drains fast, recovers fast. High-variance and very reactive to good riding |
-| **Cruiser** ⚖️ | Extremely cheap at moderate effort, punishing at maximum |
+| **Iron Lungs** ➕ | Faster kick-charge regen at every effort level |
+| **Quick Recovery** ➕ | Regenerates charges faster when settled |
+| **Thirsty** ⚖️ | Regen swings harder with how you ride — big payoff for a well-timed pull, nothing extra otherwise |
+| **Cruiser** ⚖️ | Regens charges cheaply at moderate effort, badly at maximum |
 
 ## The finish
 

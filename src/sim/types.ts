@@ -10,11 +10,11 @@ import type { TraitId } from '../data/traits.js';
 export interface Stats {
   /** Top-end velocity ceiling. */
   speed: number;
-  /** Size of the energy pool; how long peak effort lasts. */
+  /** How quickly kick charges regenerate between efforts. */
   stamina: number;
   /** Acceleration — gate break, and how fast a drive takes effect. */
   burst: number;
-  /** Performance on an empty tank; resists the late fade. Drives Resolve. */
+  /** Kick strength, and fighting through traffic. Drives Resolve. */
   grit: number;
   /** Reaction to external pressure, trainability, and the AMPLITUDE of form swings. */
   temper: number;

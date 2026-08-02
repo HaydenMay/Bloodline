@@ -1,6 +1,7 @@
 /**
- * Single-race diagnostic. Dumps how each running style's energy and track
- * position evolve, so a balance failure can be read rather than guessed at.
+ * Single-race diagnostic. Dumps how each running style's kick charges and
+ * track position evolve, so a balance failure can be read rather than
+ * guessed at.
  *
  *   npx tsx tools/probe.ts
  */
@@ -32,7 +33,7 @@ const field = [...horses, ...horses.map((h) => ({ ...h, id: h.id + 'b', name: h.
 
 interface Sample {
   t: number;
-  rows: { name: string; energy: number; pos: number; effort: number; rank: number; speed: number; blocked: boolean }[];
+  rows: { name: string; kicksRemaining: number; pos: number; effort: number; rank: number; speed: number; blocked: boolean }[];
 }
 const samples: Sample[] = [];
 let lastSample = -1;
@@ -51,7 +52,7 @@ const spy =
     if (s && s.rows.length < field.length) {
       s.rows.push({
         name: self.name,
-        energy: self.energy,
+        kicksRemaining: self.kicksRemaining,
         pos: self.distance,
         effort: out.effort,
         rank: self.rank,
@@ -67,7 +68,7 @@ const outcome = simulateRace(
   { furlongs: 8, going: 'good', hype: 0.5, seed: 'probe-race' },
 );
 
-console.log('\nENERGY / RANK THROUGH THE RACE  (one of each style)\n');
+console.log('\nCHARGES / RANK THROUGH THE RACE  (one of each style)\n');
 console.log(
   'prog  ' +
     RUNNING_STYLES.map((s) => s.slice(0, 9).padEnd(11)).join('') ,
@@ -75,7 +76,7 @@ console.log(
 for (const s of samples) {
   const cells = RUNNING_STYLES.map((style) => {
     const row = s.rows.find((r) => r.name === style);
-    return row ? `${row.energy.toFixed(0).padStart(3)}e r${row.rank} `.padEnd(11) : ''.padEnd(11);
+    return row ? `${row.kicksRemaining}c r${row.rank} `.padEnd(11) : ''.padEnd(11);
   });
   console.log(`${(s.t * 100).toFixed(0).padStart(3)}%  ` + cells.join(''));
 }
@@ -104,7 +105,7 @@ for (const s of samples) {
 console.log('\nRESULT\n');
 outcome.results.forEach((r) =>
   console.log(
-    `  ${r.finishPosition}. ${r.name.padEnd(14)} ${r.time.toFixed(2)}s  ${r.margin.toFixed(1)}L  ${r.energyLeft.toFixed(0)} energy left`,
+    `  ${r.finishPosition}. ${r.name.padEnd(14)} ${r.time.toFixed(2)}s  ${r.margin.toFixed(1)}L  ${r.kicksLeft} charges left`,
   ),
 );
 console.log(`\n  pace rating ${outcome.paceRating.toFixed(3)}\n`);

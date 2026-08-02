@@ -6,7 +6,7 @@ const result = (over: Partial<RaceResult> & { horseId: string; finishPosition: n
   name: over.horseId,
   time: 96,
   margin: 0,
-  energyLeft: 12,
+  kicksLeft: 2,
   sectionals: [],
   hadTrouble: false,
   fumbledStart: false,
@@ -92,7 +92,7 @@ describe('buildRecap', () => {
       hadTrouble: true,
       fumbledStart: true,
       offColour: true,
-      energyLeft: 40,
+      kicksLeft: 5,
     });
     const r = buildRecap(outcome(rows, { paceRating: 1.3 }), 'me', 'closer');
     expect(r.story.length).toBe(3);
@@ -100,14 +100,14 @@ describe('buildRecap', () => {
 
   it('leads with what physically stopped the horse, not with tactics', () => {
     const rows = field();
-    rows[1] = result({ horseId: 'me', finishPosition: 2, margin: 2, hadTrouble: true, energyLeft: 40 });
+    rows[1] = result({ horseId: 'me', finishPosition: 2, margin: 2, hadTrouble: true, kicksLeft: 5 });
     const r = buildRecap(outcome(rows, { paceRating: 1.3 }), 'me', 'closer');
     expect(r.story[0]).toContain('shut in');
   });
 
   it('calls out a horse that finished with energy to spare', () => {
     const rows = field();
-    rows[1] = result({ horseId: 'me', finishPosition: 2, margin: 2, energyLeft: 40 });
+    rows[1] = result({ horseId: 'me', finishPosition: 2, margin: 2, kicksLeft: 5 });
     const r = buildRecap(outcome(rows), 'me', 'closer');
     expect(r.story.join(' ')).toContain('asked too late');
   });
@@ -133,7 +133,7 @@ describe('buildRecap', () => {
 
   it('calls a tailed-off beating what it is, ahead of any tactical read', () => {
     const rows = field();
-    rows[1] = result({ horseId: 'me', finishPosition: 2, margin: 53, energyLeft: 40 });
+    rows[1] = result({ horseId: 'me', finishPosition: 2, margin: 53, kicksLeft: 5 });
     const r = buildRecap(outcome(rows, { paceRating: 1.3 }), 'me', 'closer');
     expect(r.margin).toBe('beaten a distance');
     expect(r.story[0]).toContain('tailed off');
