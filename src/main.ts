@@ -94,17 +94,21 @@ function startRace(seed: string): void {
   });
 }
 
-/** Where this style likes to sit, in plain words. */
+/**
+ * Where this style prefers to sit in the field, in plain words. This is about
+ * FIELD POSITION only — Moment (labeled separately) is what now controls WHEN
+ * a horse's kick window falls, so this must never use timing language.
+ */
 function seatLabel(style: string): string {
   switch (style) {
     case 'frontRunner':
-      return 'likes to lead';
+      return 'runs up front';
     case 'stalker':
-      return 'tracks the pace';
+      return 'sits just off the pace';
     case 'midPack':
-      return 'sits mid-pack';
+      return 'settles mid-field';
     default:
-      return 'comes from behind';
+      return 'settles at the back';
   }
 }
 

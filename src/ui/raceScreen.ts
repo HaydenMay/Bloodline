@@ -226,12 +226,29 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let finalRows: RecapRow[] | null = null;
   /** Races wait for you rather than starting the moment the page loads. */
   let started = false;
+  // 3 beats of a second each, then the field breaks and "And they're off!"
+  // fires as a normal call-out once the race is actually moving.
+  const COUNTDOWN_MS = 3000;
+  let countdownEndsAt = 0;
   const firedCallouts = new Set<string>();
+
+  const beginCountdown = (): void => {
+    if (started || countdownEndsAt !== 0) return;
+    countdownEndsAt = performance.now() + COUNTDOWN_MS;
+  };
 
   const cam: Camera = { scrollYards: 0, pixelsPerYard: 1.6 };
 
   const tick = (): void => {
-    if (!started || !running) return;
+    if (!started) {
+      if (countdownEndsAt !== 0 && performance.now() >= countdownEndsAt) {
+        started = true;
+        countdownEndsAt = 0;
+        setCallout("And they're off!");
+      }
+      return;
+    }
+    if (!running) return;
     prev = curr;
     running = race.step();
     curr = race.snapshot();
@@ -548,8 +565,10 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       ctx.fillText(callout, width / 2, height * 0.2);
     }
 
-    if (!started) drawStart(ctx, width, height);
-    else if (!running) drawFinish(ctx, width, height, player);
+    if (!started) {
+      if (countdownEndsAt !== 0) drawCountdown(ctx, width, height);
+      else drawStart(ctx, width, height);
+    } else if (!running) drawFinish(ctx, width, height, player);
   };
 
   /** Pre-race card, so a race begins when you are ready rather than on load. */
@@ -583,6 +602,20 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.fillStyle = 'rgba(139,152,169,0.85)';
     ctx.font = '500 12px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText('Tap to KICK · hold to TAKE A PULL', cx, cy + 70);
+  };
+
+  /** 3, 2, 1 — covers the gate load so the race doesn't just snap into motion. */
+  const drawCountdown = (ctx: CanvasRenderingContext2D, width: number, height: number): void => {
+    ctx.fillStyle = 'rgba(14,18,24,0.82)';
+    ctx.fillRect(0, 0, width, height);
+
+    const msLeft = Math.max(0, countdownEndsAt - performance.now());
+    const beat = Math.min(3, Math.max(1, Math.ceil(msLeft / (COUNTDOWN_MS / 3))));
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#F2C14E';
+    ctx.font = '800 64px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillText(String(beat), width / 2, height / 2 + 20);
   };
 
   /**
@@ -689,7 +722,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const down = (e: Event): void => {
     e.preventDefault();
     if (!started) {
-      started = true;
+      beginCountdown();
       pressedAt = 0;
       return;
     }
@@ -716,7 +749,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     if (e.code === 'Space' || e.code === 'ArrowUp') {
       e.preventDefault();
       if (e.type !== 'keydown') return;
-      if (!started) started = true;
+      if (!started) beginCountdown();
       else tap();
     }
     if (e.code === 'ArrowDown' || e.code === 'ShiftLeft') {

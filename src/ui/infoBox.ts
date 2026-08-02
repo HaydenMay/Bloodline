@@ -24,11 +24,14 @@ const STAT_LABELS: Record<StatKey, string> = {
   consistency: 'Consistency',
 };
 
+// Field-position language only — Moment (labeled separately below) is what
+// now controls WHEN a horse's kick window falls, so this must never describe
+// timing or it reads as contradicting the Moment label.
 const STYLE_LABELS: Record<string, { name: string; seat: string }> = {
-  frontRunner: { name: 'Front-runner', seat: 'Likes to lead' },
-  stalker: { name: 'Stalker', seat: 'Tracks the pace' },
-  midPack: { name: 'Mid-pack', seat: 'Sits mid-pack' },
-  closer: { name: 'Closer', seat: 'Comes from behind' },
+  frontRunner: { name: 'Front-runner', seat: 'Runs up front' },
+  stalker: { name: 'Stalker', seat: 'Sits just off the pace' },
+  midPack: { name: 'Mid-pack', seat: 'Settles mid-field' },
+  closer: { name: 'Closer', seat: 'Settles at the back' },
 };
 
 /** Named after the part of the track where this Moment's window falls. */
