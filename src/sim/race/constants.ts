@@ -5,6 +5,8 @@
  * here with evidence — see tools/harness.ts and DESIGN.md §4.
  */
 
+import type { Moment, RunningStyle } from '../../data/index.js';
+
 export const YARDS_PER_FURLONG = 220;
 
 /** Simulation tick rate. 30 Hz matches the render loop closely enough. */
@@ -192,9 +194,25 @@ export const WINDOW_BASE_LIFT = 0.05;
 /** Half-width of the window where the kick lands at full force. */
 export const KICK_WINDOW_HALF = 0.09;
 /** How fast effectiveness falls away outside the window. */
-export const KICK_WINDOW_FALLOFF = 0.22;
-/** Floor: a badly mistimed kick still holds position, never steals a race. */
-export const KICK_MIN_FIT = 0.35;
+export const KICK_WINDOW_FALLOFF = 0.15;
+/**
+ * Floor: a badly mistimed kick still holds position, never steals a race.
+ * Deliberately low — saving charges for the window has to clearly beat
+ * spending them the moment they're available regardless of timing, or
+ * "spam every charge" out-earns a single well-timed one on raw uptime alone
+ * (ROADMAP.md, "spam vs timing").
+ */
+export const KICK_MIN_FIT = 0.05;
+/**
+ * A mistimed kick is SHORTER as well as weaker, scaled by the same windowFit
+ * — this is what actually stops spamming, not the strength floor alone. A
+ * kick's duration used to be fixed regardless of timing, so a stream of weak
+ * mistimed kicks could still cover most of a race at reduced strength and
+ * out-earn one strong kick held for its ~13s window on raw TIME COVERED. The
+ * floor below is duration retained at the worst possible timing — never
+ * instant, since even a bad kick should do something.
+ */
+export const KICK_MISTIMED_DURATION_FLOOR = 0.3;
 
 // ---------------------------------------------------------------------------
 // Traffic (DESIGN.md §4)
@@ -285,15 +303,16 @@ export const FORM_TEMPER_AMPLIFY = 0.06 * 0.65;
 export const CONDITION_INFLUENCE = 0.1;
 
 // ---------------------------------------------------------------------------
-// Running styles — each is a pack-position preference plus a charge-regen profile.
+// Running styles — WHERE a horse sits in the pack, and its charge-regen profile.
 // preferred: 0 = front of field, 1 = back. tolerance: free play either side.
+//
+// Style no longer says WHEN a horse kicks or when its speed peaks — that's
+// Moment, below, deliberately independent so two frontRunners can differ.
 // ---------------------------------------------------------------------------
 
 export interface StyleProfile {
   preferred: number;
   tolerance: number;
-  /** Where in the race (0-1) this style wants to launch its run. */
-  kickAt: number;
   /**
    * The style's natural riding baseline. Effort BELOW this counts as taking a
    * pull — restraint that boosts charge regen (CHARGE_REGEN_HOLD_GAIN) on top
@@ -303,58 +322,134 @@ export interface StyleProfile {
 }
 
 export const STYLE_PROFILES = {
-  frontRunner: { preferred: 0.06, tolerance: 0.18, kickAt: 0.82, cruiseEffort: 0.5 },
-  stalker: { preferred: 0.3, tolerance: 0.16, kickAt: 0.8, cruiseEffort: 0.5 },
-  midPack: { preferred: 0.52, tolerance: 0.13, kickAt: 0.78, cruiseEffort: 0.5 },
-  closer: { preferred: 0.85, tolerance: 0.16, kickAt: 0.7, cruiseEffort: 0.46 },
-} as const satisfies Record<string, StyleProfile>;
+  frontRunner: { preferred: 0.06, tolerance: 0.18, cruiseEffort: 0.5 },
+  stalker: { preferred: 0.3, tolerance: 0.16, cruiseEffort: 0.5 },
+  midPack: { preferred: 0.52, tolerance: 0.13, cruiseEffort: 0.5 },
+  closer: { preferred: 0.85, tolerance: 0.16, cruiseEffort: 0.46 },
+} as const satisfies Record<RunningStyle, StyleProfile>;
+
+// ---------------------------------------------------------------------------
+// Moment — WHEN a horse's kick lands and its passive speed curve peaks.
+// Independent of running style: a frontRunner and a closer can both be
+// `late`. Style only WEIGHTS which Moment a horse is likelier to roll
+// (MOMENT_WEIGHTS_BY_STYLE, sim/horse.ts) — it never determines it outright.
+// ---------------------------------------------------------------------------
 
 /**
- * PHASE PROFILES — a style's moment in the race, not just its place on the track.
- *
- * Position says where a horse belongs; phase says WHEN it shines. Without this a
- * closer is merely "the horse at the back" rather than "the horse that flies
- * late". Values are speed multipliers at the centre of each third, smoothly
- * interpolated between.
- *
- * Crucially these are scaled by STYLE FIDELITY — how faithfully the horse has
- * actually raced its style so far. A closer only gets its finishing surge if it
- * genuinely sat back and held position early. The moment has to be earned.
+ * The kick window, in race progress (0-1), for each Moment. Not a centre +/-
+ * half-width like the old style-keyed window was — the owner's own framing:
+ * "during your entire moment, your horse should be getting full-strength
+ * kicks. This is where players should be planning to utilise their kicks."
+ * A kick anywhere inside this range lands at full force; outside it, strength
+ * and duration fall away by distance to the nearest edge (KICK_WINDOW_FALLOFF,
+ * KICK_MIN_FIT, KICK_MISTIMED_DURATION_FLOOR — sim/race/engine.ts).
  */
+export const MOMENT_WINDOWS = {
+  early: [0, 0.25],
+  earlyMid: [0.2, 0.55],
+  midLate: [0.55, 0.9],
+  late: [0.8, 1],
+} as const satisfies Record<Moment, readonly [number, number]>;
+
 /**
- * Re-tuned once against the lower-noise baseline above (BAND_DOWN/UP,
- * FORM_BASE_SPREAD/FORM_TEMPER_AMPLIFY). Cutting that noise alone — verified
- * against the harness — left the patient styles overperforming once nothing
- * washed their late-race edge out (midPack 16.0%, closer 15.6%, against a fair
- * 12.5%) while the front-loaded styles paid for it (frontRunner 10.1%,
- * stalker 8.3%, failing the harness's own bar). Stalker and midPack's numbers
- * were the timid ones in the table — smaller in magnitude than frontRunner's
- * or closer's committed bets — so stalker's are raised across all three
- * phases and closer/midPack's LATE number, the biggest lever on the biggest
- * overperformer, is cut back down.
- *
- * Re-tuned a second time for the kick-charge rebuild (ROADMAP.md, "Known
- * issue — style balance broke with the charge rebuild"). frontRunner's LATE
- * number was -0.013, tuned back when a continuous energy fade also existed to
- * reinforce a front-runner's late-race slowdown. Removing fade entirely left
- * that -0.013 as an UNCOMPENSATED penalty with nothing backing it up, and it
- * turned out to be the dominant lever: frontRunner fell to 7.7% against a
- * fair 12.5% (harness), and a fast proxy sweep (tools/harness.ts's own
- * styleBalance(), same seed prefix, at RACES=250) showed just how sharp the
- * lever is — +0.02 overshot to 22.2%, +0 landed at a fair 12.2% against the
- * full 1200-race harness with every other style still inside the 30% bar
- * (worst is midPack at +12%). Simply zeroing the number, not adding a bonus,
- * was enough once the fade it used to lean on was gone.
+ * How far BEFORE its Moment window a horse starts building toward full
+ * effort (sim/race/ai.ts) — full commitment is reached BY the window's
+ * start, not merely begun there, so a horse is already flat out the instant
+ * its window opens and can spend the kick immediately for full effect.
  */
-export const PHASE_PROFILES = {
-  //                 early    middle    late
-  // A bonus LATE is worth more than one early, because the race is decided
-  // late. Early-phase numbers are therefore larger to compensate.
-  frontRunner: { early: 0.085, middle: 0.007, late: 0 },
-  stalker: { early: 0.006, middle: 0.025, late: 0.013 },
-  midPack: { early: -0.003, middle: 0.0195, late: 0.021 },
-  closer: { early: -0.027, middle: -0.001, late: 0.038 },
-} as const satisfies Record<string, { early: number; middle: number; late: number }>;
+export const MOMENT_RAMP_LEAD = 0.15;
+
+/**
+ * Race progress past which EVERY horse commits flat out, regardless of its
+ * own Moment — the universal "down the stretch, everyone digs in" close.
+ *
+ * This is the actual fix for why `late`-moment horses were losing catastrophically
+ * (ROADMAP.md, "Moment attribute" retune) — not window placement or ramp timing,
+ * which were both red herrings traced first. The real bug: `effort =
+ * Math.max(effort, commitment)` never comes back down once a horse commits.
+ * Under the OLD style-keyed system every style's commit point clustered
+ * together late (0.7-0.82), so nobody benefited much from committing "early" —
+ * the race was nearly over either way. Splitting Moment out spread commit
+ * points across the WHOLE race (0 to 0.8), so an `early`-moment horse could
+ * commit at t=0 and simply stay at ~max effort for the entire race — an
+ * enormous, compounding speed advantage no phase bonus or kick could offset,
+ * confirmed by tracing a single race directly (tools, not committed): a
+ * closer fell 60 LENGTHS behind by 75% of the race while still riding a
+ * perfectly normal ~0.55 hold effort, because an earlyMid-moment rival had
+ * been at effort ~1.0 since ~10%.
+ *
+ * The fix: commitment now holds only through a horse's OWN window, then
+ * EASES BACK to the normal hold/position-correction effort until this
+ * universal threshold — so an early-committing horse gets its moment, then
+ * has to earn the rest of the race like everyone else, until the true
+ * finish where every style commits together again.
+ */
+export const UNIVERSAL_FINAL_STRETCH = 0.9;
+
+/**
+ * MOMENT PROFILES — a horse's moment in the race, not just its place on the
+ * track. Position (style, above) says where a horse belongs; this says WHEN
+ * it shines. Without this a `late` horse is merely "the one that kicks late"
+ * rather than one whose whole speed curve builds to it. Values are speed
+ * multipliers at the centre of each third, smoothly interpolated between.
+ *
+ * Crucially these are scaled by MOMENT FIDELITY — how faithfully the horse
+ * has actually held its preferred pack position so far (style's job). A
+ * `late` horse only gets its finishing surge if it genuinely raced its
+ * style's position early. The moment has to be earned.
+ *
+ * Moved here from PHASE_PROFILES (style-keyed) when Moment was split out from
+ * Style as its own attribute — the owner's framing: style determines pack
+ * position (and where charge regen is best), Moment determines optimal kick
+ * timing AND strength, including this passive curve. Values are carried over
+ * from the old style-keyed table rather than re-guessed: `early` ~ the old
+ * frontRunner curve, `late` ~ the old closer curve (both harness-tuned across
+ * two rounds — see the retune history this replaced), `midLate` ~ the old
+ * stalker/midPack average (both were mild, similar curves — "round the turn"
+ * matches that identity), and `earlyMid` is new, interpolated between `early`
+ * and `midLate` since no style occupied that shape before. NOT yet re-verified
+ * against the harness under the new per-horse Moment rolls — every style can
+ * now land on any Moment, weighted (MOMENT_WEIGHTS_BY_STYLE), so the balance
+ * this table was tuned against no longer holds exactly. Re-verify before
+ * calling this done (ROADMAP.md).
+ */
+export const MOMENT_PROFILES = {
+  //           early    middle    late
+  early: { early: 0.085, middle: 0.007, late: 0 },
+  earlyMid: { early: 0.04, middle: 0.015, late: 0.008 },
+  midLate: { early: 0, middle: 0.022, late: 0.017 },
+  late: { early: -0.027, middle: -0.001, late: 0.038 },
+} as const satisfies Record<Moment, { early: number; middle: number; late: number }>;
+
+/**
+ * How likely each Moment is, per running style — independent, but weighted so
+ * archetypes stay sensible (a "quick-start closer" makes no sense; a
+ * "quick-start frontRunner" does — Derby Owners Club's naming for exactly this
+ * kind of archetype). A gradient from most early-committed to most
+ * late-committed:
+ *
+ *   frontRunner — sharply `early`. Asserts the lead in its window, then has
+ *     to hold it. The only style `early` makes sense for at all.
+ *   midPack — the generalist, deliberately flat across the latter three
+ *     (roughly a third each). No strong opinion on when it moves; "mid" in
+ *     timing as much as in position.
+ *   stalker — leans `late` hard, same general shape as closer, but keeps
+ *     real weight on `midLate` too — willing to make its move a little
+ *     earlier, sneaking into contention before the closers arrive.
+ *   closer — the purest, latest-committed identity: overwhelmingly `late`,
+ *     barely anything earlier than that.
+ *
+ * Every Moment stays reachable for every style except the one combination
+ * flagged as nonsensical (`early` for the patient styles, at 0%) — a real
+ * roll, not a fixed assignment, so two horses of the same style can still
+ * kick at different points.
+ */
+export const MOMENT_WEIGHTS_BY_STYLE = {
+  frontRunner: { early: 0.7, earlyMid: 0.15, midLate: 0.1, late: 0.05 },
+  stalker: { early: 0, earlyMid: 0.15, midLate: 0.35, late: 0.5 },
+  midPack: { early: 0, earlyMid: 0.33, midLate: 0.33, late: 0.34 },
+  closer: { early: 0, earlyMid: 0.05, midLate: 0.2, late: 0.75 },
+} as const satisfies Record<RunningStyle, Record<Moment, number>>;
 
 /**
  * How much of the intrinsic front-running cost each style shrugs off.

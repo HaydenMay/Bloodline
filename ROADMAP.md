@@ -6,11 +6,14 @@ Companion to [DESIGN.md](DESIGN.md) and [TRAITS.md](TRAITS.md).
 
 ## 🚧 IN PROGRESS — the energy economy has been replaced with kick charges
 
-**Read this before touching `sim/race/` code.** The rebuild below is DONE, compiles/lints/tests
-clean, and style balance passes again after a retune — see the three "Known issue" sections further
-down for what's still open (elite divisions not tightening up, and the player's own ride not yet
-re-verified). The owner's own words, kept for context — these supersede anything below in this doc
-that still describes the old model:
+**Read this before touching `sim/race/` code.** The kick-charge rebuild itself is DONE and
+compiles/lints/tests clean. On top of it, WHEN a horse kicks has been split out from running style
+into its own independent `Moment` attribute (see "🚧 IN PROGRESS — Moment" further down) — that
+part is NOT yet balanced: style balance and pace-collapse both currently fail the harness, after a
+serious structural bug (effort commitment never coming back down) was found and fixed. Start there,
+not from scratch — the fix is done, the retune on top of it is not. Elsewhere still open: elite
+divisions no longer visibly tightening up. The owner's own words, kept for context — these
+supersede anything below in this doc that still describes the old model:
 
 > Stamina should be like a gas tank. It doesn't provide more power the more gas is in the tank.
 > It's the amount of how far the effort can go. It should allow for maximum kicks and urges rather
@@ -113,29 +116,101 @@ was where elite fields' higher Consistency used to visibly pay off — no fade l
 means less separation between a clean elite field and a division that has more genuine trouble).
 Not traced to a specific cause the way the style-balance issue above was — that is next.
 
-### Known issue — the player's own ride, not yet re-verified after the rebuild
+### Known issue — the player's own ride never committed in the stretch
 
-`npm run ride-probe` surfaced a likely pre-existing issue, worth checking against the pre-charge
-build before assuming this rebuild caused it: the player's own controller (`ui/raceScreen.ts`) rides
-at a FLAT `cruiseEffort` for the entire race, never ramping into the stretch commitment AI riders
-get (`ai.ts`'s `commitment = 0.82 + ...`). Effort feeds speed via
+✅ **Fixed.** `npm run ride-probe` surfaced this: the player's own controller (`ui/raceScreen.ts`)
+rode at a FLAT `cruiseEffort` for the entire race, never ramping into the stretch commitment AI
+riders get (`ai.ts`'s `commitment = 0.82 + ...`). Effort feeds speed via
 `effortSpeed = MIN_EFFORT_SPEED + (1 - MIN_EFFORT_SPEED) * effort` — at `MIN_EFFORT_SPEED = 0.78`,
-riding the stretch at `cruiseEffort` (~0.5) versus an AI's commitment (~1.0) costs roughly 11% of
-top speed, which `KICK_MAX_BONUS` (8.5% at full strength) cannot fully buy back. Measured: even
-"kick in window" (a single well-timed tap) wins only 4/150 races against a fair share of 19/150,
-barely above "hands off" doing nothing at all. This same flat-cruise shape existed in the
-pre-charge code too (via `PLAYER_CRUISE_CAP`), so it may not be new — but it was not re-verified
-after this rebuild and is now the most player-facing number in this whole pass. Worth tracing
-before anything else next session: either the player needs some form of stretch ramp back, or the
-kick needs to be worth substantially more than 8.5% to be the sole answer to an ~11% deficit.
+riding the stretch at `cruiseEffort` (~0.5) versus an AI's commitment (~1.0) cost roughly 11% of top
+speed, which `KICK_MAX_BONUS` (8.5% at full strength) could not fully buy back regardless of timing.
+Measured before the fix: even "kick in window" (a single well-timed tap) won only 4/150 races
+against a fair share of 19/150 — barely above "hands off" doing nothing at all. This flat-cruise
+shape predates the charge rebuild (it was `PLAYER_CRUISE_CAP` in the old energy model), so it was
+not something this rebuild introduced, just something it never re-verified.
+
+Fixed by giving the player's default ride the AI's own establish/hold/commit curve (`baseRide`'s
+`effort`, not a flat constant) — input still MODULATES it (hold caps it down, tap fires a kick) but
+no longer replaces it outright. There was never a design reason pace commitment should be the one
+piece withheld from an otherwise-competent default ride, when lane-seeking already was not. Verified
+with `npm run ride-probe`: "kick in window" now wins 18/150, right at the 19/150 fair share, clearly
+ahead of "hands off" (8/150) and "kick mistimed" (7/150) — riding well beats doing nothing, and
+timing beats mistiming. `npm run harness` re-run afterward: unaffected, since the harness never uses
+the player-specific controller — style balance, pace-collapse and dominance curve numbers are
+identical to before this fix.
+
+### Known issue — spamming every charge out-earned a well-timed one
+
+✅ **Fixed.** Found right after the fix above: "spam every charge" (tap the instant one is
+available, no timing at all) won 23/150 in `ride-probe`, MORE than "kick in window" (18/150) —
+spamming beat timing outright, which contradicts the owner's stated intent: save charges for the
+window, land them there, then spend what's left afterward as needed. A mistimed kick's STRENGTH was
+already discounted by `windowFit` (`KICK_MIN_FIT` floor, `KICK_WINDOW_FALLOFF`), but its DURATION
+(`kickRemaining = KICK_BASE_DURATION`) was not — so a stream of weak mistimed kicks, refired the
+instant a new charge arrived, still covered most of the race at reduced strength and out-earned one
+strong kick held for its ~13s window on raw TIME COVERED, not strength.
+
+Fixed with two changes: `KICK_MIN_FIT` lowered 0.35 → 0.05 (a badly mistimed kick is now genuinely
+weak, not a guaranteed 35% floor), and a new `KICK_MISTIMED_DURATION_FLOOR` (0.3) scales a kick's
+DURATION by the same `windowFit` its strength already used — a mistimed kick is now shorter as well
+as weaker, which is what actually stops spam from covering the whole race. Verified with
+`ride-probe`: "kick in window" 18/150 now clearly beats "spam every charge" 15/150, with "kick
+mistimed" (6/150) and "hands off" (8/150) both well behind either. Re-verified against the full
+harness and `margin-profile` afterward — both unchanged, since neither AI riders nor style balance
+were ever mistimed enough for this to matter to them; it only bites naive/lazy play.
+
+### 🚧 IN PROGRESS — Moment: WHEN a horse kicks, split out from Style
+
+**New independent attribute**, `Horse.moment` (`'early' | 'earlyMid' | 'midLate' | 'late'`,
+`data/index.ts`), added because the kick window used to be a fixed function of running style —
+every frontRunner peaked at the same point, every closer at another — which read as flat once you
+noticed it (the owner: "why do all my horses have the same window?"). Style (`STYLE_PROFILES`) now
+governs WHERE a horse sits in the pack only; Moment (`MOMENT_WINDOWS`, `MOMENT_PROFILES`,
+`sim/race/constants.ts`) governs WHEN its kick window opens and its passive phase-bonus curve peaks
+— independent, but weighted per style so archetypes stay sensible
+(`MOMENT_WEIGHTS_BY_STYLE`): frontRunner rolls heavily `early` (asserts the lead, then holds it —
+Derby Owners Club's "Quick Start"), midPack is the flat generalist (roughly a third each across the
+back three), stalker and closer both lean hard `late` (closer almost entirely so — "Last Spurt"),
+distinguishing "reads like a closer" from "is one" by degree, not by a different shape. Windows:
+`early` 0-25%, `earlyMid` 20-55%, `midLate` 55-90%, `late` 80-100% — deliberately wide and
+overlapping at the edges, not a narrow point: "during your entire moment, your horse should be
+getting full-strength kicks" (the owner). `ai.ts`, `engine.ts` and `raceScreen.ts`'s HUD all read
+the window from the horse's own Moment now, not a per-style constant.
+
+**A serious structural bug was found and fixed while building this, not yet fully retuned after.**
+First harness run against Moment: frontRunner 39.7% against a fair 12.5%, closer 0.4% — far worse
+than any single-lever balance miss this project has hit before. Traced directly (not asserted):
+the actual cause was `effort = Math.max(effort, commitment)` in `ai.ts` never coming back down once
+a horse commits. Under the old style-keyed system every style's commit point clustered together
+late (0.7-0.82), so nobody benefited much from committing "early" — the race was nearly over either
+way. Splitting Moment out spread commit points across the WHOLE race (0-80%), so an `early`-moment
+horse could commit at t=0 and simply stay at ~max effort for the entire race — confirmed by tracing
+a single race directly: a closer fell 60 lengths behind by 75% of the race while riding a perfectly
+normal ~0.55 hold effort, because an earlyMid-moment rival had been at effort ~1.0 since ~10%. No
+phase bonus or kick strength tuning could have fixed this; the mechanism itself was wrong. Fixed
+with `UNIVERSAL_FINAL_STRETCH` (0.9): commitment now holds only through a horse's own window
+(reached early via `MOMENT_RAMP_LEAD`, 0.15, so full effort arrives BY the window's start rather
+than merely beginning there), then EASES BACK to normal hold effort until this universal threshold,
+where every style commits together regardless of its own Moment.
+
+That fix alone took frontRunner from 39.7% to 8.9% and closer from 0.4% to 5.4% — the death spiral
+is gone. **Style balance still fails the harness** (stalker now overperforms at 21.2%, closer still
+under at 5.4%), and **pace-collapse regressed to failing too** ("a contested lead wrecks
+front-runners" no longer holds, 9.2% → 8.5% barely moves) — frontRunner's real advantage moved
+early, so contesting it late (the mechanic this suite gates on) matters much less than it used to.
+Both are normal, tunable imbalances now, not a structural break, but neither is fixed yet.
 
 **Not yet done, deliberately left rather than guessed at now:** `CHARGE_CAPACITY` (5) and
 `BASE_CHARGE_REGEN` are still first-pass values, untested against the harness beyond "style balance
-passes with them." The elite-division and player-ride issues above are open. A full retune loop —
-trace a worst-case seed the way `margin-profile`'s worst seed was traced in Phase 4.5, fix each
-structural cause, re-verify style balance and the tail together — is not finished.
+passes with them." The elite-division issue above is still open. `MOMENT_WEIGHTS_BY_STYLE` and/or
+`MOMENT_WINDOWS` need another retune pass — likely dial back stalker's `late` weight and/or restore
+some of frontRunner's contested-lead vulnerability now that its edge sits earlier — the same
+fast-proxy-then-full-harness loop used earlier in this file, not yet run to completion. A full
+retune loop generally — trace a worst-case seed the way `margin-profile`'s worst seed was traced in
+Phase 4.5, fix each structural cause, re-verify style balance, pace-collapse and the tail together —
+is not finished.
 
-`npm run check` (lint + build + test) passes clean. **The harness does not — see below.**
+`npm run check` (lint + build + test) passes clean.
 
 ---
 

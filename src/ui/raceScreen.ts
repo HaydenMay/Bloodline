@@ -11,7 +11,7 @@ import {
 } from '../render/track.js';
 import { createAiController } from '../sim/race/ai.js';
 import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
-import { CHARGE_CAPACITY, STYLE_PROFILES, TICK_HZ } from '../sim/race/constants.js';
+import { CHARGE_CAPACITY, MOMENT_WINDOWS, TICK_HZ } from '../sim/race/constants.js';
 import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../sim/race/recap.js';
 import type {
   ControlInput,
@@ -140,23 +140,26 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   };
 
   const playerHorse = field.find((h) => h.id === playerHorseId)!;
-  const playerProfile = STYLE_PROFILES[playerHorse.style];
+  const [playerMomentLo, playerMomentHi] = MOMENT_WINDOWS[playerHorse.moment];
 
   /**
-   * The jockey handles WHICH LANE (still automatic — dodging traffic, hugging
-   * the rail — that is the AI's job, not yours). Everything about the CHARGE
-   * economy is yours:
+   * The player's jockey rides the horse exactly as the AI would by default —
+   * establishing position, holding it, then committing down the stretch —
+   * the same competent ride "hand it to your jockey" auto-race gets
+   * (DESIGN.md §4). Input MODULATES that ride rather than replacing it:
    *
-   *   nothing   ride at cruise, regenerating the whole way
-   *   tap       spend one kick charge — the only way to push, at any point
-   *             in the race, not just the finish
-   *   hold      take a pull — settle back below cruise, regen faster
+   *   nothing   ride to style, establishing and committing like any AI horse
+   *   tap       spend one kick charge — the only way to push beyond that, at
+   *             any point in the race, not just the finish
+   *   hold      take a pull — settle back below the AI's own ride, regen faster
    *
-   * The jockey no longer establishes position automatically. Reaching your
-   * slot, and holding it against traffic, is now something you spend charges
-   * on — same as the finish. Do nothing and you ride safe at cruise the whole
-   * way, regenerating the entire time, but you arrive wherever the gate
-   * scatter left you.
+   * Without this the player rode a permanently flat cruise while the AI field
+   * ramped to its stretch commitment around it — a fixed ~11% top-speed
+   * deficit (MIN_EFFORT_SPEED) that the kick's +8.5% at most cannot buy back,
+   * regardless of how well it's timed. Positioning was already the jockey's
+   * automatic job (no player steering); there was never a design reason for
+   * pace commitment to be the one piece withheld from an otherwise-competent
+   * default ride.
    */
   const baseRide = createAiController(playerHorse);
 
@@ -165,11 +168,10 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     return {
       horse,
       controller: (self, race): ControlInput => {
-        // Lane-seeking only — effort comes from cruiseEffort and your input,
-        // never from the AI's own establish/stretch logic.
-        const { targetLane } = baseRide(self, race);
+        const base = baseRide(self, race);
 
-        const effort = input.takingBack ? Math.min(playerProfile.cruiseEffort, 0.26) : playerProfile.cruiseEffort;
+        const effort = input.takingBack ? Math.min(base.effort, 0.26) : base.effort;
+        const targetLane = base.targetLane;
 
         const kick = input.kickPending;
         input.kickPending = false;
@@ -441,10 +443,15 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     roundRect(ctx, px0, py0, pw, 22, 11);
     ctx.fill();
 
-    const winLo = Math.max(0, playerProfile.kickAt - 0.09);
-    const winHi = Math.min(1, playerProfile.kickAt + 0.09);
     ctx.fillStyle = 'rgba(242,193,78,0.30)';
-    roundRect(ctx, px0 + 3 + (pw - 6) * winLo, py0 + 3, (pw - 6) * (winHi - winLo), 16, 6);
+    roundRect(
+      ctx,
+      px0 + 3 + (pw - 6) * playerMomentLo,
+      py0 + 3,
+      (pw - 6) * (playerMomentHi - playerMomentLo),
+      16,
+      6,
+    );
     ctx.fill();
 
     const prog = Math.min(1, player.distance / totalYards);
@@ -459,7 +466,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.textAlign = 'center';
     ctx.fillText(
       'YOUR MOMENT',
-      px0 + 3 + (pw - 6) * ((winLo + winHi) / 2),
+      px0 + 3 + (pw - 6) * ((playerMomentLo + playerMomentHi) / 2),
       py0 + 34,
     );
 
@@ -521,7 +528,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // strength), but it no longer gates WHETHER you can fire one — that's
     // kicksRemaining now, a charge you can spend early for position or hold
     // for the finish.
-    const inWindow = Math.abs(curr.progress - playerProfile.kickAt) <= 0.09;
+    const inWindow = curr.progress >= playerMomentLo && curr.progress <= playerMomentHi;
     ctx.font = LABEL_FONT;
     ctx.textAlign = 'right';
     // What YOU are doing outranks what the race is doing to you: those states

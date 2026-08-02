@@ -39,17 +39,18 @@ type Ride = 'hands off' | 'kick mistimed' | 'kick in window' | 'spam every charg
 function run(seed: string, ride: Ride): { pos: number; margin: number; kicksLeft: number } {
   const { field: f, playerId } = field(seed);
   const me = f.find((h) => h.id === playerId)!;
-  const window = K.STYLE_PROFILES[me.style].kickAt;
+  const [windowLo, windowHi] = K.MOMENT_WINDOWS[me.moment];
   const entrants: RaceEntrant[] = f.map((horse) => {
     if (horse.id !== playerId) return { horse };
     const base = createAiController(horse);
     let tapped = false;
     return {
       horse,
-      // Flat cruise effort, exactly like the real race screen with no input.
+      // Rides the AI's own establish/hold/commit curve, exactly like the real
+      // race screen with no input — see raceScreen.ts's mountRaceScreen.
       controller: (self, race): ControlInput => {
         const b = base(self, race);
-        const inWindow = Math.abs(race.progress - window) <= 0.09;
+        const inWindow = race.progress >= windowLo && race.progress <= windowHi;
         let kick = false;
         if (ride === 'kick mistimed' && !tapped && race.progress >= K.ESTABLISH_UNTIL) {
           kick = true;
@@ -60,7 +61,7 @@ function run(seed: string, ride: Ride): { pos: number; margin: number; kicksLeft
         } else if (ride === 'spam every charge' && self.kicksRemaining > 0) {
           kick = true;
         }
-        return { effort: K.STYLE_PROFILES[me.style].cruiseEffort, kick, targetLane: b.targetLane };
+        return { effort: b.effort, kick, targetLane: b.targetLane };
       },
     };
   });

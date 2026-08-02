@@ -476,17 +476,22 @@ function stepRunner(
     const gritFactor = 1 + ((r.horse.stats.grit - 50) / 100) * K.KICK_GRIT_INFLUENCE;
     const jockeyFactor = 1 + ((r.horse.jockeySkill - 50) / 100) * K.KICK_JOCKEY_INFLUENCE;
 
-    // TIMING IS THE SKILL. Kick inside the horse's window and it lands at full
-    // force — enough to take a race. Kick outside it and you spend the same
-    // charge for a fraction of the surge: enough to hold your position, never
-    // enough to steal the lead.
-    const centre = K.STYLE_PROFILES[r.horse.style].kickAt;
-    const off = Math.max(0, Math.abs(race.progress - centre) - K.KICK_WINDOW_HALF);
+    // TIMING IS THE SKILL. Kick anywhere inside the horse's Moment window and
+    // it lands at full force — enough to take a race. Kick outside it and you
+    // spend the same charge for a fraction of the surge: enough to hold your
+    // position, never enough to steal the lead.
+    const [momentLo, momentHi] = K.MOMENT_WINDOWS[r.horse.moment];
+    const off = race.progress < momentLo ? momentLo - race.progress : Math.max(0, race.progress - momentHi);
     const windowFit = clamp(1 - off / K.KICK_WINDOW_FALLOFF, K.KICK_MIN_FIT, 1);
     r.kickWindowFit = windowFit;
 
     r.kickStrength = K.KICK_MAX_BONUS * gritFactor * jockeyFactor * windowFit;
-    r.kickRemaining = K.KICK_BASE_DURATION;
+    // Duration scales with the SAME windowFit as strength — a mistimed kick
+    // is shorter, not just weaker. Without this, spamming every charge the
+    // instant it's available could cover most of a race at reduced strength
+    // and out-earn one strong kick held for its ~13s window on raw uptime.
+    r.kickRemaining =
+      K.KICK_BASE_DURATION * (K.KICK_MISTIMED_DURATION_FLOOR + (1 - K.KICK_MISTIMED_DURATION_FLOOR) * windowFit);
 
     if (hasTrait(r.traits, 'turnOfFoot')) {
       r.kickStrength *= 1.55;
@@ -696,13 +701,14 @@ function stepRunner(
     r.variation = 1 + rng.range(-r.bandDown, r.bandUp);
   }
 
-  // --- Phase: the style's MOMENT in the race --------------------------------
-  // Position says where a horse belongs; phase says when it shines. A
-  // front-runner is sharpest out of the gate, a closer over the final third.
+  // --- Phase: the horse's MOMENT in the race --------------------------------
+  // Style says where a horse belongs; Moment says when it shines. An `early`
+  // horse is sharpest out of the gate, a `late` one over the final stretch.
   //
-  // Scaled by style fidelity, so the moment must be EARNED: a closer that
-  // spent the first two-thirds fighting for the lead does not get the surge.
-  const phase = K.PHASE_PROFILES[r.horse.style];
+  // Scaled by style fidelity (holding the PACK POSITION style wants), so the
+  // moment must be EARNED: a horse that spent the first two-thirds fighting
+  // for the wrong spot does not get the surge, regardless of its Moment.
+  const phase = K.MOMENT_PROFILES[r.horse.moment];
   const p = race.progress;
   const phaseBonus =
     p < 0.5
@@ -715,12 +721,12 @@ function stepRunner(
 
   // AUTOMATIC WINDOW LIFT — a floor for not engaging.
   //
-  // Simply being inside your window lifts you, with no input at all, so an
-  // outclassed field can be beaten on autopilot. A well-timed kick then stacks
-  // on top to roughly double it. The floor keeps auto-race viable; the ceiling
-  // is what rewards paying attention.
-  const centre = K.STYLE_PROFILES[r.horse.style].kickAt;
-  if (Math.abs(race.progress - centre) <= K.KICK_WINDOW_HALF) {
+  // Simply being inside your Moment window lifts you, with no input at all,
+  // so an outclassed field can be beaten on autopilot. A well-timed kick then
+  // stacks on top to roughly double it. The floor keeps auto-race viable; the
+  // ceiling is what rewards paying attention.
+  const [momentWindowLo, momentWindowHi] = K.MOMENT_WINDOWS[r.horse.moment];
+  if (race.progress >= momentWindowLo && race.progress <= momentWindowHi) {
     earned += K.WINDOW_BASE_LIFT * fidelity;
   }
 

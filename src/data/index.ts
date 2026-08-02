@@ -13,6 +13,16 @@ export type Division = (typeof DIVISIONS)[number];
 export const RUNNING_STYLES = ['frontRunner', 'stalker', 'midPack', 'closer'] as const;
 export type RunningStyle = (typeof RUNNING_STYLES)[number];
 
+/**
+ * WHEN a horse's kick lands and its passive speed curve peaks — independent
+ * of running style, which only says WHERE it sits in the pack. A front-runner
+ * and a closer can both be `late`; a style only weights which Moment a horse
+ * is likelier to roll (`MOMENT_WEIGHTS_BY_STYLE`, sim/race/constants.ts), it
+ * never determines it outright.
+ */
+export const MOMENTS = ['early', 'earlyMid', 'midLate', 'late'] as const;
+export type Moment = (typeof MOMENTS)[number];
+
 export const DISTANCE_BANDS = ['sprint', 'mile', 'route'] as const;
 export type DistanceBand = (typeof DISTANCE_BANDS)[number];
 

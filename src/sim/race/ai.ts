@@ -7,8 +7,11 @@ import {
   HOLD_EFFORT,
   MAX_EFFORT,
   MIN_EFFORT,
+  MOMENT_RAMP_LEAD,
+  MOMENT_WINDOWS,
   POSITION_CORRECTION_GAIN,
   STYLE_PROFILES,
+  UNIVERSAL_FINAL_STRETCH,
 } from './constants.js';
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
@@ -34,7 +37,16 @@ export function createAiController(horse: Horse): Controller {
   const sloppiness = (1 - skill) * 0.14;
 
   const preferred = clamp(profile.preferred + (hasTrait(traits, 'tractable') ? 0 : 0), 0, 1);
-  const kickAt = profile.kickAt + (1 - skill) * 0.05;
+  // Moment's window, not a single point — the horse's own rolled Moment, not
+  // its style (STYLE_PROFILES no longer carries a kick time at all). A poor
+  // jockey is a little slower to start committing once the window opens, same
+  // shape as before but measured from the window's START rather than a
+  // fixed point, since there is no longer one to measure from.
+  const [momentLo, momentHi] = MOMENT_WINDOWS[horse.moment];
+  const kickAt = momentLo + (1 - skill) * 0.05;
+  // The commit ramp starts well BEFORE the window so full effort is already
+  // reached BY the time it opens, not merely started there.
+  const rampStart = Math.max(0, momentLo - MOMENT_RAMP_LEAD);
 
   // Fire the kick exactly once. `race.progress >= kickAt` stays true on every
   // tick after it first crosses — without this guard the AI would ask the
@@ -43,7 +55,14 @@ export function createAiController(horse: Horse): Controller {
   let hasKicked = false;
 
   return (self: RunnerView, race: RaceView): ControlInput => {
-    const inStretch = race.progress >= kickAt;
+    // Committing HOLDS only through this horse's own window, then EASES
+    // BACK to the normal hold effort until the universal final stretch,
+    // where every style commits together regardless of its own Moment. Not
+    // just gated by rampStart — see UNIVERSAL_FINAL_STRETCH for why an
+    // effort that never comes back down was the actual balance-breaking bug
+    // here, not window placement or ramp timing.
+    const committing =
+      (race.progress >= rampStart && race.progress <= momentHi) || race.progress >= UNIVERSAL_FINAL_STRETCH;
 
     // --- Effort: ESTABLISH -> HOLD -> COMMIT ---------------------------------
     //
@@ -97,15 +116,17 @@ export function createAiController(horse: Horse): Controller {
       effort += 0.25;
     }
 
-    // Before the stretch, hold something back — a jockey riding flat out the
-    // whole way has nothing left to spend on the kick when it matters. This
-    // is navigational now, not a resource budget: there is no tank to
-    // conserve, only a moment worth arriving at with room to commit further.
-    if (!inStretch) {
+    // Outside a committing window, hold something back — a jockey riding
+    // flat out the whole way has nothing left to spend on the kick when it
+    // matters, and no style should get to run at max effort for most of the
+    // race just because its Moment happens to fall early.
+    if (!committing) {
       effort = Math.min(effort, 0.86);
     } else {
-      // Down the stretch: everything left.
-      const commitment = 0.82 + (race.progress - kickAt) / Math.max(0.01, 1 - kickAt);
+      // Committing: everything left. Full effort reached by kickAt (so a
+      // kick is spent at genuine max effort), held through the rest of this
+      // window, then eased back off once committing goes false again.
+      const commitment = 0.82 + (race.progress - rampStart) / Math.max(0.01, kickAt - rampStart);
       effort = Math.max(effort, commitment);
     }
 
@@ -128,7 +149,7 @@ export function createAiController(horse: Horse): Controller {
     if (hasTrait(traits, 'railHugger')) targetLane = 0;
     else if (hasTrait(traits, 'wideRunner')) targetLane = 3;
     else if (self.blocked) targetLane = self.lane + (self.lane === 0 ? 1 : -1);
-    else if (inStretch && self.rank > 2) targetLane = self.lane + 1;
+    else if (committing && self.rank > 2) targetLane = self.lane + 1;
 
     return {
       effort: clamp(effort, MIN_EFFORT, MAX_EFFORT),

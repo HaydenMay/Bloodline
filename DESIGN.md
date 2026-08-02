@@ -77,6 +77,14 @@ see §4. Nobody is punished for running their own race.
 | **Mid-Pack** | Middle of the field | Extremes, front or back |
 | **Closer** | Last, with room to swing | Anywhere near the front |
 
+### Moment 🚧
+Exactly one per horse, independent of running style — style says WHERE a horse sits in the pack,
+Moment says WHEN it kicks and when its passive speed curve peaks. Four values: **Early**,
+**Early-Mid**, **Mid-Late**, **Late**. Weighted by style so archetypes stay sensible (a
+"quick-start closer" doesn't happen) without being fixed by it — two horses of the same style can
+still kick at different points. See ROADMAP.md, "Moment: WHEN a horse kicks, split out from Style"
+for the full weighting table and current balance status (in progress, not yet fully retuned).
+
 ### Distance aptitude ✅
 Three bands: **Sprint** (5–7f) · **Mile** (8–9f) · **Route** (10–12f).
 Each horse carries a letter grade per band, tappable for the exact number (progressive

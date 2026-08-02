@@ -1,6 +1,6 @@
 import { toGrade, STAT_KEYS, type Horse, type StatKey } from '../sim/types.js';
 import { TRAITS } from '../data/traits.js';
-import { STYLE_PROFILES } from '../sim/race/constants.js';
+import type { Moment } from '../data/index.js';
 import { coatFor } from '../render/palette.js';
 
 /**
@@ -31,11 +31,18 @@ const STYLE_LABELS: Record<string, { name: string; seat: string }> = {
   closer: { name: 'Closer', seat: 'Comes from behind' },
 };
 
-function momentLabel(kickAt: number): string {
-  if (kickAt < 0.35) return 'From the gate';
-  if (kickAt < 0.62) return 'Down the back';
-  if (kickAt < 0.81) return 'Round the turn';
-  return 'In the straight';
+/** Named after the part of the track where this Moment's window falls. */
+function momentLabel(moment: Moment): string {
+  switch (moment) {
+    case 'early':
+      return 'From the gate';
+    case 'earlyMid':
+      return 'Down the back';
+    case 'midLate':
+      return 'Round the turn';
+    case 'late':
+      return 'In the straight';
+  }
 }
 
 /** Potential shown as a band, since the exact ceiling is never revealed. */
@@ -49,7 +56,6 @@ function potentialBand(current: number, potential: number): string {
 
 export function renderInfoBox(horse: Horse): string {
   const style = STYLE_LABELS[horse.style] ?? STYLE_LABELS['closer']!;
-  const profile = STYLE_PROFILES[horse.style];
   const coat = coatFor(horse.coat);
 
   const stats = STAT_KEYS.map((key) => {
@@ -98,7 +104,7 @@ export function renderInfoBox(horse: Horse): string {
     <div class="ib-row">
       <div><span class="ib-k">Style</span><span class="ib-v">${style.name}</span></div>
       <div><span class="ib-k">Runs</span><span class="ib-v">${style.seat.toLowerCase()}</span></div>
-      <div><span class="ib-k">Moment</span><span class="ib-v ib-accent">${momentLabel(profile.kickAt)}</span></div>
+      <div><span class="ib-k">Moment</span><span class="ib-v ib-accent">${momentLabel(horse.moment)}</span></div>
     </div>
 
     <p class="ib-section">Attributes</p>
