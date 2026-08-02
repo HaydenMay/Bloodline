@@ -353,38 +353,50 @@ export const MOMENT_WINDOWS = {
 
 /**
  * How far BEFORE its Moment window a horse starts building toward full
- * effort (sim/race/ai.ts) — full commitment is reached BY the window's
- * start, not merely begun there, so a horse is already flat out the instant
- * its window opens and can spend the kick immediately for full effect.
+ * effort (sim/race/ai.ts) — full commitment is reached BY `kickAt`, not
+ * merely begun there, so a horse is already flat out the instant it fires
+ * its kick.
  */
 export const MOMENT_RAMP_LEAD = 0.15;
 
 /**
- * Race progress past which EVERY horse commits flat out, regardless of its
- * own Moment — the universal "down the stretch, everyone digs in" close.
+ * Fixed TOTAL span of race progress a horse spends at max effort, the SAME
+ * for every Moment — a ramp of MOMENT_RAMP_LEAD up to `kickAt`, then held for
+ * the remainder of this duration afterward. Deliberately NOT "however wide
+ * this Moment's own window happens to be".
  *
- * This is the actual fix for why `late`-moment horses were losing catastrophically
- * (ROADMAP.md, "Moment attribute" retune) — not window placement or ramp timing,
- * which were both red herrings traced first. The real bug: `effort =
- * Math.max(effort, commitment)` never comes back down once a horse commits.
- * Under the OLD style-keyed system every style's commit point clustered
- * together late (0.7-0.82), so nobody benefited much from committing "early" —
- * the race was nearly over either way. Splitting Moment out spread commit
- * points across the WHOLE race (0 to 0.8), so an `early`-moment horse could
- * commit at t=0 and simply stay at ~max effort for the entire race — an
- * enormous, compounding speed advantage no phase bonus or kick could offset,
- * confirmed by tracing a single race directly (tools, not committed): a
- * closer fell 60 LENGTHS behind by 75% of the race while still riding a
- * perfectly normal ~0.55 hold effort, because an earlyMid-moment rival had
- * been at effort ~1.0 since ~10%.
+ * First attempt at this fix held effort for the horse's entire window, then
+ * eased off until a universal final-stretch threshold. That was still wrong,
+ * caught by the new "Moment win rate" harness suite built to check exactly
+ * this (ROADMAP.md): `midLate` won 48.1% of races on its own, independent of
+ * style, against a fair 12.5% — because its window [0.55, 0.9] happened to
+ * END exactly where the universal stretch began, so it never eased off at
+ * all, running near-max effort continuously for 60% of the race. `late`'s
+ * window ending at the literal finish (1.0) had the same "never eases off"
+ * property, just for a shorter continuous span (35%). `early` and `earlyMid`,
+ * whose windows close well before the universal stretch, got force-cooled
+ * for up to 65% of the race before rejoining — nowhere near comparable total
+ * time at effort. The win-rate gap tracked total TIME AT MAX EFFORT almost
+ * exactly, not window width or position on their own.
  *
- * The fix: commitment now holds only through a horse's OWN window, then
- * EASES BACK to the normal hold/position-correction effort until this
- * universal threshold — so an early-committing horse gets its moment, then
- * has to earn the rest of the race like everyone else, until the true
- * finish where every style commits together again.
+ * The fix: decouple "how long a horse runs flat out" from "how wide this
+ * Moment's window is" entirely. The window still governs the KICK (when it
+ * lands at full strength — MOMENT_WINDOWS, unchanged), but the EFFORT surge
+ * around it is now a fixed duration for everyone, so no Moment gets a
+ * structurally longer run at max effort just because of where its window
+ * happens to sit relative to the finish.
  */
-export const UNIVERSAL_FINAL_STRETCH = 0.9;
+export const MOMENT_COMMIT_DURATION = 0.35;
+
+/**
+ * Race progress past which EVERY horse commits flat out regardless of its
+ * own Moment — a short universal "down the stretch" close for whichever
+ * Moments finish their own fixed-duration surge well before the finish
+ * (`early`, `earlyMid`). Kept narrow deliberately: a wide one is what
+ * created the `midLate` bug above by handing some Moments a free, unearned
+ * extension of their own surge.
+ */
+export const UNIVERSAL_FINAL_STRETCH = 0.94;
 
 /**
  * MOMENT PROFILES — a horse's moment in the race, not just its place on the

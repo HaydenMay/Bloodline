@@ -5,10 +5,12 @@
  * targets in DESIGN.md §4 actually hold:
  *
  *   1. No running style dominates
- *   2. Every division is winnable
- *   3. The dominance curve is FLAT IN THE MIDDLE and STEEP AT THE ENDS —
+ *   2. Moment (WHEN a horse kicks) rolls the way its weight table says it
+ *      should, and no Moment dominates independent of style
+ *   3. Every division is winnable
+ *   4. The dominance curve is FLAT IN THE MIDDLE and STEEP AT THE ENDS —
  *      a 5% edge buys almost nothing, a 40% edge approaches dominance
- *   4. Pace collapses genuinely produce upsets
+ *   5. Pace collapses genuinely produce upsets
  *
  * This is why sim/ may never import render/ or ui/. Balance settled by
  * evidence, not by feel.
@@ -20,7 +22,16 @@ import { createRng } from '../src/sim/rng.js';
 import { createNameGenerator } from '../src/data/names.js';
 import { generateHorse } from '../src/sim/horse.js';
 import { simulateRace } from '../src/sim/race/engine.js';
-import { RUNNING_STYLES, DIVISIONS, FIELD_SIZE, type Division, type RunningStyle } from '../src/data/index.js';
+import {
+  RUNNING_STYLES,
+  DIVISIONS,
+  FIELD_SIZE,
+  MOMENTS,
+  type Division,
+  type Moment,
+  type RunningStyle,
+} from '../src/data/index.js';
+import { MOMENT_WEIGHTS_BY_STYLE } from '../src/sim/race/constants.js';
 import { STAT_KEYS, type Horse } from '../src/sim/types.js';
 import type { Going } from '../src/sim/race/types.js';
 import { writeReport, type SuiteResult } from './report.js';
@@ -143,6 +154,167 @@ function styleBalance(): Omit<SuiteResult, 'name'> {
         const delta = (r.rate / expected - 1) * 100;
         return {
           label: LABELS[r.style],
+          value: r.rate * 100,
+          note: `${delta >= 0 ? '+' : ''}${delta.toFixed(0)}%`,
+        };
+      }),
+    },
+  };
+}
+
+const MOMENT_LABELS: Record<Moment, string> = {
+  early: 'Early',
+  earlyMid: 'Early-Mid',
+  midLate: 'Mid-Late',
+  late: 'Late',
+};
+
+/**
+ * Does horse generation actually roll Moment the way MOMENT_WEIGHTS_BY_STYLE
+ * says it should?
+ *
+ * A bug guard, not a balance gate — the weights are DELIBERATELY uneven
+ * (frontRunner leans `early`, closer leans `late`; see constants.ts). This
+ * only fails if the roll drifts from the table itself, which would mean the
+ * weighted-pick logic in sim/horse.ts is broken, not that the design is.
+ */
+function momentDistribution(): Omit<SuiteResult, 'name'> {
+  const SAMPLE = 5000;
+  const lines: string[] = [];
+  let worstDeviation = 0;
+  let worstDetail = '';
+  const LABELS: Record<RunningStyle, string> = {
+    frontRunner: 'Front-runner',
+    stalker: 'Stalker',
+    midPack: 'Mid-pack',
+    closer: 'Closer',
+  };
+
+  for (const style of RUNNING_STYLES) {
+    const rng = createRng(`${SEED}-momentdist-${style}`);
+    const names = createNameGenerator(rng);
+    const counts: Record<Moment, number> = { early: 0, earlyMid: 0, midLate: 0, late: 0 };
+
+    for (let i = 0; i < SAMPLE; i++) {
+      const h = generateHorse(rng, names, { division: 'open', style, age: 4 });
+      counts[h.moment]++;
+    }
+
+    const expected = MOMENT_WEIGHTS_BY_STYLE[style];
+    const cells = MOMENTS.map((m) => {
+      const observed = counts[m] / SAMPLE;
+      const deviation = Math.abs(observed - expected[m]);
+      if (deviation > worstDeviation) {
+        worstDeviation = deviation;
+        worstDetail = `${style}/${m}`;
+      }
+      return `${m} ${pct(observed).padStart(6)} (expect ${pct(expected[m]).padStart(6)})`;
+    });
+    lines.push(`  ${LABELS[style].padEnd(13)} ${cells.join('   ')}`);
+  }
+
+  lines.push('');
+  lines.push(
+    `  Furthest from its weight table: ${worstDetail}, off by ${(worstDeviation * 100).toFixed(1)} points ` +
+      `(${SAMPLE.toLocaleString()} rolls/style; bar is 3.0 points).`,
+  );
+
+  return {
+    ok: worstDeviation < 0.03,
+    lines,
+    explain: {
+      question: 'Does each running style actually roll Moment the way its weight table says it should?',
+      how: `${SAMPLE.toLocaleString()} horses generated per style, tallying which Moment each one rolled — no races, just generation — compared against MOMENT_WEIGHTS_BY_STYLE (sim/race/constants.ts).`,
+      reading: 'This only fails if the ROLL drifts from the TABLE. The weights themselves are deliberately uneven by design (frontRunner leans early, closer leans late) — that unevenness is not what this checks.',
+    },
+  };
+}
+
+/**
+ * Win rate by Moment, isolated from running style the same way styleBalance()
+ * isolates style: two horses per Moment, rotating which STYLE carries each one
+ * across races so a style's own bias averages out of the sample. Moment is
+ * FORCED rather than rolled, so this is a controlled experiment on Moment's
+ * own effect — not an observation of the natural, style-weighted population.
+ */
+function momentBalance(): Omit<SuiteResult, 'name'> {
+  const wins: Record<Moment, number> = { early: 0, earlyMid: 0, midLate: 0, late: 0 };
+  const runs: Record<Moment, number> = { early: 0, earlyMid: 0, midLate: 0, late: 0 };
+
+  for (let i = 0; i < RACES; i++) {
+    const rng = createRng(`${SEED}-moment-${i}`);
+    const names = createNameGenerator(rng);
+    const distance = DISTANCES[i % DISTANCES.length]!;
+
+    const horses: Horse[] = [];
+    let styleIdx = i % RUNNING_STYLES.length;
+    for (const moment of MOMENTS) {
+      for (let n = 0; n < 2; n++) {
+        const style = RUNNING_STYLES[styleIdx % RUNNING_STYLES.length]!;
+        styleIdx++;
+        const h = generateHorse(rng, names, { division: 'open', style, age: 4 });
+        h.moment = moment; // forced, not rolled — isolates Moment from style's own weighting
+        for (const key of STAT_KEYS) h.stats[key] = 55;
+        h.aptitudes = { sprint: 80, mile: 80, route: 80 };
+        h.jockeySkill = 60;
+        h.condition = 75;
+        h.traits = [];
+        horses.push(h);
+      }
+    }
+
+    const outcome = simulateRace(
+      horses.map((horse) => ({ horse })),
+      { furlongs: distance, going: 'good', hype: 0.5, seed: `${SEED}-moment-race-${i}` },
+    );
+
+    const winnerId = outcome.results[0]!.horseId;
+    for (const h of horses) {
+      runs[h.moment]++;
+      if (h.id === winnerId) wins[h.moment]++;
+    }
+  }
+
+  const rates = MOMENTS.map((m) => ({ moment: m, rate: wins[m] / runs[m] }));
+  const expected = 1 / 8; // two of each Moment in a field of eight
+  const worst = Math.max(...rates.map((r) => Math.abs(r.rate - expected) / expected));
+
+  const lines = rates.map(
+    (r) =>
+      `  ${MOMENT_LABELS[r.moment].padEnd(13)} ${bar(r.rate, 0.25)} ${pct(r.rate).padStart(6)}  ` +
+      `(${((r.rate / expected - 1) * 100 >= 0 ? '+' : '') + ((r.rate / expected - 1) * 100).toFixed(0)}% vs even)`,
+  );
+  const worstMoment = rates.reduce((a, b) => (Math.abs(b.rate - expected) > Math.abs(a.rate - expected) ? b : a));
+  const worstPoints = (worstMoment.rate - expected) * 100;
+
+  lines.push('');
+  lines.push(
+    `  Furthest from fair: ${MOMENT_LABELS[worstMoment.moment]} on ${pct(worstMoment.rate)}, ` +
+      `against a fair share of ${pct(expected)}.`,
+  );
+  lines.push(
+    `  That is ${worstPoints >= 0 ? '+' : ''}${worstPoints.toFixed(1)} percentage points ` +
+      `(${pct(worst)} off in relative terms; the bar is 30%).`,
+  );
+
+  return {
+    ok: worst < 0.3,
+    lines,
+    explain: {
+      question: 'Is any Moment simply better than the others, independent of running style?',
+      how: 'Eight horses, two of each Moment, every stat set to exactly 55, no traits, identical jockeys — and which STYLE carries each Moment rotates race to race so style bias averages out. Moment is forced, not rolled.',
+      reading: 'A fair share is 12.5%. If a Moment wins more than that regardless of which style it landed on, the timing itself is carrying an edge over the others.',
+    },
+    bars: {
+      title: 'Win rate by Moment',
+      unit: '%',
+      max: 18,
+      reference: 12.5,
+      referenceLabel: 'even share 12.5%',
+      data: rates.map((r) => {
+        const delta = (r.rate / expected - 1) * 100;
+        return {
+          label: MOMENT_LABELS[r.moment],
           value: r.rate * 100,
           note: `${delta >= 0 ? '+' : ''}${delta.toFixed(0)}%`,
         };
@@ -505,9 +677,11 @@ function main(): void {
   const suites = [
     { name: '1. Determinism', run: determinism },
     { name: '2. Running style balance', run: styleBalance },
-    { name: '3. Pace collapse produces upsets', run: paceCollapse },
-    { name: '4. Dominance curve', run: dominanceCurve },
-    { name: '5. Division sanity', run: divisionSanity },
+    { name: '3. Moment assignment matches its weight table', run: momentDistribution },
+    { name: '4. Moment win rate', run: momentBalance },
+    { name: '5. Pace collapse produces upsets', run: paceCollapse },
+    { name: '6. Dominance curve', run: dominanceCurve },
+    { name: '7. Division sanity', run: divisionSanity },
   ];
 
   let allOk = true;

@@ -7,6 +7,7 @@ import {
   HOLD_EFFORT,
   MAX_EFFORT,
   MIN_EFFORT,
+  MOMENT_COMMIT_DURATION,
   MOMENT_RAMP_LEAD,
   MOMENT_WINDOWS,
   POSITION_CORRECTION_GAIN,
@@ -37,16 +38,22 @@ export function createAiController(horse: Horse): Controller {
   const sloppiness = (1 - skill) * 0.14;
 
   const preferred = clamp(profile.preferred + (hasTrait(traits, 'tractable') ? 0 : 0), 0, 1);
-  // Moment's window, not a single point — the horse's own rolled Moment, not
-  // its style (STYLE_PROFILES no longer carries a kick time at all). A poor
-  // jockey is a little slower to start committing once the window opens, same
-  // shape as before but measured from the window's START rather than a
-  // fixed point, since there is no longer one to measure from.
-  const [momentLo, momentHi] = MOMENT_WINDOWS[horse.moment];
+  // Moment's window governs the KICK (MOMENT_WINDOWS, engine.ts) — the AI's
+  // own commit timing only needs the window's START, since a poor jockey is
+  // a little slower to start committing once it opens.
+  const [momentLo] = MOMENT_WINDOWS[horse.moment];
   const kickAt = momentLo + (1 - skill) * 0.05;
-  // The commit ramp starts well BEFORE the window so full effort is already
-  // reached BY the time it opens, not merely started there.
-  const rampStart = Math.max(0, momentLo - MOMENT_RAMP_LEAD);
+  // A fixed TOTAL duration at max effort, the SAME for every Moment — not
+  // "however wide this Moment's window happens to be". See
+  // MOMENT_COMMIT_DURATION for why: that was the actual balance-breaking bug,
+  // not window placement or ramp timing (both tried and rejected first).
+  // Clamped at 0 for an `early` horse whose kickAt sits inside the ramp-lead
+  // itself — there's no room before the start of the race. Without topping up
+  // the hold AFTER kickAt to compensate, that horse would get a shorter total
+  // duration than every other Moment, not an equal one.
+  const commitStart = Math.max(0, kickAt - MOMENT_RAMP_LEAD);
+  const actualRampLead = kickAt - commitStart;
+  const commitEnd = kickAt + Math.max(0.01, MOMENT_COMMIT_DURATION - actualRampLead);
 
   // Fire the kick exactly once. `race.progress >= kickAt` stays true on every
   // tick after it first crosses — without this guard the AI would ask the
@@ -55,14 +62,12 @@ export function createAiController(horse: Horse): Controller {
   let hasKicked = false;
 
   return (self: RunnerView, race: RaceView): ControlInput => {
-    // Committing HOLDS only through this horse's own window, then EASES
-    // BACK to the normal hold effort until the universal final stretch,
-    // where every style commits together regardless of its own Moment. Not
-    // just gated by rampStart — see UNIVERSAL_FINAL_STRETCH for why an
-    // effort that never comes back down was the actual balance-breaking bug
-    // here, not window placement or ramp timing.
+    // Committing HOLDS for this fixed duration around the horse's own kick,
+    // then EASES BACK to the normal hold effort until the (narrow) universal
+    // final stretch, where every style commits together regardless of its
+    // own Moment.
     const committing =
-      (race.progress >= rampStart && race.progress <= momentHi) || race.progress >= UNIVERSAL_FINAL_STRETCH;
+      (race.progress >= commitStart && race.progress <= commitEnd) || race.progress >= UNIVERSAL_FINAL_STRETCH;
 
     // --- Effort: ESTABLISH -> HOLD -> COMMIT ---------------------------------
     //
@@ -89,10 +94,17 @@ export function createAiController(horse: Horse): Controller {
         // lead it never paid for.
         effort = HOLD_EFFORT * (1 - Math.min(0.4, -drift * 0.7) * urgency);
       }
+    } else if (Math.abs(drift) <= profile.tolerance) {
+      // HOLD, established — you're in your slot. Cruise at the flat baseline;
+      // do NOT keep throttling proportional to raw drift, or a style whose
+      // preferred position sits far from the middle (e.g. closer at 0.85)
+      // would be perpetually suppressed just for being where it wants to be.
+      effort = HOLD_EFFORT;
     } else {
-      // HOLD — the minimum needed to keep your slot. In the right place this
-      // nets POSITIVE energy, so the horse banks for its window.
-      effort = HOLD_EFFORT + drift * POSITION_CORRECTION_GAIN * (drift > 0 ? 1 : 0.5);
+      // HOLD, drifted — only correct for the part that's actually outside
+      // your comfort band, not the whole raw drift.
+      const excess = drift > 0 ? drift - profile.tolerance : drift + profile.tolerance;
+      effort = HOLD_EFFORT + excess * POSITION_CORRECTION_GAIN * (drift > 0 ? 1 : 0.5);
     }
 
     // Free Runner fights the rider early; high Temper keeps a lid on it.
@@ -124,9 +136,9 @@ export function createAiController(horse: Horse): Controller {
       effort = Math.min(effort, 0.86);
     } else {
       // Committing: everything left. Full effort reached by kickAt (so a
-      // kick is spent at genuine max effort), held through the rest of this
-      // window, then eased back off once committing goes false again.
-      const commitment = 0.82 + (race.progress - rampStart) / Math.max(0.01, kickAt - rampStart);
+      // kick is spent at genuine max effort), held for the rest of the fixed
+      // commit duration, then eased back off once committing goes false again.
+      const commitment = 0.82 + (race.progress - commitStart) / Math.max(0.01, kickAt - commitStart);
       effort = Math.max(effort, commitment);
     }
 
