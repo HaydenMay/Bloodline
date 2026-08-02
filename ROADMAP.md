@@ -200,17 +200,96 @@ front-runners" no longer holds, 9.2% → 8.5% barely moves) — frontRunner's re
 early, so contesting it late (the mechanic this suite gates on) matters much less than it used to.
 Both are normal, tunable imbalances now, not a structural break, but neither is fixed yet.
 
-**Not yet done, deliberately left rather than guessed at now:** `CHARGE_CAPACITY` (5) and
-`BASE_CHARGE_REGEN` are still first-pass values, untested against the harness beyond "style balance
-passes with them." The elite-division issue above is still open. `MOMENT_WEIGHTS_BY_STYLE` and/or
-`MOMENT_WINDOWS` need another retune pass — likely dial back stalker's `late` weight and/or restore
-some of frontRunner's contested-lead vulnerability now that its edge sits earlier — the same
-fast-proxy-then-full-harness loop used earlier in this file, not yet run to completion. A full
-retune loop generally — trace a worst-case seed the way `margin-profile`'s worst seed was traced in
-Phase 4.5, fix each structural cause, re-verify style balance, pace-collapse and the tail together —
-is not finished.
+**Second round — a new harness suite (`momentBalance`, `momentDistribution`) surfaced a much bigger
+problem than style balance:** win rate BY MOMENT ALONE (all styles pooled) was wildly uneven —
+`midLate` 34-48% against a fair 12.5%, `early` and `late` both near 0%, depending on exact retune.
+This is a different bug from the style-balance one above and needed its own diagnosis chain, run
+directly against the harness's own numbers rather than guessed at:
 
-`npm run check` (lint + build + test) passes clean.
+1. **Position-correction asymmetry (fixed).** `ai.ts`'s HOLD effort applied a proportional drift
+   correction continuously, halved for `drift < 0` — closer (preferred 0.85) sits in that halved,
+   suppressed case almost permanently, frontRunner (preferred 0.06) almost never does. Traced via a
+   direct effort readout (all styles forced onto the same Moment, so timing was held constant):
+   closer's effort sat at 0.33-0.63 continuously vs frontRunner's 0.79-0.89 — a real, continuous,
+   compounding speed deficit, matching the owner's own playtesting report ("after a couple horses
+   take the lead there is no chance of catching them"). Fixed by making HOLD cruise flat at the
+   style's own `cruiseEffort` once `|drift| <= tolerance` ("established"), only correcting for the
+   excess drift beyond tolerance rather than the whole raw drift, and — the owner's own framing —
+   giving established position no further throttle at all.
+
+2. **AI allowed more than one kick, deliberately, then a regression from it (fixed).** The owner:
+   "that isn't fair to an AI to give them handcuffs." Removed the single-kick-per-race guard, but a
+   naive real-time cooldown let WIDE Moment windows (`midLate`, 35% of the race) fit far more repeat
+   kicks than narrow ones (`late`, 20%, ending at the finish with no room for a second) — `midLate`
+   spiked to 48%, `late` collapsed to 0%. Fixed with `MAX_KICKS_PER_MOMENT` (2): kicks are capped to
+   a fixed COUNT inside `[kickAt, momentHi]`, evenly spaced, and never fire past the window at all
+   (previously a horse could burn its whole bank on mistimed post-window kicks for near-zero gain).
+   Verified this removed the width-driven spike, but barely moved the underlying win-rate skew
+   (48.1% → 46.6%) — proof that kicks were never the primary driver.
+
+3. **Charge economy is provably inert for AI (confirmed, not a bug to fix).** Draft bonus, charge
+   regen rate, and charge capacity were all tuned per the owner's request (bigger kick for catch-up
+   styles, draft more relevant, faster stamina/more charges, less front-of-pack double-taxing), then
+   directly falsified: slashing `BASE_CHARGE_REGEN` by 100x produced BYTE-IDENTICAL win-rate output.
+   AI never spends more than `MAX_KICKS_PER_MOMENT` (2) out of `CHARGE_CAPACITY` (5), so it is never
+   actually regen-gated — every charge-economy lever is cosmetically present but structurally inert
+   for AI-vs-AI balance (still meaningful for the player's own manual kicks, which aren't capped the
+   same way). `KICK_STYLE_BONUS` (a real per-style kick-strength multiplier, closer highest,
+   frontRunner none) and `PRESS_COST_RELIEF` (frontRunner no longer double-taxed by both the
+   baseline lead-cost AND the full contested-lead cost) were kept regardless — legitimate, correct
+   changes even though they don't move the AI harness numbers.
+
+4. **Leader-relative vs self-relative progress (fixed, real inconsistency, not the main driver).**
+   `race.progress` is the LEADER's distance over the total, but Moment timing (kick window, phase
+   bonus, window-lift, `ai.ts`'s commit timing) was being compared against it for EVERY horse — a
+   horse running behind hasn't covered as much of ITS OWN race as the leader has of theirs, so its
+   own Moment window was opening/closing off the leader's clock, not its own. Fixed by switching all
+   Moment-timing comparisons to each horse's own `distance / totalYards`. Verified this is real and
+   correct, but confirmed (before/after, byte-comparable win rates) that it was not the dominant
+   effect — a needed consistency fix, not the headline bug.
+
+5. **Effort has no cost in this economy — the actual root cause.** A distance-only "who's ahead"
+   check across many seeds appeared to show near-ties (final distances within ~1 yard regardless of
+   Moment/style) — which turned out to be a measurement artifact: a runner's `distance` FREEZES the
+   instant its own `finishTime` is set (mid-race snapshots were meaningful; the post-finish "final"
+   ones were not, since everyone converges to `totalYards + whatever overshoot they had in their own
+   last tick` regardless of how early or late they actually crossed). Reading real `finishTime`
+   margins instead showed the true picture: 65-length blowouts, not ties. Tracing effort directly
+   through one such race found the mechanism: frontRunner's preferred slot (0.06, tolerance 0.18) is
+   narrow and actively contested by every other forward-leaning entry, so it spends roughly half the
+   race in the "drifted" position-correction branch — running 0.63-0.86 effort, well above its own
+   0.5 cruise baseline, purely from fighting for position. Since AI is never charge-gated (point 3
+   above), that elevated effort is completely FREE — nothing in the current economy makes sustained
+   high effort cost anything. closer, whose rear slot is uncontested, settles into cheap 0.46 cruise
+   almost immediately and stays there. The result is frontRunner effectively getting THREE separate
+   high-effort windows (free position-scrambling + its own Moment commit + the shared universal
+   final stretch) against closer's ONE. Fixed two ways: lowered the non-committing effort ceiling
+   (`NON_COMMIT_EFFORT_CAP`, 0.86 → 0.65) and lowered `POSITION_CORRECTION_GAIN` (0.5 → 0.22) so
+   drifted correction costs far less free speed. Verified: frontRunner/midLate's dominance in a
+   fixed-pairing test roughly halved (56.7% → 27.2%), and `earlyMid` (previously ~0-2.5%) rose to
+   15-20%.
+
+**Where this leaves the harness, after all five fixes:** `midLate` win rate fell from 46.6% to
+34.2% and `earlyMid` rose from 2.4% to 15.2% — real, verified, substantial progress — but `early`
+and `late` remain near 0%, and style balance still fails (closer 4.3%, frontRunner 10.0%, stalker
+17.3%, midPack 18.3%). Tested and ruled out as the explanation: total time-at-high-effort is
+actually EQUAL between `early` and `midLate` on paper (both ≈0.41 of the race, split between their
+own commit and the universal final stretch) — yet `early` still loses badly, and removing the
+universal final stretch entirely changed nothing measurably. The remaining asymmetry looks like a
+genuine sequencing effect (whichever Moment's commit window lands with the SHORTEST gap before the
+shared final stretch is hardest to catch, independent of total duration) rather than anything a
+single constant can retune away — closing it fully likely needs a redesign of the commit/valley
+model itself, not another tuning pass. Flagged for the owner rather than guessed at further.
+
+**Not yet done, deliberately left rather than guessed at now:** the elite-division issue above is
+still open. `MOMENT_WEIGHTS_BY_STYLE` and/or `MOMENT_WINDOWS` may still need a retune pass once the
+sequencing issue above is actually fixed — retuning weights against a broken underlying mechanism
+risks re-guessing on top of a bug. Pace-collapse remains failing at essentially its prior magnitude
+(8.8% vs the prior 8.5%) — unrelated to this round's changes, not yet revisited.
+
+`npm run check` (lint + build + test) passes clean. Full harness: Determinism ✓, Style balance ✕
+(closer 4.3%), Moment assignment matches weight table ✓, Moment win rate ✕ (midLate 34.2%), Pace
+collapse ✕ (pre-existing), Dominance curve ✓, Division sanity ✓.
 
 ---
 

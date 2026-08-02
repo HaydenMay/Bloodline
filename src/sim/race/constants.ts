@@ -157,10 +157,20 @@ export const OUT_POSITION_RECOVERY_PENALTY = 0.5;
 export const POSITION_FADE_START = 0.6;
 export const POSITION_FADE_END = 0.8;
 
-/** Regen multiplier while sitting in another horse's slipstream. */
-export const DRAFT_RECOVERY_BONUS = 0.25;
-/** Yards behind a rival that still counts as a draft. */
-export const DRAFT_GAP = 7;
+/**
+ * Regen multiplier while sitting in another horse's slipstream. Raised from
+ * 0.25 — this is the back-of-the-pack styles' main lever for banking the
+ * charges their late Moment needs, and it was too weak to matter much next to
+ * the front-of-pack penalties (FRONT_COST_PENALTY, CONTESTED_LEAD_COST) that
+ * already stack against anyone up front.
+ */
+export const DRAFT_RECOVERY_BONUS = 0.45;
+/**
+ * Yards behind a rival that still counts as a draft. Widened from 7 so a
+ * trailing horse sitting a few lengths off the pace — not just tucked
+ * directly behind one rival — still gets credit for it.
+ */
+export const DRAFT_GAP = 10;
 
 /**
  * Poor distance aptitude is a direct top-speed penalty now — a sprinter over a
@@ -213,6 +223,34 @@ export const KICK_MIN_FIT = 0.05;
  * instant, since even a bad kick should do something.
  */
 export const KICK_MISTIMED_DURATION_FLOOR = 0.3;
+
+/**
+ * How many full-strength kicks a horse gets inside its OWN Moment window,
+ * evenly spaced across it. Not "however many charges and cooldown time
+ * happen to fit" — that handed wide windows (`midLate`, 35% of the race) far
+ * more repeat kicks than narrow ones (`late`, 20%, ending at the finish with
+ * no room for a second), which is what made midLate spike to 48% win rate
+ * the moment AI was allowed more than one kick. Fixing the count instead of
+ * the cooldown gives every Moment the same number of opportunities
+ * regardless of width (sim/race/ai.ts).
+ */
+export const MAX_KICKS_PER_MOMENT = 2;
+
+/**
+ * Extra kick strength by running style, applied on top of the Grit x jockey
+ * skill formula above. A frontRunner's kick only has to defend a lead it
+ * already holds; a closer's kick has to actually MAKE UP the ground it spent
+ * the whole race conceding. Without this, both get the identical kick and the
+ * closer is left needing its passive Moment curve and charge-regen edge alone
+ * to overturn a deficit built over 70-90% of the race — not enough on its own
+ * (ROADMAP.md, Moment win-rate investigation).
+ */
+export const KICK_STYLE_BONUS = {
+  frontRunner: 0,
+  stalker: 0.15,
+  midPack: 0.3,
+  closer: 0.5,
+} as const satisfies Record<RunningStyle, number>;
 
 // ---------------------------------------------------------------------------
 // Traffic (DESIGN.md §4)
@@ -475,20 +513,71 @@ export const FRONT_COST_RELIEF = {
 } as const satisfies Record<string, number>;
 
 /**
+ * How much of the CONTESTED-lead cost (pressCost, engine.ts) each style
+ * shrugs off — separate from FRONT_COST_RELIEF above, which only discounts
+ * the baseline "you're up front" tax (leadCost). A front-runner already pays
+ * leadCost almost in full (relief 0.02): that alone is its brake against
+ * holding a lead forever. Stacking the FULL contest tax on top as well left
+ * it double-taxed for doing the one thing its style is built to do — hold a
+ * lead under pressure. Not full immunity, so contesting a front-runner's lead
+ * still means something (the upset mechanism this was built to protect).
+ */
+export const PRESS_COST_RELIEF = {
+  frontRunner: 0.5,
+  stalker: 0.85,
+  midPack: 0.95,
+  closer: 1,
+} as const satisfies Record<RunningStyle, number>;
+
+/**
  * The three beats every horse races: ESTABLISH, then HOLD, then COMMIT.
  *
- * HOLD_EFFORT is the cruise a horse settles into once it has its slot — a
- * navigational baseline, not a spending decision now that there is no energy
- * to budget. Without a hold phase the AI has no reason to stay off a full
- * sprint the moment it reaches its preferred spot, which would collapse every
- * style into the same shape.
+ * HOLD cruises at the style's own `cruiseEffort` (STYLE_PROFILES above), not
+ * a single universal number — a navigational baseline, not a spending
+ * decision now that there is no energy to budget. Without a hold phase the AI
+ * has no reason to stay off a full sprint the moment it reaches its
+ * preferred spot, which would collapse every style into the same shape.
+ *
+ * A single global HOLD_EFFORT (0.55) was tried first and sat ABOVE every
+ * style's cruiseEffort (0.5, or 0.46 for closer) — meaning `restraint`
+ * (CHARGE_REGEN_HOLD_GAIN, engine.ts: riding below cruise banks bonus regen)
+ * could never trigger for a horse simply holding its established slot. A
+ * closer used to dip below 0.46 during quieter stretches and bank charges
+ * from it; pinned to a universal 0.55 it never did. Cruising at the style's
+ * own cruiseEffort restores that: each style's baseline IS its restraint
+ * threshold, not a fixed number sitting above all of them.
  */
-export const HOLD_EFFORT = 0.55;
 /** Establishing position is a bounded one-off push, not an ongoing effort. */
 export const ESTABLISH_UNTIL = 0.28;
 export const ESTABLISH_GAIN = 2.2;
 
-/** How hard the AI corrects toward its preferred position. */
-export const POSITION_CORRECTION_GAIN = 0.5;
+/**
+ * How hard the AI corrects toward its preferred position, once outside
+ * tolerance. Lowered from 0.5 — a style with a narrow, contested preferred
+ * slot near the edge of the pack (frontRunner: preferred 0.06, tolerance
+ * 0.18, competing with every other forward-leaning entry for that same
+ * sliver) essentially never re-enters "established" and pays this
+ * correction continuously for most of the race. Since effort has no cost in
+ * this economy (charges are never actually gated for AI), that continuous
+ * correction was a real, free, ongoing speed advantage having nothing to do
+ * with style identity or Moment — see NON_COMMIT_EFFORT_CAP above for the
+ * fuller diagnosis (ROADMAP.md, "Moment win-rate investigation").
+ */
+export const POSITION_CORRECTION_GAIN = 0.22;
+
+/**
+ * Ceiling on effort OUTSIDE a horse's own committing window. Since charges
+ * are never actually gated for AI (a horse never spends more than
+ * MAX_KICKS_PER_MOMENT out of CHARGE_CAPACITY, always plenty of time to
+ * regen — ROADMAP.md), sustained effort has NO cost in this economy: nothing
+ * stops a horse from just running higher than cruise for free outside its
+ * window. That is exactly what frontRunner's own tolerance-band scrambling
+ * did — its preferred slot is narrow and contested, so it spent nearly half
+ * the race in the drifted-HOLD correction branch at 0.63-0.86 effort, a real
+ * and completely free speed advantage having nothing to do with its Moment.
+ * Lowered from 0.86 so extended position-fighting can't quietly buy the same
+ * speed a genuine commit does.
+ */
+export const NON_COMMIT_EFFORT_CAP = 0.65;
 export const MAX_EFFORT = 1;
 export const MIN_EFFORT = 0.18;

@@ -480,12 +480,16 @@ function stepRunner(
     // it lands at full force — enough to take a race. Kick outside it and you
     // spend the same charge for a fraction of the surge: enough to hold your
     // position, never enough to steal the lead.
+    // Own progress, not the leader's — see the note in the phase-bonus block
+    // below for why the two diverge and why that matters here.
+    const ownProgress = clamp(r.distance / totalYards, 0, 1);
     const [momentLo, momentHi] = K.MOMENT_WINDOWS[r.horse.moment];
-    const off = race.progress < momentLo ? momentLo - race.progress : Math.max(0, race.progress - momentHi);
+    const off = ownProgress < momentLo ? momentLo - ownProgress : Math.max(0, ownProgress - momentHi);
     const windowFit = clamp(1 - off / K.KICK_WINDOW_FALLOFF, K.KICK_MIN_FIT, 1);
     r.kickWindowFit = windowFit;
 
-    r.kickStrength = K.KICK_MAX_BONUS * gritFactor * jockeyFactor * windowFit;
+    const styleFactor = 1 + K.KICK_STYLE_BONUS[r.horse.style];
+    r.kickStrength = K.KICK_MAX_BONUS * gritFactor * jockeyFactor * windowFit * styleFactor;
     // Duration scales with the SAME windowFit as strength — a mistimed kick
     // is shorter, not just weaker. Without this, spamming every charge the
     // instant it's available could cover most of a race at reduced strength
@@ -601,8 +605,11 @@ function stepRunner(
   // upset mechanism.
   const leadCost = Math.pow(forwardness, 1.5) * K.FRONT_COST_PENALTY * relief;
   // Sharper exponent: being pressed should punish the horses actually
-  // fighting for the lead, not everyone stuck in mid-field traffic.
-  const pressCost = Math.pow(forwardness, 3) * K.CONTESTED_LEAD_COST * contest;
+  // fighting for the lead, not everyone stuck in mid-field traffic. Discounted
+  // by PRESS_COST_RELIEF so a front-runner isn't double-taxed on top of
+  // leadCost above for the one thing its style exists to do.
+  const pressRelief = K.PRESS_COST_RELIEF[r.horse.style];
+  const pressCost = Math.pow(forwardness, 3) * K.CONTESTED_LEAD_COST * contest * pressRelief;
   const frontPenalty = 1 + leadCost + pressCost;
   const backRecovery = 1 + K.BACK_RECOVERY_BONUS * r.fieldPosition;
 
@@ -705,11 +712,24 @@ function stepRunner(
   // Style says where a horse belongs; Moment says when it shines. An `early`
   // horse is sharpest out of the gate, a `late` one over the final stretch.
   //
+  // Uses the horse's OWN progress toward the finish (its distance over the
+  // total), not race.progress (the LEADER's distance over the total). Those
+  // two diverge the moment any gap opens: a horse running behind the pace
+  // hasn't covered as much of ITS OWN race as the leader has of theirs, so
+  // keying its Moment window to the leader's position raced its own kick
+  // window, phase curve, and window-lift ahead of where it should be —
+  // stacking with a leader's OWN early advantage into a self-reinforcing
+  // spiral no amount of stat rebalancing could counter (ROADMAP.md, "Moment
+  // win-rate investigation": near-identical finish distances but a massive
+  // win-rate skew was the tell — a systematic bias converts to a huge win
+  // share in a near-tied field even though it barely moves the raw margin).
+  //
   // Scaled by style fidelity (holding the PACK POSITION style wants), so the
   // moment must be EARNED: a horse that spent the first two-thirds fighting
   // for the wrong spot does not get the surge, regardless of its Moment.
+  const ownProgress = clamp(r.distance / totalYards, 0, 1);
   const phase = K.MOMENT_PROFILES[r.horse.moment];
-  const p = race.progress;
+  const p = ownProgress;
   const phaseBonus =
     p < 0.5
       ? phase.early + (phase.middle - phase.early) * (p / 0.5)
@@ -726,7 +746,7 @@ function stepRunner(
   // stacks on top to roughly double it. The floor keeps auto-race viable; the
   // ceiling is what rewards paying attention.
   const [momentWindowLo, momentWindowHi] = K.MOMENT_WINDOWS[r.horse.moment];
-  if (race.progress >= momentWindowLo && race.progress <= momentWindowHi) {
+  if (ownProgress >= momentWindowLo && ownProgress <= momentWindowHi) {
     earned += K.WINDOW_BASE_LIFT * fidelity;
   }
 

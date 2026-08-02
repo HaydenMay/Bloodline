@@ -4,12 +4,13 @@ import { hasTrait } from '../../data/traits.js';
 import {
   ESTABLISH_GAIN,
   ESTABLISH_UNTIL,
-  HOLD_EFFORT,
   MAX_EFFORT,
+  MAX_KICKS_PER_MOMENT,
   MIN_EFFORT,
   MOMENT_COMMIT_DURATION,
   MOMENT_RAMP_LEAD,
   MOMENT_WINDOWS,
+  NON_COMMIT_EFFORT_CAP,
   POSITION_CORRECTION_GAIN,
   STYLE_PROFILES,
   UNIVERSAL_FINAL_STRETCH,
@@ -41,8 +42,12 @@ export function createAiController(horse: Horse): Controller {
   // Moment's window governs the KICK (MOMENT_WINDOWS, engine.ts) — the AI's
   // own commit timing only needs the window's START, since a poor jockey is
   // a little slower to start committing once it opens.
-  const [momentLo] = MOMENT_WINDOWS[horse.moment];
+  const [momentLo, momentHi] = MOMENT_WINDOWS[horse.moment];
   const kickAt = momentLo + (1 - skill) * 0.05;
+  // Evenly spaced slots for up to MAX_KICKS_PER_MOMENT full-strength kicks,
+  // fit entirely inside [kickAt, momentHi] — the SAME count for every Moment
+  // regardless of how wide its window happens to be.
+  const kickSlotGap = Math.max(0.01, (momentHi - kickAt) / MAX_KICKS_PER_MOMENT);
   // A fixed TOTAL duration at max effort, the SAME for every Moment — not
   // "however wide this Moment's window happens to be". See
   // MOMENT_COMMIT_DURATION for why: that was the actual balance-breaking bug,
@@ -55,19 +60,35 @@ export function createAiController(horse: Horse): Controller {
   const actualRampLead = kickAt - commitStart;
   const commitEnd = kickAt + Math.max(0.01, MOMENT_COMMIT_DURATION - actualRampLead);
 
-  // Fire the kick exactly once. `race.progress >= kickAt` stays true on every
-  // tick after it first crosses — without this guard the AI would ask the
-  // engine to kick every tick it holds true, burning every charge in a
-  // fraction of a second instead of spending one at the right moment.
-  let hasKicked = false;
+  // A horse may fire more than one kick if it has banked the charges for it —
+  // it shouldn't be handcuffed to a single shot when it has ground left to
+  // spend. But it must never fire outside its own Moment window: past
+  // `momentHi` every kick is mistimed (weak, per windowFit in engine.ts) and
+  // only burns the bank for near-zero gain — previously this ran unchecked
+  // all the way to the finish, since `race.progress >= kickAt` never becomes
+  // false again, and a horse could empty its entire charge bank on kicks that
+  // did almost nothing.
+  let kicksFiredInMoment = 0;
+  let lastKickProgress = -Infinity;
 
   return (self: RunnerView, race: RaceView): ControlInput => {
+    // The horse's OWN progress toward the finish, not race.progress (which
+    // tracks the LEADER's distance over the total). Moment timing has to be
+    // keyed to this: a horse running behind the pace hasn't covered as much
+    // of ITS OWN race as the leader has of theirs, so comparing its kick
+    // window and commit timing against the leader's progress raced its own
+    // clock ahead of where it should be the moment any gap opened — a
+    // self-reinforcing spiral that produced a massive Moment win-rate skew
+    // despite near-identical finish distances (ROADMAP.md). See the matching
+    // fix in engine.ts's phase-bonus block for the other half of this.
+    const ownProgress = clamp(self.distance / race.totalYards, 0, 1);
+
     // Committing HOLDS for this fixed duration around the horse's own kick,
     // then EASES BACK to the normal hold effort until the (narrow) universal
     // final stretch, where every style commits together regardless of its
     // own Moment.
     const committing =
-      (race.progress >= commitStart && race.progress <= commitEnd) || race.progress >= UNIVERSAL_FINAL_STRETCH;
+      (ownProgress >= commitStart && ownProgress <= commitEnd) || ownProgress >= UNIVERSAL_FINAL_STRETCH;
 
     // --- Effort: ESTABLISH -> HOLD -> COMMIT ---------------------------------
     //
@@ -86,25 +107,26 @@ export function createAiController(horse: Horse): Controller {
       const urgency = 1 - race.progress / ESTABLISH_UNTIL;
       if (drift > 0) {
         // Behind your slot — go and get it, while it is still cheap to do so.
-        effort = HOLD_EFFORT + drift * ESTABLISH_GAIN * urgency;
+        effort = profile.cruiseEffort + drift * ESTABLISH_GAIN * urgency;
       } else {
         // Ahead of your slot — actively drop back and let the horses who want
         // this ground come through. Without this the field never shuffles, the
         // front-runner never reaches the front, and a stalker inherits a free
         // lead it never paid for.
-        effort = HOLD_EFFORT * (1 - Math.min(0.4, -drift * 0.7) * urgency);
+        effort = profile.cruiseEffort * (1 - Math.min(0.4, -drift * 0.7) * urgency);
       }
     } else if (Math.abs(drift) <= profile.tolerance) {
-      // HOLD, established — you're in your slot. Cruise at the flat baseline;
-      // do NOT keep throttling proportional to raw drift, or a style whose
-      // preferred position sits far from the middle (e.g. closer at 0.85)
-      // would be perpetually suppressed just for being where it wants to be.
-      effort = HOLD_EFFORT;
+      // HOLD, established — you're in your slot. Cruise at the style's own
+      // baseline; do NOT keep throttling proportional to raw drift, or a
+      // style whose preferred position sits far from the middle (e.g. closer
+      // at 0.85) would be perpetually suppressed just for being where it
+      // wants to be.
+      effort = profile.cruiseEffort;
     } else {
       // HOLD, drifted — only correct for the part that's actually outside
       // your comfort band, not the whole raw drift.
       const excess = drift > 0 ? drift - profile.tolerance : drift + profile.tolerance;
-      effort = HOLD_EFFORT + excess * POSITION_CORRECTION_GAIN * (drift > 0 ? 1 : 0.5);
+      effort = profile.cruiseEffort + excess * POSITION_CORRECTION_GAIN * (drift > 0 ? 1 : 0.5);
     }
 
     // Free Runner fights the rider early; high Temper keeps a lid on it.
@@ -133,28 +155,34 @@ export function createAiController(horse: Horse): Controller {
     // matters, and no style should get to run at max effort for most of the
     // race just because its Moment happens to fall early.
     if (!committing) {
-      effort = Math.min(effort, 0.86);
+      effort = Math.min(effort, NON_COMMIT_EFFORT_CAP);
     } else {
       // Committing: everything left. Full effort reached by kickAt (so a
       // kick is spent at genuine max effort), held for the rest of the fixed
       // commit duration, then eased back off once committing goes false again.
-      const commitment = 0.82 + (race.progress - commitStart) / Math.max(0.01, kickAt - commitStart);
+      const commitment = 0.82 + (ownProgress - commitStart) / Math.max(0.01, kickAt - commitStart);
       effort = Math.max(effort, commitment);
     }
 
     effort += (Math.sin(race.elapsed * 3.1 + self.lane) * sloppiness) / 2;
 
     // --- The kick ----------------------------------------------------------
-    // Fire once, at the style's moment. Strength is Grit x jockey skill; the
-    // AI spends exactly one of its shared charges here regardless of how many
-    // it or the player's own horse happen to have banked.
+    // Up to MAX_KICKS_PER_MOMENT, all inside [kickAt, momentHi] so every one
+    // lands at full strength. Strength itself is Grit x jockey skill x style
+    // (KICK_STYLE_BONUS); the AI spends one charge per kick regardless of how
+    // many it or the player's own horse happen to have banked.
     const kick =
-      !hasKicked &&
       self.kicksRemaining > 0 &&
-      race.progress >= kickAt &&
+      ownProgress >= kickAt &&
+      ownProgress <= momentHi &&
+      kicksFiredInMoment < MAX_KICKS_PER_MOMENT &&
+      ownProgress - lastKickProgress >= kickSlotGap &&
       // Turn of Foot has a short kick, so it must be held later.
-      (!hasTrait(traits, 'turnOfFoot') || race.progress >= kickAt + 0.06);
-    if (kick) hasKicked = true;
+      (!hasTrait(traits, 'turnOfFoot') || ownProgress >= kickAt + 0.06);
+    if (kick) {
+      lastKickProgress = ownProgress;
+      kicksFiredInMoment++;
+    }
 
     // --- Lane --------------------------------------------------------------
     let targetLane = self.lane;
