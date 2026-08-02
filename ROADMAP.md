@@ -291,6 +291,105 @@ risks re-guessing on top of a bug. Pace-collapse remains failing at essentially 
 (closer 4.3%), Moment assignment matches weight table ✓, Moment win rate ✕ (midLate 34.2%), Pace
 collapse ✕ (pre-existing), Dominance curve ✓, Division sanity ✓.
 
+### 🚧 IN PROGRESS — full redesign: HOLD / CRUISE / KICK replaces the effort dial
+
+**Why a redesign, not another tuning pass.** After the fifth fix above, the owner asked directly:
+"are we bandaid-ing issues rather than fixing the roots?" Yes — `ai.ts`'s effort formula was fusing
+two things that should never have shared one number: fighting for pack position, and how hard a
+horse is actually running. Every fix leaked from one into the other. Agreed with the owner to
+regroup and rebuild the effort model from the ground up rather than keep patching it.
+
+**The new model (constants.ts, "Effort: HOLD / CRUISE / KICK").** A horse is in exactly one of
+three states, never a continuous dial:
+- **CRUISE** — top speed. The default. Nothing to manage.
+- **HOLD** — deliberately below top speed, for a large regen payoff. The owner's framing:
+  "holding should lower top speed by an amount in order to greatly improve regen." A horse fighting
+  for its pack slot can't afford this; one that's comfortable, or banking for a Moment still well
+  off, can.
+- **KICK** — the ONLY thing that ever exceeds top speed. The owner: "a horse should only increase
+  speed higher during a kick... then return back to cruising." A bounded lunge, not a sustained
+  gear.
+
+Position is no longer a speed lever past a short, tightly bounded opening scramble (sorts rank
+order only, `ESTABLISH_UNTIL` cut from 0.28 to 0.15, gain cut and clamped to never exceed CRUISE).
+A style's identity now comes from WHEN it can afford to hold (naturally correlated with its Moment
+— frontRunner's window opens almost immediately, so it barely gets to hold; closer's is far off, so
+it holds early and drifts back to exactly where it wants to sit) and from the existing charge-regen
+mechanics, not from a drift-correction dial. `MOMENT_PROFILES` (the passive per-Moment phase-bonus
+curve) and `MOMENT_COMMIT_DURATION`/`UNIVERSAL_FINAL_STRETCH`/`MOMENT_RAMP_LEAD` (the old commit-ramp
+machinery) are gone entirely — Moment's whole identity now lives in the kick: when it fires, and how
+strong.
+
+Kick strength gained Burst as a factor (Grit x Burst x Jockey Skill, the owner: "tied to burst and
+grit"), and `KICK_MAX_BONUS` was raised sharply (0.085 → 0.22) since it's now the only speed lever
+that exists at all.
+
+**The kick-eligibility model, reworked in parallel per the owner's own framing ("a player would see
+the small window and use all their kicks").** Kicks inside a horse's own Moment window are bounded
+only by charges and a window-width-proportional spacing (`KICK_IN_WINDOW_SLOT_FRACTION`) — no
+"N per window" count cap (tried and rejected: it favoured whichever Moment happened to be widest).
+Outside the window, capped at `MAX_KICKS_OUTSIDE_MOMENT` (1) — a little impatience is realistic,
+spending the whole bank on kicks that do almost nothing is not.
+
+**A deep investigation into a stubborn `late`-Moment failure, most of it now resolved but one piece
+still open.** Once the redesign landed, `early` went from ~0% to a genuinely fair 17.4% and style
+balance improved across the board — but `late` sat at an unmoving 0.0% through FIVE separate,
+individually-verified fixes:
+1. **Own-progress vs leader-progress** (`MAX_MOMENT_LAG`): a horse that's fallen behind has its own
+   distance-based clock lag the leader's, pushing its kick window open later in real time than it
+   should — traced directly, a `late` horse's first kick not firing until 91.7% of the way through a
+   race it was already losing. Fixed with a floor: Moment timing can't lag the leader's clock by more
+   than `MAX_MOMENT_LAG` (0.06).
+2. **`KICK_MOMENT_BONUS`**: narrower windows (`early` 25%, `late` 20%) get proportionally less real
+   time and fewer regen opportunities than wide ones (`earlyMid`/`midLate`, 35% each) — both strength
+   and duration are now boosted for narrow windows, derived directly from window width so it can't
+   drift out of sync (`early` +40%, `late` +75%).
+3. **The comeback mechanic** (`KICK_COMPLACENCY_PENALTY`): the owner's framing — "the first place
+   racer is cocky and not catching back up," a nerf to the leader's own follow-up kicks rather than a
+   handout to whoever's behind. Discounts a horse's kick strength the more clear it already is of the
+   field. Iterated three times: nearest-rival-based contest (didn't trigger — a front pack mutually
+   boxing each other in never reads as individually "clear"), then a hard threshold against the
+   back-marker (barely moved anything — a gap builds gradually across many kicks, and a cutoff only
+   discounts the LATE kicks in that build-up), then a smooth exponential ramp from the first yard of
+   separation (`CLEAR_FIELD_SCALE`) — the current form.
+4. **Kick duration also scaled by `KICK_MOMENT_BONUS`**: traced directly that `late`'s kicks, once
+   firing, genuinely closed real ground (180yd gap → 98yd in the final 10% of one race) — just not
+   over enough total TIME to finish the job, since repeat kicks fired close together mostly just
+   refresh the duration timer rather than stacking.
+
+None of 1-4 fully closed it. **The actual root cause, found by direct measurement**: every archetype
+— not just `late` — fires its entire charge bank (5-6 kicks) every single race (verified: 82-83%
+land inside the horse's own window, so this isn't mistiming), and because repeat kicks fired close
+together overlap in duration, this reads as one continuous boosted state for nearly the whole
+window rather than discrete lunges — exactly the "sustained commit" problem this whole redesign was
+built to eliminate, recreated through repeated kicks instead of an effort dial. Traced the actual
+gap this produces: by the time a `late` horse's window opens, the other 7 horses have collectively
+built a 150-200 yard lead through this continuous-boost volume, which no reasonable strength/duration
+adjustment to `late`'s own kick can close in the ~10-20% of the race it has left (the arithmetic
+doesn't work: closing 150+ yards in a ~200-yard remaining stretch requires roughly double the
+leader's speed for the whole stretch).
+
+**Explicitly ruled out as the fix**: capping kicks per window for everyone. The owner: "I don't like
+capping windows. If a player wants to use their kicks [effectively/ineffectively] then let them" —
+a hard cap removes player agency over a mechanical choice that should stay theirs, good or bad. The
+uniformity problem is specifically in the AI'S decision logic (`ai.ts`), which currently runs the
+identical algorithm for every archetype, just shifted by Moment window boundaries — confirmed by the
+kick-count-by-persona data above showing near-identical volume (5.3-6.0) regardless of style OR
+moment. Fixing that needs each archetype's AI to have a genuinely distinct kick STRATEGY (frontRunner
+front-loaded and decisive, closer patient and concentrated into one or two large late kicks, stalker
+a single tactical move, midPack closest to today's spread-it-out behavior) — a real rework, not a
+numeric tweak. **Deliberately deferred as its own item (task list: "3.5") to keep session momentum**
+— not started without a fresh design pass first.
+
+**Where this leaves the harness right now:** Determinism ✓, Moment assignment matches weight table
+✓, Dominance curve ✓, Division sanity ✓ (genuinely improved as a side effect: margins tightened
+17.6L → 9.9L, "elite racing is tighter" flipped from failing to passing). Style balance ✕ (midPack
+20.6%, furthest outlier — closer improved a lot, 4.3% → 16.8%). Moment win rate ✕ (`late` 0.0%,
+`early`/`earlyMid`/`midLate` all within a reasonable band, 13-19.5%). Pace collapse ✕, unchanged
+from its pre-existing state, not caused by this round.
+
+`npm run check` passes clean.
+
 ---
 
 **Unit of estimation is a *work session*, not a calendar day** — pace depends entirely on how often

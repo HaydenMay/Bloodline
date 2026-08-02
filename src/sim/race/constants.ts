@@ -96,12 +96,14 @@ export const BASE_CHARGE_REGEN = 1 / 30;
 export const STAMINA_CHARGE_REGEN_INFLUENCE = 0.45;
 
 /**
- * Riding BELOW your style's cruiseEffort — taking a pull, or an AI horse
- * genuinely holding back rather than merely cruising — boosts regen on top
- * of the position multiplier below. Scales with how far below cruise the
- * horse is riding, so a deeper pull banks charges faster still.
+ * HOLDING (deliberately riding below top speed — ControlInput.holding) boosts
+ * regen by this multiplier on top of the position multiplier below. The
+ * mirror of a kick: a kick spends a charge for a burst above top speed;
+ * holding banks one faster for a genuine cost in ground covered right now.
+ * "Greatly improve regen" (the owner) — this is a big multiplier, not a
+ * marginal one, since HOLD_SPEED_LEVEL already gives up real ground for it.
  */
-export const CHARGE_REGEN_HOLD_GAIN = 1.0;
+export const HOLD_REGEN_BONUS = 2.2;
 
 /**
  * Regen multiplier never drops below this, however bad the position —
@@ -188,18 +190,20 @@ export const APTITUDE_SPEED_PENALTY = 0.15;
 // only gates whether either can afford to fire one at all.
 // ---------------------------------------------------------------------------
 
-export const KICK_MAX_BONUS = 0.085;
+/**
+ * Raised sharply from 0.085 — under the HOLD/CRUISE/KICK model a kick is the
+ * ONLY thing that ever pushes a horse above its top speed at all (the owner:
+ * "a horse should only increase speed higher during a kick"), so it has to
+ * be a genuine, large lunge, not a marginal edge stacked on top of an
+ * effort dial that no longer exists.
+ */
+export const KICK_MAX_BONUS = 0.22;
 export const KICK_GRIT_INFLUENCE = 0.35;
 /** How much jockey skill swings kick strength, on top of Grit. */
 export const KICK_JOCKEY_INFLUENCE = 0.3;
+/** How much Burst swings kick strength — the explosive-lunge stat, same shape as Grit's influence above. */
+export const KICK_BURST_INFLUENCE = 0.35;
 export const KICK_BASE_DURATION = 9.0 * TIME_SCALE;
-
-/**
- * Automatic lift for being inside your window, with no input at all.
- * A floor so an outclassed field can be beaten on autopilot; a well-timed
- * kick stacks on top to roughly double it.
- */
-export const WINDOW_BASE_LIFT = 0.05;
 
 /** Half-width of the window where the kick lands at full force. */
 export const KICK_WINDOW_HALF = 0.09;
@@ -225,16 +229,37 @@ export const KICK_MIN_FIT = 0.05;
 export const KICK_MISTIMED_DURATION_FLOOR = 0.3;
 
 /**
- * How many full-strength kicks a horse gets inside its OWN Moment window,
- * evenly spaced across it. Not "however many charges and cooldown time
- * happen to fit" — that handed wide windows (`midLate`, 35% of the race) far
- * more repeat kicks than narrow ones (`late`, 20%, ending at the finish with
- * no room for a second), which is what made midLate spike to 48% win rate
- * the moment AI was allowed more than one kick. Fixing the count instead of
- * the cooldown gives every Moment the same number of opportunities
- * regardless of width (sim/race/ai.ts).
+ * Retain policy, not a window-count cap: kicks fired OUTSIDE a horse's own
+ * Moment window (before `momentLo` or after `momentHi`) are capped at this
+ * many for the whole race. Inside the window, kicks are bounded only by
+ * charges and KICK_IN_WINDOW_SLOT_FRACTION below, same as a patient player
+ * holding for their moment — this is what actually simulates that judgement,
+ * not a fixed per-window count (which favoured whichever Moment's window
+ * happened to be widest — ROADMAP.md — without saying anything about
+ * restraint). A prior "N per window" version was tried and rejected for
+ * exactly that reason: it capped the wrong thing. This caps IMPATIENCE
+ * instead.
  */
-export const MAX_KICKS_PER_MOMENT = 2;
+export const MAX_KICKS_OUTSIDE_MOMENT = 1;
+/**
+ * Minimum real-time gap between kicks fired OUTSIDE the Moment window.
+ * Without this a horse would ask to kick every tick it's eligible, burning
+ * every charge in a fraction of a second instead of spacing them out.
+ */
+export const KICK_RETRY_COOLDOWN = KICK_BASE_DURATION;
+/**
+ * Spacing between kicks INSIDE the Moment window, as a FRACTION OF THE
+ * WINDOW'S OWN WIDTH rather than a fixed real-time gap. A fixed real-time
+ * cooldown (tried first) quietly favoured wide windows: `late` (20% of the
+ * race) barely clears it once before the window closes, while `midLate`/
+ * `earlyMid` (35%) fit several. That is backwards from how a player actually
+ * plays a short window — the owner's own framing: "a player would see the
+ * small window and use all their kicks." Scaling the gap to the window's own
+ * width instead means every Moment gets roughly the same NUMBER of possible
+ * kicks inside its own window regardless of how much real time that window
+ * happens to span.
+ */
+export const KICK_IN_WINDOW_SLOT_FRACTION = 0.2;
 
 /**
  * Extra kick strength by running style, applied on top of the Grit x jockey
@@ -251,6 +276,69 @@ export const KICK_STYLE_BONUS = {
   midPack: 0.3,
   closer: 0.5,
 } as const satisfies Record<RunningStyle, number>;
+
+/**
+ * A COMEBACK mechanic: the more clear a horse is of the WHOLE FIELD — not
+ * just its nearest rival, but the back-marker (CLEAR_FIELD_GAP below) — the
+ * weaker its OWN next kick lands. Not a boost handed to whoever's behind;
+ * the leader simply gets less out of kicking again to extend a lead it's
+ * already coasting on, the same way a jockey eases off with nothing left to
+ * prove. A horse still fighting for position, or off the pace, kicks at
+ * full strength regardless.
+ *
+ * This is the fix for the confirmed sequential-kick-compounding problem
+ * (ROADMAP.md): kicks fire in Moment order (early -> earlyMid -> midLate ->
+ * late), and without this, whoever kicks first can just kick AGAIN later to
+ * defend and extend the same lead for free, so no later Moment ever
+ * genuinely catches up — it only gets to fight over whatever the leader
+ * doesn't bother collecting. Discounting the leader's OWN follow-up kicks
+ * means a big early lead has to be defended by more than idly kicking again.
+ *
+ * Deliberately measured against the BACK of the field (CLEAR_FIELD_GAP), not
+ * the nearest rival (CLEAR_LEAD_GAP, used for regen's pressCost) — traced
+ * directly: `early`/`earlyMid`/`midLate` movers spend most of the race
+ * bunched together contesting EACH OTHER for the front, so nearest-rival
+ * "contest" never reads as clear for any one of them even while they
+ * collectively pull 150-200 yards clear of a `late` horse still holding its
+ * own back-of-the-pack slot. The comeback has to react to that collective
+ * gap, not to whether the front pack is elbowing itself.
+ */
+export const KICK_COMPLACENCY_PENALTY = 0.6;
+
+/**
+ * Scale (yards) for how fast "clear of the field" ramps up, for the comeback
+ * mechanic above — NOT a threshold. A hard cutoff was tried first
+ * (fieldContest = 0 until the gap reached it, 1 after) and traced to barely
+ * move anything: a front pack's lead over a back-marker builds gradually,
+ * across several kicks fired while everyone is still close together, and a
+ * cutoff only discounts the LATE kicks in that build-up — by the time any
+ * one of them was individually "clear enough," most of the gap was already
+ * banked. An exponential ramp (1 - e^(-gap/CLEAR_FIELD_SCALE)) discounts
+ * from the very first yard of separation instead, so every kick along the
+ * way pays some price for the lead it's already sitting on, not just the
+ * ones fired after an arbitrary line is crossed. At this scale, ~20 yards
+ * clear is already ~40% of the way to full discount; ~70 yards is ~85%.
+ */
+export const CLEAR_FIELD_SCALE = 40;
+
+/**
+ * Floor on how far a horse's OWN progress (distance/totalYards — ai.ts,
+ * engine.ts) is allowed to lag the LEADER's before Moment-window timing
+ * (kickAt, momentLo, momentHi) is judged against the leader's clock instead.
+ *
+ * Own progress is the right clock for MOST of the field most of the time —
+ * it's what stopped a trailing horse's window being yanked ahead of where it
+ * should be just because the leader is running hot (ROADMAP.md). But a horse
+ * that falls FAR enough behind (a closer buried at the back, say) has its
+ * own window pushed correspondingly far out in real time too — traced
+ * directly: a `late` horse's kick not firing until 91.7% of the way through
+ * a race it was already losing, leaving no real time to use it regardless of
+ * how strong the kick itself was. This floor caps how far behind is too far:
+ * beyond MAX_MOMENT_LAG, the window opens on the leader's clock instead of
+ * continuing to wait on the horse's own, so falling behind can never also
+ * cost a horse its own chance to fire back.
+ */
+export const MAX_MOMENT_LAG = 0.06;
 
 // ---------------------------------------------------------------------------
 // Traffic (DESIGN.md §4)
@@ -351,19 +439,13 @@ export const CONDITION_INFLUENCE = 0.1;
 export interface StyleProfile {
   preferred: number;
   tolerance: number;
-  /**
-   * The style's natural riding baseline. Effort BELOW this counts as taking a
-   * pull — restraint that boosts charge regen (CHARGE_REGEN_HOLD_GAIN) on top
-   * of the position multiplier. Riding at or above it is simply racing.
-   */
-  cruiseEffort: number;
 }
 
 export const STYLE_PROFILES = {
-  frontRunner: { preferred: 0.06, tolerance: 0.18, cruiseEffort: 0.5 },
-  stalker: { preferred: 0.3, tolerance: 0.16, cruiseEffort: 0.5 },
-  midPack: { preferred: 0.52, tolerance: 0.13, cruiseEffort: 0.5 },
-  closer: { preferred: 0.85, tolerance: 0.16, cruiseEffort: 0.46 },
+  frontRunner: { preferred: 0.06, tolerance: 0.18 },
+  stalker: { preferred: 0.3, tolerance: 0.16 },
+  midPack: { preferred: 0.52, tolerance: 0.13 },
+  closer: { preferred: 0.85, tolerance: 0.16 },
 } as const satisfies Record<RunningStyle, StyleProfile>;
 
 // ---------------------------------------------------------------------------
@@ -390,86 +472,24 @@ export const MOMENT_WINDOWS = {
 } as const satisfies Record<Moment, readonly [number, number]>;
 
 /**
- * How far BEFORE its Moment window a horse starts building toward full
- * effort (sim/race/ai.ts) — full commitment is reached BY `kickAt`, not
- * merely begun there, so a horse is already flat out the instant it fires
- * its kick.
+ * Extra kick strength for the NARROWER windows, scaled to width: `early`
+ * (25% of the race) and `late` (20%) get less real time and fewer charge-
+ * regen opportunities inside their own window than `earlyMid`/`midLate`
+ * (35% each) — the owner's own reasoning: "the window is smaller so the
+ * progression forward needs to be higher." Computed directly from
+ * MOMENT_WINDOWS' widths relative to the widest window (0.35), so it can't
+ * drift out of sync if the windows themselves are retuned:
+ *   early:    0.35/0.25 - 1 = 0.40
+ *   earlyMid: 0.35/0.35 - 1 = 0   (already the widest, no bonus)
+ *   midLate:  0.35/0.35 - 1 = 0   (tied widest, no bonus)
+ *   late:     0.35/0.20 - 1 = 0.75
  */
-export const MOMENT_RAMP_LEAD = 0.15;
-
-/**
- * Fixed TOTAL span of race progress a horse spends at max effort, the SAME
- * for every Moment — a ramp of MOMENT_RAMP_LEAD up to `kickAt`, then held for
- * the remainder of this duration afterward. Deliberately NOT "however wide
- * this Moment's own window happens to be".
- *
- * First attempt at this fix held effort for the horse's entire window, then
- * eased off until a universal final-stretch threshold. That was still wrong,
- * caught by the new "Moment win rate" harness suite built to check exactly
- * this (ROADMAP.md): `midLate` won 48.1% of races on its own, independent of
- * style, against a fair 12.5% — because its window [0.55, 0.9] happened to
- * END exactly where the universal stretch began, so it never eased off at
- * all, running near-max effort continuously for 60% of the race. `late`'s
- * window ending at the literal finish (1.0) had the same "never eases off"
- * property, just for a shorter continuous span (35%). `early` and `earlyMid`,
- * whose windows close well before the universal stretch, got force-cooled
- * for up to 65% of the race before rejoining — nowhere near comparable total
- * time at effort. The win-rate gap tracked total TIME AT MAX EFFORT almost
- * exactly, not window width or position on their own.
- *
- * The fix: decouple "how long a horse runs flat out" from "how wide this
- * Moment's window is" entirely. The window still governs the KICK (when it
- * lands at full strength — MOMENT_WINDOWS, unchanged), but the EFFORT surge
- * around it is now a fixed duration for everyone, so no Moment gets a
- * structurally longer run at max effort just because of where its window
- * happens to sit relative to the finish.
- */
-export const MOMENT_COMMIT_DURATION = 0.35;
-
-/**
- * Race progress past which EVERY horse commits flat out regardless of its
- * own Moment — a short universal "down the stretch" close for whichever
- * Moments finish their own fixed-duration surge well before the finish
- * (`early`, `earlyMid`). Kept narrow deliberately: a wide one is what
- * created the `midLate` bug above by handing some Moments a free, unearned
- * extension of their own surge.
- */
-export const UNIVERSAL_FINAL_STRETCH = 0.94;
-
-/**
- * MOMENT PROFILES — a horse's moment in the race, not just its place on the
- * track. Position (style, above) says where a horse belongs; this says WHEN
- * it shines. Without this a `late` horse is merely "the one that kicks late"
- * rather than one whose whole speed curve builds to it. Values are speed
- * multipliers at the centre of each third, smoothly interpolated between.
- *
- * Crucially these are scaled by MOMENT FIDELITY — how faithfully the horse
- * has actually held its preferred pack position so far (style's job). A
- * `late` horse only gets its finishing surge if it genuinely raced its
- * style's position early. The moment has to be earned.
- *
- * Moved here from PHASE_PROFILES (style-keyed) when Moment was split out from
- * Style as its own attribute — the owner's framing: style determines pack
- * position (and where charge regen is best), Moment determines optimal kick
- * timing AND strength, including this passive curve. Values are carried over
- * from the old style-keyed table rather than re-guessed: `early` ~ the old
- * frontRunner curve, `late` ~ the old closer curve (both harness-tuned across
- * two rounds — see the retune history this replaced), `midLate` ~ the old
- * stalker/midPack average (both were mild, similar curves — "round the turn"
- * matches that identity), and `earlyMid` is new, interpolated between `early`
- * and `midLate` since no style occupied that shape before. NOT yet re-verified
- * against the harness under the new per-horse Moment rolls — every style can
- * now land on any Moment, weighted (MOMENT_WEIGHTS_BY_STYLE), so the balance
- * this table was tuned against no longer holds exactly. Re-verify before
- * calling this done (ROADMAP.md).
- */
-export const MOMENT_PROFILES = {
-  //           early    middle    late
-  early: { early: 0.085, middle: 0.007, late: 0 },
-  earlyMid: { early: 0.04, middle: 0.015, late: 0.008 },
-  midLate: { early: 0, middle: 0.022, late: 0.017 },
-  late: { early: -0.027, middle: -0.001, late: 0.038 },
-} as const satisfies Record<Moment, { early: number; middle: number; late: number }>;
+export const KICK_MOMENT_BONUS = {
+  early: 0.4,
+  earlyMid: 0,
+  midLate: 0,
+  late: 0.75,
+} as const satisfies Record<Moment, number>;
 
 /**
  * How likely each Moment is, per running style — independent, but weighted so
@@ -529,55 +549,59 @@ export const PRESS_COST_RELIEF = {
   closer: 1,
 } as const satisfies Record<RunningStyle, number>;
 
-/**
- * The three beats every horse races: ESTABLISH, then HOLD, then COMMIT.
- *
- * HOLD cruises at the style's own `cruiseEffort` (STYLE_PROFILES above), not
- * a single universal number — a navigational baseline, not a spending
- * decision now that there is no energy to budget. Without a hold phase the AI
- * has no reason to stay off a full sprint the moment it reaches its
- * preferred spot, which would collapse every style into the same shape.
- *
- * A single global HOLD_EFFORT (0.55) was tried first and sat ABOVE every
- * style's cruiseEffort (0.5, or 0.46 for closer) — meaning `restraint`
- * (CHARGE_REGEN_HOLD_GAIN, engine.ts: riding below cruise banks bonus regen)
- * could never trigger for a horse simply holding its established slot. A
- * closer used to dip below 0.46 during quieter stretches and bank charges
- * from it; pinned to a universal 0.55 it never did. Cruising at the style's
- * own cruiseEffort restores that: each style's baseline IS its restraint
- * threshold, not a fixed number sitting above all of them.
- */
-/** Establishing position is a bounded one-off push, not an ongoing effort. */
-export const ESTABLISH_UNTIL = 0.28;
-export const ESTABLISH_GAIN = 2.2;
+// ---------------------------------------------------------------------------
+// Effort: HOLD / CRUISE / KICK (sim/race/ai.ts)
+//
+// A ground-up replacement for the old ESTABLISH/HOLD/COMMIT effort formula,
+// which fused two things that should never have shared one number: fighting
+// for pack position, and how hard a horse is actually running. Every fix to
+// one kept leaking into the other all session (ROADMAP.md, "Moment win-rate
+// investigation" and the redesign discussion that followed it) — a style
+// with a narrow, contested preferred slot (frontRunner) was buying real,
+// free speed just from the act of fighting for position, with no way to cap
+// it that didn't also break something else.
+//
+// The fix is to stop trying to cap the leak and remove the shared variable
+// instead. A horse now runs in exactly one of three states:
+//   CRUISE — top speed. The default. Nothing to manage.
+//   HOLD   — deliberately below top speed, for a large regen payoff
+//            (HOLD_REGEN_BONUS below). The owner's framing: "holding should
+//            lower top speed by an amount in order to greatly improve
+//            regen." A horse fighting to hold its pack position can't
+//            afford this; a horse that's comfortable, or banking for a
+//            Moment still well off, can.
+//   KICK   — the ONLY thing that ever exceeds top speed (the owner: "a horse
+//            should only increase speed higher during a kick... then return
+//            back to cruising"). A bounded lunge, not a sustained gear.
+//
+// Position is no longer a speed lever at all outside the brief opening
+// scramble below — it emerges from WHEN each style can afford to hold
+// (correlated with its Moment: frontRunner's window opens almost immediately
+// so it barely gets to hold before needing to cruise/kick for the front;
+// closer's is far off, so it holds early and often, drifting back to
+// exactly where it wants to sit) and from the existing charge-regen
+// mechanics (FRONT_COST_RELIEF, PRESS_COST_RELIEF, draft). Holding position
+// LATE in the race, against a challenge, is now a kick's job, not an effort
+// dial's — "meaningful for maintaining position" (the owner).
+// ---------------------------------------------------------------------------
+
+/** Top speed. The default state; nothing pushes above this except a kick. */
+export const CRUISE_EFFORT = 1;
 
 /**
- * How hard the AI corrects toward its preferred position, once outside
- * tolerance. Lowered from 0.5 — a style with a narrow, contested preferred
- * slot near the edge of the pack (frontRunner: preferred 0.06, tolerance
- * 0.18, competing with every other forward-leaning entry for that same
- * sliver) essentially never re-enters "established" and pays this
- * correction continuously for most of the race. Since effort has no cost in
- * this economy (charges are never actually gated for AI), that continuous
- * correction was a real, free, ongoing speed advantage having nothing to do
- * with style identity or Moment — see NON_COMMIT_EFFORT_CAP above for the
- * fuller diagnosis (ROADMAP.md, "Moment win-rate investigation").
+ * Effort while HOLDING — below CRUISE, a genuine speed cost (via the
+ * existing effortSpeed formula, engine.ts) in exchange for HOLD_REGEN_BONUS.
  */
-export const POSITION_CORRECTION_GAIN = 0.22;
+export const HOLD_EFFORT = 0.35;
 
 /**
- * Ceiling on effort OUTSIDE a horse's own committing window. Since charges
- * are never actually gated for AI (a horse never spends more than
- * MAX_KICKS_PER_MOMENT out of CHARGE_CAPACITY, always plenty of time to
- * regen — ROADMAP.md), sustained effort has NO cost in this economy: nothing
- * stops a horse from just running higher than cruise for free outside its
- * window. That is exactly what frontRunner's own tolerance-band scrambling
- * did — its preferred slot is narrow and contested, so it spent nearly half
- * the race in the drifted-HOLD correction branch at 0.63-0.86 effort, a real
- * and completely free speed advantage having nothing to do with its Moment.
- * Lowered from 0.86 so extended position-fighting can't quietly buy the same
- * speed a genuine commit does.
+ * A short, tightly bounded opening scramble — real races have one, distinct
+ * from the pacing that follows: horses jockey for their pack slot in the
+ * first stretch out of the gate, then settle. Deliberately much shorter and
+ * much smaller than the old ESTABLISH phase (which ran to 28% of the race
+ * with a large gain and became the leak described above) — this only sorts
+ * rank order, it does not run the rest of the race.
  */
-export const NON_COMMIT_EFFORT_CAP = 0.65;
-export const MAX_EFFORT = 1;
-export const MIN_EFFORT = 0.18;
+export const ESTABLISH_UNTIL = 0.15;
+/** How hard the opening scramble pushes — bounded, clamped to CRUISE at most. */
+export const ESTABLISH_GAIN = 3;

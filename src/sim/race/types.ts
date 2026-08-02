@@ -14,8 +14,21 @@ export interface RaceConfig {
 
 /** Which effort the controller wants this tick. Player input or AI. */
 export interface ControlInput {
-  /** 0-1. The DRIVE control — hold to urge, release to settle. */
+  /**
+   * 0-1, mostly a fixed CRUISE value (top speed). Only drops below that
+   * while `holding` (see below) — there is no continuous position-correction
+   * dial anymore, so this is close to binary in practice: cruise or hold.
+   */
   effort: number;
+  /**
+   * Deliberately pulling back below top speed in exchange for a large
+   * charge-regen bonus (engine.ts) — the mirror of a kick: a kick spends a
+   * charge for a burst above top speed, holding banks a charge faster for a
+   * genuine cost in ground covered right now. A horse fighting to hold its
+   * pack position can't afford this; a horse that's comfortable, or banking
+   * for a Moment still well off, can.
+   */
+  holding: boolean;
   /** Fire the kick this tick, if it has not already been used. */
   kick: boolean;
   /** Preferred lane, 0 = rail. The jockey resolves whether it can be reached. */

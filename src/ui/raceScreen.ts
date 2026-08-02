@@ -11,7 +11,7 @@ import {
 } from '../render/track.js';
 import { createAiController } from '../sim/race/ai.js';
 import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
-import { CHARGE_CAPACITY, MOMENT_WINDOWS, TICK_HZ } from '../sim/race/constants.js';
+import { CHARGE_CAPACITY, HOLD_EFFORT, MOMENT_WINDOWS, TICK_HZ } from '../sim/race/constants.js';
 import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../sim/race/recap.js';
 import type {
   ControlInput,
@@ -144,22 +144,20 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   /**
    * The player's jockey rides the horse exactly as the AI would by default —
-   * establishing position, holding it, then committing down the stretch —
-   * the same competent ride "hand it to your jockey" auto-race gets
-   * (DESIGN.md §4). Input MODULATES that ride rather than replacing it:
+   * holding for its Moment, then cruising into the kick — the same
+   * competent ride "hand it to your jockey" auto-race gets (DESIGN.md §4).
+   * Input MODULATES that ride rather than replacing it:
    *
-   *   nothing   ride to style, establishing and committing like any AI horse
-   *   tap       spend one kick charge — the only way to push beyond that, at
-   *             any point in the race, not just the finish
-   *   hold      take a pull — settle back below the AI's own ride, regen faster
+   *   nothing   ride to style: hold for the Moment, cruise, kick, same as any
+   *             AI horse
+   *   tap       spend one kick charge — the only thing that ever pushes above
+   *             top speed (constants.ts, "Effort: HOLD / CRUISE / KICK")
+   *   hold      take a pull — genuinely below top speed, for a large regen
+   *             payoff, same HOLD_EFFORT/holding the AI itself uses
    *
-   * Without this the player rode a permanently flat cruise while the AI field
-   * ramped to its stretch commitment around it — a fixed ~11% top-speed
-   * deficit (MIN_EFFORT_SPEED) that the kick's +8.5% at most cannot buy back,
-   * regardless of how well it's timed. Positioning was already the jockey's
-   * automatic job (no player steering); there was never a design reason for
-   * pace commitment to be the one piece withheld from an otherwise-competent
-   * default ride.
+   * Positioning was already the jockey's automatic job (no player steering);
+   * there was never a design reason for pace to be the one piece withheld
+   * from an otherwise-competent default ride.
    */
   const baseRide = createAiController(playerHorse);
 
@@ -170,13 +168,14 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       controller: (self, race): ControlInput => {
         const base = baseRide(self, race);
 
-        const effort = input.takingBack ? Math.min(base.effort, 0.26) : base.effort;
+        const effort = input.takingBack ? HOLD_EFFORT : base.effort;
+        const holding = input.takingBack || base.holding;
         const targetLane = base.targetLane;
 
         const kick = input.kickPending;
         input.kickPending = false;
 
-        return { effort, kick, targetLane };
+        return { effort, holding, kick, targetLane };
       },
     };
   });
