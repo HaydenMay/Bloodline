@@ -392,6 +392,83 @@ from its pre-existing state, not caused by this round.
 
 ---
 
+### 🚧 IN PROGRESS — small UI wins landed; a bigger player-parity problem found
+
+Three small, low-risk fixes landed straight away (no design conversation needed, unlike the items
+below): a pre-race countdown (3-2-1, then "And they're off!" fires through the existing call-out
+system as the sim starts) instead of snapping straight into motion; the race bar's Style "seat" text
+folded together with the Moment text instead of duplicating it in two places on screen (and dropped
+entirely on narrow widths where it had nothing left in it); and a 1-3 arrow regen indicator next to
+the kick-charge dots, since the charge bank was visible but whether it was currently filling well
+never was — backed by a new `regenMult` field surfaced on `RunnerSnapshot` (the position/drafting/
+holding multiplier already existed internally, it just was never shown).
+
+**A real wrinkle surfaced discussing whether the Style seat text still earns its place.** The
+player's own horse is not purely hand-driven: `raceScreen.ts`'s player controller wraps
+`createAiController(playerHorse)` as its base, and manual input only overrides two things — forcing
+HOLD while actively taking a pull, and injecting a kick on tap. Everything else (the opening-gate
+position scramble, default lane changes, and automatic hold/regen-banking whenever the player isn't
+actively pulling and hasn't reached their Moment window) runs through the exact same Style-driven
+`preferred`/`tolerance` logic as every AI opponent. Concretely: during the first `ESTABLISH_UNTIL`
+(15%) of the race, if a horse is sitting further forward than its Style prefers, cruise effort is
+eased down automatically (up to ~40% below full) to let the field settle it back — and the player
+currently has no override for this; taps only add MORE pullback or fire a kick, nothing forces full
+effort back up. Past that opening window the correction disappears entirely (deliberately, per the
+redesign above), so a horse out of position later just doesn't get the passive hold/regen bonus
+instead of being actively slowed. Filed as an open discussion point on 3.5, since any archetype-
+distinct AI rework there changes the player's own autopilot too, not only opponents' — that needs an
+explicit decision, not an accidental side effect. Whether the seat-text label itself is worth keeping
+is filed alongside it: it's not decorative (it describes a real, active mechanic per the above), but
+it's also not actionable — the player can't change their horse's Style mid-race, so today it only
+explains autopilot behavior after the fact rather than informing a decision the way the Moment window
+does. The owner's own reaction: "I'm not sure I want it anymore."
+
+**A bigger, more foundational problem, found while investigating the above.** The owner's real play
+history: roughly 50 manual race attempts, zero wins, best result 2nd by 2.75L, "lost by a distance"
+(a blowout, not a close loss) roughly 80% of the time. Ran the existing `tools/ride-probe.ts` (its
+own header: "Gate 2 asks whether racing is fun, and the answer depends entirely on whether the
+player's input matters") to check this against real numbers rather than guess:
+
+```
+ride                    avg place   wins   top-3   avg beaten   charges left   kicks fired
+hands off                  7.55     0      3       53.5L          5.0        0.00
+kick mistimed              7.01     4     13       47.0L          5.0        1.00
+kick in window              5.65    11     34       30.8L          4.6        1.00
+spam every charge          5.67     9     33       35.1L          0.0        9.71
+(fair share of wins is 19/150 ≈ 12.7%)
+```
+
+Every tested strategy loses far below a fair share, including "kick in window" (a single, perfectly-
+timed kick — about as good as a simple strategy gets): 7.3% win rate, beaten by 30.8L on average.
+"Hands off" is a total blowout: 0/150 wins, beaten by 53.5L every single race. None of these tested
+strategies even attempt the AI's own multi-kick cadence (`baseRide` fires 5-6 kicks/race at ~82-83%
+inside-window, per the 3.5 diagnostics above) — they're deliberately simple, human-plausible
+strategies, and every one gets crushed by a full field of AI horses each executing that disciplined,
+precisely-timed algorithm. Reads less like "the AI is too good" in isolation and more like: a human
+tapping a touchscreen, working from limited real-time feedback, is competing against seven opponents
+that never mistime a kick and never forget to hold. This is a different, more foundational question
+than 3.5's archetype-vs-archetype fairness work — 3.5 asks "is AI vs AI fair", this asks "can a human
+compete with the AI at all" — tracked separately as its own item (task list: "3.7"), sequenced after
+3.5 per the owner ("do it after 3.5 at some point").
+
+**Related note for later, not the cause of the current losing streak** — today's demo hardcodes every
+horse, including the player's, to the `open` division (a uniform field; no career/division-
+progression system exists yet). But `DIVISION_BANDS` (`src/sim/horse.ts`) scales both core stats and
+jockey skill upward with division (maiden jockey 30-60 vs championship jockey 65-95, same shape for
+core stats and consistency) — so "AI gets better as division goes up" is correct and by design. Once
+career/division progression exists (Phase 3/4, not yet built), the 3.7 parity problem will compound
+at higher divisions unless it's fixed first; whatever fix 3.7 lands on needs to still hold up at
+championship level, not just at `open`.
+
+Three items now queued for the next interactive session, in the owner's stated order: **3.5**
+(archetype-distinct AI kick logic, the style x Moment stacking exploit, the MOMENT_WINDOWS redesign,
+plus the player-autopilot wrinkle and seat-label discussion above), **3.6** (remaining UI items:
+HUD overlap on narrow widths, drafting indicator + lane logic, results-screen race card, trait
+tooltip clipping), **3.7** (player-vs-AI parity, above). None started without the owner at a computer
+able to play-test, per their own instruction.
+
+---
+
 **Unit of estimation is a *work session*, not a calendar day** — pace depends entirely on how often
 we sit down with it. Sizes are honest, not optimistic.
 
