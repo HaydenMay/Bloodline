@@ -2,6 +2,82 @@
 
 Companion to [DESIGN.md](DESIGN.md) and [TRAITS.md](TRAITS.md).
 
+---
+
+## 🚧 IN PROGRESS — the energy economy is being replaced with kick charges
+
+**Read this before touching `sim/race/` energy code.** Mid-redesign, paused deliberately to
+preserve context across a chat reset rather than mid-file. The owner's own words, most recent
+first — these supersede anything below in this doc that still describes the old model:
+
+> Stamina should be like a gas tank. It doesn't provide more power the more gas is in the tank.
+> It's the amount of how far the effort can go. It should allow for maximum kicks and urges rather
+> than how much power there [is].
+>
+> I don't want urges. I want to only be able to tap... I don't think I want the stamina bar and I
+> think I want a number of kicks available (kick charges is fine terminology) that regenerate
+> ALWAYS but regenerate quicker in good positioning. Tapping anytime should use one kick. Then have
+> it regenerate.
+>
+> [Holding should] boost charge regen. Kick strength tied to Grit and jockey skill — not banked
+> energy. If it's tied to Grit already, leave it like that.
+
+**The target design, in full:**
+- **No continuous 0–100 energy value at all.** Not just hidden from the player — removed from the
+  simulation. This affects every runner, AI included, since there is no separate resource left for
+  AI riders to have either.
+- **Kick charges are the only resource.** A small integer bank per horse. Tapping — any time, no
+  separate "urge" — spends one charge and fires the existing kick mechanic (a temporary speed
+  multiplier, `speedCap *= 1 + kickStrength`, lasting `KICK_BASE_DURATION`).
+- **Kick strength = Grit × jockey skill.** Deliberately NOT scaled by how full the bank is — a
+  horse with 3 charges banked and one with 0.2 kick equally hard; the bank only gates whether you
+  can fire at all, never how hard.
+- **Charges regenerate always**, never stuck, never negative — faster in a good spot for the
+  horse's running style, slower out of it. Reuse the position-quality math already built this
+  session (`frontPenalty`/`misfit`/`fit`/`RECOVERY_FLOOR` and friends in `engine.ts` — the whole
+  "how fast do you refill" computation) — just retarget it at charge-regen rate instead of energy.
+- **Holding (take a pull)** still settles the horse back (costs ground, as before) and now ALSO
+  gives an extra boost to charge regen on top of the position bonus — a deliberate "bank a charge"
+  move.
+- **Stamina (the stat) sets the TANK SIZE** — max charge capacity — not power and not regen rate.
+  A high-Stamina horse can bank more charges; position/holding decide how fast it fills toward that
+  cap. This is the one piece not yet fully decided in conversation but is the natural reading of
+  "gas tank" — confirm before locking in a formula.
+- **No more "fade."** `FADE_THRESHOLD`/`FADE_FLOOR`/`GRIT_FADE_RELIEF` (speed collapsing on low
+  energy) have no meaning without a continuous energy value — remove them, don't repurpose them.
+- **Aptitude needs a new home.** It used to cost energy ("a sprinter over a route runs out, not
+  slower"). With no energy, the cleanest replacement is a direct `maxSpeed` penalty for a badly
+  suited distance — untested, just the obvious mapping.
+
+**What's actually committed right now** (the last checkpoint pushed before the reset): kicks became
+a multi-charge resource (`RaceEntrant.kickCharges`, `Runner.kicksRemaining`, defaults to 1 for every
+AI/harness entrant, player gets `KICK_CHARGES = 2`), kick strength moved to `Grit × jockeySkill`
+(`KICK_JOCKEY_INFLUENCE`), and an empty-tank gate was added so urging/kicking can't fire for free at
+0 energy. **This is a stepping-stone, not the target** — it still has the full continuous energy
+bar, drain/recovery, urging, and the energy HUD (bar/chevrons/cause-tags) sitting underneath it,
+none of which the owner wants anymore per the quotes above. The next session's job is to strip all
+of that out and rebuild around charges as described above, not to keep layering on top of it.
+
+**Full blast radius, mapped before the reset so it doesn't have to be re-traced:**
+`sim/race/constants.ts` (the whole energy-economy block, `MAX_ENERGY`/`BASE_DRAIN`/
+`BASE_RECOVERY`/`REST_RECOVERY_BASE`/`FADE_*`/`APTITUDE_DRAIN_PENALTY` all go), `sim/race/engine.ts`
+(`Runner.energy`/`drainRate`/`recoveryRate`/`fadeRelief`/`energyRate`/`energyFactor` all go;
+`stepRunner`'s whole energy section rewrites around a charge float; `RunnerSnapshot`/`RunnerView`
+lose `energy`, keep/extend `kicksRemaining`), `sim/race/types.ts` (`EnergyFactor` likely removed
+entirely — the elaborate "why is energy moving" HUD reporting doesn't have a place in a
+charges-only model), `sim/race/ai.ts` (effort computation collapses to ~always-1 now that urging is
+gone — most of `HOLD_EFFORT`/`ESTABLISH_GAIN`/the reserve-preservation logic becomes dead code),
+`sim/race/recap.ts` (`energyLeft` narrative → `kicksLeft`, same "banked but unspent" idea),
+`ui/raceScreen.ts` (drop the energy bar/chevrons/factor tags; tap-to-kick + hold-to-settle is the
+whole control surface), and traits that referenced drain/recovery (**Iron Lungs**, **Quick
+Recovery**, **Thirsty**, **Cruiser**, **Alert** — see TRAITS.md) each need a charge-regen-rate
+equivalent, worked out fresh rather than assumed.
+
+Verify with the usual discipline once rebuilt: `npm run harness` for Gate 1, `tools/margin-profile.ts`
+and a fresh trace script for the tail, before declaring it done.
+
+---
+
 **Unit of estimation is a *work session*, not a calendar day** — pace depends entirely on how often
 we sit down with it. Sizes are honest, not optimistic.
 

@@ -11,7 +11,7 @@ import {
 } from '../render/track.js';
 import { createAiController } from '../sim/race/ai.js';
 import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
-import { ESTABLISH_UNTIL, STYLE_PROFILES, TICK_HZ } from '../sim/race/constants.js';
+import { KICK_CHARGES, STYLE_PROFILES, TICK_HZ } from '../sim/race/constants.js';
 import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../sim/race/recap.js';
 import type {
   ControlInput,
@@ -106,6 +106,11 @@ const FACTOR_DWELL_MS = 260;
  * `neutral` is deliberately blank: a label that is always lit stops being read.
  */
 const FACTOR_LABELS: Record<EnergyFactor, { text: string; colour: string } | null> = {
+  // Distinct from the player's own input-driven URGING tag above this one in
+  // the priority chain: this fires when EFFORT is above cruise for a reason
+  // other than the player currently holding the control — the establish
+  // scramble or the forced stretch commitment.
+  urging: { text: 'PUSHING ON', colour: '#E8A33D' },
   pressed: { text: 'BEING PRESSED', colour: '#E2564A' },
   onTheLead: { text: 'ON THE LEAD', colour: '#E8A33D' },
   outOfPosition: { text: 'OUT OF POSITION', colour: '#E8A33D' },
@@ -146,43 +151,19 @@ const CALLOUTS = [
 ] as const;
 
 /**
- * Ceiling on the default ride, once the field has settled.
- *
- * Chosen by sweeping it against 150 races at each of six values. 0.48 is the
- * best point available, and it is where a well-timed ride wins most (25 of 150
- * against a fair share of 19). Higher preserves less; lower loses more ground
- * for no extra wins.
- *
- * It cannot preserve ALL of it — hands-off reaches the wire with 46 of 100.
- * But NOT because the cruise bleeds, which is what this note claimed until the
- * rate was measured per phase over 60 races:
- *
- *     taking up position   -2.3/s      the whole reserve, and then some
- *     settled cruise       +0.1/s      break-even, which is the cap working
- *     the stretch          -0.9/s      committing, as it should
- *
- * Capped and in position the cruise is already break-even. The reserve goes in
- * the opening 28% — which this constant deliberately does not cap, for the
- * reason below. So the cost is the price of a slot, not a leak, and raising the
- * cap would not recover it. What remains a simulation problem for Phase 4.5 is
- * that the opening is that expensive at all; see the known issue in ROADMAP.md.
- *
- * It applies only AFTER position is taken up. Capping the opening as well was
- * the mistake in the first attempt: the jockey could not go and get its slot,
- * so the horse leaked ground from the gate and arrived 26 lengths adrift with a
- * full tank and nothing to do with it. Position is the jockey's job. The
- * reserve is yours.
+ * The double-tap window, in ms, that turns a second tap into a kick request
+ * rather than a second urge. See the controller below: a single tap urges
+ * (repeatable, cheap), a double tap spends a kick charge (rarer, decisive).
  */
-const PLAYER_CRUISE_CAP = 0.48;
+const KICK_TAP_MS = 350;
 
 interface PlayerInput {
   /** Hold to take a pull — settle, drop back, and recover. */
   takingBack: boolean;
   /** Timestamp (ms) until which the current urge is still pushing. */
   urgeUntil: number;
-  /** Fires the engine's one big kick, on the first urge inside the window. */
+  /** Set by a double-tap; consumed by the controller the next tick it reads it. */
   kickPending: boolean;
-  kickUsed: boolean;
 }
 
 export interface RaceScreenOptions {
@@ -205,23 +186,26 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     takingBack: false,
     urgeUntil: 0,
     kickPending: false,
-    kickUsed: false,
   };
 
   const playerHorse = field.find((h) => h.id === playerHorseId)!;
   const playerProfile = STYLE_PROFILES[playerHorse.style];
 
   /**
-   * The player's jockey rides the horse's style by default, exactly as the AI
-   * would. Input MODULATES that ride rather than replacing it:
+   * The jockey handles WHICH LANE (still automatic — dodging traffic, hugging
+   * the rail — that is the AI's job, not yours). Everything about EFFORT is
+   * yours:
    *
-   *   nothing   ride to style, and recover energy while settled
-   *   tap       urge forward — a short burst, repeatable, each one costs
-   *   hold      take a pull — settle back, lose ground, recover faster
+   *   nothing     ride at cruise — never drains, always recovers
+   *   tap         urge forward — a short push above cruise, repeatable, costs
+   *   double-tap  spend a kick charge — the bigger, decisive burst
+   *   hold        take a pull — settle back below cruise, recover faster
    *
-   * Doing it this way means letting go of the controls is a valid ride rather
-   * than a horse that forgets how to race, which is what made energy
-   * unrecoverable before.
+   * The jockey no longer establishes position automatically. Reaching your
+   * slot, and holding it against traffic, is now something you spend urges
+   * and kicks on — same as the finish. Do nothing and you ride safe at
+   * cruise the whole way, recovering the entire time, but you arrive
+   * wherever the gate scatter left you.
    */
   const baseRide = createAiController(playerHorse);
 
@@ -229,33 +213,23 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     if (horse.id !== playerHorseId) return { horse };
     return {
       horse,
+      kickCharges: KICK_CHARGES,
       controller: (self, race): ControlInput => {
-        const base = baseRide(self, race);
+        // Lane-seeking only — effort comes from cruiseEffort and your input,
+        // never from the AI's own establish/stretch logic.
+        const { targetLane } = baseRide(self, race);
 
-        // The AI empties the tank down the stretch, because that is the right
-        // ride when nobody is steering. For a PLAYER that is a bug: it spends
-        // the reserve on your behalf and leaves you nothing to use.
-        //
-        // So the jockey rides the opening exactly as the AI would — taking up
-        // position costs a little and is worth it — and is then held at the
-        // sustainable cruise for the rest. Positioning still happens; committing
-        // the reserve is always your decision.
-        const settled = race.progress >= ESTABLISH_UNTIL;
-        let effort = settled ? Math.min(base.effort, PLAYER_CRUISE_CAP) : base.effort;
-
+        let effort: number = playerProfile.cruiseEffort;
         if (input.takingBack) {
           effort = Math.min(effort, 0.26);
         } else if (performance.now() < input.urgeUntil) {
           effort = 1;
         }
 
-        const kick = input.kickPending && !input.kickUsed;
-        if (kick) {
-          input.kickPending = false;
-          input.kickUsed = true;
-        }
+        const kick = input.kickPending;
+        input.kickPending = false;
 
-        return { effort, kick, targetLane: base.targetLane };
+        return { effort, kick, targetLane };
       },
     };
   });
@@ -572,6 +546,21 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const barX = (width - barW) / 2;
     const barY = height - pad - 34;
 
+    // ---- Kick charges — dots above the bar, filled = still available -------
+    // A charge no longer just means "the finish". Spending one early to fight
+    // for a slot is a real choice, so how many are left has to be visible the
+    // whole race, not only revealed at the window.
+    const dotR = 5;
+    const dotGap = 14;
+    const dotsY = barY - 12;
+    const dotsX0 = (width - (KICK_CHARGES - 1) * dotGap) / 2;
+    for (let i = 0; i < KICK_CHARGES; i++) {
+      ctx.beginPath();
+      ctx.arc(dotsX0 + i * dotGap, dotsY, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = i < player.kicksRemaining ? '#F2C14E' : 'rgba(139,152,169,0.35)';
+      ctx.fill();
+    }
+
     ctx.fillStyle = 'rgba(14,18,24,0.72)';
     roundRect(ctx, barX, barY, barW, 26, 13);
     ctx.fill();
@@ -670,13 +659,17 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       pendingFactor = factor;
     }
 
+    // The window still marks where a kick lands hardest (timing decides its
+    // strength), but it no longer gates WHETHER you can fire one — that's
+    // kicksRemaining now, a charge you can spend early for position or hold
+    // for the finish.
     const inWindow = Math.abs(curr.progress - playerProfile.kickAt) <= 0.09;
     const tagX = barX + barW - 12;
     // What YOU are doing outranks what the race is doing to you: those states
     // are transient, deliberate, and the moment you need to act on.
     if (input.takingBack) {
       barLabel('TAKING A PULL', tagX, 'right', LABEL_FONT, '#0E1218', '#4EC9A0');
-    } else if (inWindow && !input.kickUsed) {
+    } else if (inWindow && player.kicksRemaining > 0) {
       barLabel('YOUR MOMENT', tagX, 'right', LABEL_FONT, '#0E1218', '#F2C14E');
     } else if (performance.now() < input.urgeUntil) {
       barLabel('URGING', tagX, 'right', LABEL_FONT, '#0E1218', '#E8A33D');
@@ -821,17 +814,23 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   // ---- Input --------------------------------------------------------------
   //
   // Tap repeatedly to urge, like a jockey asking again and again. Hold to take
-  // a pull. A tap inside the horse's window also spends the one big kick.
+  // a pull. Tap TWICE quickly to spend a kick charge instead — a deliberate,
+  // rarer action from the same gesture rather than a new button, usable any
+  // time you have a charge left: early to fight for your slot, late for the
+  // finish. Read `player.kicksRemaining` off the snapshot rather than tracked
+  // locally, since it is now a multi-charge resource the engine owns.
   const URGE_MS = 550;
   const HOLD_MS = 220; // press longer than this and it's a pull, not an urge
 
   let pressedAt = 0;
   let holdTimer = 0;
+  let lastTapAt = 0;
 
   const urge = (): void => {
-    input.urgeUntil = performance.now() + URGE_MS;
-    const inWindow = Math.abs(curr.progress - playerProfile.kickAt) <= 0.09;
-    if (inWindow && !input.kickUsed) input.kickPending = true;
+    const now = performance.now();
+    input.urgeUntil = now + URGE_MS;
+    if (now - lastTapAt <= KICK_TAP_MS) input.kickPending = true;
+    lastTapAt = now;
   };
 
   const down = (e: Event): void => {

@@ -39,7 +39,8 @@ export interface RunnerView {
   rank: number;
   blocked: boolean;
   drafting: boolean;
-  kickUsed: boolean;
+  /** Kicks not yet fired. AI riders get one; the player gets more — see RaceEntrant.kickCharges. */
+  kicksRemaining: number;
   /** True while running below true ability — surfaced on screen, never silent. */
   offColour: boolean;
 }
@@ -57,19 +58,21 @@ export interface RunnerView {
  * the model; the wording on screen belongs to the UI.
  */
 export type EnergyFactor =
-  /** Being hounded for the lead. The expensive one, and nobody is spared it. */
+  /** Pushing above the style's cruise effort — the only way to drain outside a kick. */
+  | 'urging'
+  /** Spending the reserve on the kick, on purpose. */
+  | 'kicking'
+  /** Being hounded for the lead. Refills slower, and nobody is spared it. */
   | 'pressed'
-  /** Paying the baseline cost of racing up front, discounted by style. */
+  /** Refilling slower for holding the lead, discounted by style. */
   | 'onTheLead'
-  /** Racing somewhere the style does not want to be. */
+  /** Refilling slower for racing somewhere the style does not want to be. */
   | 'outOfPosition'
-  /** In the style's slot, drawing the discount and the recovery bonus. */
+  /** In the style's slot, refilling faster. */
   | 'inPosition'
   /** Sitting in a rival's slipstream. */
   | 'drafting'
-  /** Spending the reserve, on purpose. */
-  | 'kicking'
-  /** Nothing dominant — the drift is just effort against recovery. */
+  /** Nothing dominant — riding to style, refilling at the baseline rate. */
   | 'neutral';
 
 export interface RaceView {
@@ -133,6 +136,14 @@ export interface RaceOutcome {
 export interface RaceEntrant {
   horse: Horse;
   controller?: Controller;
+  /**
+   * How many kicks this runner starts the race with. Defaults to 1 (every AI
+   * rider, and every test/harness field) — unchanged from the original
+   * one-shot kick. The player's own entrant sets this higher: establishing
+   * position and finishing the race are now two separate, player-spent
+   * charges of the same resource, not one automatic ride plus one kick.
+   */
+  kickCharges?: number;
 }
 
 /** Which aptitude band a distance falls into. */

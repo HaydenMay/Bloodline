@@ -62,84 +62,82 @@ export const BURST_ACCEL_INFLUENCE = 0.5;
 // ---------------------------------------------------------------------------
 // The energy economy (DESIGN.md §4)
 //
-// One currency. Energy drains when you drive and recovers when you settle, and
-// both rates depend on whether the horse is where its running style wants to be.
+// Redesigned from "position costs energy" to "position changes how fast you
+// refill." Energy now only ever DRAINS from deliberate spend — riding above
+// your style's natural cruise, or the kick — and only ever RECOVERS
+// otherwise, at a rate position scales up or down but never below a floor.
+// It is structurally impossible to lose energy just by being in the wrong
+// spot, which is a stronger guarantee than the old model's death-spiral fix
+// (MISFIT_ENERGY_RELIEF_FLOOR, retired here): that discounted a penalty that
+// could still, in principle, drain a horse. This removes the drain entirely.
 // ---------------------------------------------------------------------------
 
 export const MAX_ENERGY = 100;
 
-/** Energy per second burned at full effort by a stamina-50 horse in position. */
+/** Energy per second burned per unit of EXCESS effort (above cruiseEffort), squared. */
 export const BASE_DRAIN = 7.4 / TIME_SCALE;
 export const STAMINA_DRAIN_INFLUENCE = 0.45;
 
-/** Energy per second recovered at zero effort, in the style's happy place. */
+/** Energy per second recovered at full rest, in the style's happy place. */
 export const BASE_RECOVERY = 4.1 / TIME_SCALE;
 
 /**
- * Leading is INTRINSICALLY expensive — no slipstream, and you set the tempo.
- * This is the load-bearing asymmetry: without it every style is equally
- * efficient in its own preferred slot, there is no real trade, and whoever
- * runs the least effort nearest the front simply wins.
- *
- * A front-runner does not escape this cost. Its style merely lets it carry the
- * cost without falling apart, in exchange for never having ground to make up.
+ * Even riding exactly at cruiseEffort — not resting below it, just racing to
+ * style — still recovers at this fraction of BASE_RECOVERY. Without this,
+ * only a horse actively taking a pull would refill, and "just ride to style"
+ * would sit at a dead break-even rather than genuinely climbing, which is
+ * what "should only go up" requires whenever you are not spending.
+ */
+export const REST_RECOVERY_BASE = 0.35;
+
+/**
+ * Recovery multiplier never drops below this, however bad the position —
+ * leading, contested, badly out of your style's slot. Position can only slow
+ * the refill, never stop or reverse it. This is what makes the drain rule
+ * above literally true rather than true-except-when-out-of-position: nothing
+ * left in this file can push net energy negative outside of excess effort or
+ * the kick.
+ */
+export const RECOVERY_FLOOR = 0.35;
+
+/**
+ * Leading refills SLOWER — no slipstream, and you set the tempo. This is the
+ * load-bearing asymmetry: without it every style recharges equally well in
+ * its own preferred slot, there is no real trade, and whoever spends least
+ * near the front simply wins. A front-runner does not escape this — its style
+ * merely lets it recharge better than another style would in the same spot,
+ * in exchange for never having ground to make up.
  */
 export const FRONT_COST_PENALTY = 0.3;
-/** Sitting at the back is cheap and restful — but leaves ground to cover. */
+/** Sitting at the back refills faster — but leaves ground to cover. */
 export const BACK_RECOVERY_BONUS = 0.10;
 
 /**
  * Yards of clear air needed before a lead counts as uncontested.
- * Inside this, the horse is being pressed and pays the full front cost.
+ * Inside this, the horse is being pressed and refills at the full penalty.
  */
 export const CLEAR_LEAD_GAP = 14;
 /**
- * Cost of being PRESSED, applied on top of the baseline front cost and NOT
- * discounted by running style. Being hounded hurts everyone equally — that is
- * what makes contesting a lead a real weapon, and what Pace Pusher exploits.
+ * Extra refill slowdown from being PRESSED, on top of the baseline lead
+ * penalty and NOT discounted by running style. Being hounded hurts everyone
+ * equally — that is what makes contesting a lead a real weapon, and what Pace
+ * Pusher exploits.
  */
 export const CONTESTED_LEAD_COST = 0.34;
 
 /**
- * Racing your style RIGHT must pay, not merely avoid a fine.
+ * Racing your style RIGHT must pay off, not merely avoid a fine.
  *
- * These four numbers form a two-sided curve around 1.0: a horse perfectly in
- * its style's slot burns LESS than baseline and recovers MORE, while one out of
- * position burns more and recovers less. Previously being in position only
- * meant dodging a penalty, which let a stalker sit on the lead all race for
- * almost nothing — there was no reward for doing it right and no real
- * consequence for doing it wrong.
+ * A horse perfectly in its style's slot refills faster; one badly out of
+ * position refills slower — never negative, per RECOVERY_FLOOR above.
+ * Previously being in position only meant dodging a drain penalty, which let
+ * a stalker sit on the lead all race for almost nothing; there was no reward
+ * for doing it right and no real consequence for doing it wrong.
  */
-/** Drain discount at a perfect fit. */
-export const IN_POSITION_DRAIN_BONUS = 0.28;
-/** Extra drain when badly out of position for your style. */
-export const POSITION_COST_PENALTY = 1.1;
 /** Extra recovery when perfectly in position. */
 export const POSITION_RECOVERY_BONUS = 0.5;
-/** Lost recovery when out of position. */
+/** Lost recovery when out of position — floored by RECOVERY_FLOOR, never negative. */
 export const OUT_POSITION_RECOVERY_PENALTY = 0.5;
-
-/**
- * The death spiral, and its floor.
- *
- * Misfit used to cost the same whether a horse had 60 energy or 5 — so a horse
- * that lost its slot AND its energy paid full price on both axes at once, with
- * no way to break the loop: too broke to afford the drain of fighting back to
- * position, and denied the recovery to ever afford it later, because the very
- * act of being out of position was what was suppressing that recovery. Traced
- * directly (`tools/margin-profile.ts`'s worst seed): a front-runner crashed to
- * 0 energy by 12% of the race, spent the remaining 88% locked between 0 and 14,
- * and finished 106 lengths behind — not fading, trapped.
- *
- * This discounts the misfit PENALTY (not the reward for being in position,
- * which stays full price) once a horse is already this deep in trouble, so the
- * fade curve is the thing punishing it rather than the fade curve and a
- * bottomless recovery penalty compounding each other. A horse with a healthy
- * reserve is completely unaffected — the discount only engages below
- * FADE_THRESHOLD, so this cannot change how any race that never gets this bad
- * plays out.
- */
-export const MISFIT_ENERGY_RELIEF_FLOOR = 0.4;
 
 /**
  * Positional preference fades out across these two points. Past the end, only
@@ -165,18 +163,33 @@ export const GRIT_FADE_RELIEF = 0.08;
 export const APTITUDE_DRAIN_PENALTY = 0.5;
 
 // ---------------------------------------------------------------------------
-// The kick — scales with banked energy × Grit (DESIGN.md §4)
+// The kick — scales with GRIT × JOCKEY SKILL, gated by the tank (DESIGN.md §4)
 //
-// This is what stops the sim collapsing into "closers always win late": a
-// front-runner who burned everything gets a feeble kick, and a well-paced
-// leader can still defend.
+// Deliberately NOT scaled by banked energy. Stamina is the gas tank: it does
+// not make a kick more powerful, it decides how many you can afford — see
+// KICK_CHARGES and the empty-tank gate in engine.ts. A horse with a healthy
+// reserve and one with a single digit left kick with the SAME force; the
+// difference is whether either can still afford to fire one at all.
 // ---------------------------------------------------------------------------
 
 export const KICK_MAX_BONUS = 0.085;
 export const KICK_GRIT_INFLUENCE = 0.35;
+/** How much jockey skill swings kick strength, on top of Grit. */
+export const KICK_JOCKEY_INFLUENCE = 0.3;
 export const KICK_BASE_DURATION = 9.0 * TIME_SCALE;
 /** Kick costs energy on top of the effort it implies. */
 export const KICK_DRAIN_MULTIPLIER = 1.35;
+
+/**
+ * How many kicks the PLAYER starts a race with. Every AI rider, and every
+ * harness/test field, still gets exactly one (RaceEntrant.kickCharges
+ * defaults to 1 when unset) — this is a player-only mechanic. Establishing
+ * position and finishing the race are now two separate, deliberately spent
+ * charges of the same resource rather than one automatic ride plus one kick:
+ * fight for your slot early, then need to have recovered enough to afford the
+ * one that decides the finish.
+ */
+export const KICK_CHARGES = 2;
 
 /**
  * Automatic lift for being inside your window, with no input at all.
@@ -292,7 +305,11 @@ export interface StyleProfile {
   tolerance: number;
   /** Where in the race (0-1) this style wants to launch its run. */
   kickAt: number;
-  /** Baseline effort before positional correction. */
+  /**
+   * The line between "riding to style" and "urging" (DESIGN.md §4). Effort at
+   * or below this never drains energy — it only recovers, faster or slower
+   * depending on position. Only effort ABOVE this, or the kick, spends.
+   */
   cruiseEffort: number;
 }
 

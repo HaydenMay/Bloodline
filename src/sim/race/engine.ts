@@ -35,7 +35,7 @@ interface Runner {
   fieldPosition: number;
 
   effort: number;
-  kickUsed: boolean;
+  kicksRemaining: number;
   kickRemaining: number;
   kickStrength: number;
   /** 1 = kicked inside the window, lower = mistimed. */
@@ -131,6 +131,8 @@ export interface RunnerSnapshot {
   rank: number;
   effort: number;
   kicking: boolean;
+  /** Kicks not yet fired. The player starts with more than the AI field. */
+  kicksRemaining: number;
   blocked: boolean;
   drafting: boolean;
   /** Net energy per second, and the mechanic currently dominating it. */
@@ -233,6 +235,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
           rank: r.rank,
           effort: r.effort,
           kicking: r.kickRemaining > 0,
+          kicksRemaining: r.kicksRemaining,
           blocked: r.blockedFor > 0,
           drafting: r.drafting,
           energyRate: r.energyRate,
@@ -405,7 +408,7 @@ function createRunner(
     rank: index + 1,
     fieldPosition: index / Math.max(1, fieldSize - 1),
     effort: 0,
-    kickUsed: false,
+    kicksRemaining: entrant.kickCharges ?? 1,
     kickRemaining: 0,
     kickStrength: 0,
     kickWindowFit: 1,
@@ -467,20 +470,32 @@ function stepRunner(
     rank: r.rank,
     blocked: r.blockedFor > 0,
     drafting: r.drafting,
-    kickUsed: r.kickUsed,
+    kicksRemaining: r.kicksRemaining,
     offColour: r.offColour,
   };
 
   const input: ControlInput = r.controller(view, race);
-  r.effort = clamp(input.effort, 0, 1);
+  const profile = K.STYLE_PROFILES[r.horse.style];
+
+  // The gas tank: empty means the throttle doesn't answer above cruise,
+  // regardless of what was asked for. Without this an empty horse could still
+  // urge at full effort for free, since drain simply clamps at 0 energy but
+  // the speed benefit of a high effort value does not — a horse running on
+  // fumes should not be able to keep flooring it at no cost.
+  const requested = clamp(input.effort, 0, 1);
+  r.effort = r.energy <= 0 ? Math.min(requested, profile.cruiseEffort) : requested;
 
   // --- The kick -----------------------------------------------------------
-  // Strength scales with BANKED ENERGY x GRIT. A front-runner who spent
-  // everything gets a feeble kick; a well-paced leader can still defend.
-  if (input.kick && !r.kickUsed) {
-    r.kickUsed = true;
-    const reserve = r.energy / K.MAX_ENERGY;
+  // Strength scales with GRIT x JOCKEY SKILL — a fixed measure of the horse
+  // and rider, not of how full the tank happens to be right now. Stamina is
+  // the gas tank: it does not make the engine more powerful, it decides how
+  // much running on it you can afford. That gate is the tank check below —
+  // the same empty-tank throttle limit that caps urging, applied to firing a
+  // kick at all.
+  if (input.kick && r.kicksRemaining > 0 && r.energy > 0) {
+    r.kicksRemaining--;
     const gritFactor = 1 + ((r.horse.stats.grit - 50) / 100) * K.KICK_GRIT_INFLUENCE;
+    const jockeyFactor = 1 + ((r.horse.jockeySkill - 50) / 100) * K.KICK_JOCKEY_INFLUENCE;
 
     // TIMING IS THE SKILL. Kick inside the horse's window and it lands at full
     // force — enough to take a race. Kick outside it and you get a fraction of
@@ -491,7 +506,7 @@ function stepRunner(
     const windowFit = clamp(1 - off / K.KICK_WINDOW_FALLOFF, K.KICK_MIN_FIT, 1);
     r.kickWindowFit = windowFit;
 
-    r.kickStrength = K.KICK_MAX_BONUS * reserve * gritFactor * windowFit;
+    r.kickStrength = K.KICK_MAX_BONUS * gritFactor * jockeyFactor * windowFit;
     r.kickRemaining = K.KICK_BASE_DURATION;
 
     if (hasTrait(r.traits, 'turnOfFoot')) {
@@ -569,21 +584,23 @@ function stepRunner(
         Math.abs(o.lane - r.lane) <= 1,
     ) && r.blockedFor === 0;
 
-  // --- Position: the load-bearing asymmetry --------------------------------
-  // Leading is intrinsically expensive (no slipstream, you set the tempo) and
-  // sitting at the back is intrinsically cheap. A front-runner does not escape
-  // that cost — it just carries it better, in exchange for having no ground to
-  // make up. Without this, every style is equally efficient in its own slot and
-  // the whole trade collapses.
-  const profile = K.STYLE_PROFILES[r.horse.style];
+  // --- Position: changes the REFILL rate, never drains on its own ----------
+  //
+  // Energy only ever drains from EXCESS effort (above the style's
+  // cruiseEffort) or the kick, below. Position's whole job is to say how fast
+  // you refill otherwise — leading and being out of your style's slot refill
+  // slower, never negative, per RECOVERY_FLOOR. A front-runner does not escape
+  // the lead's refill penalty — its style merely lets it recharge better than
+  // another style would in the same spot, in exchange for never having ground
+  // to make up.
   const relief = K.FRONT_COST_RELIEF[r.horse.style];
 
   const forwardness = 1 - r.fieldPosition; // 1 at the front, 0 at the back
 
-  // How hard is this horse being pressed? A CLEAR lead is cheap — the leader
-  // dictates a soft tempo and saves. A CONTESTED lead is ruinous. This is the
-  // front-runner's entire win condition, and it is what gives Pace Pusher
-  // something to punish: contest the lead and you burn the leader down.
+  // How hard is this horse being pressed? A CLEAR lead refills fine — the
+  // leader dictates a soft tempo. A CONTESTED lead refills much worse. This is
+  // the front-runner's entire win condition, and what gives Pace Pusher
+  // something to punish: contest the lead and the leader can't recharge.
   const nearest = all.reduce((best, o) => {
     if (o === r || o.finishTime !== null) return best;
     const gap = Math.abs(o.distance - r.distance);
@@ -591,18 +608,19 @@ function stepRunner(
   }, Number.POSITIVE_INFINITY);
   const contest = clamp(1 - nearest / K.CLEAR_LEAD_GAP, 0, 1);
 
-  // Two separate costs, deliberately decoupled.
+  // Two separate slowdowns, deliberately decoupled.
   //
-  // The BASELINE cost of being up front is discounted by running style — that
-  // is what lets a front-runner hold a lead cheaply. The CONTEST cost of being
-  // pressed is not: being hounded hurts everyone the same. Previously one
-  // number did both jobs, so making front-runners efficient also made them
-  // immune to being contested, which quietly disabled the whole upset mechanism.
+  // The BASELINE slowdown from being up front is discounted by running style —
+  // that is what lets a front-runner hold a lead without its reserve
+  // stagnating. The CONTEST slowdown from being pressed is not: being hounded
+  // hurts everyone the same. One number doing both jobs would make efficient
+  // front-runners immune to being contested too, quietly disabling the whole
+  // upset mechanism.
   const leadCost = Math.pow(forwardness, 1.5) * K.FRONT_COST_PENALTY * relief;
   // Sharper exponent: being pressed should punish the horses actually
   // fighting for the lead, not everyone stuck in mid-field traffic.
   const pressCost = Math.pow(forwardness, 3) * K.CONTESTED_LEAD_COST * contest;
-  const frontCost = 1 + leadCost + pressCost;
+  const frontPenalty = 1 + leadCost + pressCost;
   const backRecovery = 1 + K.BACK_RECOVERY_BONUS * r.fieldPosition;
 
   const rawMisfit = Math.abs(r.fieldPosition - profile.preferred);
@@ -613,22 +631,13 @@ function stepRunner(
   // Positional preference only matters while a race is still being SET UP, and
   // ramps in rather than snapping on at the gate.
   //
-  // It used to be flat at full strength for the whole first 60% of the race,
-  // which double-charged the establish scramble: ai.ts already prices reaching
-  // your slot as a bounded spike in EFFORT (ESTABLISH_GAIN, up to MAX_EFFORT),
-  // and this misfit penalty was charging the SAME distance again as extra
-  // drain, at the same moment — a horse still two lengths from its slot half a
-  // second after the gate was already being fined for not being there yet.
-  // That double charge could crater a horse to 0 energy inside the first 12%
-  // of the race, permanently out of position with nothing left to fix it —
-  // the death spiral behind the 100+ length tail margins this fixes.
-  //
-  // Fading it in across the same window ai.ts is still willing to pay the
-  // effort-spike for (ESTABLISH_UNTIL) means the drift itself is what's
-  // priced during the scramble, not the scramble AND the drift together.
-  // Once everyone is committed in the stretch it fades OUT again — otherwise
-  // a closer is punished for executing its own strategy, since making its run
-  // means leaving the back of the field by definition.
+  // ai.ts already prices reaching your slot as a bounded spike in EFFORT
+  // (ESTABLISH_GAIN, up to MAX_EFFORT) — fading this in across the same window
+  // (ESTABLISH_UNTIL) means the drift itself is what's priced during the
+  // scramble, not the scramble and the drift together. Once everyone is
+  // committed in the stretch it fades OUT again — otherwise a closer is
+  // punished for executing its own strategy, since making its run means
+  // leaving the back of the field by definition.
   const positional = clamp(
     Math.min(
       race.progress / K.ESTABLISH_UNTIL,
@@ -646,103 +655,94 @@ function stepRunner(
     r.fidelityTicks++;
   }
 
-  // Two-sided: a perfect fit earns a genuine DISCOUNT, a bad fit a genuine
-  // penalty. Being in position must pay, not merely avoid a fine.
+  // Two-sided: a perfect fit earns a genuine refill BONUS, a bad fit a genuine
+  // PENALTY — floored, never a drain. Being in position must pay off, not
+  // merely avoid a fine.
   const fit = (1 - misfit) * positional;
 
-  // The misfit PENALTY (not the fit reward, which is untouched) is discounted
-  // once a horse is already critically low on energy — see
-  // MISFIT_ENERGY_RELIEF_FLOOR. A horse with a healthy reserve pays the full
-  // rate; this only engages below FADE_THRESHOLD, where it is already paying
-  // for being out of position via the fade curve and does not also need a
-  // bottomless recovery penalty that leaves no way back.
-  const energyRelief = clamp(r.energy / K.FADE_THRESHOLD, K.MISFIT_ENERGY_RELIEF_FLOOR, 1);
-  const misfitEconomy = misfit * energyRelief;
+  // Never below RECOVERY_FLOOR: leading, contested, and badly out of position
+  // all compound here, but nothing in this stack can push the refill rate to
+  // zero or negative. That is what makes the drain rule below literally true
+  // rather than true-except-in-a-bad-spot.
+  let recoveryMult = clamp(
+    (backRecovery * (1 + K.POSITION_RECOVERY_BONUS * fit - K.OUT_POSITION_RECOVERY_PENALTY * misfit)) /
+      frontPenalty,
+    K.RECOVERY_FLOOR,
+    4,
+  );
 
-  let costMult =
-    frontCost * (1 + K.POSITION_COST_PENALTY * misfitEconomy - K.IN_POSITION_DRAIN_BONUS * fit);
-  let recoveryMult =
-    backRecovery *
-    (1 + K.POSITION_RECOVERY_BONUS * fit - K.OUT_POSITION_RECOVERY_PENALTY * misfitEconomy);
-
-  if (hasTrait(r.traits, 'railHugger')) costMult *= r.lane === 0 ? 0.94 : 1.05;
+  if (hasTrait(r.traits, 'railHugger')) recoveryMult *= r.lane === 0 ? 1.06 : 0.95;
   if (hasTrait(r.traits, 'herdAnimal')) recoveryMult *= r.drafting ? 1.15 : 0.92;
   if (hasTrait(r.traits, 'loner')) recoveryMult *= r.drafting ? 0.9 : 1.12;
-  if (hasTrait(r.traits, 'needsRoom')) costMult *= r.blockedFor > 0 ? 1.2 : 0.96;
-  if (hasTrait(r.traits, 'gateRusher') && race.progress < 0.125) costMult *= 1.3;
-  if (hasTrait(r.traits, 'alert') && race.progress < 0.2) costMult *= 1.1;
-  if (hasTrait(r.traits, 'cruiser')) costMult *= r.effort > 0.85 ? 1.3 : 0.8;
-  const recoveryBeforeDraft = recoveryMult;
+  if (hasTrait(r.traits, 'needsRoom')) recoveryMult *= r.blockedFor > 0 ? 0.83 : 1.04;
   if (r.drafting) recoveryMult *= 1 + K.DRAFT_RECOVERY_BONUS;
+  recoveryMult = Math.max(K.RECOVERY_FLOOR, recoveryMult);
 
-  // --- Energy: drain when driving, recover when settled --------------------
+  // --- Energy: drain only from EXCESS effort or the kick --------------------
+  //
+  // cruiseEffort is the line between "riding to style" and "urging". At or
+  // below it, energy only ever recovers — position (above) decides how fast,
+  // never whether. Above it, only the EXCESS drains, quadratically, same
+  // shape as before but measured from the style's own baseline instead of
+  // from zero, so a style that naturally cruises harder doesn't pay for
+  // simply existing at its own baseline.
   const kicking = r.kickRemaining > 0;
   const kickCost = kicking
     ? K.KICK_DRAIN_MULTIPLIER * (1 + (1 - r.kickWindowFit) * K.MISTIMED_KICK_DRAIN)
     : 1;
-  const drain = r.drainRate * r.effort * r.effort * costMult * kickCost;
-  // Recovery is QUADRATIC in slack, not linear. A horse galloping at 90% of
-  // race speed is not resting — with a linear curve it recovered faster than it
-  // drained, which let a leader cruise the whole way on full energy and made
-  // the entire style trade meaningless.
-  const slack = 1 - r.effort;
-  // recoveryMult can go negative when badly out of position; clamp so a horse
-  // never gains energy from being in the wrong place.
-  const recovery = r.recoveryRate * slack * slack * Math.max(0, recoveryMult);
+
+  let urgeMult = 1;
+  if (hasTrait(r.traits, 'gateRusher') && race.progress < 0.125) urgeMult *= 1.3;
+  if (hasTrait(r.traits, 'alert') && race.progress < 0.2) urgeMult *= 1.1;
+  if (hasTrait(r.traits, 'cruiser')) urgeMult *= r.effort > 0.85 ? 1.3 : 0.8;
+
+  const excess = Math.max(0, r.effort - profile.cruiseEffort);
+  const rest = Math.max(0, profile.cruiseEffort - r.effort);
+  const urging = excess > 0;
+
+  const drain = r.drainRate * excess * excess * urgeMult * kickCost;
+  // Recovery only applies while NOT urging — riding at or below cruiseEffort.
+  // REST_RECOVERY_BASE means simply racing to style already refills; resting
+  // further BELOW cruiseEffort (taking a pull) adds to that quadratically,
+  // same shape the old slack-based recovery had.
+  const recovery = urging
+    ? 0
+    : r.recoveryRate * (K.REST_RECOVERY_BASE + rest * rest) * recoveryMult;
   r.energy = clamp(r.energy + (recovery - drain) * K.DT, 0, K.MAX_ENERGY);
 
   // --- Why the energy moved -------------------------------------------------
   //
-  // Four multipliers act on the drain and recovery above, and the bar on screen
-  // shows only their sum. Report which one is doing the most work, so the HUD
-  // can name the mechanic rather than leaving the player to infer it.
-  //
-  // Each is measured as the ENERGY PER SECOND it is worth: how far the net rate
-  // would move if that factor alone were switched off. Comparing the raw
-  // constants instead is not like-for-like — a factor that touches both drain
-  // and recovery would win on having two terms rather than on mattering more,
-  // which put "in position" on screen 61% of the time when first tried.
-  //
-  // Reporting only. Nothing here feeds back into the simulation.
+  // Reporting only. Nothing here feeds back into the simulation. Draining and
+  // recovering are mutually exclusive by construction now, so the report only
+  // has to rank within whichever one is actually happening this tick.
   r.energyRate = recovery - drain;
-  const drainUnit = r.drainRate * r.effort * r.effort * kickCost;
-  const recoveryUnit = r.recoveryRate * slack * slack;
-  const positionBracket =
-    1 + K.POSITION_COST_PENALTY * misfitEconomy - K.IN_POSITION_DRAIN_BONUS * fit;
-  const draftMult = r.drafting ? 1 + K.DRAFT_RECOVERY_BONUS : 1;
 
-  const factors: [EnergyFactor, number][] = [
-    ['pressed', drainUnit * pressCost * positionBracket],
-    ['onTheLead', drainUnit * leadCost * positionBracket],
-    [
-      'outOfPosition',
-      drainUnit * frontCost * K.POSITION_COST_PENALTY * misfitEconomy +
-        recoveryUnit * backRecovery * K.OUT_POSITION_RECOVERY_PENALTY * misfitEconomy * draftMult,
-    ],
-    [
-      'inPosition',
-      drainUnit * frontCost * K.IN_POSITION_DRAIN_BONUS * fit +
-        recoveryUnit * backRecovery * K.POSITION_RECOVERY_BONUS * fit * draftMult,
-    ],
-    ['drafting', r.drafting ? recoveryUnit * recoveryBeforeDraft * K.DRAFT_RECOVERY_BONUS : 0],
-    // The kick is reported whenever it runs. It is the one factor the player
-    // deliberately caused, and being told what your own input is costing
-    // outranks anything merely circumstantial.
-    ['kicking', kicking ? Number.POSITIVE_INFINITY : 0],
-  ];
-
-  let best: EnergyFactor = 'neutral';
-  // Energy per second below which a factor is not worth a word on screen. A
-  // race is ~64s, so this is a factor that would swing under 6 of 100 energy
-  // across the whole trip.
-  let bestWeight = 0.09;
-  for (const [name, weight] of factors) {
-    if (weight > bestWeight) {
-      best = name;
-      bestWeight = weight;
+  if (drain > 0) {
+    // The kick outranks urging — it's the bigger, deliberate spend, and the
+    // one the player explicitly chose to fire.
+    r.energyFactor = kicking ? 'kicking' : 'urging';
+  } else {
+    const draftMult = r.drafting ? 1 + K.DRAFT_RECOVERY_BONUS : 1;
+    const factors: [EnergyFactor, number][] = [
+      ['pressed', recovery * (1 - 1 / (1 + pressCost))],
+      ['onTheLead', recovery * (1 - 1 / (1 + leadCost))],
+      ['outOfPosition', recovery * K.OUT_POSITION_RECOVERY_PENALTY * misfit],
+      ['inPosition', recovery * K.POSITION_RECOVERY_BONUS * fit],
+      ['drafting', r.drafting ? recovery * (1 - 1 / draftMult) : 0],
+    ];
+    let best: EnergyFactor = 'neutral';
+    // Energy per second below which a factor is not worth a word on screen. A
+    // race is ~64s, so this is a factor that would swing under 6 of 100 energy
+    // across the whole trip.
+    let bestWeight = 0.09;
+    for (const [name, weight] of factors) {
+      if (weight > bestWeight) {
+        best = name;
+        bestWeight = weight;
+      }
     }
+    r.energyFactor = best;
   }
-  r.energyFactor = best;
 
   // --- The performance band -------------------------------------------------
   // Consistency decides how tightly the horse delivers its true ability,
