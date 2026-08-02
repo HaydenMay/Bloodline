@@ -115,10 +115,11 @@ export function createAiController(horse: Horse): Controller {
     effort += (Math.sin(race.elapsed * 3.1 + self.lane) * sloppiness) / 2;
 
     // --- The kick ----------------------------------------------------------
-    // Fire once, at the style's moment. Strength is decided by the engine from
-    // banked energy and Grit — a horse that burned everything gets very little.
+    // Fire once, at the style's moment. Strength is Grit x jockey skill, gated
+    // by having any fuel left at all — the AI rides its one charge exactly as
+    // before regardless of how many the player's own horse now carries.
     const kick =
-      !self.kickUsed &&
+      self.kicksRemaining > 0 &&
       race.progress >= kickAt &&
       // Turn of Foot has a short kick, so it must be held later.
       (!hasTrait(traits, 'turnOfFoot') || race.progress >= kickAt + 0.06);
