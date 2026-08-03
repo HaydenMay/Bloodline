@@ -485,10 +485,10 @@ export const MOMENT_WINDOWS = {
  *   late:     0.35/0.20 - 1 = 0.75
  */
 export const KICK_MOMENT_BONUS = {
-  early: 0.20,
-  earlyMid: 0.20,
-  midLate: 0.20,
-  late: 0.20,
+  early: 0.10,
+  earlyMid: 0.10,
+  midLate: 0.15,
+  late: 0.35,
 } as const satisfies Record<Moment, number>;
 
 /**
