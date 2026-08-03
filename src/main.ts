@@ -2,8 +2,7 @@ import './style.css';
 import { createRng } from './sim/index.js';
 import { createNameGenerator } from './data/names.js';
 import { generateHorse } from './sim/horse.js';
-import { FIELD_SIZE, RUNNING_STYLES, type Moment } from './data/index.js';
-import { MOMENT_WINDOWS } from './sim/race/constants.js';
+import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
 import { attachInfoBox } from './ui/infoBox.js';
 import { mountRaceScreen } from './ui/raceScreen.js';
 import { mountHorsePreview } from './ui/horsePreview.js';
@@ -56,17 +55,15 @@ function startRace(seed: string): void {
 
   const bar = document.createElement('div');
   bar.className = 'racebar';
-  // Where this horse's window sits in the race, as a share of the distance.
-  // Moment is independent of style now (sim/race/constants.ts) — a horse's
-  // own rolled Moment decides this, not its running style.
-  const [winLo, winHi] = MOMENT_WINDOWS[player.moment];
-  const lo = Math.round(winLo * 100);
-  const hi = Math.round(winHi * 100);
+  // TODO: Moment window display — simulation not yet rebuilt
+  // Horses no longer have moments during redesign
+  const lo = 0; // stub
+  const hi = 100; // stub
 
   bar.innerHTML = `
     <div class="rb-horse">
       <span class="rb-name">${player.name}</span>
-      <span class="rb-style">${styleLabel(player.style)} · <span class="rb-moment-when">${momentLabel(player.moment)}</span></span>
+      <span class="rb-style">${styleLabel(player.style)}</span>
     </div>
     <div class="rb-moment">
       <span class="rb-moment-label">Your moment</span>
@@ -91,20 +88,6 @@ function startRace(seed: string): void {
     playerSilks: { primary: '#F2C14E', secondary: '#12222B' },
     config: { furlongs: 8, going: 'good', hype: 0.65, seed: `${seed}-run` },
   });
-}
-
-/** Named after the part of the track where this Moment's window falls. */
-function momentLabel(moment: Moment): string {
-  switch (moment) {
-    case 'early':
-      return 'from the gate';
-    case 'earlyMid':
-      return 'down the back';
-    case 'midLate':
-      return 'round the turn';
-    case 'late':
-      return 'in the straight';
-  }
 }
 
 function styleLabel(style: string): string {

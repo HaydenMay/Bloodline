@@ -11,8 +11,6 @@ const result = (over: Partial<RaceResult> & { horseId: string; finishPosition: n
   hadTrouble: false,
   fumbledStart: false,
   offColour: false,
-  holdingTicks: 0,
-  avgChargesWhileHolding: 0,
   ...over,
 });
 

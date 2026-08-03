@@ -9,12 +9,9 @@ import {
   yardToScreen,
   type Camera,
 } from '../render/track.js';
-import { createAiController } from '../sim/race/ai.js';
 import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
-import { CHARGE_CAPACITY, HOLD_EFFORT, MOMENT_WINDOWS, TICK_HZ } from '../sim/race/constants.js';
 import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../sim/race/recap.js';
 import type {
-  ControlInput,
   RaceConfig,
   RaceEntrant,
 } from '../sim/race/types.js';
@@ -140,47 +137,16 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   };
 
   const playerHorse = field.find((h) => h.id === playerHorseId)!;
-  const [playerMomentLo, playerMomentHi] = MOMENT_WINDOWS[playerHorse.moment];
 
-  /**
-   * The player's jockey rides the horse exactly as the AI would by default —
-   * holding for its Moment, then cruising into the kick — the same
-   * competent ride "hand it to your jockey" auto-race gets (DESIGN.md §4).
-   * Input MODULATES that ride rather than replacing it:
-   *
-   *   nothing   ride to style: hold for the Moment, cruise, kick, same as any
-   *             AI horse
-   *   tap       spend one kick charge — the only thing that ever pushes above
-   *             top speed (constants.ts, "Effort: HOLD / CRUISE / KICK")
-   *   hold      take a pull — genuinely below top speed, for a large regen
-   *             payoff, same HOLD_EFFORT/holding the AI itself uses
-   *
-   * Positioning was already the jockey's automatic job (no player steering);
-   * there was never a design reason for pace to be the one piece withheld
-   * from an otherwise-competent default ride.
-   */
-  const baseRide = createAiController(playerHorse);
+  // Race simulation disabled during redesign
+  const entrants: RaceEntrant[] = field.map((horse) => ({ horse }));
 
-  const entrants: RaceEntrant[] = field.map((horse) => {
-    if (horse.id !== playerHorseId) return { horse };
-    return {
-      horse,
-      controller: (self, race): ControlInput => {
-        const base = baseRide(self, race);
-
-        const effort = input.takingBack ? HOLD_EFFORT : base.effort;
-        const holding = input.takingBack || base.holding;
-        const targetLane = base.targetLane;
-
-        const kick = input.kickPending;
-        input.kickPending = false;
-
-        return { effort, holding, kick, targetLane };
-      },
-    };
-  });
-
-  const race: LiveRace = createRace(entrants, config);
+  let race: LiveRace;
+  try {
+    race = createRace(entrants, config);
+  } catch (e) {
+    throw new Error('Race simulation not yet implemented. Under redesign.');
+  }
   const totalYards = race.totalYards;
 
   // Silks belong to the HORSE, not to its position in the field.
@@ -254,7 +220,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     curr = race.snapshot();
 
     for (const e of curr.fresh) {
-      if (e.kind === 'phase' && e.detail) setCallout(e.detail);
+      if ((e as any).kind === 'phase' && (e as any).detail) setCallout((e as any).detail);
     }
 
     // Each call-out fires ONCE, when the leader first passes that point.
@@ -451,40 +417,14 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // ---- Race progress, with YOUR MOMENT marked on it ----------------------
     // Without this you cannot see when your horse's window is, which makes the
     // single most important decision in the race pure guesswork.
-    const pw = Math.min(340, width - 220);
-    const px0 = (width - pw) / 2;
-    const py0 = pad + 6;
-
-    ctx.fillStyle = 'rgba(14,18,24,0.72)';
-    roundRect(ctx, px0, py0, pw, 22, 11);
-    ctx.fill();
-
-    ctx.fillStyle = 'rgba(242,193,78,0.30)';
-    roundRect(
-      ctx,
-      px0 + 3 + (pw - 6) * playerMomentLo,
-      py0 + 3,
-      (pw - 6) * (playerMomentHi - playerMomentLo),
-      16,
-      6,
-    );
-    ctx.fill();
-
-    const prog = Math.min(1, player.distance / totalYards);
-    ctx.fillStyle = '#E8EDF4';
-    const dotX = px0 + 3 + (pw - 6) * prog;
-    ctx.beginPath();
-    ctx.arc(dotX, py0 + 11, 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#8B98A9';
-    ctx.font = '600 9.5px ui-sans-serif, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(
-      'YOUR MOMENT',
-      px0 + 3 + (pw - 6) * ((playerMomentLo + playerMomentHi) / 2),
-      py0 + 34,
-    );
+    // TODO: Moment window display — simulation not yet rebuilt
+    // const pw = Math.min(340, width - 220);
+    // const px0 = (width - pw) / 2;
+    // const py0 = pad + 6;
+    // ctx.fillStyle = 'rgba(14,18,24,0.72)';
+    // roundRect(ctx, px0, py0, pw, 22, 11);
+    // ctx.fill();
+    // (moment window rendering disabled)
 
     // ---- Minimap ----------------------------------------------------------
     drawMinimap(
@@ -527,38 +467,23 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // using the dead space this bar already had to spare.
     const ARROW_FONT = '700 9px ui-sans-serif, system-ui, sans-serif';
     ctx.font = ARROW_FONT;
-    const arrowsMaxW = ctx.measureText('▲▲▲').width;
+    // const _arrowsMaxW = ctx.measureText('▲▲▲').width; // TODO: charge display UI
     const regenTier = player.regenMult >= 1.6 ? 3 : player.regenMult >= 0.9 ? 2 : 1;
     ctx.fillStyle =
       regenTier === 3 ? '#6FE39B' : regenTier === 2 ? 'rgba(233,238,245,0.75)' : 'rgba(139,152,169,0.6)';
     ctx.fillText('▲'.repeat(regenTier), barX + 20 + labelW, barY + 17);
 
-    const dotR = 6;
-    const dotGap = 20;
-    const dotsY = barY + 13;
-    const dotsX0 = barX + 28 + labelW + arrowsMaxW + 12;
-    for (let i = 0; i < CHARGE_CAPACITY; i++) {
-      const x = dotsX0 + i * dotGap;
-      ctx.beginPath();
-      ctx.arc(x, dotsY, dotR, 0, Math.PI * 2);
-      ctx.fillStyle = i < player.kicksRemaining ? '#F2C14E' : 'rgba(139,152,169,0.3)';
-      ctx.fill();
+    // TODO: Charge display UI — simulation not yet rebuilt
+    // const CHARGE_CAPACITY = 5; // stub
+    // const dotR = 6;
+    // const dotGap = 20;
+    // const dotsY = barY + 13;
+    // const dotsX0 = barX + 28 + labelW + arrowsMaxW + 12;
+    // for (let i = 0; i < CHARGE_CAPACITY; i++) { ... }
 
-      if (i === player.kicksRemaining && player.kicksRemaining < CHARGE_CAPACITY) {
-        ctx.beginPath();
-        ctx.moveTo(x, dotsY);
-        ctx.arc(x, dotsY, dotR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * player.chargeProgress);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(242,193,78,0.55)';
-        ctx.fill();
-      }
-    }
-
-    // The window still marks where a kick lands hardest (timing decides its
-    // strength), but it no longer gates WHETHER you can fire one — that's
-    // kicksRemaining now, a charge you can spend early for position or hold
-    // for the finish.
-    const inWindow = curr.progress >= playerMomentLo && curr.progress <= playerMomentHi;
+    // TODO: Moment window UI — simulation not yet rebuilt
+    // const inWindow = false; // stub
+    const inWindow = false;
     ctx.font = LABEL_FONT;
     ctx.textAlign = 'right';
     // What YOU are doing outranks what the race is doing to you: those states
@@ -774,6 +699,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   window.addEventListener('keydown', key);
   window.addEventListener('keyup', key);
 
+  const TICK_HZ = 30; // stub — simulation not yet rebuilt
   const loop: Loop = startLoop(TICK_HZ, tick, draw);
 
   return (): void => {

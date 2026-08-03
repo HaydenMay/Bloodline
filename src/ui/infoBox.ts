@@ -1,6 +1,5 @@
 import { toGrade, STAT_KEYS, type Horse, type StatKey } from '../sim/types.js';
 import { TRAITS } from '../data/traits.js';
-import type { Moment } from '../data/index.js';
 import { coatFor } from '../render/palette.js';
 
 /**
@@ -33,20 +32,6 @@ const STYLE_LABELS: Record<string, { name: string; seat: string }> = {
   midPack: { name: 'Mid-pack', seat: 'Settles mid-field' },
   closer: { name: 'Closer', seat: 'Settles at the back' },
 };
-
-/** Named after the part of the track where this Moment's window falls. */
-function momentLabel(moment: Moment): string {
-  switch (moment) {
-    case 'early':
-      return 'From the gate';
-    case 'earlyMid':
-      return 'Down the back';
-    case 'midLate':
-      return 'Round the turn';
-    case 'late':
-      return 'In the straight';
-  }
-}
 
 /** Potential shown as a band, since the exact ceiling is never revealed. */
 function potentialBand(current: number, potential: number): string {
@@ -107,7 +92,6 @@ export function renderInfoBox(horse: Horse): string {
     <div class="ib-row">
       <div><span class="ib-k">Style</span><span class="ib-v">${style.name}</span></div>
       <div><span class="ib-k">Runs</span><span class="ib-v">${style.seat.toLowerCase()}</span></div>
-      <div><span class="ib-k">Moment</span><span class="ib-v ib-accent">${momentLabel(horse.moment)}</span></div>
     </div>
 
     <p class="ib-section">Attributes</p>

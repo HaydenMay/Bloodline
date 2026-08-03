@@ -1,26 +1,10 @@
 import type { Rng } from './rng.js';
 import type { Aptitudes, Gender, Horse, Stats } from './types.js';
 import { STAT_KEYS } from './types.js';
-import { COAT_IDS, DISTANCE_BANDS, MOMENTS, type DistanceBand, type Division, type Moment, RUNNING_STYLES, type RunningStyle } from '../data/index.js';
-import { MOMENT_WEIGHTS_BY_STYLE } from './race/constants.js';
+import { COAT_IDS, DISTANCE_BANDS, type DistanceBand, type Division, RUNNING_STYLES, type RunningStyle } from '../data/index.js';
 import { RACING_TRAIT_IDS, TRAITS, type TraitId } from '../data/traits.js';
 import type { NameGenerator } from '../data/names.js';
 
-/**
- * A horse's Moment, weighted by its running style so archetypes stay sensible
- * (MOMENT_WEIGHTS_BY_STYLE, sim/race/constants.ts) — independent otherwise, so
- * two horses of the same style can still kick at different points.
- */
-function rollMoment(rng: Rng, style: RunningStyle): Moment {
-  const weights = MOMENT_WEIGHTS_BY_STYLE[style];
-  const total = MOMENTS.reduce((sum, m) => sum + weights[m], 0);
-  let roll = rng.next() * total;
-  for (const moment of MOMENTS) {
-    roll -= weights[moment];
-    if (roll <= 0) return moment;
-  }
-  return MOMENTS[MOMENTS.length - 1]!;
-}
 
 /**
  * Quality band per division.
@@ -179,7 +163,6 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     stats,
     potential: rollPotential(rng, stats, opts.starter ? 1.35 : 1),
     style,
-    moment: rollMoment(rng, style),
     aptitudes: rollAptitudes(rng, primaryBand),
     traits: rollTraits(rng, opts.legacy ?? 0),
     condition: opts.starter ? 70 : clamp100(rng.range(58, 88)),

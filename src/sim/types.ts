@@ -1,4 +1,4 @@
-import type { Division, DistanceBand, Moment, RunningStyle } from '../data/index.js';
+import type { Division, DistanceBand, RunningStyle } from '../data/index.js';
 import type { TraitId } from '../data/traits.js';
 
 /**
@@ -62,8 +62,6 @@ export interface Horse {
 
   /** WHERE it sits in the pack. */
   style: RunningStyle;
-  /** WHEN its kick lands and its passive speed curve peaks — independent of style. */
-  moment: Moment;
   aptitudes: Aptitudes;
   traits: TraitId[];
 
