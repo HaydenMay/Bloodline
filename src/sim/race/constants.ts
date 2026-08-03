@@ -272,9 +272,9 @@ export const KICK_IN_WINDOW_SLOT_FRACTION = 0.2;
  */
 export const KICK_STYLE_BONUS = {
   frontRunner: 0,
-  stalker: 0.15,
-  midPack: 0.3,
-  closer: 0.5,
+  stalker: 0.1,
+  midPack: 0.2,
+  closer: 0.3,
 } as const satisfies Record<RunningStyle, number>;
 
 /**
@@ -303,7 +303,7 @@ export const KICK_STYLE_BONUS = {
  * own back-of-the-pack slot. The comeback has to react to that collective
  * gap, not to whether the front pack is elbowing itself.
  */
-export const KICK_COMPLACENCY_PENALTY = 0.6;
+export const KICK_COMPLACENCY_PENALTY = 0;
 
 /**
  * Scale (yards) for how fast "clear of the field" ramps up, for the comeback
@@ -465,10 +465,10 @@ export const STYLE_PROFILES = {
  * KICK_MIN_FIT, KICK_MISTIMED_DURATION_FLOOR — sim/race/engine.ts).
  */
 export const MOMENT_WINDOWS = {
-  early: [0, 0.25],
-  earlyMid: [0.2, 0.55],
-  midLate: [0.55, 0.9],
-  late: [0.8, 1],
+  early: [0, 0.3],
+  earlyMid: [0, 0.55],
+  midLate: [0.45, 1],
+  late: [0.7, 1],
 } as const satisfies Record<Moment, readonly [number, number]>;
 
 /**
@@ -485,10 +485,10 @@ export const MOMENT_WINDOWS = {
  *   late:     0.35/0.20 - 1 = 0.75
  */
 export const KICK_MOMENT_BONUS = {
-  early: 0.4,
+  early: 0.83,
   earlyMid: 0,
   midLate: 0,
-  late: 0.75,
+  late: 0.83,
 } as const satisfies Record<Moment, number>;
 
 /**
