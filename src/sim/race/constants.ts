@@ -271,10 +271,10 @@ export const KICK_IN_WINDOW_SLOT_FRACTION = 0.2;
  * (ROADMAP.md, Moment win-rate investigation).
  */
 export const KICK_STYLE_BONUS = {
-  frontRunner: 0,
+  frontRunner: 0.15,
   stalker: 0.15,
-  midPack: 0.3,
-  closer: 0.5,
+  midPack: 0.15,
+  closer: 0.15,
 } as const satisfies Record<RunningStyle, number>;
 
 /**
@@ -303,7 +303,7 @@ export const KICK_STYLE_BONUS = {
  * own back-of-the-pack slot. The comeback has to react to that collective
  * gap, not to whether the front pack is elbowing itself.
  */
-export const KICK_COMPLACENCY_PENALTY = 0.6;
+export const KICK_COMPLACENCY_PENALTY = 0.3;
 
 /**
  * Scale (yards) for how fast "clear of the field" ramps up, for the comeback
@@ -466,9 +466,9 @@ export const STYLE_PROFILES = {
  */
 export const MOMENT_WINDOWS = {
   early: [0, 0.25],
-  earlyMid: [0.2, 0.55],
-  midLate: [0.55, 0.9],
-  late: [0.8, 1],
+  earlyMid: [0.25, 0.5],
+  midLate: [0.5, 0.75],
+  late: [0.75, 1],
 } as const satisfies Record<Moment, readonly [number, number]>;
 
 /**
@@ -485,10 +485,10 @@ export const MOMENT_WINDOWS = {
  *   late:     0.35/0.20 - 1 = 0.75
  */
 export const KICK_MOMENT_BONUS = {
-  early: 0.4,
-  earlyMid: 0,
-  midLate: 0,
-  late: 0.75,
+  early: 0.10,
+  earlyMid: 0.10,
+  midLate: 0.15,
+  late: 0.35,
 } as const satisfies Record<Moment, number>;
 
 /**
