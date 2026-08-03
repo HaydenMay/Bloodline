@@ -244,6 +244,222 @@ function styleBalanceWithEarlyMoment(): Omit<SuiteResult, 'name'> {
   };
 }
 
+/**
+ * Isolation test: all 8 horses forced to "earlyMid" moment.
+ */
+function styleBalanceWithEarlyMidMoment(): Omit<SuiteResult, 'name'> {
+  const wins: Record<RunningStyle, number> = { frontRunner: 0, stalker: 0, midPack: 0, closer: 0 };
+  const runs: Record<RunningStyle, number> = { frontRunner: 0, stalker: 0, midPack: 0, closer: 0 };
+
+  for (let i = 0; i < RACES; i++) {
+    const rng = createRng(`${SEED}-earlyMid-style-${i}`);
+    const names = createNameGenerator(rng);
+
+    const horses: Horse[] = [];
+    for (const style of RUNNING_STYLES) {
+      for (let n = 0; n < 2; n++) {
+        const h = generateHorse(rng, names, { division: 'open', style, age: 4 });
+        h.moment = 'earlyMid'; // FORCED
+        for (const key of STAT_KEYS) h.stats[key] = 55;
+        h.aptitudes = { sprint: 80, mile: 80, route: 80 };
+        horses.push(h);
+        runs[style]++;
+      }
+    }
+
+    const distance = DISTANCES[i % DISTANCES.length]!;
+    const outcome = simulateRace(
+      horses.map((horse) => ({ horse })),
+      { furlongs: distance, going: 'firm', hype: 0.5, seed: `${SEED}-earlyMid-race-${i}` },
+    );
+    const winnerId = outcome.results[0]!.horseId;
+    for (const h of horses) {
+      if (h.id === winnerId) {
+        wins[h.style]++;
+        break;
+      }
+    }
+  }
+
+  const rates = RUNNING_STYLES.map((s) => ({ style: s, rate: wins[s] / (runs[s] / 1) }));
+  const expected = 1 / 8;
+  const worst = Math.max(...rates.map((r) => Math.abs(r.rate - expected) / expected));
+
+  const lines = rates.map(
+    (r) =>
+      `  ${r.style.padEnd(13)} ${bar(r.rate, 0.25)} ${pct(r.rate).padStart(6)}  ` +
+      `(${((r.rate / expected - 1) * 100 >= 0 ? '+' : '') + ((r.rate / expected - 1) * 100).toFixed(0)}% vs even)`,
+  );
+  const worstStyle = rates.reduce((a, b) =>
+    Math.abs(b.rate - expected) > Math.abs(a.rate - expected) ? b : a,
+  );
+  const worstPoints = (worstStyle.rate - expected) * 100;
+
+  lines.push('');
+  lines.push(
+    `  Furthest from fair: ${worstStyle.style} on ${pct(worstStyle.rate)}, ` +
+      `against a fair share of ${pct(expected)}.`,
+  );
+  lines.push(
+    `  That is ${worstPoints >= 0 ? '+' : ''}${worstPoints.toFixed(1)} percentage points ` +
+      `(${pct(worst)} off in relative terms; the bar is 30%).`,
+  );
+
+  return {
+    ok: worst < 0.3,
+    lines,
+    explain: {
+      question: 'With moment held constant (earlyMid), which style dominates?',
+      how: 'Eight horses, two of each style, all forced to earlyMid moment. Stats identical at 55.',
+      reading: 'Fair share is 12.5%. If a style wins more, the style-earlyMid combination is unbalanced.',
+    },
+  };
+}
+
+/**
+ * Isolation test: all 8 horses forced to "midLate" moment.
+ */
+function styleBalanceWithMidLateMoment(): Omit<SuiteResult, 'name'> {
+  const wins: Record<RunningStyle, number> = { frontRunner: 0, stalker: 0, midPack: 0, closer: 0 };
+  const runs: Record<RunningStyle, number> = { frontRunner: 0, stalker: 0, midPack: 0, closer: 0 };
+
+  for (let i = 0; i < RACES; i++) {
+    const rng = createRng(`${SEED}-midLate-style-${i}`);
+    const names = createNameGenerator(rng);
+
+    const horses: Horse[] = [];
+    for (const style of RUNNING_STYLES) {
+      for (let n = 0; n < 2; n++) {
+        const h = generateHorse(rng, names, { division: 'open', style, age: 4 });
+        h.moment = 'midLate'; // FORCED
+        for (const key of STAT_KEYS) h.stats[key] = 55;
+        h.aptitudes = { sprint: 80, mile: 80, route: 80 };
+        horses.push(h);
+        runs[style]++;
+      }
+    }
+
+    const distance = DISTANCES[i % DISTANCES.length]!;
+    const outcome = simulateRace(
+      horses.map((horse) => ({ horse })),
+      { furlongs: distance, going: 'firm', hype: 0.5, seed: `${SEED}-midLate-race-${i}` },
+    );
+    const winnerId = outcome.results[0]!.horseId;
+    for (const h of horses) {
+      if (h.id === winnerId) {
+        wins[h.style]++;
+        break;
+      }
+    }
+  }
+
+  const rates = RUNNING_STYLES.map((s) => ({ style: s, rate: wins[s] / (runs[s] / 1) }));
+  const expected = 1 / 8;
+  const worst = Math.max(...rates.map((r) => Math.abs(r.rate - expected) / expected));
+
+  const lines = rates.map(
+    (r) =>
+      `  ${r.style.padEnd(13)} ${bar(r.rate, 0.25)} ${pct(r.rate).padStart(6)}  ` +
+      `(${((r.rate / expected - 1) * 100 >= 0 ? '+' : '') + ((r.rate / expected - 1) * 100).toFixed(0)}% vs even)`,
+  );
+  const worstStyle = rates.reduce((a, b) =>
+    Math.abs(b.rate - expected) > Math.abs(a.rate - expected) ? b : a,
+  );
+  const worstPoints = (worstStyle.rate - expected) * 100;
+
+  lines.push('');
+  lines.push(
+    `  Furthest from fair: ${worstStyle.style} on ${pct(worstStyle.rate)}, ` +
+      `against a fair share of ${pct(expected)}.`,
+  );
+  lines.push(
+    `  That is ${worstPoints >= 0 ? '+' : ''}${worstPoints.toFixed(1)} percentage points ` +
+      `(${pct(worst)} off in relative terms; the bar is 30%).`,
+  );
+
+  return {
+    ok: worst < 0.3,
+    lines,
+    explain: {
+      question: 'With moment held constant (midLate), which style dominates?',
+      how: 'Eight horses, two of each style, all forced to midLate moment. Stats identical at 55.',
+      reading: 'Fair share is 12.5%. If a style wins more, the style-midLate combination is unbalanced.',
+    },
+  };
+}
+
+/**
+ * Isolation test: all 8 horses forced to "late" moment.
+ */
+function styleBalanceWithLateMoment(): Omit<SuiteResult, 'name'> {
+  const wins: Record<RunningStyle, number> = { frontRunner: 0, stalker: 0, midPack: 0, closer: 0 };
+  const runs: Record<RunningStyle, number> = { frontRunner: 0, stalker: 0, midPack: 0, closer: 0 };
+
+  for (let i = 0; i < RACES; i++) {
+    const rng = createRng(`${SEED}-late-style-${i}`);
+    const names = createNameGenerator(rng);
+
+    const horses: Horse[] = [];
+    for (const style of RUNNING_STYLES) {
+      for (let n = 0; n < 2; n++) {
+        const h = generateHorse(rng, names, { division: 'open', style, age: 4 });
+        h.moment = 'late'; // FORCED
+        for (const key of STAT_KEYS) h.stats[key] = 55;
+        h.aptitudes = { sprint: 80, mile: 80, route: 80 };
+        horses.push(h);
+        runs[style]++;
+      }
+    }
+
+    const distance = DISTANCES[i % DISTANCES.length]!;
+    const outcome = simulateRace(
+      horses.map((horse) => ({ horse })),
+      { furlongs: distance, going: 'firm', hype: 0.5, seed: `${SEED}-late-race-${i}` },
+    );
+    const winnerId = outcome.results[0]!.horseId;
+    for (const h of horses) {
+      if (h.id === winnerId) {
+        wins[h.style]++;
+        break;
+      }
+    }
+  }
+
+  const rates = RUNNING_STYLES.map((s) => ({ style: s, rate: wins[s] / (runs[s] / 1) }));
+  const expected = 1 / 8;
+  const worst = Math.max(...rates.map((r) => Math.abs(r.rate - expected) / expected));
+
+  const lines = rates.map(
+    (r) =>
+      `  ${r.style.padEnd(13)} ${bar(r.rate, 0.25)} ${pct(r.rate).padStart(6)}  ` +
+      `(${((r.rate / expected - 1) * 100 >= 0 ? '+' : '') + ((r.rate / expected - 1) * 100).toFixed(0)}% vs even)`,
+  );
+  const worstStyle = rates.reduce((a, b) =>
+    Math.abs(b.rate - expected) > Math.abs(a.rate - expected) ? b : a,
+  );
+  const worstPoints = (worstStyle.rate - expected) * 100;
+
+  lines.push('');
+  lines.push(
+    `  Furthest from fair: ${worstStyle.style} on ${pct(worstStyle.rate)}, ` +
+      `against a fair share of ${pct(expected)}.`,
+  );
+  lines.push(
+    `  That is ${worstPoints >= 0 ? '+' : ''}${worstPoints.toFixed(1)} percentage points ` +
+      `(${pct(worst)} off in relative terms; the bar is 30%).`,
+  );
+
+  return {
+    ok: worst < 0.3,
+    lines,
+    explain: {
+      question: 'With moment held constant (late), which style dominates?',
+      how: 'Eight horses, two of each style, all forced to late moment. Stats identical at 55.',
+      reading: 'Fair share is 12.5%. If a style wins more, the style-late combination is unbalanced.',
+    },
+  };
+}
+
 const MOMENT_LABELS: Record<Moment, string> = {
   early: 'Early',
   earlyMid: 'Early-Mid',
@@ -760,6 +976,9 @@ function main(): void {
     { name: '1. Determinism', run: determinism },
     { name: '2. Running style balance', run: styleBalance },
     { name: '2b. Running style with early moment forced', run: styleBalanceWithEarlyMoment },
+    { name: '2c. Running style with earlyMid moment forced', run: styleBalanceWithEarlyMidMoment },
+    { name: '2d. Running style with midLate moment forced', run: styleBalanceWithMidLateMoment },
+    { name: '2e. Running style with late moment forced', run: styleBalanceWithLateMoment },
     { name: '3. Moment assignment matches its weight table', run: momentDistribution },
     { name: '4. Moment win rate', run: momentBalance },
     { name: '5. Pace collapse produces upsets', run: paceCollapse },
