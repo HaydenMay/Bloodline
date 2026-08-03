@@ -538,7 +538,6 @@ function stepRunner(
     const insideWindow = off === 0;
     r.kickWindowFit = insideWindow ? 1 : 0;
 
-    const styleFactor = 1 + K.KICK_STYLE_BONUS[r.horse.style];
     const momentFactor = insideWindow ? (1 + K.KICK_MOMENT_BONUS[r.horse.moment]) : 1;
     const complacency = rankFactor * fieldClearness;
     const complacencyFactor = 1 - K.KICK_COMPLACENCY_PENALTY * complacency;
@@ -547,7 +546,6 @@ function stepRunner(
       gritFactor *
       burstFactor *
       jockeyFactor *
-      styleFactor *
       momentFactor *
       complacencyFactor;
     // Duration scales with momentFactor only when inside window — kicks are always
@@ -710,6 +708,11 @@ function stepRunner(
   if (hasTrait(r.traits, 'needsRoom')) recoveryMult *= r.blockedFor > 0 ? 0.83 : 1.04;
   if (r.drafting) recoveryMult *= 1 + K.DRAFT_RECOVERY_BONUS;
   recoveryMult = Math.max(K.RECOVERY_FLOOR, recoveryMult);
+
+  // Running style affects charge regen rate, not kick power — each style's
+  // trade-off is about how fast it can reload, not how hard it hits.
+  const styleFactor = 1 + K.KICK_STYLE_BONUS[r.horse.style];
+  recoveryMult *= styleFactor;
 
   // --- Charge regen: the only way charges move, other than the kick --------
   //
