@@ -6,7 +6,7 @@ import { createRng } from '../src/sim/rng.js';
 import { createNameGenerator } from '../src/data/names.js';
 import { generateHorse } from '../src/sim/horse.js';
 import { simulateRace } from '../src/sim/race/engine.js';
-import { RUNNING_STYLES, FIELD_SIZE, type RunningStyle } from '../src/data/index.js';
+import { RUNNING_STYLES, type RunningStyle } from '../src/data/index.js';
 import { STAT_KEYS, type Horse } from '../src/sim/types.js';
 
 const RACES = 50;
@@ -48,34 +48,33 @@ for (let i = 0; i < RACES; i++) {
     { furlongs: distance, going: 'good', hype: 0.5, seed: `${SEED}-race-${i}` },
   );
 
-  // This is where we'd want to access detailed tick-by-tick data to track holding
-  // But simulateRace likely doesn't return that level of detail
-  // For now, we note the issue and recommend instrumenting the engine
-
-  for (const horse of horses) {
-    styleStats[horse.style].races++;
-    // TODO: This requires adding holding tracking to engine.ts
-    // We need to log when each horse enters/exits holding mode
+  // Now we have holding data! Track it by running style
+  for (const result of outcome.results) {
+    const horse = horses.find((h) => h.id === result.horseId)!;
+    const stats = styleStats[horse.style];
+    stats.races++;
+    stats.totalHoldTicks += result.holdingTicks;
+    stats.totalRaceTicks += Math.round(result.time * 30); // 30 Hz ticks per second
   }
 }
 
-console.log('\n=== HOLDING BEHAVIOR DIAGNOSTIC ===\n');
-console.log(
-  'NOTE: To properly track holding, we need to instrument the race engine to log\n' +
-  'when each horse enters/exits holding mode during the race.\n',
-);
+console.log('\n=== HOLDING BEHAVIOR DIAGNOSTIC ===');
+console.log(`${RACES} races analyzed\n`);
+console.log('Running Style | Races | Avg Hold % | Total Hold Ticks');
+console.log('─'.repeat(60));
 
 for (const style of RUNNING_STYLES) {
   const stats = styleStats[style];
-  console.log(`\n${style}:`);
-  console.log(`  Races: ${stats.races}`);
-  console.log(`  (Requires engine instrumentation to show holding %)`);
+  stats.avgHoldPercent = stats.totalRaceTicks > 0 ? (stats.totalHoldTicks / stats.totalRaceTicks) * 100 : 0;
+
+  console.log(
+    `${style.padEnd(14)} | ${stats.races.toString().padEnd(5)} | ${stats.avgHoldPercent.toFixed(1).padEnd(9)}% | ${stats.totalHoldTicks}`,
+  );
 }
 
-console.log(
-  '\n\nTo implement this, we need to:\n' +
-  '1. Add a holding event tracker to the Runner state (engine.ts)\n' +
-  '2. Log when holding becomes true/false during stepRunner()\n' +
-  '3. Sum up total ticks with holding=true per horse\n' +
-  '4. Report total holding time / total race time percentage\n',
-);
+console.log('\n\nINTERPRETATION:');
+console.log('- High hold % = spending time at 35% effort to build charges');
+console.log('- Low hold % = riding at full effort the whole time');
+console.log('- Closer should hold more than frontRunner (needs to build charges while chasing)');
+console.log('- FrontRunner should hold less (has lead to defend)');
+console.log('- If closer holds but is still weak, the issue is not holding strategy but position/timing');

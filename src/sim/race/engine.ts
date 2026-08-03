@@ -71,6 +71,11 @@ interface Runner {
   finishTime: number | null;
   sectionals: number[];
   nextSectional: number;
+
+  // Holding behavior tracking
+  holdingTicks: number;
+  holdingChargeSum: number; // sum of kicksRemaining at each holding tick (for average)
+  holdingEvents: number; // count of holding ticks (to calculate average)
 }
 
 const goingBias = (going: Going): number => {
@@ -429,6 +434,9 @@ function createRunner(
     finishTime: null,
     sectionals: [],
     nextSectional: K.YARDS_PER_FURLONG,
+    holdingTicks: 0,
+    holdingChargeSum: 0,
+    holdingEvents: 0,
   };
 }
 
@@ -466,6 +474,14 @@ function stepRunner(
   const input: ControlInput = r.controller(view, race);
   const profile = K.STYLE_PROFILES[r.horse.style];
   r.effort = clamp(input.effort, 0, 1);
+
+  // Track holding behavior: if effort is below HOLD_EFFORT (0.35), horse is holding
+  if (r.effort < K.HOLD_EFFORT) {
+    r.holdingTicks++;
+    r.holdingChargeSum += r.kicksRemaining;
+    r.holdingEvents++;
+  }
+
   // The horse's OWN progress toward the finish, not race.progress (the
   // LEADER's distance over the total) — a horse running behind the pace
   // hasn't covered as much of ITS OWN race as the leader has of theirs, so
@@ -844,6 +860,8 @@ function buildOutcome(
       hadTrouble: r.hadTrouble,
       fumbledStart: r.fumbledStart,
       offColour: r.offColour,
+      holdingTicks: r.holdingTicks,
+      avgChargesWhileHolding: r.holdingEvents > 0 ? r.holdingChargeSum / r.holdingEvents : 0,
     };
   });
 

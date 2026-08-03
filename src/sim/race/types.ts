@@ -106,6 +106,12 @@ export interface RaceResult {
   hadTrouble: boolean;
   fumbledStart: boolean;
   offColour: boolean;
+
+  // Holding behavior metrics
+  /** Total ticks spent holding (effort < 0.35). */
+  holdingTicks: number;
+  /** Average charge level when holding (to see if they're at capacity). */
+  avgChargesWhileHolding: number;
 }
 
 export interface RaceOutcome {
