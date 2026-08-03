@@ -303,7 +303,7 @@ export const KICK_STYLE_BONUS = {
  * own back-of-the-pack slot. The comeback has to react to that collective
  * gap, not to whether the front pack is elbowing itself.
  */
-export const KICK_COMPLACENCY_PENALTY = 0.6;
+export const KICK_COMPLACENCY_PENALTY = 0.3;
 
 /**
  * Scale (yards) for how fast "clear of the field" ramps up, for the comeback

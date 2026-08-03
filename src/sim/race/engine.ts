@@ -514,7 +514,7 @@ function stepRunner(
     return o.distance > r.distance ? count + 1 : count;
   }, 0);
   const isLeading = horsesAhead === 0;
-  const rankFactor = isLeading ? 1.0 : 0.15; // Leader: full penalty; chaser: minimal
+  const rankFactor = isLeading ? 0.4 : 0.05; // Leader: 40% penalty; chaser: minimal
 
   // --- The kick -----------------------------------------------------------
   // The ONLY thing that ever pushes a horse above its top speed (constants.ts,
