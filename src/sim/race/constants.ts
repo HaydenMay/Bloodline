@@ -465,10 +465,10 @@ export const STYLE_PROFILES = {
  * KICK_MIN_FIT, KICK_MISTIMED_DURATION_FLOOR — sim/race/engine.ts).
  */
 export const MOMENT_WINDOWS = {
-  early: [0, 0.25],
-  earlyMid: [0.2, 0.55],
-  midLate: [0.55, 0.9],
-  late: [0.8, 1],
+  early: [0, 0.35],
+  earlyMid: [0.2, 0.65],
+  midLate: [0.45, 0.85],
+  late: [0.65, 1],
 } as const satisfies Record<Moment, readonly [number, number]>;
 
 /**
@@ -485,10 +485,10 @@ export const MOMENT_WINDOWS = {
  *   late:     0.35/0.20 - 1 = 0.75
  */
 export const KICK_MOMENT_BONUS = {
-  early: 0.4,
-  earlyMid: 0,
-  midLate: 0,
-  late: 0.75,
+  early: 0.25,
+  earlyMid: 0.05,
+  midLate: 0.05,
+  late: 0.3,
 } as const satisfies Record<Moment, number>;
 
 /**
