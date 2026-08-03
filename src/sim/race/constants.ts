@@ -271,10 +271,10 @@ export const KICK_IN_WINDOW_SLOT_FRACTION = 0.2;
  * (ROADMAP.md, Moment win-rate investigation).
  */
 export const KICK_STYLE_BONUS = {
-  frontRunner: 0.15,
-  stalker: 0.15,
-  midPack: 0.15,
-  closer: 0.15,
+  frontRunner: 0.10,
+  stalker: 0.10,
+  midPack: 0.10,
+  closer: 0.22,
 } as const satisfies Record<RunningStyle, number>;
 
 /**
@@ -467,8 +467,8 @@ export const STYLE_PROFILES = {
 export const MOMENT_WINDOWS = {
   early: [0, 0.25],
   earlyMid: [0.25, 0.5],
-  midLate: [0.5, 0.75],
-  late: [0.75, 1],
+  midLate: [0.5, 0.65],
+  late: [0.65, 1],
 } as const satisfies Record<Moment, readonly [number, number]>;
 
 /**
@@ -485,10 +485,10 @@ export const MOMENT_WINDOWS = {
  *   late:     0.35/0.20 - 1 = 0.75
  */
 export const KICK_MOMENT_BONUS = {
-  early: 0.10,
-  earlyMid: 0.10,
-  midLate: 0.15,
-  late: 0.35,
+  early: 0.06,
+  earlyMid: 0.08,
+  midLate: 0.10,
+  late: 0.40,
 } as const satisfies Record<Moment, number>;
 
 /**
