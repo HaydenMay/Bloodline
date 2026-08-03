@@ -43,7 +43,7 @@ const RACES = Number(process.env['RACES'] ?? 1200);
  * samples, vary this:  SEED=b npm run harness
  */
 const SEED = process.env['SEED'] ?? 'a';
-const DISTANCES = [6] as const;
+const DISTANCES = [6, 8, 10] as const;
 const GOINGS: Going[] = ['firm', 'good', 'soft', 'heavy'];
 
 const pct = (n: number): string => `${(n * 100).toFixed(1)}%`;

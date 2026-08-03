@@ -488,7 +488,7 @@ export const KICK_MOMENT_BONUS = {
   early: 0.25,
   earlyMid: 0.05,
   midLate: 0.05,
-  late: 0.4,
+  late: 0.55,
 } as const satisfies Record<Moment, number>;
 
 /**
