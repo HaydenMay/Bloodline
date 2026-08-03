@@ -189,9 +189,17 @@ function styleBalanceWithEarlyMoment(): Omit<SuiteResult, 'name'> {
     }
 
     const distance = DISTANCES[i % DISTANCES.length]!;
-    const result = simulateRace(rng, horses, distance, 'firm');
-    const winner = result.order[0]!;
-    wins[winner.style]++;
+    const outcome = simulateRace(
+      horses.map((horse) => ({ horse })),
+      { furlongs: distance, going: 'firm', hype: 0.5, seed: `${SEED}-early-race-${i}` },
+    );
+    const winnerId = outcome.results[0]!.horseId;
+    for (const h of horses) {
+      if (h.id === winnerId) {
+        wins[h.style]++;
+        break;
+      }
+    }
   }
 
   const rates = RUNNING_STYLES.map((s) => ({ style: s, rate: wins[s] / (runs[s] / 1) }));
