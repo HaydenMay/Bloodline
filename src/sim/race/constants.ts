@@ -467,8 +467,8 @@ export const STYLE_PROFILES = {
 export const MOMENT_WINDOWS = {
   early: [0, 0.25],
   earlyMid: [0.25, 0.5],
-  midLate: [0.5, 0.65],
-  late: [0.5, 1],
+  midLate: [0.5, 0.75],
+  late: [0.65, 1],
 } as const satisfies Record<Moment, readonly [number, number]>;
 
 /**
@@ -486,9 +486,9 @@ export const MOMENT_WINDOWS = {
  */
 export const KICK_MOMENT_BONUS = {
   early: 0.15,
-  earlyMid: 0.15,
-  midLate: 0.15,
-  late: 0.20,
+  earlyMid: 0.12,
+  midLate: 0.18,
+  late: 0.30,
 } as const satisfies Record<Moment, number>;
 
 /**
