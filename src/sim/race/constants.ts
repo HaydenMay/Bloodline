@@ -271,10 +271,10 @@ export const KICK_IN_WINDOW_SLOT_FRACTION = 0.2;
  * (ROADMAP.md, Moment win-rate investigation).
  */
 export const KICK_STYLE_BONUS = {
-  frontRunner: 0,
-  stalker: 0.1,
-  midPack: 0.2,
-  closer: 0.3,
+  frontRunner: 0.15,
+  stalker: 0.15,
+  midPack: 0.15,
+  closer: 0.15,
 } as const satisfies Record<RunningStyle, number>;
 
 /**
