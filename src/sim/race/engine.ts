@@ -535,18 +535,11 @@ function stepRunner(
     const [momentLo, momentHi] = K.MOMENT_WINDOWS[r.horse.moment];
     const off =
       momentProgress < momentLo ? momentLo - momentProgress : Math.max(0, momentProgress - momentHi);
-    const windowFit = clamp(1 - off / K.KICK_WINDOW_FALLOFF, K.KICK_MIN_FIT, 1);
-    r.kickWindowFit = windowFit;
+    const insideWindow = off === 0;
+    r.kickWindowFit = insideWindow ? 1 : 0;
 
     const styleFactor = 1 + K.KICK_STYLE_BONUS[r.horse.style];
-    // Narrower windows (`early`, `late`) need a stronger kick to make up for
-    // less real time and fewer regen opportunities inside them — see
-    // KICK_MOMENT_BONUS.
-    const momentFactor = 1 + K.KICK_MOMENT_BONUS[r.horse.moment];
-    // COMEBACK: the leader who's clear of the WHOLE FIELD means less urgency —
-    // kicking again to extend a lead already coasting on clear air buys less
-    // than kicking under real pressure or from off the pace. Chasers get minimal
-    // penalty even if clear of followers behind them. See KICK_COMPLACENCY_PENALTY.
+    const momentFactor = insideWindow ? (1 + K.KICK_MOMENT_BONUS[r.horse.moment]) : 1;
     const complacency = rankFactor * fieldClearness;
     const complacencyFactor = 1 - K.KICK_COMPLACENCY_PENALTY * complacency;
     r.kickStrength =
@@ -554,26 +547,15 @@ function stepRunner(
       gritFactor *
       burstFactor *
       jockeyFactor *
-      windowFit *
       styleFactor *
       momentFactor *
       complacencyFactor;
-    // Duration scales with the SAME windowFit as strength — a mistimed kick
-    // is shorter, not just weaker. Without this, spamming every charge the
-    // instant it's available could cover most of a race at reduced strength
-    // and out-earn one strong kick held for its ~13s window on raw uptime.
-    //
-    // Also scaled by momentFactor, same as strength above — repeat kicks
-    // fired close together (a narrow window) mostly just refresh this timer
-    // rather than stacking, so a narrow window's real TOTAL boosted time
-    // ends up close to its own window width regardless of how many charges
-    // get spent inside it. A strength bonus alone doesn't fix that: it makes
-    // the boost faster, not longer. Traced directly — `late`'s kicks closed
-    // real ground once they started, just not over enough total TIME to
-    // finish the job (ROADMAP.md).
+    // Duration scales with momentFactor only when inside window — kicks are always
+    // full duration, but the boost inside the window (momentFactor) makes them
+    // more effective over their time. This rewards good timing without penalizing
+    // kicks outside the window.
     r.kickRemaining =
       K.KICK_BASE_DURATION *
-      (K.KICK_MISTIMED_DURATION_FLOOR + (1 - K.KICK_MISTIMED_DURATION_FLOOR) * windowFit) *
       momentFactor;
 
     if (hasTrait(r.traits, 'turnOfFoot')) {
