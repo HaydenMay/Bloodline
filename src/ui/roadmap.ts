@@ -17,7 +17,7 @@ interface Phase {
 
 const PHASES: Phase[] = [
   { n: 0, name: 'Foundation', summary: 'Tooling & deploy', done: true },
-  { n: 1, name: 'Race simulation', summary: 'Engine & balance', done: true },
+  { n: 1, name: 'Race simulation', summary: 'Engine & balance', done: false },
   { n: 2, name: 'Playable race', summary: 'Renderer & controls', done: false },
   { n: 3, name: 'Full career', summary: 'Training & divisions', done: false },
   { n: 4, name: 'The stable', summary: 'Money & facilities', done: false },
