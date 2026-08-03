@@ -507,6 +507,15 @@ function stepRunner(
   // Smooth ramp, not a threshold — see CLEAR_FIELD_SCALE for why.
   const fieldClearness = 1 - Math.exp(-furthestBehindGap / K.CLEAR_FIELD_SCALE);
 
+  // Actual rank-based complacency: only the leader gets penalized for kicking
+  // when clear. Horses chasing get minimal penalty even if clear of followers.
+  const horsesAhead = all.reduce((count, o) => {
+    if (o === r || o.finishTime !== null) return count;
+    return o.distance > r.distance ? count + 1 : count;
+  }, 0);
+  const isLeading = horsesAhead === 0;
+  const rankFactor = isLeading ? 1.0 : 0.15; // Leader: full penalty; chaser: minimal
+
   // --- The kick -----------------------------------------------------------
   // The ONLY thing that ever pushes a horse above its top speed (constants.ts,
   // "Effort: HOLD / CRUISE / KICK"). Strength scales with GRIT x BURST x
@@ -534,11 +543,11 @@ function stepRunner(
     // less real time and fewer regen opportunities inside them — see
     // KICK_MOMENT_BONUS.
     const momentFactor = 1 + K.KICK_MOMENT_BONUS[r.horse.moment];
-    // COMEBACK: clear of the WHOLE FIELD (fieldClearness, not the nearest
-    // rival) means less urgency — kicking again to extend a lead already
-    // coasting on clear air buys less than kicking under real pressure or
-    // from off the pace. See KICK_COMPLACENCY_PENALTY for the full rationale.
-    const complacency = forwardness * fieldClearness;
+    // COMEBACK: the leader who's clear of the WHOLE FIELD means less urgency —
+    // kicking again to extend a lead already coasting on clear air buys less
+    // than kicking under real pressure or from off the pace. Chasers get minimal
+    // penalty even if clear of followers behind them. See KICK_COMPLACENCY_PENALTY.
+    const complacency = rankFactor * fieldClearness;
     const complacencyFactor = 1 - K.KICK_COMPLACENCY_PENALTY * complacency;
     r.kickStrength =
       K.KICK_MAX_BONUS *
