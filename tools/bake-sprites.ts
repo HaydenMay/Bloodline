@@ -169,8 +169,19 @@ function main(): void {
     const cx = ((b.x0 + b.x1) / 2 - box.x0) / w;
     const top = (b.y0 - box.y0) / h;
     const bottom = (b.y1 - box.y0) / h;
-    if (cx < 0.42 && top < 0.5) return MATERIAL.hair; // tail, hung from the dock
-    if (top < 0.32 && cx > 0.45) return MATERIAL.hair; // mane along the crest
+    // A gathered leg can swing into the tail's or mane's corner of the frame
+    // (left-of-centre and starting above the midline, same as the tail; or
+    // upper-right, same as the mane) in a handful of gait phases — checked
+    // directly across the whole cycle, the real tail never reaches past ~65%
+    // of frame height and the real mane never past ~45%, while a misread leg
+    // blob reaches all the way to the hoof (>85%). So a blob that reaches
+    // that far down is a leg regardless of where its top edge sits — without
+    // this a handful of frames tint a whole cannon as mane/tail colour
+    // instead of points colour, which flashes as the gallop cycles.
+    if (bottom < 0.72) {
+      if (cx < 0.42 && top < 0.5) return MATERIAL.hair; // tail, hung from the dock
+      if (top < 0.32 && cx > 0.45) return MATERIAL.hair; // mane along the crest
+    }
     if (bottom > 0.72) return MATERIAL.points; // cannons and hooves
     return MATERIAL.fixed; // boots, saddle, bridle
   });
