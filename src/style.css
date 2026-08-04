@@ -506,6 +506,13 @@ body {
   flex: none;
 }
 
+.ib-badge {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  image-rendering: crisp-edges;
+}
+
 .ib-name {
   margin: 0;
   font-size: 15px;

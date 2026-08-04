@@ -294,3 +294,13 @@ export function drawShieldBadge(
   ctx.restore();
   return true;
 }
+
+/**
+ * Get a badge as a data URI synchronously (for embedding in HTML).
+ * Returns a PNG data URL that can be used as an img src, or null if badge not loaded yet.
+ */
+export function getBadgeDataUri(scheme: BadgeScheme): string | null {
+  const badge = tintedBadge(scheme);
+  if (!badge) return null;
+  return badge.toDataURL('image/png');
+}

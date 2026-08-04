@@ -1,6 +1,7 @@
 import { toGrade, STAT_KEYS, type Horse, type StatKey } from '../sim/types.js';
 import { TRAITS } from '../data/traits.js';
-import { coatFor } from '../render/palette.js';
+import { coatFor, type Silks } from '../render/palette.js';
+import { getBadgeDataUri } from '../render/shieldBadge.js';
 
 /**
  * The info box.
@@ -49,7 +50,7 @@ function potentialBand(current: number, potential: number): string {
   return 'barely scratched';
 }
 
-export function renderInfoBox(horse: Horse): string {
+export function renderInfoBox(horse: Horse, silks?: Silks): string {
   const style = STYLE_LABELS[horse.style] ?? STYLE_LABELS['closer']!;
   const coat = coatFor(horse.coat);
 
@@ -91,9 +92,15 @@ export function renderInfoBox(horse: Horse): string {
 
   const speedRoom = potentialBand(horse.stats.speed, horse.potential.speed);
 
+  // Use shield badge if silks provided, otherwise fall back to color swatch
+  const badgeUri = silks ? getBadgeDataUri({ coat: horse.coat, silks }) : null;
+  const badgeHtml = badgeUri
+    ? `<img class="ib-badge" src="${badgeUri}" alt="Shield badge" />`
+    : `<span class="ib-swatch" style="background:${coat.body};border-color:${coat.hair}"></span>`;
+
   return `
     <div class="ib-head">
-      <span class="ib-swatch" style="background:${coat.body};border-color:${coat.hair}"></span>
+      ${badgeHtml}
       <div>
         <p class="ib-name">${horse.name}</p>
         <p class="ib-sub">${coat.name} ${horse.gender === 'stallion' ? 'colt' : 'filly'} · ${horse.age}yo</p>
@@ -119,11 +126,11 @@ export function renderInfoBox(horse: Horse): string {
 }
 
 /** Attaches a hover/tap card to a trigger element. */
-export function attachInfoBox(trigger: HTMLElement, horse: Horse): () => void {
+export function attachInfoBox(trigger: HTMLElement, horse: Horse, silks?: Silks): () => void {
   const card = document.createElement('div');
   card.className = 'info-box';
   card.hidden = true;
-  card.innerHTML = renderInfoBox(horse);
+  card.innerHTML = renderInfoBox(horse, silks);
   document.body.appendChild(card);
 
   const place = (): void => {
