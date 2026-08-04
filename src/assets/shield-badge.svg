@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <!-- Shield outline (blue) -->
+  <path d="M 128 32 L 200 72 L 200 160 Q 128 220 128 220 Q 56 220 56 160 L 56 72 Z" 
+        fill="#A0A0A0" stroke="#0052CC" stroke-width="6"/>
+  
+  <!-- Horse head (grey body) -->
+  <circle cx="100" cy="120" r="25" fill="#808080"/>
+  
+  <!-- Horse neck -->
+  <rect x="105" y="100" width="12" height="40" fill="#808080"/>
+  
+  <!-- Mane (red, will be tinted to brown) -->
+  <path d="M 110 95 Q 115 80 120 90 Q 125 75 130 90 Q 135 80 140 95 L 140 115 Q 125 105 110 115" 
+        fill="#CC3333"/>
+  
+  <!-- Legs (magenta for detection) -->
+  <rect x="85" y="155" width="8" height="35" fill="#FF00FF"/>
+  <rect x="105" y="155" width="8" height="35" fill="#FF00FF"/>
+  <rect x="90" y="160" width="8" height="30" fill="#FF00FF"/>
+  <rect x="110" y="160" width="8" height="30" fill="#FF00FF"/>
+  
+  <!-- Tail (red/brown) -->
+  <path d="M 125 145 Q 145 135 155 160 Q 150 165 140 155 Q 135 140 125 150" 
+        fill="#DD4444"/>
+</svg>
