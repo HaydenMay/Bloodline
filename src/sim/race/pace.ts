@@ -75,7 +75,7 @@ const POINTS = 5;
  */
 export const STYLE_BASE: Record<RunningStyle, readonly number[]> = {
   /** Peaks at the gate. Takes them along and tries to last. */
-  frontRunner: [0.987, 0.979, 0.973, 0.963, 0.956],
+  frontRunner: [0.98732, 0.97632, 0.97232, 0.96332, 0.95632],
   /**
    * The generalist. Sustains through the middle and keeps a little back.
    *
@@ -85,11 +85,11 @@ export const STYLE_BASE: Record<RunningStyle, readonly number[]> = {
    * direction too: the same rising shape as closer with a lower ceiling, which
    * is strictly dominated. This sustained, slightly rising row measured best.
    */
-  midPack: [0.949, 0.963, 0.98, 0.976, 0.98],
+  midPack: [0.94853, 0.96153, 0.98053, 0.97653, 0.98053],
   /** Peaks off the turn. Sits handy, then quickens. */
-  stalker: [0.958, 0.964, 0.974, 0.984, 0.973],
+  stalker: [0.95758, 0.96158, 0.97358, 0.98358, 0.97258],
   /** Peaks on the wire. Everything kept for the run home. */
-  closer: [0.957, 0.962, 0.974, 0.978, 0.982],
+  closer: [0.95756, 0.96056, 0.97456, 0.97856, 0.98256],
 };
 
 /**
