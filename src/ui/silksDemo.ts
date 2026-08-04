@@ -1,33 +1,27 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { getHorsePreviewDataUri, loadHorsePreview } from '../render/horsePreview.js';
 import { loadSprites } from '../render/spriteHorse.js';
-import type { Silks } from '../render/palette.js';
+import { COATS, RIVAL_SILKS, type Silks } from '../render/palette.js';
 
-const COAT_COLORS = [
-  { id: 'bay', name: 'Bay' },
-  { id: 'chestnut', name: 'Chestnut' },
-  { id: 'palomino', name: 'Palomino' },
-  { id: 'grey', name: 'Grey' },
-  { id: 'black', name: 'Black' },
-] as const;
+const COAT_COLORS = Object.values(COATS).map((coat) => ({
+  id: coat.id,
+  name: coat.name,
+}));
 
-const DEMO_COLORS = [
-  { hex: '#F2C14E', name: 'Gold' },
-  { hex: '#E63946', name: 'Red' },
-  { hex: '#457B9D', name: 'Blue' },
-  { hex: '#1D3557', name: 'Navy' },
-  { hex: '#A8DADC', name: 'Light Blue' },
-  { hex: '#F1FAEE', name: 'Cream' },
-  { hex: '#2A9D8F', name: 'Teal' },
-  { hex: '#E76F51', name: 'Orange' },
-  { hex: '#9D4EDD', name: 'Purple' },
-  { hex: '#3A86FF', name: 'Bright Blue' },
-] as const;
+const MANE_COLORS = Object.values(COATS).map((coat) => ({
+  hex: coat.hair,
+  name: `${coat.name} Mane`,
+}));
+
+const SILKS_COLORS = RIVAL_SILKS.map((silks, i) => ({
+  hex: silks.primary,
+  name: `Silks ${i + 1}`,
+}));
 
 export function mountSilksDemo(host: HTMLElement): void {
   let selectedCoat = 'palomino';
-  let selectedManeColor = '#1a1a1a';
-  let selectedSilksColor = '#A8DADC';
+  let selectedManeColor = COATS.palomino.hair;
+  let selectedSilksColor = RIVAL_SILKS[0]!.primary;
 
   const updatePreview = async () => {
     const silks: Silks = { primary: selectedSilksColor, secondary: selectedManeColor };
@@ -93,7 +87,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       <div class="sd-section">
         <label>2. Mane & Leg Color</label>
         <div class="sd-colors">
-          ${DEMO_COLORS.map(
+          ${MANE_COLORS.map(
             (color) =>
               `<button
                 class="sd-color-btn sd-mane ${color.hex === selectedManeColor ? 'active' : ''}"
@@ -103,13 +97,13 @@ export function mountSilksDemo(host: HTMLElement): void {
               ></button>`,
           ).join('')}
         </div>
-        <input type="text" class="sd-hex-input" id="mane-hex" value="${selectedManeColor}" placeholder="#1a1a1a" />
+        <input type="text" class="sd-hex-input" id="mane-hex" value="${selectedManeColor}" placeholder="#F2E7D2" />
       </div>
 
       <div class="sd-section">
         <label>3. Silks Color (Jockey & Shield Outline)</label>
         <div class="sd-colors">
-          ${DEMO_COLORS.map(
+          ${SILKS_COLORS.map(
             (color) =>
               `<button
                 class="sd-color-btn sd-silks ${color.hex === selectedSilksColor ? 'active' : ''}"
@@ -119,7 +113,7 @@ export function mountSilksDemo(host: HTMLElement): void {
               ></button>`,
           ).join('')}
         </div>
-        <input type="text" class="sd-hex-input" id="silks-hex" value="${selectedSilksColor}" placeholder="#A8DADC" />
+        <input type="text" class="sd-hex-input" id="silks-hex" value="${selectedSilksColor}" placeholder="#2F7FD1" />
       </div>
 
       <div class="sd-preview-container">
