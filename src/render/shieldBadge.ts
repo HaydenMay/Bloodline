@@ -139,8 +139,16 @@ function detectRegion(r: number, g: number, b: number, tolerance: number = 20): 
   return 'fixed';
 }
 
+export interface Silks {
+  primary: string;
+  secondary: string;
+}
+
 export interface BadgeScheme {
   coat: string;
+  /** Jockey silks — primary color is used as the accent for mane/legs/outline. */
+  silks?: Silks;
+  /** Fallback accent color if silks not provided. */
   accentColor?: string;
 }
 
@@ -150,10 +158,11 @@ const DEFAULT_ACCENT = '#6B8FA3'; // Muted blue-grey (subtle accent)
 
 /**
  * Recolor a badge for the given coat and accent color.
+ * Accent color comes from silks primary (jockey shirt) if provided, otherwise uses accentColor fallback.
  */
 export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
   if (!loaded) return null;
-  const accentColor = scheme.accentColor ?? DEFAULT_ACCENT;
+  const accentColor = scheme.silks?.primary ?? scheme.accentColor ?? DEFAULT_ACCENT;
   const key = `${scheme.coat}|${accentColor}`;
   const hit = tinted.get(key);
   if (hit) {
