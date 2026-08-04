@@ -106,18 +106,22 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   return [Math.round(255 * f(0)), Math.round(255 * f(8)), Math.round(255 * f(4))];
 }
 
-function detectRegion(r: number, g: number, b: number, tolerance: number = 20): string {
-  // Grey body (neutral grey)
-  if (Math.abs(r - g) < tolerance && Math.abs(g - b) < tolerance && Math.abs(r - b) < tolerance && r > 100) {
-    return 'body';
+function detectRegion(r: number, g: number, b: number, tolerance: number = 25): string {
+  // Blue outline/silks (high blue, low red) - check first to avoid false positives
+  if (b > g + 30 && b > r + 30) {
+    return 'outline';
   }
   // Red/Dark red mane (high red, lower green and blue)
   if (r > g + 30 && r > b + 30 && r > 100) {
     return 'mane';
   }
-  // Blue outline/silks (high blue, low red)
-  if (b > g + 30 && b > r + 30) {
-    return 'outline';
+  // Magenta mane (high red and blue, low green)
+  if (r > 150 && b > 150 && g < 100) {
+    return 'mane';
+  }
+  // Grey body (neutral grey) - more lenient tolerance
+  if (Math.abs(r - g) < tolerance && Math.abs(g - b) < tolerance && Math.abs(r - b) < tolerance && r > 80) {
+    return 'body';
   }
   return 'fixed';
 }
