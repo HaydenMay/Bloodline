@@ -304,3 +304,5 @@ export function getBadgeDataUri(scheme: BadgeScheme): string | null {
   if (!badge) return null;
   return badge.toDataURL('image/png');
 }
+
+loadBadge();
