@@ -22,16 +22,16 @@ const DEMO_COLORS = [
 ] as const;
 
 export function mountSilksDemo(host: HTMLElement): void {
-  let selectedCoat = 'bay';
-  let selectedManeColor = '#12222B';
-  let selectedBadgeAccent = '#F2C14E';
+  let selectedCoat = 'palomino';
+  let selectedManeColor = '#1a1a1a';
+  let selectedSilksColor = '#A8DADC';
 
   const updateBadge = async () => {
     const badgeImg = host.querySelector<HTMLImageElement>('.sd-badge');
     if (badgeImg) {
       const uri = await getBadgeDataUri({
         coat: selectedCoat,
-        silks: { primary: selectedBadgeAccent, secondary: selectedManeColor },
+        silks: { primary: selectedSilksColor, secondary: selectedManeColor },
       });
       if (uri) {
         badgeImg.src = uri;
@@ -42,10 +42,10 @@ export function mountSilksDemo(host: HTMLElement): void {
   host.innerHTML = `
     <div class="silks-demo">
       <h2>Color System Demo</h2>
-      <p>Customize the three independent color regions: body, mane/legs, and badge accent.</p>
+      <p>Customize the three color regions: body, mane/legs, and silks.</p>
 
       <div class="sd-section">
-        <label>Coat Color (Body)</label>
+        <label>1. Body Color (Coat)</label>
         <div class="sd-buttons">
           ${COAT_COLORS.map(
             (coat) =>
@@ -57,7 +57,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       </div>
 
       <div class="sd-section">
-        <label>Mane & Leg Color</label>
+        <label>2. Mane & Leg Color</label>
         <div class="sd-colors">
           ${DEMO_COLORS.map(
             (color) =>
@@ -69,23 +69,23 @@ export function mountSilksDemo(host: HTMLElement): void {
               ></button>`,
           ).join('')}
         </div>
-        <input type="text" class="sd-hex-input" id="mane-hex" value="${selectedManeColor}" />
+        <input type="text" class="sd-hex-input" id="mane-hex" value="${selectedManeColor}" placeholder="#1a1a1a" />
       </div>
 
       <div class="sd-section">
-        <label>Badge Accent Color</label>
+        <label>3. Silks Color (Jockey & Shield Outline)</label>
         <div class="sd-colors">
           ${DEMO_COLORS.map(
             (color) =>
               `<button
-                class="sd-color-btn sd-badge-accent ${color.hex === selectedBadgeAccent ? 'active' : ''}"
+                class="sd-color-btn sd-silks ${color.hex === selectedSilksColor ? 'active' : ''}"
                 data-color="${color.hex}"
                 title="${color.name}"
                 style="background: ${color.hex}"
               ></button>`,
           ).join('')}
         </div>
-        <input type="text" class="sd-hex-input" id="accent-hex" value="${selectedBadgeAccent}" />
+        <input type="text" class="sd-hex-input" id="silks-hex" value="${selectedSilksColor}" placeholder="#A8DADC" />
       </div>
 
       <div class="sd-preview">
@@ -99,8 +99,8 @@ export function mountSilksDemo(host: HTMLElement): void {
               <span class="sd-color-swatch" style="background: ${selectedManeColor}"></span>
             </div>
             <div class="sd-color-info">
-              <span class="sd-color-label">Badge</span>
-              <span class="sd-color-swatch" style="background: ${selectedBadgeAccent}"></span>
+              <span class="sd-color-label">Silks</span>
+              <span class="sd-color-swatch" style="background: ${selectedSilksColor}"></span>
             </div>
           </div>
         </div>
@@ -146,15 +146,15 @@ export function mountSilksDemo(host: HTMLElement): void {
     });
   });
 
-  // Badge accent color selection
-  host.querySelectorAll('.sd-color-btn.sd-badge-accent').forEach((btn) => {
+  // Silks color selection
+  host.querySelectorAll('.sd-color-btn.sd-silks').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const color = (e.target as HTMLElement).getAttribute('data-color');
       if (color) {
-        selectedBadgeAccent = color;
-        host.querySelectorAll('.sd-color-btn.sd-badge-accent').forEach((b) => b.classList.remove('active'));
+        selectedSilksColor = color;
+        host.querySelectorAll('.sd-color-btn.sd-silks').forEach((b) => b.classList.remove('active'));
         (e.target as HTMLElement).classList.add('active');
-        host.querySelector<HTMLInputElement>('#accent-hex')!.value = color;
+        host.querySelector<HTMLInputElement>('#silks-hex')!.value = color;
         host.querySelectorAll('.sd-color-info')[1]!.querySelector('.sd-color-swatch')!.setAttribute(
           'style',
           `background: ${color}`,
@@ -178,11 +178,11 @@ export function mountSilksDemo(host: HTMLElement): void {
     }
   });
 
-  host.querySelector<HTMLInputElement>('#accent-hex')!.addEventListener('change', (e) => {
+  host.querySelector<HTMLInputElement>('#silks-hex')!.addEventListener('change', (e) => {
     const hex = (e.target as HTMLInputElement).value;
     if (/^#[0-9A-F]{6}$/i.test(hex)) {
-      selectedBadgeAccent = hex;
-      host.querySelectorAll('.sd-color-btn.sd-badge-accent').forEach((b) => b.classList.remove('active'));
+      selectedSilksColor = hex;
+      host.querySelectorAll('.sd-color-btn.sd-silks').forEach((b) => b.classList.remove('active'));
       host.querySelectorAll('.sd-color-info')[1]!.querySelector('.sd-color-swatch')!.setAttribute(
         'style',
         `background: ${hex}`,
@@ -198,7 +198,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       JSON.stringify({
         coat: selectedCoat,
         maneColor: selectedManeColor,
-        badgeAccent: selectedBadgeAccent,
+        silksColor: selectedSilksColor,
       }),
     );
     window.location.href = '/';

@@ -81,24 +81,23 @@ function startRace(seed: string): void {
   app.appendChild(bar);
 
   // Check for color overrides from demo mode
-  let playerSilks = { primary: '#F2C14E', secondary: '#12222B' };
-  let badgeAccent = '#F2C14E';
-  let maneColor = '#12222B';
+  let playerSilks = { primary: '#A8DADC', secondary: '#12222B' };
 
   const colorOverride = sessionStorage.getItem('color-override');
   if (colorOverride) {
     try {
       const colors = JSON.parse(colorOverride);
-      maneColor = colors.maneColor || '#12222B';
-      badgeAccent = colors.badgeAccent || '#F2C14E';
+      // silksColor for shield outline and jockey silks
+      // maneColor for horse mane/legs and badge mane/legs
+      playerSilks = {
+        primary: colors.silksColor || '#A8DADC',
+        secondary: colors.maneColor || '#12222B',
+      };
       sessionStorage.removeItem('color-override');
     } catch {
       // Ignore invalid JSON
     }
   }
-
-  // Create silks object for badge rendering (uses badge accent color)
-  playerSilks = { primary: badgeAccent, secondary: maneColor };
 
   attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks);
 
@@ -111,7 +110,7 @@ function startRace(seed: string): void {
     host: stage,
     field,
     playerHorseId: playerId,
-    playerSilks: { primary: badgeAccent, secondary: maneColor },
+    playerSilks,
     config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
   });
 }
