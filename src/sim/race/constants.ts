@@ -93,8 +93,15 @@ export const HOLD_FLOOR = 0.92;
  * The 2x-launch bug came from four multiplicative kick modifiers with no
  * ceiling compounding on a closer running from behind. Modifiers may change how
  * EASILY a horse reaches this cap. They may never change where it is.
+ *
+ * Large, and deliberately so. The kick is the ONLY thing the player controls,
+ * so it has to be big enough that placing it well decides races. At 0.13 the
+ * entire kick content of a race was worth about nine metres out of fourteen
+ * hundred, so perfect timing bought roughly 1.4 lengths — less than the gap
+ * between finishing places, and mashing beat timing simply by firing more
+ * often. A lever nobody can feel is not a lever.
  */
-export const KICK_MAX_BONUS = 0.13;
+export const KICK_MAX_BONUS = 0.22;
 
 /**
  * Speed factor of a completely empty horse.
@@ -120,12 +127,13 @@ export const FATIGUE_FLOOR = 0.96;
 /**
  * Tank level at which fatigue starts to bite. A smooth ramp below, never a cliff.
  *
- * Held EQUAL TO KICK_TANK_COST on purpose, so the last charge dot going out and
- * fatigue beginning are the same moment. That is what lets the dots the HUD
- * already draws be an honest readout of a hidden budget (REBUILD.md §5.5) —
- * change one of these two numbers and you must change the other.
+ * Generous, because the tank is now the jockey's alone and its job is to make
+ * pace matter and keep leads from running away — not to police the player's
+ * kicks. A horse whose tank is draining loses effectiveness gradually from
+ * here, which is the owner's "as tank lowers the effectiveness of the horse
+ * should lower".
  */
-export const FATIGUE_START = 0.15;
+export const FATIGUE_START = 0.3;
 
 /**
  * Harness invariant (REBUILD.md I2), not a tuning value.
@@ -133,7 +141,7 @@ export const FATIGUE_START = 0.15;
  * No runner may ever exceed `cruise * preRace * this`. Asserted every tick of
  * every race in the harness so the launch bug cannot silently return.
  */
-export const ABSOLUTE_SPEED_CEILING = 1.14;
+export const ABSOLUTE_SPEED_CEILING = 1.25;
 
 // ---------------------------------------------------------------------------
 // The tank — the one conserved quantity (REBUILD.md R6, §5)
@@ -171,7 +179,7 @@ export const PRESS_RANGE_METRES = 5.0;
  * doing the pressing pay it too, which is what makes a duel mutually
  * destructive rather than a tax on whoever happens to be in front.
  */
-export const PRESS_COST = 0.1;
+export const PRESS_COST = 0.17;
 
 /** Rank at or above which a horse is "in front" and can be pressed. */
 export const PRESS_RANK_LIMIT = 3;
@@ -256,30 +264,113 @@ export const DRAFT_RECOVER_BONUS = 0.34;
  *
  * Raised to 0.45 while the field was still bunched and this almost never
  * triggered; once STYLE_BASE was widened and leads became real, it started
- * paying out 30% of every race and pushed frontRunner to +32%. Cut back to suit
- * the field that actually exists now.
+ * paying out 30% of every race and pushed frontRunner to +32%. Cut back to 0.28
+ * to suit the field that actually existed then.
+ *
+ * Raised again once kicks stopped draining the tank. While they did, every
+ * horse spent stamina on them and that partly equalised the styles; with pace
+ * the only thing draining the tank, a front-runner is uniquely taxed for
+ * running at the front and measured 9.3% against a fair 12.5%. This and
+ * PRESS_COST are the pair that price leading correctly, and they move together.
  */
-export const EASY_LEAD_RECOVER_BONUS = 0.28;
+export const EASY_LEAD_RECOVER_BONUS = 0.44;
+
+// (KICK_TANK_COST is gone. A kick costs a CHARGE and nothing else — see
+// charges.ts. Combining the two made spending stamina the price of every kick,
+// so hoarding could beat riding, which is not a game about riding.)
+
+// ---------------------------------------------------------------------------
+// Kick charges — the PLAYER's resource (REBUILD.md §5.5, charges.ts)
+//
+// Wholly separate from the tank. A kick costs one charge and never touches
+// stamina, so a kick always rewards the player; what limits how many a horse
+// fires is regen and cooldown, not how tired it is.
+// ---------------------------------------------------------------------------
 
 /**
- * Tank spent per kick. Also the size of one charge dot.
+ * Charge dots shown, and the most a horse can bank.
  *
- * Sized against the number of kicks a style plans (KICK_PLAN, rider.ts) so the
- * TOTAL a race costs in kicks stays near 0.48 of the budget. When the patterns
- * went from three kicks to four — so a front-runner could keep two back to
- * defend its lead — leaving this at 0.15 quietly raised every style's kick
- * spend from 0.45 to 0.60 and pushed midPack to -31% off fair share.
+ * Sized so a narrow window can actually SPEND a full bank. At five, a `late`
+ * horse — whose window is about eighteen seconds — could fit two kicks inside
+ * it at the cooldown and carried the rest to the wire unspent, where they were
+ * worth nothing. Measured: a well-timed ride finished with 1.8 charges in hand
+ * and lost to mashing, which at least spent them.
+ *
+ * A resource you cannot spend is not a decision, it is a tax on patience.
  */
-export const KICK_TANK_COST = 0.15;
+export const CHARGE_CAPACITY = 3;
+
+/** How many a horse leaves the gate with. */
+export const CHARGE_START = 1;
 
 /**
- * Charge dots shown. The dots ARE the tank, quantised — floor(tank / cost).
+ * Seconds to earn one charge at a normal, unsheltered gallop.
  *
- * With cost 0.15 the last dot goes out at tank 0.15, exactly where FATIGUE_START
- * begins to bite. That coincidence is not luck, it is the reason the existing
- * HUD needs no extra instrumentation to be honest.
+ * SCARCITY IS WHAT MAKES TIMING MATTER, and it has to be set against the
+ * cooldown rather than on its own. If a horse can bank more charges than the
+ * cooldown lets it spend, then firing at every opportunity is simply optimal
+ * and there is no decision left — measured exactly so: mashing won 21.2%
+ * against a fair 12.5% while every timed ride finished with four or five
+ * charges unspent.
+ *
+ * REGEN MUST BE SLOWER THAN THE COOLDOWN or the bank constrains nothing. At 16
+ * seconds against an 18-second cooldown, charges arrived faster than any horse
+ * could spend them: every ride finished with a full bank, firing at every
+ * opportunity was trivially optimal, and mashing beat a well-timed ride 15.5%
+ * to 10.5%. The bank was decoration.
+ *
+ * Scarce enough that NOBODY CAN OUT-FIRE ANYONE, which is the only condition
+ * under which placement beats volume. Measured at 30 seconds: a mashing ride
+ * fired 3.7 kicks with 1.3 in its window, a well-timed one 2.2 kicks with 1.6
+ * in its window — MORE well-placed kicks and fewer total — and the mashing ride
+ * won by six points. The extra kicks were not winning on kick value, which was
+ * a wash; they were winning because any kick at all pushes a horse forward, and
+ * being forward is rewarded by the tank economy all on its own.
+ *
+ * At 42 seconds every ride gets roughly the same two or three charges across a
+ * race, so the only variable left is where they go. Few kicks, each one worth
+ * caring about — which also matches what a real horse produces: two or three
+ * sustained efforts, not ten.
  */
-export const CHARGE_CAPACITY = 5;
+export const CHARGE_REGEN_SECONDS = 42.0;
+
+/**
+ * Regen time multiplier while settled — taking a pull, drafting, or dictating
+ * an unpressed lead. Below 1 means FASTER.
+ *
+ * This is what makes taking a pull a tactical move rather than simply giving up
+ * ground, exactly as the owner specified: charges "regenerate ALWAYS but
+ * regenerate quicker in good positioning".
+ */
+export const CHARGE_REGEN_SETTLED = 0.45;
+
+/**
+ * Width of every Moment's kick window, as a fraction of the race.
+ *
+ * ONE WIDTH FOR ALL FOUR, which is the whole reason a window is safe to have
+ * again. The previous build ran windows of 25%, 35%, 35% and 20%, so a
+ * `midLate` horse simply got a third more opportunity than a `late` one:
+ * midLate won 34-48% against a fair 12.5% and late sat at 0.0% through five
+ * separate fixes. Equal widths at evenly spaced centres mean a Moment can
+ * differ in WHEN its window falls and in nothing else.
+ */
+export const MOMENT_WINDOW_WIDTH = 0.3;
+
+/**
+ * Kick strength multiplier OUTSIDE the horse's own window.
+ *
+ * A kick still works wherever it is fired — the owner's rule that a player may
+ * spend their charges as they see fit, well or badly — it is simply worth much
+ * less than one produced at the horse's own moment. Never zero: a mistimed kick
+ * is weak, not wasted.
+ *
+ * The gap has to be wide enough that PLACEMENT beats VOLUME, which is the whole
+ * point of having a window. At 0.55 it was not: a player mashing every charge
+ * the cooldown allowed fired five at middling value and beat one who spent
+ * three at nearly full value, 13.0% against 8.7%. Timing only matters if being
+ * out of position costs more than an extra go.
+ */
+export const KICK_OUT_OF_WINDOW = 0.12;
 
 // ---------------------------------------------------------------------------
 // The kick (REBUILD.md §8)
@@ -320,8 +411,15 @@ export const KICK_DURATION = 4.5;
  * It is a SPACING, not a cap on how many kicks a race may contain: the owner's
  * rule that a player who wants to spend their charges may, well or badly,
  * still holds. What it removes is the option of spending them all at once.
+ *
+ * Set against CHARGE_REGEN_SECONDS, which is now the binding constraint: a
+ * horse has fewer charges than the cooldown would let it fire, so the cooldown
+ * is no longer what limits volume. What it must do instead is stay SHORT enough
+ * that even the narrowest Moment window can absorb a full bank — at 18 seconds
+ * a `late` horse could fit only two kicks inside its window while a mashing
+ * ride fired three anywhere, and out-firing beat out-placing on that alone.
  */
-export const KICK_COOLDOWN = 12.0;
+export const KICK_COOLDOWN = 14.0;
 
 /** Seconds ramping in. */
 export const KICK_RAMP = 0.5;

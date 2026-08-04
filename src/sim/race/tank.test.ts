@@ -1,19 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  chargeProgressFor,
-  chargesFor,
-  drainPerSecond,
-  fatigueFactor,
-  recoverPerSecond,
-} from './tank.js';
+import { conditionReadout, drainPerSecond, fatigueFactor, recoverPerSecond } from './tank.js';
 import { distanceFactor, peakFor } from './aptitude.js';
-import {
-  CHARGE_CAPACITY,
-  FATIGUE_FLOOR,
-  KICK_TANK_COST,
-  REFERENCE_PACE,
-  TANK_START,
-} from './constants.js';
+import { FATIGUE_FLOOR, FATIGUE_START, REFERENCE_PACE, TANK_START } from './constants.js';
 
 /**
  * Simulates a whole race at a constant pace and returns the tank left at the
@@ -130,32 +118,21 @@ describe('fatigue', () => {
   });
 });
 
-describe('charges are the tank, quantised (REBUILD.md §5.5)', () => {
-  it('reads off the tank at the documented breakpoints', () => {
-    expect(chargesFor(1.0)).toBe(5);
-    expect(chargesFor(0.75)).toBe(5);
-    expect(chargesFor(0.6)).toBe(4);
-    expect(chargesFor(0.45)).toBe(3);
-    expect(chargesFor(0.3)).toBe(2);
-    expect(chargesFor(0.15)).toBe(1);
-    expect(chargesFor(0.14)).toBe(0);
+describe('the tank is the jockey\'s alone', () => {
+  it('surfaces how the horse is going without exposing a number to manage', () => {
+    // No stamina bar, but the EFFECT of the tank must be visible or a horse can
+    // show a full bank of charges while being completely out of petrol.
+    expect(conditionReadout(1)).toBe(1);
+    expect(conditionReadout(FATIGUE_START)).toBe(1);
+    expect(conditionReadout(0)).toBe(0);
+    expect(conditionReadout(FATIGUE_START / 2)).toBeCloseTo(0.5, 5);
   });
 
-  it('never exceeds capacity', () => {
-    expect(chargesFor(999)).toBe(CHARGE_CAPACITY);
-  });
-
-  it('the last dot goes out exactly as fatigue starts to bite', () => {
-    // Not a coincidence — it is why the existing HUD needs no extra
-    // instrumentation to be an honest readout of a hidden resource.
-    expect(chargesFor(KICK_TANK_COST)).toBe(1);
-    expect(chargesFor(KICK_TANK_COST - 0.001)).toBe(0);
-    expect(fatigueFactor(KICK_TANK_COST)).toBe(1);
-  });
-
-  it('reports progress toward the next dot', () => {
-    expect(chargeProgressFor(0.15)).toBeCloseTo(0, 5);
-    expect(chargeProgressFor(0.225)).toBeCloseTo(0.5, 5);
+  it('tracks the fatigue that is actually being applied', () => {
+    // The readout is honest: it starts falling exactly when speed does.
+    expect(fatigueFactor(FATIGUE_START)).toBe(1);
+    expect(fatigueFactor(FATIGUE_START * 0.5)).toBeLessThan(1);
+    expect(fatigueFactor(0)).toBeCloseTo(FATIGUE_FLOOR);
   });
 });
 

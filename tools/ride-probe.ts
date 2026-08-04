@@ -3,8 +3,8 @@ import { createNameGenerator } from '../src/data/names.js';
 import { generateHorse } from '../src/sim/horse.js';
 import { FIELD_SIZE, RUNNING_STYLES } from '../src/data/index.js';
 import { createRace } from '../src/sim/race/engine.js';
-import { KICK_PLAN } from '../src/sim/race/rider.js';
-import type { RunningStyle } from '../src/data/index.js';
+import { momentWindow } from '../src/sim/race/charges.js';
+import type { Moment } from '../src/data/index.js';
 import type { PlayerInput, RaceEntrant } from '../src/sim/race/types.js';
 
 /**
@@ -32,7 +32,7 @@ type Persona = {
   /** Called every tick. Mutates `input` in place. */
   ride(
     input: PlayerInput,
-    ctx: { progress: number; charges: number; style: RunningStyle },
+    ctx: { progress: number; charges: number; moment: Moment },
   ): void;
 };
 
@@ -87,28 +87,28 @@ const PERSONAS: Persona[] = [
     },
   },
   {
-    // Rides to the horse's OWN style, which the HUD tells the player. This is
-    // the informed ride: a front-runner asserted early and defended late, a
-    // closer held together and produced at the end. It should beat the
-    // autopilot, because the autopilot's own schedule is degraded by jockey
-    // error (jitter, a wasted kick) and this one is not.
-    name: 'rides to style',
+    // Waits for the horse's window and then spends hard inside it. Half-right:
+    // it finds the right moment but does not settle beforehand to bank for it.
+    name: 'window only',
     ride(input, ctx) {
-      const points = KICK_PLAN[ctx.style];
-      input.kickPending =
-        ctx.charges >= 1 && points.some((p) => ctx.progress >= p && ctx.progress < p + 0.02);
+      const w = momentWindow(ctx.moment);
+      input.kickPending = ctx.charges >= 1 && ctx.progress >= w.from && ctx.progress <= w.to;
     },
   },
   {
     // THE CANONICAL GOOD RIDE, and the one the gate below is measured against.
     //
-    // A player who has understood the game: let the jockey settle the horse
-    // early, then spend every charge through the business end of the race,
-    // where a kick's fatigue bill has the least race left to come due in. No
-    // hoarding, no mashing, no holding for its own sake.
+    // A player who has understood the game: hold fire until the horse's own
+    // moment arrives, then spend every charge from there on. Taking a pull to
+    // bank faster was tried here and measured WORSE — the ground it costs is
+    // not repaid by the charges it earns.
     name: 'well ridden',
     ride(input, ctx) {
-      input.kickPending = ctx.progress >= 0.55 && ctx.charges >= 1;
+      // Nothing before the window — a charge spent early is a charge not there
+      // for the moment it was saved for. From the window onward, spend
+      // everything: an unspent charge at the wire is worth nothing at all.
+      const w = momentWindow(ctx.moment);
+      input.kickPending = ctx.charges >= 1 && ctx.progress >= w.from;
     },
   },
 ];
@@ -119,12 +119,13 @@ interface Tally {
   places: number;
   beaten: number;
   kicks: number;
+  inWindow: number;
   left: number;
 }
 
 const results = new Map<string, Tally>();
 for (const p of PERSONAS) {
-  results.set(p.name, { wins: 0, top3: 0, places: 0, beaten: 0, kicks: 0, left: 0 });
+  results.set(p.name, { wins: 0, top3: 0, places: 0, beaten: 0, kicks: 0, inWindow: 0, left: 0 });
 }
 
 for (const persona of PERSONAS) {
@@ -156,21 +157,29 @@ for (const persona of PERSONAS) {
     const input: PlayerInput = { takingBack: false, kickPending: false };
     race.setPlayer(playerId, input);
 
-    let kicks = 0;
     while (race.step()) {
       const snap = race.snapshot();
       const me = snap.runners.find((r) => r.id === playerId)!;
       if (me.finished) continue;
-      const before = me.kicksRemaining;
       persona.ride(input, {
         progress: me.distance / METRES,
         charges: me.kicksRemaining,
-        style: playerHorse.style,
+        moment: playerHorse.moment,
       });
-      if (input.kickPending && before >= 1) kicks += 1;
     }
 
     const outcome = race.outcome();
+    // Count what ACTUALLY fired, and how much of it landed in the window.
+    const w = momentWindow(playerHorse.moment);
+    let kicks = 0;
+    let inWindow = 0;
+    for (const e of outcome.events) {
+      if (e.kind !== 'kick' || e.horseId !== playerId) continue;
+      kicks += 1;
+      const at = e.at / outcome.duration;
+      if (at >= w.from && at <= w.to) inWindow += 1;
+    }
+    tally.inWindow += inWindow;
     const me = outcome.results.find((r) => r.horseId === playerId)!;
     tally.places += me.finishPosition;
     tally.beaten += me.margin;
@@ -184,7 +193,7 @@ for (const persona of PERSONAS) {
 const FAIR = RACES / FIELD_SIZE;
 
 console.log(`\n${RACES} races, ${METRES} m. Fair share of wins is ${FAIR.toFixed(0)}.\n`);
-console.log('ride              avg place   wins   win%   top-3   avg beaten   charges left');
+console.log('ride              avg place   wins   win%   top-3   avg beaten   left  kicks  in-win');
 for (const p of PERSONAS) {
   const t = results.get(p.name)!;
   console.log(
@@ -194,7 +203,9 @@ for (const p of PERSONAS) {
       `${((t.wins / RACES) * 100).toFixed(1).padStart(7)}%` +
       `${String(t.top3).padStart(7)}` +
       `${(t.beaten / RACES).toFixed(1).padStart(11)}L` +
-      `${(t.left / RACES).toFixed(1).padStart(12)}`,
+      `${(t.left / RACES).toFixed(1).padStart(6)}` +
+      `${(t.kicks / RACES).toFixed(1).padStart(7)}` +
+      `${(t.inWindow / RACES).toFixed(1).padStart(8)}`,
   );
 }
 

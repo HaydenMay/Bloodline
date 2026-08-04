@@ -1,15 +1,21 @@
 # REBUILD.md — Race Simulation, Ground-Up Rebuild
 
-**Status:** planned, not started. **Audience:** the implementing agent.
+**Status: BUILT.** Gate 1 passes 12/12, player parity 3/4, `npm run check` clean.
+**Audience:** anyone touching `src/sim/race/`.
 **Companions:** [DESIGN.md](DESIGN.md) · [TRAITS.md](TRAITS.md) · [ROADMAP.md](ROADMAP.md)
 
 ---
 
 ## 0. How to use this document
 
-This is a **specification, not a discussion**. Every number here is a decided first-pass
-value. Build exactly what is written, in the order in §15, and verify each step against its
-stated acceptance criteria before moving to the next.
+This began as a specification written before any code existed. It is now a **living
+record**: the plan, plus what measurement did to it.
+
+Where the built simulation departs from the original plan, the plan text is struck
+through and the reason sits directly beneath it. **~~Struck-through text describes
+something that was tried and did not survive contact with the harness.~~** Do not
+reinstate it — every one of those was measured, not guessed at, and the numbers are
+recorded so the same ground is not walked twice.
 
 Where this document conflicts with `DESIGN.md`, `ROADMAP.md` or a code comment, **this
 document wins** — those predate the rebuild and describe systems that no longer exist.
@@ -17,10 +23,21 @@ document wins** — those predate the rebuild and describe systems that no longe
 Three things you must not do:
 
 1. **Do not invent a mechanic that is not in this document.** The previous three attempts
-   failed because systems accumulated. If something seems missing, it was cut on purpose.
+   failed because systems accumulated. Four mechanics WERE added during the build — press,
+   easy lead, contact, and the charge bank — and each one is documented in §20 with the
+   measurement that forced it. That is the bar for adding a fifth.
 2. **Do not tune a constant before §16's harness passes for the step you are on.** Numbers
    here are first-pass and expected to move — but only against measurements, never by feel.
 3. **Do not commit or push.** The owner will say when.
+
+### Live status
+
+| Gate | Result |
+|---|---|
+| §16.1 invariants I1–I5 | **5/5** |
+| §16.2 balance B1–B6 | **7/7** (incl. B2b) |
+| §16.3 player parity | **3/4** — timing beats mashing by 2.8 points against a 3-point bar |
+| `npm run check` | clean · 73 tests |
 
 ---
 
@@ -36,9 +53,9 @@ A runner's speed is computed in exactly one place, from exactly five factors:
 ```
 target = cruise(horse)      // §4.1  the ceiling, from the Speed stat
        × preRace            // §10   condition · morale · form · going · distance — FROZEN at the gate
-       × pace               // §6    the pace curve, plus HOLD.  Range [0.920, 1.000]
-       × kick               // §8    the ONLY factor that may exceed 1.0.  Range [1.000, 1.060]
-       × fatigue            // §5.4  the tank running dry.  Range [0.880, 1.000]
+       × pace               // §6    the pace curve, plus HOLD and contact.  Range [0.920, 1.000]
+       × kick               // §8    the ONLY factor that may exceed 1.0.  Range [1.000, 1.220]
+       × fatigue            // §5.4  the tank running dry.  Range [0.960, 1.000]
 ```
 
 Nothing else in the codebase may write to speed. No positional bonus, no catch-up multiplier,
@@ -69,17 +86,48 @@ No runner steers toward a pack slot. No drift correction, no position-quality mu
 `ESTABLISH_UNTIL` scramble. A horse's place in the field is a **consequence** of the pace it
 chose. A closer sits last because it is running slower, not because a dial pushed it there.
 
+**One refinement, added on the owner's instruction and bounded on purpose.** A horse that has
+lost touch with the leader by more than `CONTACT_LENGTHS` lifts its pace toward the top of its
+own range (`CONTACT_MAX_LIFT`, §6.6). This reads position, so it is worth being explicit about
+why it is not R3 in disguise:
+
+| | the old catch-up bug | contact |
+|---|---|---|
+| what it scales | kick STRENGTH | the horse's own pace target |
+| ceiling | none — compounded with the deficit | `PACE_MAX`, the same one every horse has |
+| cost | free | full superlinear tank drain |
+
+It can never produce speed a leader could not also reach, and a horse that had to chase
+arrives with less in the tank than one that did not. Without it a patient horse simply let the
+field walk away, which is not patience — the owner: *"They can't just coast the whole time."*
+
 ### R5 — Moment is zero-sum
 
 `MOMENT_SHIFT` rows (§6.3) must each sum to approximately zero across the race. No Moment may
 be inherently faster than another; they may only differ in **when** they spend. Asserted in
 §16 as a unit test, not a tuning target.
 
-### R6 — One conserved quantity
+### R6 — ~~One conserved quantity~~ Two resources, cleanly divided
 
-The tank (§5) is the only resource. Kick charges are a **quantised view of the tank**, not a
+~~The tank (§5) is the only resource. Kick charges are a **quantised view of the tank**, not a
 separate pool. Running hard drains it, kicking drains it, sitting off the pace refills it.
-There is no second budget anywhere.
+There is no second budget anywhere.~~
+
+**Superseded during the build, on measurement and the owner's call.** Combining them meant a
+kick cost stamina, so spending a charge could lose more ground in fatigue than the kick
+gained — measured, a player who never kicked at all won 13.8% against a fair 12.5%, purely by
+not spending what everyone else wasted. A game whose only input is "tap to kick" cannot have
+tapping be the wrong move.
+
+The rule that replaces it, and it is just as strict:
+
+- **The tank is the JOCKEY's.** Drains from pace only, never from kicks. Governs fatigue,
+  when a horse settles, and how hard it chases. The player never sees or spends it.
+- **Charges are the PLAYER's.** Own bank, own regen clock, faster when settled. A kick costs
+  one charge and touches nothing else.
+
+Neither may read the other. `tank.ts` and `charges.ts` do not import from each other, and
+that separation is what stops the two economies leaking into one another again.
 
 ### R7 — `sim/` stays pure
 
@@ -112,6 +160,9 @@ meaningful. Never introduce wall-clock time or unseeded randomness into `sim/`.
 | `src/sim/race/constants.ts` | 8-line placeholder | Every constant in §13 |
 | `src/sim/race/engine.ts` | Stubs that `throw` | The simulation |
 | `src/sim/race/pace.ts` | *does not exist* | Pace curves (§6) |
+| `src/sim/race/tank.ts` | *does not exist* | The jockey's budget (§5) |
+| `src/sim/race/charges.ts` | *does not exist* | The player's bank + Moment windows (§5.5, §8.4) |
+| `src/sim/race/aptitude.ts` | *does not exist* | Distance preference (§7) |
 | `src/sim/race/rider.ts` | *does not exist* | AI + player ride logic (§11) |
 | `src/sim/race/types.ts` | Type shells | Real types |
 | `tools/harness.ts` | `throw` | Gate 1 suite (§16) |
@@ -291,29 +342,34 @@ fatigue = tank >= FATIGUE_START
 runs 12% below cruise — the largest single penalty in the game, which is what makes emptying
 the worst thing that can happen to you.
 
-### 5.5 Charges are the tank, quantised
+### 5.5 ~~Charges are the tank, quantised~~ Charges are their own bank
 
-```ts
-charges = Math.min(CHARGE_CAPACITY, Math.floor(tank / KICK_TANK_COST));
-```
+~~`charges = Math.min(CHARGE_CAPACITY, Math.floor(tank / KICK_TANK_COST))`. The last dot goes
+out at exactly the point fatigue begins to bite, so the dots are an honest readout of the tank
+with no extra instrumentation. Firing a kick subtracts `KICK_TANK_COST` from the tank directly.
+This is what makes kick-spam self-limiting: five kicks costs 0.75 of tank, so a spammer empties
+and fades.~~
 
-`KICK_TANK_COST = 0.15`, `CHARGE_CAPACITY = 5`:
+**Superseded — see R6.** It was an elegant coupling and it produced the wrong game. Charges now
+live in `charges.ts` with their own clock:
 
-| tank | 1.00 | 0.75 | 0.60 | 0.45 | 0.30 | 0.15 | 0.14 |
-|---|---|---|---|---|---|---|---|
-| dots | 5 | 5 | 4 | 3 | 2 | 1 | 0 |
+| | value | why |
+|---|---|---|
+| `CHARGE_CAPACITY` | 3 | Small enough that even the narrowest Moment window can spend a full bank. At 5, a `late` horse carried charges to the wire unspent, where they were worth nothing. |
+| `CHARGE_START` | 1 | There has to be something to earn. |
+| `CHARGE_REGEN_SECONDS` | 42 | **Must be slower than `KICK_COOLDOWN`**, or the bank constrains nothing and firing at every opportunity is trivially optimal. |
+| `CHARGE_REGEN_SETTLED` | 0.45 | Taking a pull, drafting, or an unpressed lead all refill faster — the owner's "regenerate quicker in good positioning". |
 
-The last dot goes out at exactly the point fatigue begins to bite. **The dots are an honest
-readout of the tank with no extra instrumentation** — which is why §12 can make them the whole
-of the player's information problem.
+**The scarcity is load-bearing.** Placement only beats volume when nobody can out-fire anyone.
+Measured at 30-second regen: a mashing ride fired 3.7 kicks with 1.3 in its window, a
+well-timed ride 2.2 kicks with 1.6 in its window — *more* well-placed kicks, fewer total — and
+mashing won by six points. The extra kicks were not winning on kick value, which was a wash;
+they won because any kick pushes a horse forward and being forward is rewarded by the tank
+economy on its own.
 
-Firing a kick subtracts `KICK_TANK_COST` from the tank directly. Nothing else is deducted, and
-there is no separate charge counter to keep in sync.
-
-> This is also what makes kick-spam self-limiting, closing the hole the previous build had
-> where AI riders were never charge-gated at all. Five kicks costs 0.75 of tank, so a spammer
-> empties and fades. No cap on kicks is needed, and none is wanted — the owner: *"If a player
-> wants to use their kicks then let them."*
+The player now sees **two** things, not one: the charge dots, and a `condition` readout (§14)
+for how the horse is going. The dots no longer imply anything about stamina, so a horse can be
+showing a full bank while completely cooked — that gap had to be covered explicitly.
 
 ---
 
@@ -380,6 +436,17 @@ export const MOMENT_SHIFT: Record<Moment, number[]> = {
 `HOLD_DELTA = -0.030` is added to the pace factor, floored at `HOLD_FLOOR = 0.920`. It costs
 ground immediately and banks tank fast (§5.3). It is a *deliberate* move, not a state the AI
 sits in permanently.
+
+### 6.6 Keeping in touch — contact
+
+A horse more than `CONTACT_LENGTHS` (6) behind the leader lifts its pace toward the top of its
+own range, ramping to full by `CONTACT_RAMP_LENGTHS` (14), capped at `CONTACT_MAX_LIFT`
+(0.018) and then clamped by `PACE_MAX` like everything else.
+
+Added on the owner's instruction — *"They can't just coast the whole time. They need a
+mechanic to attempt to keep up when they're so far back."* See R4 for why this is not the
+catch-up bug: it is bounded by the same ceiling every horse has and it is paid for at the full
+superlinear drain rate.
 
 ### 6.5 Moment assignment
 
@@ -505,17 +572,55 @@ function kickShape(elapsed: number): number {
 kickFactor = 1 + Math.min(KICK_MAX_BONUS, KICK_MAX_BONUS * strength * kickShape(elapsed));
 ```
 
-`KICK_DURATION = 4.0 s`, `KICK_RAMP = 0.5 s`, `KICK_DECAY = 1.5 s`, `KICK_MAX_BONUS = 0.060`.
+`KICK_DURATION = 4.5 s`, `KICK_RAMP = 0.5 s`, `KICK_DECAY = 1.5 s`, **`KICK_MAX_BONUS = 0.22`**.
 
-Over 4 seconds at 20.6 m/s, a full-strength kick is worth roughly **+4 m ≈ 1.7 lengths**.
-Meaningful, and nothing like a launch.
+~~`KICK_MAX_BONUS = 0.060`. Over 4 seconds a full-strength kick is worth roughly +4 m ≈ 1.7
+lengths. Meaningful, and nothing like a launch.~~
+
+**Superseded: far too small.** The kick is the only thing the player controls, and at 0.06 the
+entire kick content of a race came to about nine metres out of fourteen hundred — so timing it
+perfectly bought 1.4 lengths, less than the gap between finishing places, and mashing beat
+timing simply by firing more often. A lever nobody can feel is not a lever. The hard clamp
+(R2) is unchanged; only its height moved, and `ABSOLUTE_SPEED_CEILING` moved with it.
+
+### 8.4 The Moment window — reinstated, with the failure designed out
+
+A kick fired at the horse's own moment is worth its full strength; outside it, only
+`KICK_OUT_OF_WINDOW` (0.12) of it. Weak, never wasted — the owner's rule that a player may
+spend their charges as they see fit, well or badly, still holds.
+
+The original plan removed windows entirely because they destroyed the previous build. They are
+back because the owner asked for kicks to reward timing, and they are safe now for one reason:
+
+> **Every window pays the same at its peak. Only the WIDTH differs.**
+>
+> The old windows were 25%, 35%, 35% and 20% of the race, so `midLate` simply got a third more
+> opportunity than `late` — midLate won 34–48% against a fair 12.5% and late sat at 0.0%
+> through five separate fixes.
+>
+> An equal-**area** scheme was tried first and also failed (`early` −38%): a horse fires four
+> *points*, not an integral, so sampling a narrow sharp bump lands near its peak while a broad
+> flat one lands near its average.
+>
+> Equal **peaks** with varying widths is what works. Width now sets how *forgiving* the timing
+> is — `early` is generous, `late` demands precision for the identical reward — which is a
+> quality you can read off a horse and ride to, rather than a number that quietly decides
+> races. Asserted in `charges.test.ts`.
 
 ### 8.3 Firing
 
-- Costs `KICK_TANK_COST` off the tank, immediately. Requires `charges >= 1`.
-- Firing while a kick is live **refreshes** its timer. It does not stack (R2) and it does not
-  add a second kick to the pipeline. It still costs a charge — that is the player's call.
-- No windows. No per-window caps. No "already kicked" guard. Fire any time you have a charge.
+- Costs **one charge**. Never any tank. Requires `charges >= 1`.
+- ~~Firing while a kick is live **refreshes** its timer. It still costs a charge — that is the
+  player's call.~~ **Superseded:** paying full price to refresh a kick already running is never
+  the better play, so it was never a choice — only a trap. A live kick now ignores further fire
+  requests entirely: no charge spent, no timer refreshed.
+- **`KICK_COOLDOWN` (14s)** — a horse cannot lunge twice in the same stride. Set short enough
+  that the narrowest window can still absorb a full bank; at 18s a `late` horse could fit only
+  two kicks inside its window while a mashing ride fired three anywhere.
+- Requires the horse to be **up to speed** (`KICK_READY_FRACTION`). A horse still accelerating
+  is accel-limited, not pace-limited, so a kick raises a ceiling it cannot reach. A tap during
+  the gate break is *held* until it can be used, never discarded.
+- ~~No windows.~~ **Superseded — windows are back, safely.** See §8.4.
 
 ---
 
@@ -667,19 +772,37 @@ championship rival barely errs. The difficulty ladder falls out of data that alr
 and beating a maiden field feels different from beating a championship field for a *mechanical*
 reason.
 
-### 11.4 Player input
+### 11.4 Player input — **THE JOCKEY DOES NOT KICK**
 
 ```ts
-export function playerRide(base: RideDecision, input: PlayerInput): RideDecision {
+export function playerRide(base, input, atSpeed): RideDecision {
   return {
     gear: input.takingBack ? 'HOLD' : base.gear,
-    fireKick: input.kickPending || base.fireKick,
+    // base.fireKick is deliberately NOT consulted.
+    fireKick: input.kickPending && atSpeed,
   };
 }
 ```
 
-Tap fires a kick immediately; hold forces `HOLD`. Everything else is the shared base ride, so
-a hands-off player is competitive and an attentive one is better. Gated by §16.3.
+~~`fireKick: input.kickPending || base.fireKick`. Everything else is the shared base ride, so a
+hands-off player is competitive and an attentive one is better.~~
+
+**Superseded, and this was the single most important finding of the build.** The jockey still
+rides the horse — it settles, it banks, it eases when the horse is in trouble — but on the
+player's horse **every charge is spent by the player or not at all**.
+
+Two measurements forced it:
+
+1. **Additive taps punished participation.** With `||`, a player's taps were added on top of an
+   already-complete AI plan, so touching the screen just overspent. Hands-off won a fair 12.7%
+   while *every* active strategy won 0.0% and was beaten 18–36 lengths.
+2. **Even after fixing that, there was no headroom.** The autopilot's plan was matched to the
+   horse's own style and moment — about as good as a player could do — so riding well could
+   only ever *match* riding not at all (11.7% against 12.0%, a tie inside noise). Nothing was
+   left for the player to decide.
+
+With the jockey out of the kicking business: **ridden 13.5% · mashed 10.7% · untouched 5.3% ·
+hoarded 0.0%.** The owner's call, in their words: *"The jockey should not be allowed to kick."*
 
 ---
 
@@ -713,107 +836,33 @@ chat rail (§18).
 
 ## 13. Constants reference
 
-Everything below goes in `src/sim/race/constants.ts`. **All values are first-pass.** Tune only
-against §16 measurements.
+**`src/sim/race/constants.ts` is the source of truth**, and every constant there carries the
+measurement that set it. The tables below are gone deliberately — a second copy of ~60 numbers
+would be wrong within a week. What follows is only the ones that moved far enough from the
+original plan to be worth flagging, and why.
 
-### 13.1 Clock and scale
-```ts
-export const TICK_HZ = 30;
-export const BASE_SPEED = 21.0;          // m/s at 50 Speed, reference pace
-export const SPEED_STAT_SPAN = 0.08;
-export const BASE_ACCEL = 3.0;           // m/s²
-export const BURST_ACCEL_SPAN = 0.6;
-export const DECEL_MULT = 1.5;
-export const METRES_PER_LENGTH = 2.4;
-```
+| Constant | Planned | Built | Why it moved |
+|---|---|---|---|
+| `BASE_ACCEL` | 3.0 | **5.5** | 3.0 took 6.9 s and 71 m to reach racing speed — 10% of a 700 m race, where most of this game lives. A horse still accelerating is accel-limited, so pace bonuses and kicks alike do nothing for it. |
+| `KICK_MAX_BONUS` | 0.060 | **0.22** | At 0.06 the whole kick content of a race was ~9 m in 1400. Perfect timing bought 1.4 lengths, less than the gap between places, so mashing beat timing on volume alone. |
+| `KICK_DURATION` | 4.0 | **4.5** | Minor; value came from the bonus instead. |
+| `FATIGUE_FLOOR` | 0.88 | **0.96** | 12% swamped a 2.2% pace band and a 6% kick. Fatigue decided everything and nothing else mattered. |
+| `FATIGUE_START` | 0.15 | **0.30** | Fatigue is the jockey's problem now, not a tax on the player's kicks. |
+| `KICK_TANK_COST` | 0.15 | **removed** | Kicks cost a charge, never tank (R6). |
+| `REFERENCE_PACE` | 0.975 | **0.971** | Set to the equal average of every style curve, so the economy is measured against an average horse rather than one style's baseline. |
+| `PACE_MIN` / `PACE_MAX` | 0.94 / 1.00 | unchanged | |
+| `ABSOLUTE_SPEED_CEILING` | 1.06 | **1.25** | Follows `KICK_MAX_BONUS`. Still a hard clamp asserted every tick (I2); only its height moved. |
 
-### 13.2 Pipeline bounds — R1/R2 enforcement
-```ts
-export const PACE_MIN = 0.940;
-export const PACE_MAX = 1.000;
-export const HOLD_DELTA = -0.030;
-export const HOLD_FLOOR = 0.920;
-export const KICK_MAX_BONUS = 0.060;
-export const FATIGUE_FLOOR = 0.880;
-export const FATIGUE_START = 0.15;
-/** Harness invariant. No runner may ever exceed cruise * preRace * this. */
-export const ABSOLUTE_SPEED_CEILING = 1.060;
-```
+Constants that did not exist in the plan at all — `PRESS_*`, `EASY_LEAD_RECOVER_BONUS`,
+`CONTACT_*`, `CHARGE_*`, `KICK_COOLDOWN`, `KICK_READY_FRACTION`, `KICK_OUT_OF_WINDOW` — are
+covered in §20.
 
-### 13.3 Tank
-```ts
-export const TANK_START = 1.00;
-export const REFERENCE_PACE = 0.975;
-export const DRAIN_EXPONENT = 12;
-export const TANK_RACE_COST = 3.00;
-export const TANK_RECOVER_RATE = 3.00;
-export const STAMINA_RECOVER_SPAN = 0.50;
-export const DRAFT_RECOVER_BONUS = 0.20;
-export const KICK_TANK_COST = 0.15;
-export const CHARGE_CAPACITY = 5;
-```
+### 13.7 Traits
 
-### 13.4 Kick
-```ts
-export const KICK_DURATION = 4.0;
-export const KICK_RAMP = 0.5;
-export const KICK_DECAY = 1.5;
-export const KICK_GRIT_WEIGHT = 0.45;
-export const KICK_BURST_WEIGHT = 0.30;
-export const KICK_JOCKEY_WEIGHT = 0.25;
-```
-
-### 13.5 Distance preference
-```ts
-export const DIST_CENTRE_MIN = 700;
-export const DIST_CENTRE_MAX = 2400;
-export const DIST_WIDTH_MIN = 200;
-export const DIST_WIDTH_MAX = 700;
-export const DIST_PEAK_BASE = 1.000;
-export const DIST_PEAK_NARROW_BONUS = 0.020;
-export const DIST_FLOOR = 0.960;
-export const DIST_TOLERANCE = 500;       // metres outside the range to reach the floor
-```
-
-### 13.6 Pre-race, rider, drafting
-```ts
-export const FORM_BASE_SPREAD = 0.004;
-export const FORM_TEMPER_AMPLIFY = 0.010;
-export const FUMBLE_BASE = 0.22;
-export const FUMBLE_DURATION = 1.6;
-export const OFF_COLOUR_BASE = 0.16;
-export const OFF_COLOUR_PENALTY = 0.985;
-export const GREEN_DURATION = 1.2;
-
-export const HOLD_TRIGGER_TANK = 0.80;
-export const MOMENT_KICK_SHIFT = 0.08;
-export const JOCKEY_JITTER = 0.18;
-export const JOCKEY_WASTE = 0.35;
-export const JOCKEY_MISS_HOLD = 0.30;
-export const JOCKEY_READOUT_LAG = 0.8;
-export const JOCKEY_READOUT_NOISE = 0.35;
-
-export const DRAFT_RANGE_METRES = 4.0;
-export const DRAFT_LANE_TOLERANCE = 1;
-export const LANE_COUNT = 8;
-```
-
-### 13.7 Traits — where the five homeless ones land
-
-`TRAITS.md` lists five traits that referenced the deleted drain/recovery model, plus Gate
-Rusher's early cost. Rehome them as **tank** modifiers, never speed modifiers (R1):
-
-| Trait | New effect |
-|---|---|
-| Iron Lungs | `TANK_RECOVER_RATE` ×1.12 for this horse |
-| Quick Recovery | `DRAFT_RECOVER_BONUS` ×2 for this horse |
-| Thirsty | `TANK_RECOVER_RATE` ×0.90 |
-| Cruiser | `DRAIN_EXPONENT` −2 (flatter cost curve at pace) |
-| Alert | `FUMBLE_BASE` ×0.4 |
-| Gate Rusher | `paceFactor` +0.015 for `t < 0.15`, then −0.010 for `t < 0.4` |
-
-Conditions traits (Mudder, Firm Specialist, All-Weather) feed `goingFactor` in §10. Every other
-trait is out of scope for v1 — do not wire them.
+Unchanged from the plan and implemented as written: Iron Lungs, Quick Recovery, Thirsty and
+Cruiser are tank modifiers; Alert reduces fumbles; Gate Rusher lifts early pace and pays it
+back; the conditions traits feed `goingFactor`. Every one is a tank or pace modifier, never a
+speed modifier — R1 allows five factors and traits are not one of them.
 
 ---
 
@@ -923,32 +972,37 @@ so `me.kicksLeft > 2` remains correct. Import the constant instead of hardcoding
 
 ---
 
-## 15. Build order
+## 15. Build order — ✅ COMPLETE
+
+All eleven steps landed, in order, each verified against its acceptance criteria before the
+next began. The one rule that mattered most: **step 7 (the harness) was written before step 8
+(any tuning)**, and the UI was not reconnected until Gate 1 passed headless. That sequencing is
+the difference between this attempt and the three that failed.
 
 Each step must compile (`npm run build`) and lint (`npm run lint`) before the next.
 **Do not proceed past a failed acceptance check.**
 
-### Step 1 — Types and data
+### ✅ Step 1 — Types and data
 `sim/types.ts`, `data/index.ts`, `sim/horse.ts` per §14.
 **Accept:** `npm run build` clean. `generateHorse` produces a `moment` and a
 `preferredDistance`; no reference to `aptitudes` or `DISTANCE_BANDS` remains anywhere.
 
-### Step 2 — Constants
+### ✅ Step 2 — Constants
 All of §13 into `sim/race/constants.ts`.
 **Accept:** builds; every constant in §13 present with its stated value.
 
-### Step 3 — Pace curves
+### ✅ Step 3 — Pace curves
 `sim/race/pace.ts` per §6.
 **Accept:** a unit test asserts each `MOMENT_SHIFT` row sums to within ±0.001 of zero (R5), and
 `paceFactor` stays inside `[PACE_MIN, PACE_MAX]` for all 16 style×moment pairs across
 `t = 0 … 1` in steps of 0.01.
 
-### Step 4 — The tank
+### ✅ Step 4 — The tank
 Tank drain/recover/fatigue/charges as pure functions, before any engine exists.
 **Accept:** a unit test reproduces §5.3's table — flat 1.000 pace empties the tank to within
 ±0.05 of zero over a simulated race; flat 0.975 holds within ±0.05 of start; flat 0.950 banks.
 
-### Step 5 — Engine
+### ✅ Step 5 — Engine
 `sim/race/engine.ts`. Fixed 30 Hz tick. Per tick, per runner, in this order:
 
 1. `pace` ← `paceFactor(style, moment, ownProgress)` + `HOLD_DELTA` if holding
@@ -963,31 +1017,31 @@ Tank drain/recover/fatigue/charges as pure functions, before any engine exists.
 **Accept:** `simulateRace` returns a full `RaceOutcome` for a field of 8. Same seed twice →
 identical JSON. No runner's speed ever exceeds `cruise × preRace × ABSOLUTE_SPEED_CEILING`.
 
-### Step 6 — Rider
+### ✅ Step 6 — Rider
 `sim/race/rider.ts` per §11, wired into the engine.
 **Accept:** kick counts per race differ measurably by style — front-runner ~3 and front-loaded,
 closer ~2 and late. Not the flat 5–6 for everyone the old build produced.
 
-### Step 7 — Harness
+### ✅ Step 7 — Harness
 `tools/harness.ts` per §16. **Write this before tuning anything.**
 **Accept:** runs, reports all nine checks, and is honest about failures.
 
-### Step 8 — Tune to Gate 1
+### ✅ Step 8 — Tune to Gate 1
 Iterate constants against §16 until every check passes. Record each change and its measured
 effect in `ROADMAP.md` — the history of *what was measured* is the most valuable artifact this
 project has.
 **Accept:** §16's full suite green.
 
-### Step 9 — Reconnect the UI
+### ✅ Step 9 — Reconnect the UI
 Only now. `raceScreen.ts`, `main.ts`, `infoBox.ts`, `render/track.ts` per §14 and §3.
 **Accept:** `npm run check` clean; a race runs on screen; charge dots track the tank; the
 preferred-length line reads correctly in the info box.
 
-### Step 10 — Ride probe
+### ✅ Step 10 — Ride probe
 `tools/ride-probe.ts` per §16.3, then tune the player side only.
 **Accept:** §16.3 passes.
 
-### Step 11 — Report
+### ✅ Step 11 — Report
 Update `ROADMAP.md`: tick Phase 1, record the final harness numbers, note what was deferred.
 **Then stop and report to the owner. Do not commit or push.**
 
@@ -1081,7 +1135,12 @@ Each of these is a specific, documented failure from the previous three attempts
 | Make kick strength scale with the tank | Bank gates *whether*, never *how hard*. §8.1. |
 | Add a `TIME_SCALE` lever | Order-1 vs order-2 trap. §3. |
 | Tune before the harness passes | This is how all three previous attempts failed. §15 step 8. |
-| Add a second resource | R6. |
+| ~~Add a second resource~~ | ~~R6.~~ **Superseded** — there are two now, tank and charges, and they must stay separate. Do not recombine them. |
+| Let charges regenerate faster than `KICK_COOLDOWN` | The bank stops constraining anything and firing at every opportunity becomes trivially optimal. Mashing beat timing 15.5% to 10.5% when this slipped. |
+| Give Moment windows different peak values | Equal peaks, varying widths. Equal *areas* was tried and failed too (`early` −38%) — a horse fires points, not integrals. |
+| Let the jockey kick on the player's horse | §11.4. It leaves the player nothing to decide. |
+| Let a live kick be refreshed for a charge | Paying full price to refresh a running kick is never the better play, so it is a trap rather than a choice. |
+| Let a horse kick before it is up to speed | It is accel-limited; the kick raises a ceiling it cannot reach and the charge buys nothing. |
 | Commit or push | The owner will say when. |
 
 ---
@@ -1101,6 +1160,48 @@ Explicitly agreed as out of scope for v1. Do not build any of these.
   headless path already produces the full outcome.
 - **Metres/yards display toggle.** `SaveSettings.distanceUnits` already exists; the sim is
   metric, so this is a display-layer concern for later.
+
+---
+
+## 20. What the build added, and what forced it
+
+Four mechanics exist that the plan did not contain. Each was added because a gate could not
+pass without it, and each is recorded here with the measurement — this is the bar for adding a
+fifth.
+
+### PRESS — a contested lead costs tank
+
+`PRESS_COST` 0.17 per rival within `PRESS_RANGE_METRES` (5 m), for a horse in the top
+`PRESS_RANK_LIMIT` (3), capped at `PRESS_MAX_RIVALS` (2), inert before `PRESS_FROM` (20% of
+the race).
+
+**Why:** B3 could never pass. `DESIGN.md` §4 requires that "when two front-runners refuse to
+yield they burn each other out", but pace curves are fixed per horse — a lone leader and one of
+three duelling leaders ran the identical race. Nothing in the simulation made one horse's
+presence cost another anything.
+
+**The grace period is load-bearing.** Without `PRESS_FROM`, the whole field is inside 5 m at the
+gate, so the front three paid maximum press from tick one and frontRunner measured **0.0%**.
+That is not a contested lead; it is a field that has not spread out yet.
+
+### EASY LEAD — an uncontested one pays
+
+`EASY_LEAD_RECOVER_BONUS` 0.44 to tank recovery for a rank-1 horse with nobody pressing it.
+
+**Why:** press alone made front-running pure cost. A leader cannot draft (there is nobody ahead
+to shelter behind) and pays press the moment anyone closes, so it had every disadvantage and no
+upside — 0.6% against a fair 12.5%. Racing calls it *getting an easy lead*, and a horse allowed
+to dictate its own tempo genuinely is having an easier time of it. When three front-runners
+refuse to yield, none of them gets it and all of them pay press instead, which is the collapse
+B3 asks for, now driven from both directions.
+
+### CONTACT — a patient horse still has to be in the race
+
+See §6.6 and R4.
+
+### THE CHARGE BANK — the player's own resource
+
+See R6 and §5.5.
 
 ---
 

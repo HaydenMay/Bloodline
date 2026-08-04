@@ -1,13 +1,14 @@
 import type { Rng } from '../rng.js';
 import type { Horse } from '../types.js';
 import type { PlayerInput } from './types.js';
-import { MOMENTS, type Moment, type RunningStyle } from '../../data/index.js';
+import type { RunningStyle } from '../../data/index.js';
+import { momentWindow } from './charges.js';
 import {
   HOLD_TRIGGER_TANK,
   JOCKEY_JITTER,
   JOCKEY_MISS_HOLD,
   JOCKEY_WASTE,
-  MOMENT_KICK_SHIFT,
+  KICK_COOLDOWN,
   RECOVERY_RIDE_TANK,
   RECOVERY_RIDE_UNTIL,
 } from './constants.js';
@@ -38,8 +39,12 @@ export type KickPattern = readonly number[];
  * This is the deferred "3.5" item from ROADMAP.md. The old AI ran one identical
  * algorithm for every archetype and fired 5-6 kicks per race regardless of
  * style OR moment — measured, not assumed — which is why no amount of tuning
- * ever separated the archetypes from each other. Style sets the PATTERN here;
- * Moment shifts the TIMING.
+ * ever separated the archetypes from each other.
+ *
+ * These are positions WITHIN the horse's own Moment window, 0 being its start
+ * and 1 its end — not positions within the race. Style says how a horse spends
+ * across its window, Moment says where the window is, and the two compose
+ * without either having to know about the other.
  *
  * COUNTS ARE EQUAL ACROSS STYLES, deliberately. They were not at first
  * (frontRunner 3, midPack 4, stalker and closer 2) and it quietly decided the
@@ -56,39 +61,15 @@ export type KickPattern = readonly number[];
  * touch, then concentrates the rest.
  */
 export const KICK_PLAN: Record<RunningStyle, KickPattern> = {
-  /** Assert the lead early, then two held back to defend it off the turn. */
-  frontRunner: [0.08, 0.24, 0.62, 0.88],
-  /** Sits handy, then a decisive move off the turn. */
-  stalker: [0.32, 0.58, 0.8, 0.93],
-  /** The generalist: makes its move at halfway and tries to hold on. */
-  midPack: [0.36, 0.58, 0.78, 0.94],
-  /** One to keep in touch, then everything concentrated late. */
-  closer: [0.42, 0.72, 0.86, 0.95],
+  /** Front-loaded: assert at once, then hold something back to defend with. */
+  frontRunner: [0.0, 0.35, 0.9],
+  /** Even and decisive through the window. */
+  stalker: [0.15, 0.5, 0.85],
+  /** The generalist. Spread across everything it has. */
+  midPack: [0.05, 0.5, 0.95],
+  /** Patient, then concentrated into the closing half. */
+  closer: [0.25, 0.65, 0.95],
 };
-
-/** How far each Moment shifts a style's pattern, in steps either side of centre. */
-function momentOffset(moment: Moment): number {
-  return MOMENTS.indexOf(moment) - (MOMENTS.length - 1) / 2;
-}
-
-/**
- * Move a planned kick earlier or later, TAPERING TO ZERO at both ends of the race.
- *
- * A uniform shift is the old Moment-window unfairness in new clothes, and it
- * measured exactly like it. Sliding every point by the same amount pushed an
- * `early` front-runner's first kick to 0.01 — fired before the horse has even
- * finished accelerating — and a `late` one's last kick past the wire, so both
- * extremes threw a charge away while `earlyMid` and `midLate` kept all four.
- * earlyMid came out at +40% off fair share, `early` at -24%.
- *
- * The 4p(1-p) weighting is zero at p=0 and p=1 and maximal mid-race, so a
- * Moment changes WHEN a horse spends without ever costing it a charge for
- * sitting at one end of the range. No clamping, so nothing is silently lost.
- */
-function shiftKick(point: number, shift: number): number {
-  const taper = 4 * point * (1 - point);
-  return point + shift * taper;
-}
 
 export interface KickPlanned {
   /** Own-progress points at which this horse intends to kick. */
@@ -111,16 +92,35 @@ const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > 
  * and a championship rival barely errs, so the difficulty ladder falls out of
  * data the horse already carries.
  */
-export function planKicks(horse: Horse, rng: Rng): KickPlanned {
+export function planKicks(horse: Horse, rng: Rng, raceSeconds: number): KickPlanned {
   const pattern = KICK_PLAN[horse.style];
-  const shift = MOMENT_KICK_SHIFT * momentOffset(horse.moment);
   const error = 1 - horse.jockeySkill / 100;
+  const window = momentWindow(horse.moment);
+
+  // Style says how a horse spends across its window; Moment says WHERE that
+  // window is. The pattern is a set of positions from 0 to 1 WITHIN the window
+  // rather than within the race, so a front-runner and a closer sharing a
+  // Moment still spend differently inside it.
+  //
+  // THE COOLDOWN HAS TO BE PLANNED AROUND, or the window-width problem returns
+  // through the back door. A `late` window is about 19 seconds of a 69-second
+  // race; at a 12-second cooldown only two kicks physically fit inside it, so
+  // planning four there left two silently blocked and unspendable. Measured:
+  // late collapsed to 4.9% against a fair 12.5% while the wider windows were
+  // fine. Charges that cannot fit inside the window are placed just BEFORE it
+  // instead, where they are worth less but are at least worth something.
+  const minSpacing = KICK_COOLDOWN / Math.max(1, raceSeconds);
+  const span = window.to - window.from;
 
   const points: number[] = [];
-  for (const base of pattern) {
-    const jitter = rng.normal(0, JOCKEY_JITTER * error);
-    points.push(clamp(shiftKick(base, shift) + jitter, 0.01, 0.995));
+  for (let i = pattern.length - 1; i >= 0; i--) {
+    const wanted = window.from + span * pattern[i]!;
+    const previous = points.length > 0 ? points[points.length - 1]! : Infinity;
+    const latest = previous - minSpacing;
+    const jitter = rng.normal(0, JOCKEY_JITTER * error * span);
+    points.push(clamp(Math.min(wanted, latest) + jitter, 0.005, 0.99));
   }
+  points.reverse();
 
   // A poor jockey throws one away entirely — fires it somewhere it does almost
   // nothing rather than inside the horse's own phase.

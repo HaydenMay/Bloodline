@@ -1,11 +1,9 @@
 import {
-  CHARGE_CAPACITY,
   DRAIN_EXPONENT,
   DRAFT_RECOVER_BONUS,
   EASY_LEAD_RECOVER_BONUS,
   FATIGUE_FLOOR,
   FATIGUE_START,
-  KICK_TANK_COST,
   PRESS_COST,
   PRESS_MAX_RIVALS,
   REFERENCE_PACE,
@@ -17,12 +15,22 @@ import {
 /**
  * The tank — the one conserved quantity in the simulation (REBUILD.md §5, R6).
  *
- * It is never shown as a bar. The player sees it only as charge dots, which are
- * the tank quantised (`chargesFor` below). That satisfies the owner's "no
- * stamina bar" while giving the simulation the conserved quantity it has to
- * have: the previous rebuild removed energy entirely and, in doing so, removed
- * the only thing that made speed cost anything. The roadmap's own diagnosis:
- * "Effort has no cost in this economy — the actual root cause."
+ * IT IS THE JOCKEY'S, NOT THE PLAYER'S. It is never shown as a bar and the
+ * player never spends it. Its job is to make pace cost something — so that
+ * going too fast early is punished and a lead cannot simply run away — and to
+ * give the jockey a reason to settle a horse or ask it to close. Kick charges
+ * are a separate bank entirely (charges.ts) and a kick never touches this.
+ *
+ * The two were combined at first, charges being the tank quantised, and the
+ * consequence was that spending a charge spent stamina: a kick could cost more
+ * ground in fatigue than it gained, and a player who never kicked beat almost
+ * every player who did. The owner's call, and the right one — kicks should
+ * always reward the player.
+ *
+ * What survives from that model is the part worth keeping: the previous rebuild
+ * removed energy altogether and with it the only thing that made speed cost
+ * anything. The roadmap's own diagnosis: "Effort has no cost in this economy —
+ * the actual root cause."
  *
  * Drain is charged against race PROGRESS rather than wall-clock seconds. That
  * is what lets one set of constants serve a 600 m dash and a 2400 m route
@@ -92,11 +100,12 @@ export function recoverPerSecond(
 }
 
 /**
- * The speed penalty for running dry.
+ * The speed penalty for running dry — "as tank lowers, effectiveness lowers".
  *
  * A smooth ramp rather than a cliff, and the largest single penalty in the
- * game — which is what makes emptying the worst thing that can happen to a
- * horse, and therefore what makes pace a real decision.
+ * game, which is what makes emptying the worst thing that can happen to a horse
+ * and therefore what makes pace a real decision. It applies to the horse's
+ * whole output, kicks included: a tired horse cannot quicken like a fresh one.
  */
 export function fatigueFactor(tank: number): number {
   if (tank >= FATIGUE_START) return 1;
@@ -105,19 +114,13 @@ export function fatigueFactor(tank: number): number {
 }
 
 /**
- * Charge dots. THE DOTS ARE THE TANK, quantised.
+ * How well the horse is going, 0 (cooked) to 1 (full of running).
  *
- * With KICK_TANK_COST = 0.15 the last dot goes out at tank 0.15 — exactly where
- * FATIGUE_START begins to bite. So the dots the HUD already draws are an honest
- * readout of a hidden resource, with no extra instrumentation needed anywhere.
+ * The tank is hidden, but its effect must not be: the HUD shows this rather
+ * than a stamina bar, so a player can see their horse coming to the end of its
+ * tether without being handed a number to manage.
  */
-export function chargesFor(tank: number): number {
-  return Math.min(CHARGE_CAPACITY, Math.floor(tank / KICK_TANK_COST));
-}
-
-/** Fraction of the way toward the next dot. Drives the existing fill wedge. */
-export function chargeProgressFor(tank: number): number {
-  if (chargesFor(tank) >= CHARGE_CAPACITY) return 1;
-  const within = (tank % KICK_TANK_COST) / KICK_TANK_COST;
-  return within < 0 ? 0 : within;
+export function conditionReadout(tank: number): number {
+  const t = tank / FATIGUE_START;
+  return t >= 1 ? 1 : t < 0 ? 0 : t;
 }

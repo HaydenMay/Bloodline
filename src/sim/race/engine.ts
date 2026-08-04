@@ -12,12 +12,19 @@ import { paceFactor } from './pace.js';
 import { distanceFactor } from './aptitude.js';
 import {
   type TankModifiers,
-  chargeProgressFor,
-  chargesFor,
+  conditionReadout,
   drainPerSecond,
   fatigueFactor,
   recoverPerSecond,
 } from './tank.js';
+import {
+  type ChargeState,
+  inMomentWindow,
+  kickWindowBonus,
+  regenCharges,
+  spendCharge,
+  startingCharges,
+} from './charges.js';
 import {
   type KickPlanned,
   type RideDecision,
@@ -56,7 +63,6 @@ import {
   KICK_MAX_BONUS,
   KICK_RAMP,
   KICK_READY_FRACTION,
-  KICK_TANK_COST,
   LANE_COUNT,
   METRES_PER_LENGTH,
   MORALE_MAX_FACTOR,
@@ -123,6 +129,16 @@ export interface RunnerSnapshot {
   chargeProgress: number;
   /** recover / drain this tick. Drives the 1-3 arrow regen indicator. */
   regenMult: number;
+  /**
+   * How well the horse is going, 1 (full of running) to 0 (cooked).
+   *
+   * The tank itself stays hidden — no stamina bar — but its EFFECT must not be,
+   * or a horse can be showing a full bank of charges while being completely out
+   * of petrol and the player has no way to know.
+   */
+  condition: number;
+  /** Inside its own Moment window, where its kick is worth most. */
+  inWindow: boolean;
   /** Always false in v1 — there is no blocking (REBUILD.md §9). */
   blocked: boolean;
   drafting: boolean;
@@ -185,6 +201,8 @@ interface Runner {
   distance: number;
   speed: number;
   tank: number;
+  /** The player's bank. Wholly separate from `tank` — a kick never costs tank. */
+  charges: ChargeState;
   /** Elapsed seconds when the live kick fired, or -1. */
   kickAt: number;
   kickStrength: number;
@@ -252,7 +270,13 @@ function tankModsFor(horse: Horse): TankModifiers {
   };
 }
 
-function makeRunner(horse: Horse, lane: number, config: RaceConfig, rng: Rng): Runner {
+function makeRunner(
+  horse: Horse,
+  lane: number,
+  config: RaceConfig,
+  rng: Rng,
+  raceSeconds: number,
+): Runner {
   const consistency = horse.stats.consistency / 100;
 
   // ---- Pre-race, computed ONCE and then frozen (REBUILD.md §10) ------------
@@ -280,7 +304,7 @@ function makeRunner(horse: Horse, lane: number, config: RaceConfig, rng: Rng): R
   }
   greenAt.sort((a, b) => a - b);
 
-  const plan = planKicks(horse, rng);
+  const plan = planKicks(horse, rng, raceSeconds);
 
   return {
     horse,
@@ -298,6 +322,7 @@ function makeRunner(horse: Horse, lane: number, config: RaceConfig, rng: Rng): R
     distance: 0,
     speed: 0,
     tank: TANK_START,
+    charges: startingCharges(),
     kickAt: -1,
     kickStrength: 0,
     kicksFired: 0,
@@ -363,8 +388,12 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
   const rng = createRng(config.seed);
   const totalMetres = config.metres;
 
+  // Rough, but all the rider needs: it only sets how far apart planned kicks
+  // must sit to clear the cooldown.
+  const raceSeconds = totalMetres / BASE_SPEED;
+
   const runners: Runner[] = entrants.map((e, i) =>
-    makeRunner(e.horse, i % LANE_COUNT, config, rng),
+    makeRunner(e.horse, i % LANE_COUNT, config, rng, raceSeconds),
   );
 
   let elapsed = 0;
@@ -436,7 +465,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
     const ownProgress = clamp01(r.distance / totalMetres);
 
     // ---- 1. Ask the rider -------------------------------------------------
-    const charges = chargesFor(r.tank);
+    const charges = r.charges.count;
     // Measured against last tick's target, which is all a rider could know.
     const atSpeed = r.speed >= r.cruise * r.preRace * r.paceNow * KICK_READY_FRACTION;
     const state: RiderState = { ownProgress, tank: r.tank, charges, fired: r.fired, atSpeed };
@@ -461,10 +490,14 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
     // was never a real choice — only a trap for anyone who touched the screen.
     const kickLive = r.kickAt >= 0 && elapsed - r.kickAt < KICK_COOLDOWN;
 
-    if (decision.fireKick && charges >= 1 && atSpeed && !kickLive) {
-      r.tank = Math.max(0, r.tank - KICK_TANK_COST);
+    if (decision.fireKick && charges >= 1 && atSpeed && !kickLive && spendCharge(r.charges)) {
       r.kickAt = elapsed;
-      r.kickStrength = kickStrengthFor(r.horse);
+      // A kick produced at the horse's own moment is worth more, on a smooth
+      // curve rather than a cliff — and how much more depends on the SHAPE of
+      // that horse's window. A late horse's window is narrow and fierce, an
+      // early horse's broad and mild, and the two are worth the same over a
+      // race. Outside it entirely a kick still works, just poorly.
+      r.kickStrength = kickStrengthFor(r.horse) * kickWindowBonus(r.horse.moment, ownProgress);
       r.kicksFired += 1;
 
       // A player tap brings the next planned kick FORWARD; the AI's own
@@ -548,6 +581,11 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
     r.regenMult = drain > 0 ? recover / drain : 1;
     r.tank = clamp01(r.tank + (recover - drain) * dt);
 
+    // ---- 6b. Charges — the player's bank, on its own clock ----------------
+    // Settled covers every way a horse is having an easier time of it, so
+    // taking a pull is a real tactical move and not just lost ground.
+    regenCharges(r.charges, dt, r.holding || r.drafting || r.easyLead);
+
     // ---- 7. Sectionals and the wire --------------------------------------
     const progress = r.distance / totalMetres;
     while (r.nextSectional <= 1.0001 && progress >= r.nextSectional) {
@@ -600,9 +638,11 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
     // Remap the pace band onto 0-1 so the render rig's `drive` reads sensibly.
     effort: clamp01((r.paceNow - HOLD_FLOOR) / (1 - HOLD_FLOOR)),
     kicking: r.kickAt >= 0 && elapsed - r.kickAt <= KICK_DURATION,
-    kicksRemaining: chargesFor(r.tank),
-    chargeProgress: chargeProgressFor(r.tank),
+    kicksRemaining: r.charges.count,
+    chargeProgress: r.charges.progress,
     regenMult: r.regenMult,
+    condition: conditionReadout(r.tank),
+    inWindow: inMomentWindow(r.horse.moment, clamp01(r.distance / totalMetres)),
     blocked: false,
     drafting: r.drafting,
     offColour: r.offColour,
@@ -638,7 +678,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
         finishPosition: i + 1,
         time,
         margin: marginMetres / METRES_PER_LENGTH,
-        kicksLeft: chargesFor(r.tank),
+        kicksLeft: r.charges.count,
         sectionals: r.sectionals,
         hadTrouble: false,
         fumbledStart: r.fumbledStart,
