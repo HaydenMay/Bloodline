@@ -112,12 +112,20 @@ export const STYLE_BASE: Record<RunningStyle, readonly number[]> = {
  *
  * So the lobes are spaced across the four usable quarters instead. "Early"
  * means the first quarter of the race, not the first stride.
+ *
+ * THE AMPLITUDES ARE NOT EQUAL, and that is deliberate. Zero-sum guarantees no
+ * Moment gets more PACE than another, but it cannot guarantee equal TANK COST,
+ * because drain is convex: a sag early banks stamina that is then available for
+ * the whole rest of the race, while the same sag late banks stamina nothing is
+ * left to spend. `late` therefore gets more out of an identical-sized shift
+ * than `early` does, and measured +36% off fair share on symmetric rows. Its
+ * row is flattened and `early`'s deepened to pay that difference back.
  */
 export const MOMENT_SHIFT: Record<Moment, readonly number[]> = {
-  early: [+0.002, +0.014, +0.002, -0.009, -0.009],
-  earlyMid: [-0.005, +0.007, +0.011, -0.004, -0.009],
-  midLate: [-0.009, -0.007, +0.008, +0.014, -0.006],
-  late: [-0.009, -0.009, -0.005, +0.011, +0.012],
+  early: [+0.006, +0.022, +0.002, -0.015, -0.015],
+  earlyMid: [-0.005, +0.011, +0.016, -0.009, -0.013],
+  midLate: [-0.007, -0.005, +0.006, +0.011, -0.005],
+  late: [-0.004, -0.004, -0.002, +0.005, +0.005],
 };
 
 /** Linear interpolation across a control-point table, `t` in [0, 1]. */

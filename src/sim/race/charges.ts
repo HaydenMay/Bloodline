@@ -42,8 +42,15 @@ export function startingCharges(): ChargeState {
  * pull, drafting, or dictating an unpressed lead. All of them refill faster.
  */
 export function regenCharges(state: ChargeState, dt: number, settled: boolean): void {
+  // A full bank holds NO stored progress. Pinning it at 1 while full meant that
+  // spending a charge was refunded on the very next tick — progress was already
+  // at the threshold, so it immediately rolled over into a new charge and a
+  // horse at capacity effectively had unlimited kicks. Measured: a mashing ride
+  // fired 7.4 kicks from a bank of three on a 60-second regen and finished the
+  // race still full, which is arithmetically impossible and was the real reason
+  // volume kept beating timing.
   if (state.count >= CHARGE_CAPACITY) {
-    state.progress = 1;
+    state.progress = 0;
     return;
   }
   const seconds = CHARGE_REGEN_SECONDS * (settled ? CHARGE_REGEN_SETTLED : 1);
@@ -52,7 +59,7 @@ export function regenCharges(state: ChargeState, dt: number, settled: boolean): 
     state.progress -= 1;
     state.count += 1;
   }
-  if (state.count >= CHARGE_CAPACITY) state.progress = 1;
+  if (state.count >= CHARGE_CAPACITY) state.progress = 0;
 }
 
 /** Spend one. Returns false if the bank is empty. */

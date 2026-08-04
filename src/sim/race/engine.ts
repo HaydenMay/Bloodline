@@ -44,6 +44,7 @@ import {
   DECEL_MULT,
   DRAFT_LANE_TOLERANCE,
   DRAFT_RANGE_METRES,
+  EASY_LEAD_CLEAR_METRES,
   FORM_BASE_SPREAD,
   FORM_TEMPER_AMPLIFY,
   FUMBLE_BASE,
@@ -139,6 +140,15 @@ export interface RunnerSnapshot {
   condition: number;
   /** Inside its own Moment window, where its kick is worth most. */
   inWindow: boolean;
+  /**
+   * 0 while a kick is ready, rising to 1 as the cooldown expires.
+   *
+   * A horse cannot lunge twice in the same stride, but if the HUD does not SAY
+   * so then a tap that does nothing just reads as a broken button. The owner,
+   * playing it: "after I use a kick charge I can't use another for a period of
+   * time and I don't know why that is."
+   */
+  kickReady: number;
   /** Always false in v1 — there is no blocking (REBUILD.md §9). */
   blocked: boolean;
   drafting: boolean;
@@ -211,8 +221,8 @@ interface Runner {
   drafting: boolean;
   /** Rivals contesting this horse's position. Costs tank, never speed. */
   press: number;
-  /** Leading, unpressed, dictating the tempo. Recovers tank faster. */
-  easyLead: boolean;
+  /** 0-1: how clear of the field this horse is while leading it. */
+  easyLead: number;
   holding: boolean;
   regenMult: number;
   paceNow: number;
@@ -329,7 +339,7 @@ function makeRunner(
     fired: plan.points.map(() => false),
     drafting: false,
     press: 0,
-    easyLead: false,
+    easyLead: 0,
     holding: false,
     regenMult: 1,
     paceNow: PACE_MIN,
@@ -423,7 +433,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
       if (r.finished) {
         r.drafting = false;
         r.press = 0;
-        r.easyLead = false;
+        r.easyLead = 0;
         continue;
       }
 
@@ -452,10 +462,20 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
             ).length
           : 0;
 
-      // The counterweight to press: a leader nobody is challenging is having an
-      // easy time of it. Three front-runners refusing to yield give this to
-      // nobody and pay press instead.
-      r.easyLead = settled && r.rank === 1 && r.press === 0;
+      // Daylight. Being in front is physically hard (RANK_SHELTER says so);
+      // being in front UNCHALLENGED is tactically easy, and this is that.
+      // Graded by how clear the horse actually is, so it rewards a front-runner
+      // for doing its job rather than switching on only in rare quiet races.
+      if (settled && r.rank === 1) {
+        let nearest = Infinity;
+        for (const o of runners) {
+          if (o === r || o.finished) continue;
+          nearest = Math.min(nearest, r.distance - o.distance);
+        }
+        r.easyLead = clamp01(nearest / EASY_LEAD_CLEAR_METRES);
+      } else {
+        r.easyLead = 0;
+      }
     }
   };
 
@@ -576,6 +596,8 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
       totalMetres,
       r.drafting,
       r.tankMods,
+      r.rank,
+      runners.length,
       r.easyLead,
     );
     r.regenMult = drain > 0 ? recover / drain : 1;
@@ -584,7 +606,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
     // ---- 6b. Charges — the player's bank, on its own clock ----------------
     // Settled covers every way a horse is having an easier time of it, so
     // taking a pull is a real tactical move and not just lost ground.
-    regenCharges(r.charges, dt, r.holding || r.drafting || r.easyLead);
+    regenCharges(r.charges, dt, r.holding || r.drafting || r.easyLead > 0.5);
 
     // ---- 7. Sectionals and the wire --------------------------------------
     const progress = r.distance / totalMetres;
@@ -638,6 +660,8 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
     // Remap the pace band onto 0-1 so the render rig's `drive` reads sensibly.
     effort: clamp01((r.paceNow - HOLD_FLOOR) / (1 - HOLD_FLOOR)),
     kicking: r.kickAt >= 0 && elapsed - r.kickAt <= KICK_DURATION,
+    kickReady:
+      r.kickAt < 0 ? 1 : Math.min(1, (elapsed - r.kickAt) / KICK_COOLDOWN),
     kicksRemaining: r.charges.count,
     chargeProgress: r.charges.progress,
     regenMult: r.regenMult,

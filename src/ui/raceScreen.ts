@@ -421,9 +421,40 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const barX = (width - barW) / 2;
     const barY = height - pad - 34;
 
-    ctx.fillStyle = 'rgba(14,18,24,0.72)';
-    roundRect(ctx, barX, barY, barW, 26, 13);
-    ctx.fill();
+    // YOUR MOMENT — the one piece of timing information the player rides on.
+    // Drawn as the whole bar lighting up rather than a word in a corner: this
+    // is the cue to spend, and it has to be visible without being read.
+    if (player.inWindow) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(242,193,78,0.85)';
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = 'rgba(242,193,78,0.16)';
+      roundRect(ctx, barX, barY, barW, 26, 13);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.strokeStyle = 'rgba(242,193,78,0.9)';
+      ctx.lineWidth = 2;
+      roundRect(ctx, barX, barY, barW, 26, 13);
+      ctx.stroke();
+
+      // A banner above it, so the moment ARRIVING is an event and not just a
+      // state you might notice.
+      const bannerW = 122;
+      const bannerX = (width - bannerW) / 2;
+      const bannerY = barY - 26;
+      ctx.fillStyle = '#F2C14E';
+      roundRect(ctx, bannerX, bannerY, bannerW, 20, 10);
+      ctx.fill();
+      ctx.fillStyle = '#12222B';
+      ctx.font = '800 11px ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('YOUR MOMENT', width / 2, bannerY + 14);
+    } else {
+      ctx.fillStyle = 'rgba(14,18,24,0.72)';
+      roundRect(ctx, barX, barY, barW, 26, 13);
+      ctx.fill();
+    }
 
     const LABEL_FONT = '700 11px ui-sans-serif, system-ui, sans-serif';
     ctx.font = LABEL_FONT;
@@ -439,11 +470,15 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // using the dead space this bar already had to spare.
     const ARROW_FONT = '700 9px ui-sans-serif, system-ui, sans-serif';
     ctx.font = ARROW_FONT;
+    // How the horse is GOING. The tank itself stays hidden — no stamina bar —
+    // but a horse can hold a full bank of charges and still be completely out of
+    // petrol, and the player has to be able to see that coming.
     const arrowsMaxW = ctx.measureText('===').width;
-    const regenTier = player.regenMult >= 1.15 ? 3 : player.regenMult >= 0.95 ? 2 : 1;
+    const cond = player.condition;
+    const condTier = cond > 0.66 ? 3 : cond > 0.33 ? 2 : 1;
     ctx.fillStyle =
-      regenTier === 3 ? '#6FE39B' : regenTier === 2 ? 'rgba(233,238,245,0.75)' : 'rgba(139,152,169,0.6)';
-    ctx.fillText('▲'.repeat(regenTier), barX + 20 + labelW, barY + 17);
+      condTier === 3 ? '#6FE39B' : condTier === 2 ? '#F2C14E' : '#D9534F';
+    ctx.fillText('='.repeat(condTier), barX + 20 + labelW, barY + 17);
 
     // ---- The charge dots ---------------------------------------------------
     // These ARE the tank, quantised (REBUILD.md §5.5). The hidden budget the
@@ -455,13 +490,22 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const dotsY = barY + 13;
     const dotsX0 = barX + 28 + labelW + arrowsMaxW + 12;
 
+    // A horse cannot lunge twice in the same stride, so a charge you own is not
+    // always a charge you can spend. Dimming the whole row while the cooldown
+    // runs is what stops a dead tap reading as a broken button.
+    const ready = player.kickReady >= 1;
+
     for (let i = 0; i < CHARGE_CAPACITY; i++) {
       const cx = dotsX0 + i * dotGap;
       const filled = i < player.kicksRemaining;
 
       ctx.beginPath();
       ctx.arc(cx, dotsY, dotR, 0, Math.PI * 2);
-      ctx.fillStyle = filled ? '#F2C14E' : 'rgba(139,152,169,0.25)';
+      ctx.fillStyle = filled
+        ? ready
+          ? '#F2C14E'
+          : 'rgba(242,193,78,0.28)'
+        : 'rgba(139,152,169,0.25)';
       ctx.fill();
 
       // The wedge on the first empty dot: how close the next one is.
@@ -475,14 +519,34 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       }
     }
 
+    // The recharging horse: a sweep across the dot row showing when the next
+    // effort can be asked for.
+    if (!ready) {
+      const sweepW = (CHARGE_CAPACITY - 1) * dotGap + dotR * 2;
+      const sweepX = dotsX0 - dotR;
+      ctx.fillStyle = 'rgba(139,152,169,0.22)';
+      ctx.fillRect(sweepX, dotsY + dotR + 4, sweepW, 2);
+      ctx.fillStyle = '#F2C14E';
+      ctx.fillRect(sweepX, dotsY + dotR + 4, sweepW * player.kickReady, 2);
+    }
+
     ctx.font = LABEL_FONT;
     ctx.textAlign = 'right';
+    // What the horse is doing right now, most urgent first. The middle two are
+    // the ones that used to be invisible: a player could tap into a cooldown or
+    // into an exhausted horse and get no explanation for why nothing happened.
     if (input.takingBack) {
       ctx.fillStyle = '#4EC9A0';
       ctx.fillText('TAKING A PULL', barX + barW - 12, barY + 17);
     } else if (player.kicksRemaining === 0) {
       ctx.fillStyle = '#D9534F';
-      ctx.fillText('EMPTY', barX + barW - 12, barY + 17);
+      ctx.fillText('NO CHARGES', barX + barW - 12, barY + 17);
+    } else if (!ready) {
+      ctx.fillStyle = 'rgba(139,152,169,0.9)';
+      ctx.fillText('GETTING BACK', barX + barW - 12, barY + 17);
+    } else if (player.inWindow) {
+      ctx.fillStyle = '#F2C14E';
+      ctx.fillText('GO NOW', barX + barW - 12, barY + 17);
     }
 
     // ---- Call-outs ---------------------------------------------------------

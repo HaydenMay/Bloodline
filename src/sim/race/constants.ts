@@ -101,7 +101,7 @@ export const HOLD_FLOOR = 0.92;
  * between finishing places, and mashing beat timing simply by firing more
  * often. A lever nobody can feel is not a lever.
  */
-export const KICK_MAX_BONUS = 0.22;
+export const KICK_MAX_BONUS = 0.14;
 
 /**
  * Speed factor of a completely empty horse.
@@ -112,17 +112,18 @@ export const KICK_MAX_BONUS = 0.22;
  * race time and cost ~1.8% by bringing the empty point forward, making kicks
  * net-NEGATIVE and handing the race to whichever style planned fewest of them.
  *
- * Softened again from 0.94 for the same reason one level down. A kick is only
- * ever worth firing if the ground it gains outweighs the fatigue it brings
- * forward, and at 0.94 that was true only inside the final fifth of the race —
- * a player who simply never kicked beat almost every ride that did. THE COST
- * GRADIENT IS THE POINT and is deliberately kept: a kick near the line is
- * nearly free because there is no race left to pay it back in, while an early
- * one carries a long bill. That gradient is what makes timing a skill. What
- * changed is the magnitude, so that spending is worthwhile across most of the
- * race rather than only in the last furlong.
+ * Then SOFTENED to 0.96 while kicks still cost tank, because any fatigue at all
+ * made kicks net-negative and a player who never kicked beat almost every ride
+ * that did.
+ *
+ * And now STRENGTHENED again to 0.90, because separating charges from the tank
+ * removed the reason to keep it weak and nobody took that back. Measured with
+ * it at 0.96: every style finished a race at 0.96-1.00 condition, meaning the
+ * tank was barely biting anyone — so press, rank shelter, easy lead and
+ * drafting were all expressing through a lever that did nothing, and none of
+ * them could move a win rate. The tank only matters if running dry hurts.
  */
-export const FATIGUE_FLOOR = 0.96;
+export const FATIGUE_FLOOR = 0.9;
 
 /**
  * Tank level at which fatigue starts to bite. A smooth ramp below, never a cliff.
@@ -141,7 +142,7 @@ export const FATIGUE_START = 0.3;
  * No runner may ever exceed `cruise * preRace * this`. Asserted every tick of
  * every race in the harness so the launch bug cannot silently return.
  */
-export const ABSOLUTE_SPEED_CEILING = 1.25;
+export const ABSOLUTE_SPEED_CEILING = 1.18;
 
 // ---------------------------------------------------------------------------
 // The tank — the one conserved quantity (REBUILD.md R6, §5)
@@ -166,7 +167,7 @@ export const REFERENCE_PACE = 0.971;
  * The only pack interaction in the simulation besides drafting, and like
  * drafting it is TANK-side — nothing here touches speed (R1).
  */
-export const PRESS_RANGE_METRES = 5.0;
+export const PRESS_RANGE_METRES = 7.5;
 
 /**
  * Extra drain per pressing rival, for a horse in the front of the field.
@@ -178,11 +179,24 @@ export const PRESS_RANGE_METRES = 5.0;
  * identical race and B3 could never pass. Being pressed costs tank; the horses
  * doing the pressing pay it too, which is what makes a duel mutually
  * destructive rather than a tax on whoever happens to be in front.
+ *
+ * Eased back when RANK_SHELTER arrived: both of these tax the front of the
+ * field, and stacked at their old values they drove frontRunner to 6.4% against
+ * a fair 12.5%. Press is now specifically about a CONTESTED lead; the general
+ * cost of being in front is the rank gradient's job.
  */
-export const PRESS_COST = 0.17;
+export const PRESS_COST = 0.26;
 
-/** Rank at or above which a horse is "in front" and can be pressed. */
-export const PRESS_RANK_LIMIT = 3;
+/**
+ * Rank at or above which a horse is "in front" and can be pressed.
+ *
+ * TWO, not three, so this is about the lead DUEL rather than the whole front
+ * group. At three, widening PRESS_RANGE_METRES taxed every chaser as well as
+ * the leader — a front-runner that got clear escaped it while the pack behind
+ * all paid, which inverted the mechanic: press started HELPING front-runners
+ * (16.0% against a fair 12.5%) instead of punishing contested ones.
+ */
+export const PRESS_RANK_LIMIT = 2;
 
 /** Never more than this many rivals count, so a bunched field cannot run away. */
 export const PRESS_MAX_RIVALS = 2;
@@ -250,30 +264,58 @@ export const STAMINA_RECOVER_SPAN = 0.5;
 export const DRAFT_RECOVER_BONUS = 0.34;
 
 /**
+ * How much more sheltered the BACK of the field is than the front.
+ *
+ * A continuous gradient by finishing position: the leader gets none of this and
+ * the back-marker gets all of it, with everyone in between scaled linearly. It
+ * is the physical fact of a race — the horse in front breaks the air and
+ * everyone behind it is running in cleaner going — and it is a graded version
+ * of what DRAFT_RECOVER_BONUS does crudely by proximity.
+ *
+ * It exists because leads ran away. The owner, playing it: "I can't really
+ * catch up." A leader now pays to be a leader, continuously, in proportion to
+ * how far clear it is in the running order, which compresses the field without
+ * any horse ever being handed speed for being behind (R3).
+ *
+ * REPLACES the old EASY_LEAD_RECOVER_BONUS, which gave the rank-1 horse EXTRA
+ * recovery when unpressed — the exact opposite of this, and the two cannot both
+ * be true. A lone leader's reward for an uncontested lead is now simply that it
+ * pays no PRESS, which is enough and does not contradict anything.
+ */
+export const RANK_SHELTER = 0.3;
+
+/**
  * Recovery bonus for a leader nobody is pressing — racing's "easy lead".
  *
- * The counterweight to PRESS, and the reason front-running is a strategy rather
- * than pure cost. Without it a leader had every disadvantage and no upside: it
- * cannot draft (there is nobody ahead to shelter behind) and it pays press the
- * moment anyone closes, so frontRunner measured 0.6% against a fair 12.5%.
+ * Restored after being removed in favour of RANK_SHELTER, which was a mistake:
+ * a falsification test showed the rank gradient was NOT what hurt front-runners
+ * (zeroing it moved them 6.5% -> 5.8%, nothing), and that losing this bonus was.
  *
- * A horse allowed to dictate its own tempo in front is genuinely having an
- * easier time of it. When three front-runners refuse to yield, none of them
- * gets this and all of them pay press instead — which is exactly the collapse
- * DESIGN.md §4 asks for, now driven from both directions.
+ * They are not opposed once stated properly, and both are true of a real race.
+ * Being in front is PHYSICALLY hard — you break the air and nobody shelters
+ * you, which is RANK_SHELTER. Being in front UNCHALLENGED is TACTICALLY easy —
+ * you dictate the tempo and fight nobody, which is this. A leader with company
+ * gets the first and not the second, which is exactly the pace collapse
+ * DESIGN.md §4 asks for.
  *
- * Raised to 0.45 while the field was still bunched and this almost never
- * triggered; once STYLE_BASE was widened and leads became real, it started
- * paying out 30% of every race and pushed frontRunner to +32%. Cut back to 0.28
- * to suit the field that actually existed then.
- *
- * Raised again once kicks stopped draining the tank. While they did, every
- * horse spent stamina on them and that partly equalised the styles; with pace
- * the only thing draining the tank, a front-runner is uniquely taxed for
- * running at the front and measured 9.3% against a fair 12.5%. This and
- * PRESS_COST are the pair that price leading correctly, and they move together.
+ * Large because a leader is missing TWO other things at once: it sits at the
+ * worst end of the rank gradient AND it cannot draft, since there is nobody
+ * ahead to shelter behind. A drafting back-marker recovers at 1.3 x 1.34; this
+ * is what an unchallenged leader has to be worth to sit alongside that.
  */
-export const EASY_LEAD_RECOVER_BONUS = 0.44;
+export const EASY_LEAD_RECOVER_BONUS = 0.9;
+
+/**
+ * Metres of daylight at which a leader is fully "in the clear".
+ *
+ * EASY_LEAD is graded by this rather than switched on and off. As a boolean —
+ * requiring literally nobody inside PRESS_RANGE_METRES — it almost never fired
+ * once RANK_SHELTER compressed the field, and raising the bonus from 0.44 to
+ * 0.72 changed the win rate by nothing at all, which is how a dead mechanic
+ * announces itself. A leader a length clear should get a little of it and one
+ * ten lengths clear all of it.
+ */
+export const EASY_LEAD_CLEAR_METRES = 2.5;
 
 // (KICK_TANK_COST is gone. A kick costs a CHARGE and nothing else — see
 // charges.ts. Combining the two made spending stamina the price of every kick,
@@ -300,8 +342,15 @@ export const EASY_LEAD_RECOVER_BONUS = 0.44;
  */
 export const CHARGE_CAPACITY = 3;
 
-/** How many a horse leaves the gate with. */
-export const CHARGE_START = 1;
+/**
+ * How many a horse leaves the gate with. FULL.
+ *
+ * It was 1 for a while, purely as a balance lever, and that is a bad reason for
+ * a player to look at an empty bank at the start of a race they have not begun
+ * riding yet. Scarcity comes from CHARGE_REGEN_SECONDS instead, which is where
+ * it belongs.
+ */
+export const CHARGE_START = CHARGE_CAPACITY;
 
 /**
  * Seconds to earn one charge at a normal, unsheltered gallop.
@@ -332,7 +381,7 @@ export const CHARGE_START = 1;
  * caring about — which also matches what a real horse produces: two or three
  * sustained efforts, not ten.
  */
-export const CHARGE_REGEN_SECONDS = 42.0;
+export const CHARGE_REGEN_SECONDS = 45.0;
 
 /**
  * Regen time multiplier while settled — taking a pull, drafting, or dictating
@@ -342,7 +391,7 @@ export const CHARGE_REGEN_SECONDS = 42.0;
  * ground, exactly as the owner specified: charges "regenerate ALWAYS but
  * regenerate quicker in good positioning".
  */
-export const CHARGE_REGEN_SETTLED = 0.45;
+export const CHARGE_REGEN_SETTLED = 0.6;
 
 /**
  * Width of every Moment's kick window, as a fraction of the race.
@@ -370,7 +419,7 @@ export const MOMENT_WINDOW_WIDTH = 0.3;
  * three at nearly full value, 13.0% against 8.7%. Timing only matters if being
  * out of position costs more than an extra go.
  */
-export const KICK_OUT_OF_WINDOW = 0.12;
+export const KICK_OUT_OF_WINDOW = 0.3;
 
 // ---------------------------------------------------------------------------
 // The kick (REBUILD.md §8)
@@ -412,14 +461,20 @@ export const KICK_DURATION = 4.5;
  * rule that a player who wants to spend their charges may, well or badly,
  * still holds. What it removes is the option of spending them all at once.
  *
- * Set against CHARGE_REGEN_SECONDS, which is now the binding constraint: a
- * horse has fewer charges than the cooldown would let it fire, so the cooldown
- * is no longer what limits volume. What it must do instead is stay SHORT enough
- * that even the narrowest Moment window can absorb a full bank — at 18 seconds
- * a `late` horse could fit only two kicks inside its window while a mashing
- * ride fired three anywhere, and out-firing beat out-placing on that alone.
+ * Set against CHARGE_REGEN_SECONDS, and the two only work as a PAIR:
+ *
+ *   - Charges must be scarce enough to BIND, so nobody can out-fire anyone and
+ *     the only variable left is where the kicks go.
+ *   - The cooldown must be short enough that the NARROWEST window can still
+ *     absorb a full bank, or a `late` horse is structurally unable to spend
+ *     what it saved. At 18 seconds its 19-second window fitted two kicks while
+ *     a mashing ride fired five anywhere, and out-firing beat out-placing.
+ *
+ * Nine seconds lets even `late` fit three efforts inside its window. It is also
+ * short enough not to feel like a dead button, which was the owner's own
+ * complaint playing it.
  */
-export const KICK_COOLDOWN = 14.0;
+export const KICK_COOLDOWN = 7.0;
 
 /** Seconds ramping in. */
 export const KICK_RAMP = 0.5;
