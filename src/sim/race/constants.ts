@@ -340,7 +340,7 @@ export const EASY_LEAD_CLEAR_METRES = 2.5;
  *
  * A resource you cannot spend is not a decision, it is a tax on patience.
  */
-export const CHARGE_CAPACITY = 3;
+export const CHARGE_CAPACITY = 4;
 
 /**
  * How many a horse leaves the gate with. FULL.
@@ -475,6 +475,15 @@ export const KICK_DURATION = 4.5;
  * complaint playing it.
  */
 export const KICK_COOLDOWN = 7.0;
+
+/**
+ * Reduced cooldown when firing during the horse's own moment window.
+ *
+ * Allows horses to space kicks more tightly during their peak window, rewarding
+ * precise timing. This makes extra charges (4+) actually spendable for late horses
+ * whose narrow windows would otherwise leave unspent charges on the table.
+ */
+export const KICK_COOLDOWN_IN_WINDOW = 3.5;
 
 /** Seconds ramping in. */
 export const KICK_RAMP = 0.5;
