@@ -174,6 +174,7 @@ export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
   const coat = coatFor(scheme.coat);
   const bodyHsl = hexToHsl(coat.body);
   const accentHsl = hexToHsl(accentColor);
+  const maneHsl = scheme.silks ? hexToHsl(scheme.silks.secondary) : accentHsl;
 
   const { width: W, height: H } = loaded;
   const ctx = scratch(W, H);
@@ -240,7 +241,14 @@ export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
     }
 
     const l = (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
-    const tintHsl = region === 'body' ? bodyHsl : accentHsl;
+    let tintHsl: [number, number, number];
+    if (region === 'body') {
+      tintHsl = bodyHsl;
+    } else if (region === 'mane' || region === 'legs') {
+      tintHsl = maneHsl;
+    } else {
+      tintHsl = accentHsl;
+    }
     const meanL = regionMeans[region] ?? 0.5;
     const lit = Math.max(0.02, Math.min(0.98, tintHsl[2] + (l - meanL) * 0.9));
     const [nr, ng, nb] = hslToRgb(tintHsl[0], tintHsl[1], lit);
@@ -296,10 +304,11 @@ export function drawShieldBadge(
 }
 
 /**
- * Get a badge as a data URI synchronously (for embedding in HTML).
- * Returns a PNG data URL that can be used as an img src, or null if badge not loaded yet.
+ * Get a badge as a data URI. Waits for the badge asset to load if needed.
+ * Returns a PNG data URL that can be used as an img src, or null if loading fails.
  */
-export function getBadgeDataUri(scheme: BadgeScheme): string | null {
+export async function getBadgeDataUri(scheme: BadgeScheme): Promise<string | null> {
+  await loadBadge();
   const badge = tintedBadge(scheme);
   if (!badge) return null;
   return badge.toDataURL('image/png');

@@ -30,7 +30,9 @@ export function mountSilksDemo(host: HTMLElement): void {
   let selectedSilksColor = '#A8DADC';
 
   const updatePreview = async () => {
-    const silks: Silks = { primary: selectedSilksColor, secondary: selectedManeColor };
+
+  const silks: Silks = { primary: selectedSilksColor, secondary: selectedManeColor };
+
     // Update badge
     const badgeImg = host.querySelector<HTMLImageElement>('.sd-badge');
     if (badgeImg) {

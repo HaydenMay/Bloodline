@@ -6,6 +6,7 @@ import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
 import { attachInfoBox } from './ui/infoBox.js';
 import { mountRaceScreen } from './ui/raceScreen.js';
 import { mountHorsePreview } from './ui/horsePreview.js';
+import { mountSilksDemo } from './ui/silksDemo.js';
 import { mountRoadmap } from './ui/roadmap.js';
 import type { Horse } from './sim/types.js';
 
@@ -79,7 +80,25 @@ function startRace(seed: string): void {
   `;
   app.appendChild(bar);
 
-  const playerSilks = { primary: '#F2C14E', secondary: '#12222B' };
+  // Check for color overrides from demo mode
+  let playerSilks = { primary: '#A8DADC', secondary: '#12222B' };
+
+  const colorOverride = sessionStorage.getItem('color-override');
+  if (colorOverride) {
+    try {
+      const colors = JSON.parse(colorOverride);
+      // silksColor for shield outline and jockey silks
+      // maneColor for horse mane/legs and badge mane/legs
+      playerSilks = {
+        primary: colors.silksColor || '#A8DADC',
+        secondary: colors.maneColor || '#12222B',
+      };
+      sessionStorage.removeItem('color-override');
+    } catch {
+      // Ignore invalid JSON
+    }
+  }
+
   attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks);
 
   bar.querySelector('.rb-again')!.addEventListener('click', (e) => {
@@ -124,11 +143,15 @@ function styleLabel(style: string): string {
 
 // ?preview opens the horse preview instead of a race — a development view for
 // judging the drawing at a size where problems are actually visible.
-if (new URLSearchParams(location.search).has('preview')) {
+// ?silks-demo opens the silks color picker for testing badge colors.
+const params = new URLSearchParams(location.search);
+if (params.has('preview')) {
   const stage = document.createElement('div');
   stage.className = 'stage stage-full';
   app.appendChild(stage);
   mountHorsePreview(stage);
+} else if (params.has('silks-demo')) {
+  mountSilksDemo(app);
 } else {
   startRace('bloodline-demo');
 }

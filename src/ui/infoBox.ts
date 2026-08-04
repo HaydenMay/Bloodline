@@ -50,7 +50,7 @@ function potentialBand(current: number, potential: number): string {
   return 'barely scratched';
 }
 
-export function renderInfoBox(horse: Horse, silks?: Silks): string {
+export function renderInfoBox(horse: Horse): string {
   const style = STYLE_LABELS[horse.style] ?? STYLE_LABELS['closer']!;
   const coat = coatFor(horse.coat);
 
@@ -92,11 +92,8 @@ export function renderInfoBox(horse: Horse, silks?: Silks): string {
 
   const speedRoom = potentialBand(horse.stats.speed, horse.potential.speed);
 
-  // Use shield badge if silks provided, otherwise fall back to color swatch
-  const badgeUri = silks ? getBadgeDataUri({ coat: horse.coat, silks }) : null;
-  const badgeHtml = badgeUri
-    ? `<img class="ib-badge" src="${badgeUri}" alt="Shield badge" />`
-    : `<span class="ib-swatch" style="background:${coat.body};border-color:${coat.hair}"></span>`;
+  // Placeholder for badge; will be updated once loaded
+  const badgeHtml = `<span class="ib-badge-placeholder" style="background:${coat.body};border-color:${coat.hair}"></span>`;
 
   return `
     <div class="ib-head">
@@ -130,8 +127,24 @@ export function attachInfoBox(trigger: HTMLElement, horse: Horse, silks?: Silks)
   const card = document.createElement('div');
   card.className = 'info-box';
   card.hidden = true;
-  card.innerHTML = renderInfoBox(horse, silks);
+  card.innerHTML = renderInfoBox(horse);
   document.body.appendChild(card);
+
+  // Load badge asynchronously if silks provided
+  if (silks) {
+    getBadgeDataUri({ coat: horse.coat, silks }).then((uri) => {
+      const placeholder = card.querySelector('.ib-badge-placeholder');
+      if (uri && placeholder) {
+        placeholder.replaceWith(Object.assign(document.createElement('img'), {
+          className: 'ib-badge',
+          src: uri,
+          alt: 'Shield badge',
+        }));
+      }
+    }).catch(() => {
+      // If badge fails, keep the placeholder swatch
+    });
+  }
 
   const place = (): void => {
     const r = trigger.getBoundingClientRect();
