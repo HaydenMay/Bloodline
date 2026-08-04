@@ -6,6 +6,7 @@ import {
   FATIGUE_START,
   PRESS_COST,
   PRESS_MAX_RIVALS,
+  RANK_SHELTER,
   REFERENCE_PACE,
   STAMINA_RECOVER_SPAN,
   TANK_RACE_COST,
@@ -81,21 +82,38 @@ export function drainPerSecond(
   );
 }
 
-/** Tank recovered per second. Position never enters this — only pace does. */
+/**
+ * How much easier the going is at a given position in the field.
+ *
+ * 1.0 for the leader, rising to 1 + RANK_SHELTER for the back-marker. The horse
+ * in front breaks the air; everyone behind is sheltered by it, more so the
+ * further back they are. Drafting stacks on top for a horse tucked directly in
+ * behind another, which is a tactical position rather than a positional one.
+ */
+export function shelterForRank(rank: number, fieldSize: number): number {
+  if (fieldSize <= 1) return 1;
+  const back = (rank - 1) / (fieldSize - 1);
+  return 1 + RANK_SHELTER * back;
+}
+
 export function recoverPerSecond(
   stamina: number,
   speed: number,
   totalMetres: number,
   drafting: boolean,
   mods: TankModifiers = NO_TANK_MODIFIERS,
-  easyLead = false,
+  rank = 1,
+  fieldSize = 1,
+  easyLead = 0,
 ): number {
   const progressPerSecond = speed / totalMetres;
-  const shelter = drafting
-    ? 1 + DRAFT_RECOVER_BONUS * mods.draftMult
-    : easyLead
-      ? 1 + EASY_LEAD_RECOVER_BONUS
-      : 1;
+  // Three separate things, and they compose rather than compete: where you are
+  // in the field (physical), whether you are tucked in behind someone
+  // (tactical), and whether anyone is actually challenging you (also tactical).
+  const shelter =
+    shelterForRank(rank, fieldSize) *
+    (drafting ? 1 + DRAFT_RECOVER_BONUS * mods.draftMult : 1) *
+    (1 + EASY_LEAD_RECOVER_BONUS * easyLead);
   return progressPerSecond * TANK_RECOVER_RATE * staminaFactor(stamina) * mods.recoverMult * shelter;
 }
 

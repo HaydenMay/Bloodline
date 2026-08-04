@@ -1,5 +1,5 @@
 import type { Moment, RunningStyle } from '../../data/index.js';
-import { PACE_MAX, PACE_MIN } from './constants.js';
+import { DRAIN_EXPONENT, PACE_MAX, PACE_MIN, REFERENCE_PACE } from './constants.js';
 
 /**
  * Pace curves — the whole of what Style and Moment do (REBUILD.md §6).
@@ -75,7 +75,7 @@ const POINTS = 5;
  */
 export const STYLE_BASE: Record<RunningStyle, readonly number[]> = {
   /** Peaks at the gate. Takes them along and tries to last. */
-  frontRunner: [0.986, 0.98, 0.972, 0.962, 0.955],
+  frontRunner: [0.987, 0.979, 0.973, 0.963, 0.956],
   /**
    * The generalist. Sustains through the middle and keeps a little back.
    *
@@ -85,11 +85,11 @@ export const STYLE_BASE: Record<RunningStyle, readonly number[]> = {
    * direction too: the same rising shape as closer with a lower ceiling, which
    * is strictly dominated. This sustained, slightly rising row measured best.
    */
-  midPack: [0.95, 0.966, 0.981, 0.977, 0.981],
+  midPack: [0.949, 0.963, 0.98, 0.976, 0.98],
   /** Peaks off the turn. Sits handy, then quickens. */
-  stalker: [0.958, 0.966, 0.974, 0.984, 0.973],
+  stalker: [0.958, 0.964, 0.974, 0.984, 0.973],
   /** Peaks on the wire. Everything kept for the run home. */
-  closer: [0.957, 0.964, 0.974, 0.978, 0.982],
+  closer: [0.957, 0.962, 0.974, 0.978, 0.982],
 };
 
 /**
@@ -112,12 +112,23 @@ export const STYLE_BASE: Record<RunningStyle, readonly number[]> = {
  *
  * So the lobes are spaced across the four usable quarters instead. "Early"
  * means the first quarter of the race, not the first stride.
+ *
+ * THE AMPLITUDES ARE NOT EQUAL, and that is deliberate. Zero-sum guarantees no
+ * Moment gets more PACE than another, but it cannot guarantee equal TANK COST,
+ * because drain is convex: a sag early banks stamina that is then available for
+ * the whole rest of the race, while the same sag late banks stamina nothing is
+ * left to spend. `late` therefore gets more out of an identical-sized shift
+ * than `early` does, and measured +36% off fair share on symmetric rows. Its
+ * row is flattened and `early`'s deepened to pay that difference back.
+ *
+ * Scaled down by 0.98 to prevent pace clamping, which would break the zero-sum
+ * invariant (REBUILD.md R5). Scaling preserves zero-sum exactly.
  */
 export const MOMENT_SHIFT: Record<Moment, readonly number[]> = {
-  early: [+0.002, +0.014, +0.002, -0.009, -0.009],
-  earlyMid: [-0.005, +0.007, +0.011, -0.004, -0.009],
-  midLate: [-0.009, -0.007, +0.008, +0.014, -0.006],
-  late: [-0.009, -0.009, -0.005, +0.011, +0.012],
+  early: [+0.0059, +0.0216, +0.0020, -0.0147, -0.0147],
+  earlyMid: [-0.0049, +0.0108, +0.0157, -0.0088, -0.0127],
+  midLate: [-0.0069, -0.0049, +0.0059, +0.0108, -0.0049],
+  late: [-0.0039, -0.0039, -0.0020, +0.0049, +0.0049],
 };
 
 /** Linear interpolation across a control-point table, `t` in [0, 1]. */
@@ -152,4 +163,19 @@ export function paceFactor(style: RunningStyle, moment: Moment, t: number): numb
  */
 export function averagePace(style: RunningStyle): number {
   return STYLE_BASE[style].reduce((a, b) => a + b, 0) / STYLE_BASE[style].length;
+}
+
+/**
+ * The tank a style's curve costs across a whole race, relative to reference pace.
+ * Equal for every style by construction — see styleCost.test asserting it.
+ */
+export function styleCost(style: RunningStyle, steps = 2000): number {
+  let total = 0;
+  for (let i = 0; i < steps; i++) {
+    const t = (i + 0.5) / steps;
+    const pace = interp(STYLE_BASE[style], t);
+    const normalized = pace / REFERENCE_PACE;
+    total += Math.pow(normalized, DRAIN_EXPONENT);
+  }
+  return total / steps;
 }

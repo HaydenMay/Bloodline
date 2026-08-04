@@ -67,14 +67,13 @@ describe('a mistimed kick is weak, never wasted', () => {
 });
 
 describe('the charge bank', () => {
-  it('starts part-full, so there is something to earn', () => {
-    const s = startingCharges();
-    expect(s.count).toBeGreaterThan(0);
-    expect(s.count).toBeLessThan(CHARGE_CAPACITY);
+  it('starts FULL — a player should not open a race with an empty bank', () => {
+    expect(startingCharges().count).toBe(CHARGE_CAPACITY);
   });
 
   it('regenerates on its own clock, never from the tank', () => {
     const s = startingCharges();
+    spendCharge(s);
     const before = s.count;
     regenCharges(s, CHARGE_REGEN_SECONDS, false);
     expect(s.count).toBe(before + 1);
@@ -83,6 +82,8 @@ describe('the charge bank', () => {
   it('refills faster when the horse is settled', () => {
     const busy = startingCharges();
     const settled = startingCharges();
+    spendCharge(busy);
+    spendCharge(settled);
     for (let i = 0; i < 300; i++) {
       regenCharges(busy, 1 / 30, false);
       regenCharges(settled, 1 / 30, true);
@@ -95,6 +96,18 @@ describe('the charge bank', () => {
     const s = startingCharges();
     for (let i = 0; i < 10000; i++) regenCharges(s, 1 / 30, true);
     expect(s.count).toBe(CHARGE_CAPACITY);
+  });
+
+  it('does not refund a charge spent from a full bank', () => {
+    // The bug this guards: progress pinned at 1 while full meant spending a
+    // charge rolled straight back over on the next tick, so a horse sitting at
+    // capacity had effectively unlimited kicks.
+    const s = startingCharges();
+    for (let i = 0; i < 10000; i++) regenCharges(s, 1 / 30, true);
+    expect(s.count).toBe(CHARGE_CAPACITY);
+    spendCharge(s);
+    regenCharges(s, 1 / 30, true);
+    expect(s.count).toBe(CHARGE_CAPACITY - 1);
   });
 
   it('spends one at a time and refuses when empty', () => {
