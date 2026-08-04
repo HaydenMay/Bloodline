@@ -55,7 +55,7 @@ export function loadHorsePreview(): Promise<Loaded> {
     }
     const base = bctx.getImageData(0, 0, W, H);
 
-    let mask = new Uint8Array(W * H);
+    const mask = new Uint8Array(W * H);
     if (maskImg) {
       const mctx = scratch(W, H);
       mctx.drawImage(maskImg, 0, 0);
