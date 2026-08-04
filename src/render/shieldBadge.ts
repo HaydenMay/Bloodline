@@ -296,10 +296,11 @@ export function drawShieldBadge(
 }
 
 /**
- * Get a badge as a data URI synchronously (for embedding in HTML).
- * Returns a PNG data URL that can be used as an img src, or null if badge not loaded yet.
+ * Get a badge as a data URI. Waits for the badge asset to load if needed.
+ * Returns a PNG data URL that can be used as an img src, or null if loading fails.
  */
-export function getBadgeDataUri(scheme: BadgeScheme): string | null {
+export async function getBadgeDataUri(scheme: BadgeScheme): Promise<string | null> {
+  await loadBadge();
   const badge = tintedBadge(scheme);
   if (!badge) return null;
   return badge.toDataURL('image/png');

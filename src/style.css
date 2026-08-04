@@ -506,11 +506,17 @@ body {
   flex: none;
 }
 
-.ib-badge {
+.ib-badge,
+.ib-badge-placeholder {
   width: 40px;
   height: 40px;
   flex: none;
   image-rendering: crisp-edges;
+  border-radius: 4px;
+}
+
+.ib-badge-placeholder {
+  border: 1px solid currentColor;
 }
 
 .ib-name {
