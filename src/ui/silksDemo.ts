@@ -8,7 +8,7 @@ const COAT_COLORS = [
   { id: 'black', name: 'Black' },
 ] as const;
 
-const DEMO_SILKS_COLORS = [
+const DEMO_COLORS = [
   { hex: '#F2C14E', name: 'Gold' },
   { hex: '#E63946', name: 'Red' },
   { hex: '#457B9D', name: 'Blue' },
@@ -23,15 +23,15 @@ const DEMO_SILKS_COLORS = [
 
 export function mountSilksDemo(host: HTMLElement): void {
   let selectedCoat = 'bay';
-  let selectedPrimary = '#F2C14E';
-  let selectedSecondary = '#12222B';
+  let selectedManeColor = '#12222B';
+  let selectedBadgeAccent = '#F2C14E';
 
   const updateBadge = async () => {
     const badgeImg = host.querySelector<HTMLImageElement>('.sd-badge');
     if (badgeImg) {
       const uri = await getBadgeDataUri({
         coat: selectedCoat,
-        silks: { primary: selectedPrimary, secondary: selectedSecondary },
+        silks: { primary: selectedBadgeAccent, secondary: selectedManeColor },
       });
       if (uri) {
         badgeImg.src = uri;
@@ -41,11 +41,11 @@ export function mountSilksDemo(host: HTMLElement): void {
 
   host.innerHTML = `
     <div class="silks-demo">
-      <h2>Silks Demo</h2>
-      <p>Select coat and silks colors, then start a race to see the badge in action.</p>
+      <h2>Color System Demo</h2>
+      <p>Customize the three independent color regions: body, mane/legs, and badge accent.</p>
 
       <div class="sd-section">
-        <label>Coat Color</label>
+        <label>Coat Color (Body)</label>
         <div class="sd-buttons">
           ${COAT_COLORS.map(
             (coat) =>
@@ -57,45 +57,51 @@ export function mountSilksDemo(host: HTMLElement): void {
       </div>
 
       <div class="sd-section">
-        <label>Primary Silks Color</label>
+        <label>Mane & Leg Color</label>
         <div class="sd-colors">
-          ${DEMO_SILKS_COLORS.map(
+          ${DEMO_COLORS.map(
             (color) =>
               `<button
-                class="sd-color-btn ${color.hex === selectedPrimary ? 'active' : ''}"
+                class="sd-color-btn sd-mane ${color.hex === selectedManeColor ? 'active' : ''}"
                 data-color="${color.hex}"
                 title="${color.name}"
                 style="background: ${color.hex}"
               ></button>`,
           ).join('')}
         </div>
-        <input type="text" class="sd-hex-input" id="primary-hex" value="${selectedPrimary}" />
+        <input type="text" class="sd-hex-input" id="mane-hex" value="${selectedManeColor}" />
       </div>
 
       <div class="sd-section">
-        <label>Secondary Silks Color</label>
+        <label>Badge Accent Color</label>
         <div class="sd-colors">
-          ${DEMO_SILKS_COLORS.map(
+          ${DEMO_COLORS.map(
             (color) =>
               `<button
-                class="sd-color-btn sd-secondary ${color.hex === selectedSecondary ? 'active' : ''}"
+                class="sd-color-btn sd-badge-accent ${color.hex === selectedBadgeAccent ? 'active' : ''}"
                 data-color="${color.hex}"
                 title="${color.name}"
                 style="background: ${color.hex}"
               ></button>`,
           ).join('')}
         </div>
-        <input type="text" class="sd-hex-input" id="secondary-hex" value="${selectedSecondary}" />
+        <input type="text" class="sd-hex-input" id="accent-hex" value="${selectedBadgeAccent}" />
       </div>
 
       <div class="sd-preview">
-        <p>Preview</p>
+        <p>Badge Preview</p>
         <img class="sd-badge" src="" alt="Badge preview" />
         <div class="sd-info">
           <span class="sd-coat-name">${COAT_COLORS.find((c) => c.id === selectedCoat)?.name}</span>
-          <div class="sd-silks-preview">
-            <span class="sd-silks-swatch" style="background: ${selectedPrimary}"></span>
-            <span class="sd-silks-swatch" style="background: ${selectedSecondary}"></span>
+          <div class="sd-color-labels">
+            <div class="sd-color-info">
+              <span class="sd-color-label">Mane</span>
+              <span class="sd-color-swatch" style="background: ${selectedManeColor}"></span>
+            </div>
+            <div class="sd-color-info">
+              <span class="sd-color-label">Badge</span>
+              <span class="sd-color-swatch" style="background: ${selectedBadgeAccent}"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -122,53 +128,65 @@ export function mountSilksDemo(host: HTMLElement): void {
     });
   });
 
-  // Primary color selection
-  host.querySelectorAll('.sd-color-btn:not(.sd-secondary)').forEach((btn) => {
+  // Mane color selection
+  host.querySelectorAll('.sd-color-btn.sd-mane').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const color = (e.target as HTMLElement).getAttribute('data-color');
       if (color) {
-        selectedPrimary = color;
-        host.querySelectorAll('.sd-color-btn:not(.sd-secondary)').forEach((b) => b.classList.remove('active'));
+        selectedManeColor = color;
+        host.querySelectorAll('.sd-color-btn.sd-mane').forEach((b) => b.classList.remove('active'));
         (e.target as HTMLElement).classList.add('active');
-        host.querySelector<HTMLInputElement>('#primary-hex')!.value = color;
-        host.querySelectorAll('.sd-silks-preview .sd-silks-swatch')[0]!.setAttribute('style', `background: ${color}`);
+        host.querySelector<HTMLInputElement>('#mane-hex')!.value = color;
+        host.querySelectorAll('.sd-color-info')[0]!.querySelector('.sd-color-swatch')!.setAttribute(
+          'style',
+          `background: ${color}`,
+        );
         updateBadge();
       }
     });
   });
 
-  // Secondary color selection
-  host.querySelectorAll('.sd-color-btn.sd-secondary').forEach((btn) => {
+  // Badge accent color selection
+  host.querySelectorAll('.sd-color-btn.sd-badge-accent').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const color = (e.target as HTMLElement).getAttribute('data-color');
       if (color) {
-        selectedSecondary = color;
-        host.querySelectorAll('.sd-color-btn.sd-secondary').forEach((b) => b.classList.remove('active'));
+        selectedBadgeAccent = color;
+        host.querySelectorAll('.sd-color-btn.sd-badge-accent').forEach((b) => b.classList.remove('active'));
         (e.target as HTMLElement).classList.add('active');
-        host.querySelector<HTMLInputElement>('#secondary-hex')!.value = color;
-        host.querySelectorAll('.sd-silks-preview .sd-silks-swatch')[1]!.setAttribute('style', `background: ${color}`);
+        host.querySelector<HTMLInputElement>('#accent-hex')!.value = color;
+        host.querySelectorAll('.sd-color-info')[1]!.querySelector('.sd-color-swatch')!.setAttribute(
+          'style',
+          `background: ${color}`,
+        );
         updateBadge();
       }
     });
   });
 
   // Hex input updates
-  host.querySelector<HTMLInputElement>('#primary-hex')!.addEventListener('change', (e) => {
+  host.querySelector<HTMLInputElement>('#mane-hex')!.addEventListener('change', (e) => {
     const hex = (e.target as HTMLInputElement).value;
     if (/^#[0-9A-F]{6}$/i.test(hex)) {
-      selectedPrimary = hex;
-      host.querySelectorAll('.sd-color-btn:not(.sd-secondary)').forEach((b) => b.classList.remove('active'));
-      host.querySelectorAll('.sd-silks-preview .sd-silks-swatch')[0]!.setAttribute('style', `background: ${hex}`);
+      selectedManeColor = hex;
+      host.querySelectorAll('.sd-color-btn.sd-mane').forEach((b) => b.classList.remove('active'));
+      host.querySelectorAll('.sd-color-info')[0]!.querySelector('.sd-color-swatch')!.setAttribute(
+        'style',
+        `background: ${hex}`,
+      );
       updateBadge();
     }
   });
 
-  host.querySelector<HTMLInputElement>('#secondary-hex')!.addEventListener('change', (e) => {
+  host.querySelector<HTMLInputElement>('#accent-hex')!.addEventListener('change', (e) => {
     const hex = (e.target as HTMLInputElement).value;
     if (/^#[0-9A-F]{6}$/i.test(hex)) {
-      selectedSecondary = hex;
-      host.querySelectorAll('.sd-color-btn.sd-secondary').forEach((b) => b.classList.remove('active'));
-      host.querySelectorAll('.sd-silks-preview .sd-silks-swatch')[1]!.setAttribute('style', `background: ${hex}`);
+      selectedBadgeAccent = hex;
+      host.querySelectorAll('.sd-color-btn.sd-badge-accent').forEach((b) => b.classList.remove('active'));
+      host.querySelectorAll('.sd-color-info')[1]!.querySelector('.sd-color-swatch')!.setAttribute(
+        'style',
+        `background: ${hex}`,
+      );
       updateBadge();
     }
   });
@@ -176,10 +194,11 @@ export function mountSilksDemo(host: HTMLElement): void {
   // Start race button
   host.querySelector('.sd-start-btn')!.addEventListener('click', () => {
     sessionStorage.setItem(
-      'silks-override',
+      'color-override',
       JSON.stringify({
-        primary: selectedPrimary,
-        secondary: selectedSecondary,
+        coat: selectedCoat,
+        maneColor: selectedManeColor,
+        badgeAccent: selectedBadgeAccent,
       }),
     );
     window.location.href = '/';

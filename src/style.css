@@ -913,12 +913,24 @@ body {
   font-weight: 600;
 }
 
-.sd-silks-preview {
+.sd-color-labels {
   display: flex;
+  gap: 16px;
+}
+
+.sd-color-info {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.sd-silks-swatch {
+.sd-color-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.sd-color-swatch {
   width: 32px;
   height: 32px;
   border-radius: 4px;
