@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MOMENT_SHIFT, STYLE_BASE, interp, paceFactor } from './pace.js';
+import { MOMENT_SHIFT, STYLE_BASE, interp, paceFactor, styleCost } from './pace.js';
 import { MOMENTS, RUNNING_STYLES } from '../../data/index.js';
 import { PACE_MAX, PACE_MIN } from './constants.js';
 
@@ -34,6 +34,18 @@ describe('paceFactor stays inside its bounds', () => {
       expect(paceFactor(style, 'late', 1.5)).toBe(paceFactor(style, 'late', 1));
     }
   });
+
+  it('the pace clamp never binds — a bound shift breaks zero-sum', () => {
+    for (const style of RUNNING_STYLES) {
+      for (const moment of MOMENTS) {
+        for (let t = 0; t <= 1.0001; t += 0.005) {
+          const raw = interp(STYLE_BASE[style], t) + interp(MOMENT_SHIFT[moment], t);
+          expect(raw).toBeLessThanOrEqual(PACE_MAX + 1e-9);
+          expect(raw).toBeGreaterThanOrEqual(PACE_MIN - 1e-9);
+        }
+      }
+    }
+  });
 });
 
 describe('the curves say what the design says they say', () => {
@@ -45,12 +57,9 @@ describe('the curves say what the design says they say', () => {
     expect(interp(STYLE_BASE.closer, 1)).toBeGreaterThan(interp(STYLE_BASE.frontRunner, 1));
   });
 
-  it('every style row sums to the same budget (REBUILD.md R5, applied to Style)', () => {
-    // The load-bearing invariant for style balance. Unequal sums mean one style
-    // is simply faster and has to be rescued by fading — which is how the first
-    // harness run produced frontRunner 0.2% against closer 25.4%.
-    const sums = RUNNING_STYLES.map((s) => STYLE_BASE[s].reduce((a, b) => a + b, 0));
-    for (const sum of sums) expect(sum).toBeCloseTo(sums[0]!, 5);
+  it('every style costs the same tank across a race (the real invariant)', () => {
+    const costs = RUNNING_STYLES.map((s) => styleCost(s));
+    for (const c of costs) expect(c).toBeCloseTo(costs[0]!, 3);
   });
 
   it('a front-runner does NOT finish flat out — it has spent its race', () => {
