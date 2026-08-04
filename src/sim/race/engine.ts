@@ -61,6 +61,7 @@ import {
   KICK_GRIT_WEIGHT,
   KICK_JOCKEY_WEIGHT,
   KICK_COOLDOWN,
+  KICK_COOLDOWN_IN_WINDOW,
   KICK_MAX_BONUS,
   KICK_RAMP,
   KICK_READY_FRACTION,
@@ -83,6 +84,7 @@ import {
   TICK_HZ,
   TRAIT_ALERT_FUMBLE,
   TRAIT_CRUISER_EXPONENT_RELIEF,
+  FRONT_RUNNER_EXPONENT_RELIEF,
   TRAIT_GATE_RUSHER_EARLY,
   TRAIT_GATE_RUSHER_PAYBACK,
   TRAIT_IRON_LUNGS_RECOVER,
@@ -273,10 +275,13 @@ function tankModsFor(horse: Horse): TankModifiers {
   let recoverMult = 1;
   if (horse.traits.includes('ironLungs')) recoverMult *= TRAIT_IRON_LUNGS_RECOVER;
   if (horse.traits.includes('thirsty')) recoverMult *= TRAIT_THIRSTY_RECOVER;
+  let exponentRelief = 0;
+  if (horse.traits.includes('cruiser')) exponentRelief += TRAIT_CRUISER_EXPONENT_RELIEF;
+  if (horse.style === 'frontRunner') exponentRelief += FRONT_RUNNER_EXPONENT_RELIEF;
   return {
     recoverMult,
     draftMult: horse.traits.includes('quickRecovery') ? TRAIT_QUICK_RECOVERY_DRAFT : 1,
-    exponentRelief: horse.traits.includes('cruiser') ? TRAIT_CRUISER_EXPONENT_RELIEF : 0,
+    exponentRelief,
   };
 }
 
@@ -508,7 +513,9 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
     // lengths, against a hands-off autopilot winning a fair 12.7%. Paying full
     // price to refresh a kick already running is never the better play, so it
     // was never a real choice — only a trap for anyone who touched the screen.
-    const kickLive = r.kickAt >= 0 && elapsed - r.kickAt < KICK_COOLDOWN;
+    const inWindow = inMomentWindow(r.horse.moment, ownProgress);
+    const cooldown = inWindow ? KICK_COOLDOWN_IN_WINDOW : KICK_COOLDOWN;
+    const kickLive = r.kickAt >= 0 && elapsed - r.kickAt < cooldown;
 
     if (decision.fireKick && charges >= 1 && atSpeed && !kickLive && spendCharge(r.charges)) {
       r.kickAt = elapsed;
@@ -660,8 +667,12 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
     // Remap the pace band onto 0-1 so the render rig's `drive` reads sensibly.
     effort: clamp01((r.paceNow - HOLD_FLOOR) / (1 - HOLD_FLOOR)),
     kicking: r.kickAt >= 0 && elapsed - r.kickAt <= KICK_DURATION,
-    kickReady:
-      r.kickAt < 0 ? 1 : Math.min(1, (elapsed - r.kickAt) / KICK_COOLDOWN),
+    kickReady: (() => {
+      const ownProgress = clamp01(r.distance / totalMetres);
+      const inWindow = inMomentWindow(r.horse.moment, ownProgress);
+      const cooldown = inWindow ? KICK_COOLDOWN_IN_WINDOW : KICK_COOLDOWN;
+      return r.kickAt < 0 ? 1 : Math.min(1, (elapsed - r.kickAt) / cooldown);
+    })(),
     kicksRemaining: r.charges.count,
     chargeProgress: r.charges.progress,
     regenMult: r.regenMult,

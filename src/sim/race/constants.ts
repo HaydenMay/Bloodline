@@ -261,7 +261,7 @@ export const STAMINA_RECOVER_SPAN = 0.5;
  * in between are simply squeezed. Measured at 0.2 they drafted 35-40% of every
  * race — by far the most in the field — and still finished worst.
  */
-export const DRAFT_RECOVER_BONUS = 0.34;
+export const DRAFT_RECOVER_BONUS = 0.20;
 
 /**
  * How much more sheltered the BACK of the field is than the front.
@@ -282,7 +282,7 @@ export const DRAFT_RECOVER_BONUS = 0.34;
  * be true. A lone leader's reward for an uncontested lead is now simply that it
  * pays no PRESS, which is enough and does not contradict anything.
  */
-export const RANK_SHELTER = 0.3;
+export const RANK_SHELTER = 0.15;
 
 /**
  * Recovery bonus for a leader nobody is pressing — racing's "easy lead".
@@ -317,6 +317,14 @@ export const EASY_LEAD_RECOVER_BONUS = 0.9;
  */
 export const EASY_LEAD_CLEAR_METRES = 2.5;
 
+/**
+ * Recovery bonus for frontRunner specifically, scaled by lead distance.
+ *
+ * Rewards frontRunner for establishing and maintaining clear leads. The bonus
+ * increases continuously with daylight: a frontRunner a few lengths clear gets
+ * a small bonus; one 30+ metres clear gets the full bonus. This is a targeted
+ * buff that makes the frontRunner archetype reward dominance.
+ */
 // (KICK_TANK_COST is gone. A kick costs a CHARGE and nothing else — see
 // charges.ts. Combining the two made spending stamina the price of every kick,
 // so hoarding could beat riding, which is not a game about riding.)
@@ -340,7 +348,7 @@ export const EASY_LEAD_CLEAR_METRES = 2.5;
  *
  * A resource you cannot spend is not a decision, it is a tax on patience.
  */
-export const CHARGE_CAPACITY = 3;
+export const CHARGE_CAPACITY = 4;
 
 /**
  * How many a horse leaves the gate with. FULL.
@@ -475,6 +483,15 @@ export const KICK_DURATION = 4.5;
  * complaint playing it.
  */
 export const KICK_COOLDOWN = 7.0;
+
+/**
+ * Reduced cooldown when firing during the horse's own moment window.
+ *
+ * Allows horses to space kicks more tightly during their peak window, rewarding
+ * precise timing. This makes extra charges (4+) actually spendable for late horses
+ * whose narrow windows would otherwise leave unspent charges on the table.
+ */
+export const KICK_COOLDOWN_IN_WINDOW = 3.5;
 
 /** Seconds ramping in. */
 export const KICK_RAMP = 0.5;
@@ -676,6 +693,16 @@ export const TRAIT_IRON_LUNGS_RECOVER = 1.12;
 export const TRAIT_THIRSTY_RECOVER = 0.9;
 export const TRAIT_QUICK_RECOVERY_DRAFT = 2.0;
 export const TRAIT_CRUISER_EXPONENT_RELIEF = 2;
+
+/**
+ * Drain exponent relief for frontRunner style.
+ *
+ * FrontRunner horses run fast early and set the pace. Reducing their drain
+ * exponent rewards their archetype directly: running fast early costs them
+ * less tank, so they can establish and maintain leads without depleting.
+ */
+export const FRONT_RUNNER_EXPONENT_RELIEF = 11;
+
 export const TRAIT_ALERT_FUMBLE = 0.4;
 export const TRAIT_GATE_RUSHER_EARLY = 0.015;
 export const TRAIT_GATE_RUSHER_PAYBACK = -0.01;
