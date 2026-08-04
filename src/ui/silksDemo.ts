@@ -1,5 +1,6 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
-import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
+import { getHorsePreviewDataUri, loadHorsePreview } from '../render/horsePreview.js';
+import { loadSprites } from '../render/spriteHorse.js';
 import type { Silks } from '../render/palette.js';
 
 const COAT_COLORS = [
@@ -29,12 +30,15 @@ export function mountSilksDemo(host: HTMLElement): void {
   let selectedSilksColor = '#A8DADC';
 
   const updatePreview = async () => {
+
+  const silks: Silks = { primary: selectedSilksColor, secondary: selectedManeColor };
+
     // Update badge
     const badgeImg = host.querySelector<HTMLImageElement>('.sd-badge');
     if (badgeImg) {
       const uri = await getBadgeDataUri({
         coat: selectedCoat,
-        silks: { primary: selectedSilksColor, secondary: selectedManeColor },
+        silks,
       });
       if (uri) {
         badgeImg.src = uri;
@@ -42,18 +46,26 @@ export function mountSilksDemo(host: HTMLElement): void {
     }
 
     // Update horse preview
-    const horseCanvas = host.querySelector<HTMLCanvasElement>('.sd-horse-canvas');
-    if (horseCanvas) {
-      const ctx = horseCanvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, horseCanvas.width, horseCanvas.height);
-        const silks: Silks = { primary: selectedSilksColor, secondary: selectedManeColor };
-        drawSpriteHorse(ctx, horseCanvas.width / 2, horseCanvas.height * 0.65, {
-          coat: selectedCoat,
-          silks,
-          phase: 0.5,
-          scale: 2,
-        });
+    const horseUri = await getHorsePreviewDataUri({
+      coat: selectedCoat,
+      silks,
+    });
+    if (horseUri) {
+      let horseImg = host.querySelector<HTMLImageElement>('.sd-horse-img');
+      if (!horseImg) {
+        const container = host.querySelector('.sd-preview:first-child');
+        if (container) {
+          const canvas = container.querySelector<HTMLCanvasElement>('.sd-horse-canvas');
+          if (canvas) {
+            horseImg = document.createElement('img');
+            horseImg.className = 'sd-horse-img';
+            horseImg.style.cssText = 'width: 100%; height: auto; image-rendering: crisp-edges; display: block;';
+            canvas.replaceWith(horseImg);
+          }
+        }
+      }
+      if (horseImg) {
+        horseImg.src = horseUri;
       }
     }
   };
@@ -155,11 +167,9 @@ export function mountSilksDemo(host: HTMLElement): void {
 
   // Mane color selection
   const maneBtns = host.querySelectorAll('.sd-color-btn.sd-mane');
-  console.log('Mane buttons found:', maneBtns.length);
   maneBtns.forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const color = (e.target as HTMLElement).getAttribute('data-color');
-      console.log('Mane button clicked, color:', color);
       if (color) {
         selectedManeColor = color;
         host.querySelectorAll('.sd-color-btn.sd-mane').forEach((b) => b.classList.remove('active'));
@@ -233,5 +243,5 @@ export function mountSilksDemo(host: HTMLElement): void {
   });
 
   // Initial preview render
-  loadSprites().then(() => updatePreview());
+  Promise.all([loadSprites(), loadHorsePreview()]).then(() => updatePreview());
 }
