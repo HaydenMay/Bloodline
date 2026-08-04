@@ -261,7 +261,7 @@ export const STAMINA_RECOVER_SPAN = 0.5;
  * in between are simply squeezed. Measured at 0.2 they drafted 35-40% of every
  * race — by far the most in the field — and still finished worst.
  */
-export const DRAFT_RECOVER_BONUS = 0.34;
+export const DRAFT_RECOVER_BONUS = 0.20;
 
 /**
  * How much more sheltered the BACK of the field is than the front.
@@ -282,7 +282,7 @@ export const DRAFT_RECOVER_BONUS = 0.34;
  * be true. A lone leader's reward for an uncontested lead is now simply that it
  * pays no PRESS, which is enough and does not contradict anything.
  */
-export const RANK_SHELTER = 0.3;
+export const RANK_SHELTER = 0.15;
 
 /**
  * Recovery bonus for a leader nobody is pressing — racing's "easy lead".
