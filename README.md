@@ -8,6 +8,12 @@ The horse is a **run**; your stable is the **save file** and never resets.
 > **All Rights Reserved.** This repository is public for visibility only.
 > See [LICENSE](LICENSE).
 
+> ### 🚧 The race simulation is being rebuilt from scratch
+> All AI and movement logic was deliberately removed. Horses generate and render,
+> but nothing moves. **[REBUILD.md](REBUILD.md) is the specification for the rebuild**
+> and supersedes the racing sections of DESIGN.md and ROADMAP.md.
+> Start there before touching anything under `src/sim/race/`.
+
 ---
 
 ## Documentation
