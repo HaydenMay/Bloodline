@@ -1,17 +1,21 @@
 import horseUrl from '../assets/horse-reference.png';
+import maskUrl from '../assets/horse-reference-mask.png';
 import { coatFor } from './palette.js';
 import type { Silks } from './palette.js';
 
 /**
  * Horse preview renderer for the silks demo.
- * Uses color-region detection similar to shield badge:
- * - Grey pixels → body (tinted with coat color)
- * - Red/magenta pixels → mane (tinted with mane color)
- * - Blue pixels → outline (tinted with silks color)
+ * Uses a material mask for precise region identification:
+ * - Material 1 → body (tinted with coat color)
+ * - Material 2 → hair/mane (tinted with mane color)
+ * - Material 4 → silks/outline (tinted with silks color)
  */
+
+const MATERIAL = { body: 1, hair: 2, points: 3, silks: 4, trim: 5, fixed: 6 } as const;
 
 interface Loaded {
   base: ImageData;
+  mask: Uint8Array;
   width: number;
   height: number;
 }
@@ -40,39 +44,28 @@ export function loadHorsePreview(): Promise<Loaded> {
   if (loaded) return Promise.resolve(loaded);
   if (loading) return loading;
   loading = (async () => {
-    const baseImg = await loadImage(horseUrl);
-    const W = 256;
-    const H = 256;
+    const [baseImg, maskImg] = await Promise.all([loadImage(horseUrl), loadImage(maskUrl)]);
+    if (!baseImg) throw new Error('Failed to load horse-reference.png');
+    const W = baseImg.width;
+    const H = baseImg.height;
 
     const bctx = scratch(W, H);
     if (baseImg) {
       bctx.drawImage(baseImg, 0, 0);
-    } else {
-      bctx.fillStyle = '#F5F5DC';
-      bctx.fillRect(0, 0, W, H);
-
-      bctx.fillStyle = '#808080';
-      bctx.beginPath();
-      bctx.ellipse(128, 100, 35, 45, 0, 0, Math.PI * 2);
-      bctx.fill();
-
-      bctx.fillStyle = '#CC3333';
-      bctx.fillRect(115, 50, 26, 50);
-
-      bctx.fillStyle = '#0052CC';
-      bctx.strokeStyle = '#0052CC';
-      bctx.lineWidth = 8;
-      bctx.beginPath();
-      bctx.ellipse(128, 100, 35, 45, 0, 0, Math.PI * 2);
-      bctx.stroke();
-
-      bctx.fillStyle = '#808080';
-      bctx.fillRect(105, 150, 12, 80);
-      bctx.fillRect(145, 150, 12, 80);
     }
     const base = bctx.getImageData(0, 0, W, H);
 
-    loaded = { base, width: W, height: H };
+    let mask = new Uint8Array(W * H);
+    if (maskImg) {
+      const mctx = scratch(W, H);
+      mctx.drawImage(maskImg, 0, 0);
+      const maskData = mctx.getImageData(0, 0, W, H);
+      for (let i = 0; i < W * H; i++) {
+        mask[i] = maskData.data[i * 4]!;
+      }
+    }
+
+    loaded = { base, mask, width: W, height: H };
     return loaded;
   })();
   return loading;
@@ -106,25 +99,6 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   return [Math.round(255 * f(0)), Math.round(255 * f(8)), Math.round(255 * f(4))];
 }
 
-function detectRegion(r: number, g: number, b: number, tolerance: number = 25): string {
-  // Blue outline/silks (high blue, low red) - check first to avoid false positives
-  if (b > g + 30 && b > r + 30) {
-    return 'outline';
-  }
-  // Red/Dark red mane (high red, lower green and blue)
-  if (r > g + 30 && r > b + 30 && r > 100) {
-    return 'mane';
-  }
-  // Magenta mane (high red and blue, low green)
-  if (r > 150 && b > 150 && g < 100) {
-    return 'mane';
-  }
-  // Grey body (neutral grey) - more lenient tolerance
-  if (Math.abs(r - g) < tolerance && Math.abs(g - b) < tolerance && Math.abs(r - b) < tolerance && r > 80) {
-    return 'body';
-  }
-  return 'fixed';
-}
 
 export interface HorsePreviewScheme {
   coat: string;
@@ -155,47 +129,48 @@ export function tintedHorsePreview(scheme: HorsePreviewScheme): HTMLCanvasElemen
   const { width: W, height: H } = loaded;
   const ctx = scratch(W, H);
   const out = ctx.createImageData(W, H);
-  const { base } = loaded;
+  const { base, mask } = loaded;
 
-  // Calculate mean luminance for each region
-  const regionMeans: Record<string, number> = { body: 0, mane: 0, outline: 0, fixed: 0 };
-  const regionCounts: Record<string, number> = { body: 0, mane: 0, outline: 0, fixed: 0 };
+  // Calculate mean luminance for each region using the mask
+  const regionMeans: Record<number, number> = {};
+  const regionCounts: Record<number, number> = {};
 
   for (let p = 0; p < W * H; p++) {
     const i = p * 4;
     const a = base.data[i + 3]!;
     if (a === 0) continue;
 
+    const material = mask[p] || 0;
     const r = base.data[i]!;
     const g = base.data[i + 1]!;
     const b = base.data[i + 2]!;
-    const region = detectRegion(r, g, b);
     const l = (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
 
-    regionMeans[region] = (regionMeans[region] ?? 0) + l;
-    regionCounts[region] = (regionCounts[region] ?? 0) + 1;
+    regionMeans[material] = (regionMeans[material] ?? 0) + l;
+    regionCounts[material] = (regionCounts[material] ?? 0) + 1;
   }
-  for (const region of Object.keys(regionMeans)) {
-    if (regionCounts[region]! > 0) {
-      regionMeans[region] = regionMeans[region]! / regionCounts[region]!;
+  for (const material in regionMeans) {
+    const m = parseInt(material);
+    if (regionCounts[m]! > 0) {
+      regionMeans[m] = regionMeans[m]! / regionCounts[m]!;
     } else {
-      regionMeans[region] = 0.5;
+      regionMeans[m] = 0.5;
     }
   }
 
-  // Tint pixels
+  // Tint pixels based on material mask
   for (let p = 0; p < W * H; p++) {
     const i = p * 4;
     const a = base.data[i + 3]!;
     out.data[i + 3] = a;
     if (a === 0) continue;
 
+    const material = mask[p] || 0;
     const r = base.data[i]!;
     const g = base.data[i + 1]!;
     const b = base.data[i + 2]!;
-    const region = detectRegion(r, g, b);
 
-    if (region === 'fixed') {
+    if (material === MATERIAL.fixed || material === 0) {
       out.data[i] = r;
       out.data[i + 1] = g;
       out.data[i + 2] = b;
@@ -204,14 +179,16 @@ export function tintedHorsePreview(scheme: HorsePreviewScheme): HTMLCanvasElemen
 
     const l = (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
     let tintHsl: [number, number, number];
-    if (region === 'body') {
+    if (material === MATERIAL.body) {
       tintHsl = bodyHsl;
-    } else if (region === 'mane') {
+    } else if (material === MATERIAL.hair) {
+      tintHsl = maneHsl;
+    } else if (material === MATERIAL.points) {
       tintHsl = maneHsl;
     } else {
       tintHsl = silksHsl;
     }
-    const meanL = regionMeans[region] ?? 0.5;
+    const meanL = regionMeans[material] ?? 0.5;
     const lit = Math.max(0.02, Math.min(0.98, tintHsl[2] + (l - meanL) * 0.9));
     const [nr, ng, nb] = hslToRgb(tintHsl[0], tintHsl[1], lit);
     out.data[i] = nr;
