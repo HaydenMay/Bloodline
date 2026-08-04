@@ -1,4 +1,6 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
+import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
+import type { Silks } from '../render/palette.js';
 
 const COAT_COLORS = [
   { id: 'bay', name: 'Bay' },
@@ -26,7 +28,8 @@ export function mountSilksDemo(host: HTMLElement): void {
   let selectedManeColor = '#1a1a1a';
   let selectedSilksColor = '#A8DADC';
 
-  const updateBadge = async () => {
+  const updatePreview = async () => {
+    // Update badge
     const badgeImg = host.querySelector<HTMLImageElement>('.sd-badge');
     if (badgeImg) {
       const uri = await getBadgeDataUri({
@@ -35,6 +38,22 @@ export function mountSilksDemo(host: HTMLElement): void {
       });
       if (uri) {
         badgeImg.src = uri;
+      }
+    }
+
+    // Update horse preview
+    const horseCanvas = host.querySelector<HTMLCanvasElement>('.sd-horse-canvas');
+    if (horseCanvas) {
+      const ctx = horseCanvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, horseCanvas.width, horseCanvas.height);
+        const silks: Silks = { primary: selectedSilksColor, secondary: selectedManeColor };
+        drawSpriteHorse(ctx, horseCanvas.width / 2, horseCanvas.height / 2, {
+          coat: selectedCoat,
+          silks,
+          phase: 0.5,
+          scale: 3,
+        });
       }
     }
   };
@@ -88,19 +107,25 @@ export function mountSilksDemo(host: HTMLElement): void {
         <input type="text" class="sd-hex-input" id="silks-hex" value="${selectedSilksColor}" placeholder="#A8DADC" />
       </div>
 
-      <div class="sd-preview">
-        <p>Badge Preview</p>
-        <img class="sd-badge" src="" alt="Badge preview" />
-        <div class="sd-info">
-          <span class="sd-coat-name">${COAT_COLORS.find((c) => c.id === selectedCoat)?.name}</span>
-          <div class="sd-color-labels">
-            <div class="sd-color-info">
-              <span class="sd-color-label">Mane</span>
-              <span class="sd-color-swatch" style="background: ${selectedManeColor}"></span>
-            </div>
-            <div class="sd-color-info">
-              <span class="sd-color-label">Silks</span>
-              <span class="sd-color-swatch" style="background: ${selectedSilksColor}"></span>
+      <div class="sd-preview-container">
+        <div class="sd-preview">
+          <p>Horse Preview</p>
+          <canvas class="sd-horse-canvas" width="400" height="300"></canvas>
+        </div>
+        <div class="sd-preview">
+          <p>Badge Preview</p>
+          <img class="sd-badge" src="" alt="Badge preview" />
+          <div class="sd-info">
+            <span class="sd-coat-name">${COAT_COLORS.find((c) => c.id === selectedCoat)?.name}</span>
+            <div class="sd-color-labels">
+              <div class="sd-color-info">
+                <span class="sd-color-label">Mane</span>
+                <span class="sd-color-swatch" style="background: ${selectedManeColor}"></span>
+              </div>
+              <div class="sd-color-info">
+                <span class="sd-color-label">Silks</span>
+                <span class="sd-color-swatch" style="background: ${selectedSilksColor}"></span>
+              </div>
             </div>
           </div>
         </div>
@@ -123,7 +148,7 @@ export function mountSilksDemo(host: HTMLElement): void {
         (e.target as HTMLElement).classList.add('active');
         host.querySelector<HTMLSpanElement>('.sd-coat-name')!.textContent =
           COAT_COLORS.find((c) => c.id === coat)?.name || coat;
-        updateBadge();
+        updatePreview();
       }
     });
   });
@@ -141,7 +166,7 @@ export function mountSilksDemo(host: HTMLElement): void {
           'style',
           `background: ${color}`,
         );
-        updateBadge();
+        updatePreview();
       }
     });
   });
@@ -159,7 +184,7 @@ export function mountSilksDemo(host: HTMLElement): void {
           'style',
           `background: ${color}`,
         );
-        updateBadge();
+        updatePreview();
       }
     });
   });
@@ -174,7 +199,7 @@ export function mountSilksDemo(host: HTMLElement): void {
         'style',
         `background: ${hex}`,
       );
-      updateBadge();
+      updatePreview();
     }
   });
 
@@ -187,7 +212,7 @@ export function mountSilksDemo(host: HTMLElement): void {
         'style',
         `background: ${hex}`,
       );
-      updateBadge();
+      updatePreview();
     }
   });
 
@@ -204,6 +229,6 @@ export function mountSilksDemo(host: HTMLElement): void {
     window.location.href = '/';
   });
 
-  // Initial badge render
-  updateBadge();
+  // Initial preview render
+  loadSprites().then(() => updatePreview());
 }

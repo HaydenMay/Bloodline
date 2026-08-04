@@ -875,8 +875,14 @@ body {
   border-color: var(--accent);
 }
 
-.sd-preview {
+.sd-preview-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
   margin: 32px 0;
+}
+
+.sd-preview {
   padding: 24px;
   background: var(--bg);
   border: 1px solid var(--line);
@@ -891,6 +897,15 @@ body {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.sd-horse-canvas {
+  width: 100%;
+  height: auto;
+  background: var(--panel);
+  border-radius: 4px;
+  margin-bottom: 16px;
+  image-rendering: crisp-edges;
 }
 
 .sd-badge {
