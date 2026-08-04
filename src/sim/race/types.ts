@@ -1,10 +1,14 @@
 import type { Horse } from '../types.js';
-import type { DistanceBand } from '../../data/index.js';
 
 export type Going = 'firm' | 'good' | 'soft' | 'heavy';
 
 export interface RaceConfig {
-  furlongs: number;
+  /**
+   * Race distance in METRES. The whole simulation and the render layer both
+   * work in metres and seconds — there is no conversion boundary anywhere,
+   * because a conversion boundary is a permanent source of bugs.
+   */
+  metres: number;
   going: Going;
   hype: number;
   seed: string;
@@ -27,9 +31,12 @@ export interface RaceResult {
   name: string;
   finishPosition: number;
   time: number;
+  /** Behind the winner, in lengths. */
   margin: number;
+  /** Charge dots left at the wire — banked but unspent. */
   kicksLeft: number;
   sectionals: number[];
+  /** Always false in v1: there is no blocking (REBUILD.md §9). */
   hadTrouble: boolean;
   fumbledStart: boolean;
   offColour: boolean;
@@ -38,44 +45,29 @@ export interface RaceResult {
 export interface RaceOutcome {
   results: RaceResult[];
   events: RaceEvent[];
+  /**
+   * Late sectional over early sectional. Above 1 means the race SLOWED — the
+   * leaders went off too fast and emptied, which is the collapse an upset comes
+   * out of. `recap.ts`'s `paceOf()` reads it this way; do not change the sense.
+   */
   paceRating: number;
   duration: number;
 }
 
-// Stubs for UI layer — simulation not yet rebuilt
-export interface ControlInput {
-  effort: number;
-  holding: boolean;
-  kick: boolean;
-  targetLane: number;
+/** What the player's input can say. Everything else is the shared base ride. */
+export interface PlayerInput {
+  /** Hold to take a pull — settle below the pace curve, bank tank faster. */
+  takingBack: boolean;
+  /** Set by a tap; consumed the next tick the rider reads it. */
+  kickPending: boolean;
 }
 
-export interface RunnerView {
-  id: string;
-  name: string;
-  distance: number;
-  speed: number;
-  lane: number;
-  fieldPosition: number;
-  rank: number;
-  blocked: boolean;
-  drafting: boolean;
-  kicksRemaining: number;
-  offColour: boolean;
-}
-
+/** Race-wide state a rider can see. */
 export interface RaceView {
+  /** The LEADER's progress, 0-1. Riders use their OWN progress for timing. */
   progress: number;
   elapsed: number;
-  totalYards: number;
+  totalMetres: number;
   fieldSize: number;
   leaderDistance: number;
-  pacePressure: number;
-}
-
-/** Which aptitude band a distance falls into. */
-export function bandFor(furlongs: number): DistanceBand {
-  if (furlongs <= 7) return 'sprint';
-  if (furlongs <= 9) return 'mile';
-  return 'route';
 }

@@ -23,9 +23,16 @@ const STAT_LABELS: Record<StatKey, string> = {
   consistency: 'Consistency',
 };
 
-// Field-position language only — Moment (labeled separately below) is what
-// now controls WHEN a horse's kick window falls, so this must never describe
-// timing or it reads as contradicting the Moment label.
+// Field-position language only. Moment (labelled separately) says WHEN a horse
+// spends, so this must never describe timing or the two read as contradicting
+// each other.
+const MOMENT_LABELS: Record<string, string> = {
+  early: 'Goes early',
+  earlyMid: 'Goes before halfway',
+  midLate: 'Goes off the turn',
+  late: 'Goes late',
+};
+
 const STYLE_LABELS: Record<string, { name: string; seat: string }> = {
   frontRunner: { name: 'Front-runner', seat: 'Runs up front' },
   stalker: { name: 'Stalker', seat: 'Sits just off the pace' },
@@ -58,15 +65,19 @@ export function renderInfoBox(horse: Horse): string {
       </div>`;
   }).join('');
 
-  const aptitudes = (['sprint', 'mile', 'route'] as const)
-    .map(
-      (band) => `
+  // A plain range in metres, not a grade per band. The bands needed explaining
+  // every time; "Preferred Length 600-800 m" does not (REBUILD.md §7).
+  const { min, max } = horse.preferredDistance;
+  const width = max - min;
+  const versatility = width >= 550 ? 'handles most trips' : width <= 300 ? 'specialist' : 'some scope';
+  const distance = `
       <div class="ib-apt">
-        <span>${band}</span>
-        <b class="ib-g${toGrade(horse.aptitudes[band])}">${toGrade(horse.aptitudes[band])}</b>
-      </div>`,
-    )
-    .join('');
+        <span>Preferred length</span>
+        <b>${min}–${max} m</b>
+      </div>
+      <div class="ib-apt ib-apt-note">
+        <span>${versatility}</span>
+      </div>`;
 
   const traits = horse.traits.length
     ? horse.traits
@@ -92,6 +103,7 @@ export function renderInfoBox(horse: Horse): string {
     <div class="ib-row">
       <div><span class="ib-k">Style</span><span class="ib-v">${style.name}</span></div>
       <div><span class="ib-k">Runs</span><span class="ib-v">${style.seat.toLowerCase()}</span></div>
+      <div><span class="ib-k">Moment</span><span class="ib-v">${(MOMENT_LABELS[horse.moment] ?? '').toLowerCase()}</span></div>
     </div>
 
     <p class="ib-section">Attributes</p>
@@ -99,7 +111,7 @@ export function renderInfoBox(horse: Horse): string {
     <p class="ib-hint">Potential: ${speedRoom}</p>
 
     <p class="ib-section">Distance</p>
-    <div class="ib-apts">${aptitudes}</div>
+    <div class="ib-apts">${distance}</div>
 
     <p class="ib-section">Traits</p>
     <div class="ib-traits">${traits}</div>

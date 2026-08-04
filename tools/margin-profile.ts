@@ -6,6 +6,7 @@ import { simulateRace } from '../src/sim/race/engine.js';
 import type { RaceEntrant } from '../src/sim/race/types.js';
 
 const RACE_COUNT = 200;
+const RACE_METRES = 1400;
 
 /**
  * The tail-collapse table from ROADMAP.md, "Known issue — winning margins are
@@ -28,11 +29,12 @@ for (let n = 0; n < RACE_COUNT; n++) {
       division: 'open',
       style: RUNNING_STYLES[i % RUNNING_STYLES.length]!,
       age: 4,
+      distanceCentre: RACE_METRES * rng.range(0.85, 1.15),
     }),
   );
   const entrants: RaceEntrant[] = field.map((horse) => ({ horse }));
   const outcome = simulateRace(entrants, {
-    furlongs: 8,
+    metres: RACE_METRES,
     going: 'good',
     hype: 0.5,
     seed: `margin-profile-${n}`,
@@ -45,6 +47,6 @@ const median = (a: number[]): number => {
   return s[Math.floor(s.length / 2)]!;
 };
 
-console.log(`Median margin behind the winner by place (${RACE_COUNT} races, 8f open)\n`);
+console.log(`Median margin behind the winner by place (${RACE_COUNT} races, ${RACE_METRES}m open)\n`);
 console.log('place  ' + byPlace.map((_, i) => `${i + 1}${['st', 'nd', 'rd'][i] ?? 'th'}`.padStart(6)).join(''));
 console.log('behind ' + byPlace.map((p) => `${median(p).toFixed(1)}L`.padStart(6)).join(''));
