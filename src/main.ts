@@ -79,7 +79,8 @@ function startRace(seed: string): void {
   `;
   app.appendChild(bar);
 
-  attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player);
+  const playerSilks = { primary: '#F2C14E', secondary: '#12222B' };
+  attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks);
 
   bar.querySelector('.rb-again')!.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -90,7 +91,7 @@ function startRace(seed: string): void {
     host: stage,
     field,
     playerHorseId: playerId,
-    playerSilks: { primary: '#F2C14E', secondary: '#12222B' },
+    playerSilks,
     config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
   });
 }
