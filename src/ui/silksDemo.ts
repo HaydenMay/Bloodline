@@ -154,9 +154,12 @@ export function mountSilksDemo(host: HTMLElement): void {
   });
 
   // Mane color selection
-  host.querySelectorAll('.sd-color-btn.sd-mane').forEach((btn) => {
+  const maneBtns = host.querySelectorAll('.sd-color-btn.sd-mane');
+  console.log('Mane buttons found:', maneBtns.length);
+  maneBtns.forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const color = (e.target as HTMLElement).getAttribute('data-color');
+      console.log('Mane button clicked, color:', color);
       if (color) {
         selectedManeColor = color;
         host.querySelectorAll('.sd-color-btn.sd-mane').forEach((b) => b.classList.remove('active'));
