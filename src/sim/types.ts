@@ -1,4 +1,4 @@
-import type { Division, DistanceBand, Moment, RunningStyle } from '../data/index.js';
+import type { Division, Moment, RunningStyle } from '../data/index.js';
 import type { TraitId } from '../data/traits.js';
 
 /**
@@ -44,8 +44,24 @@ export function toGrade(value: number): Grade {
   return 'D';
 }
 
-/** Aptitude per distance band, 0-100. Expressed to the player as a grade. */
-export type Aptitudes = Record<DistanceBand, number>;
+/**
+ * The distances a horse actually wants, in metres.
+ *
+ * Replaces the three-band aptitude grid (REBUILD.md §7). A range reads plainly
+ * to the player — "Preferred Length 600-800 m" — where a letter grade per band
+ * needed explaining, and it is continuous, so there is no cliff at a boundary
+ * that a horse is arbitrarily on the wrong side of.
+ *
+ * The WIDTH is a real quality, and a trade rather than a tier: a narrow range
+ * is a specialist that peaks higher and falls off hard, a wide one handles
+ * anything without ever being sharp. See `distanceFactor` in race/aptitude.ts.
+ */
+export interface DistancePreference {
+  /** Metres. Lower bound of the sweet spot. */
+  min: number;
+  /** Metres. Upper bound of the sweet spot. */
+  max: number;
+}
 
 export type Gender = 'stallion' | 'mare';
 
@@ -62,9 +78,10 @@ export interface Horse {
 
   /** WHERE it sits in the pack. */
   style: RunningStyle;
-  /** WHEN its kick lands and its passive speed curve peaks — independent of style. */
+  /** WHEN it spends. Style and Moment together pick a pace curve (REBUILD.md §6). */
   moment: Moment;
-  aptitudes: Aptitudes;
+  /** The distances it wants, in metres. */
+  preferredDistance: DistancePreference;
   traits: TraitId[];
 
   /** 0-100. Scales race performance; managed through training and rest. */

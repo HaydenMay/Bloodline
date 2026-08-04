@@ -1,6 +1,5 @@
 import type { RaceOutcome, RaceResult } from './types.js';
 import type { RunningStyle } from '../../data/index.js';
-import { CHARGE_CAPACITY } from './constants.js';
 
 /**
  * The post-race recap.
@@ -157,7 +156,7 @@ export function buildRecap(
     );
   }
 
-  if (!won && me.kicksLeft > CHARGE_CAPACITY / 2) {
+  if (!won && me.kicksLeft > 2) { // CHARGE_CAPACITY was 5, so > 2 means still banked
     add('You crossed the line with charges still banked. You asked too late, or not at all.');
   } else if (!won && me.kicksLeft === 0) {
     add('You spent everything you had, and it still was not enough.');

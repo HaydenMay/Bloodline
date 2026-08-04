@@ -14,17 +14,33 @@ export const RUNNING_STYLES = ['frontRunner', 'stalker', 'midPack', 'closer'] as
 export type RunningStyle = (typeof RUNNING_STYLES)[number];
 
 /**
- * WHEN a horse's kick lands and its passive speed curve peaks — independent
- * of running style, which only says WHERE it sits in the pack. A front-runner
- * and a closer can both be `late`; a style only weights which Moment a horse
- * is likelier to roll (`MOMENT_WEIGHTS_BY_STYLE`, sim/race/constants.ts), it
- * never determines it outright.
+ * WHEN a horse spends its race — independent of running style, which only says
+ * WHERE it sits in the pack. A front-runner and a closer can both be `late`;
+ * style only weights which Moment a horse is likelier to roll
+ * (`MOMENT_WEIGHTS_BY_STYLE` below), it never determines it outright.
+ *
+ * Moment does exactly ONE thing now: together with style it selects a pace
+ * curve shape (REBUILD.md §6). It owns no kick window, no passive speed bonus
+ * and no AI commit ramp — one attribute driving three systems at once is what
+ * broke the previous build.
  */
 export const MOMENTS = ['early', 'earlyMid', 'midLate', 'late'] as const;
 export type Moment = (typeof MOMENTS)[number];
 
-export const DISTANCE_BANDS = ['sprint', 'mile', 'route'] as const;
-export type DistanceBand = (typeof DISTANCE_BANDS)[number];
+/**
+ * How likely each style is to roll each Moment.
+ *
+ * Weighted so archetypes stay sensible — a "quick-start closer" is vanishingly
+ * rare — without being fixed outright, so two horses of one style can still
+ * peak at different points. Rows need not sum to exactly 1; `rollMoment`
+ * normalises.
+ */
+export const MOMENT_WEIGHTS_BY_STYLE: Record<RunningStyle, Record<Moment, number>> = {
+  frontRunner: { early: 0.55, earlyMid: 0.3, midLate: 0.1, late: 0.05 },
+  stalker: { early: 0.1, earlyMid: 0.25, midLate: 0.4, late: 0.25 },
+  midPack: { early: 0.15, earlyMid: 0.3, midLate: 0.3, late: 0.25 },
+  closer: { early: 0.02, earlyMid: 0.08, midLate: 0.3, late: 0.6 },
+};
 
 /** Field size for every race (DESIGN.md §4). */
 export const FIELD_SIZE = 8;

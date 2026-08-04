@@ -2,8 +2,7 @@ import './style.css';
 import { createRng } from './sim/index.js';
 import { createNameGenerator } from './data/names.js';
 import { generateHorse } from './sim/horse.js';
-import { FIELD_SIZE, RUNNING_STYLES, type Moment } from './data/index.js';
-import { MOMENT_WINDOWS } from './sim/race/constants.js';
+import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
 import { attachInfoBox } from './ui/infoBox.js';
 import { mountRaceScreen } from './ui/raceScreen.js';
 import { mountHorsePreview } from './ui/horsePreview.js';
@@ -17,6 +16,12 @@ import type { Horse } from './sim/types.js';
  * DRIVE control can be judged on their own before careers exist to wrap them.
  * Replaced by the real career flow in Phase 3.
  */
+
+/**
+ * Demo distance. Most races in the game are 600-900 m; 1400 is a middle-
+ * distance test that shows every style doing its job inside ~70 s.
+ */
+const RACE_METRES = 1400;
 
 const appEl = document.querySelector<HTMLDivElement>('#app');
 if (!appEl) throw new Error('#app not found');
@@ -56,21 +61,18 @@ function startRace(seed: string): void {
 
   const bar = document.createElement('div');
   bar.className = 'racebar';
-  // Where this horse's window sits in the race, as a share of the distance.
-  // Moment is independent of style now (sim/race/constants.ts) — a horse's
-  // own rolled Moment decides this, not its running style.
-  const [winLo, winHi] = MOMENT_WINDOWS[player.moment];
-  const lo = Math.round(winLo * 100);
-  const hi = Math.round(winHi * 100);
 
+  // No moment WINDOW is drawn any more: Moment selects a pace-curve shape, not
+  // a window (REBUILD.md §6), so there is nothing to mark on a timeline. What
+  // the player needs instead is what trip the horse wants.
   bar.innerHTML = `
     <div class="rb-horse">
       <span class="rb-name">${player.name}</span>
-      <span class="rb-style">${styleLabel(player.style)} · <span class="rb-moment-when">${momentLabel(player.moment)}</span></span>
+      <span class="rb-style">${styleLabel(player.style)} · ${momentLabel(player.moment)}</span>
     </div>
     <div class="rb-moment">
-      <span class="rb-moment-label">Your moment</span>
-      <div class="rb-track"><div class="rb-window" style="left:${lo}%;width:${hi - lo}%"></div></div>
+      <span class="rb-moment-label">Preferred length</span>
+      <span class="rb-pref">${player.preferredDistance.min}–${player.preferredDistance.max} m</span>
     </div>
     <div class="rb-hint">Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b></div>
     <button class="rb-again">New race</button>
@@ -89,21 +91,20 @@ function startRace(seed: string): void {
     field,
     playerHorseId: playerId,
     playerSilks: { primary: '#F2C14E', secondary: '#12222B' },
-    config: { furlongs: 8, going: 'good', hype: 0.65, seed: `${seed}-run` },
+    config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
   });
 }
 
-/** Named after the part of the track where this Moment's window falls. */
-function momentLabel(moment: Moment): string {
+function momentLabel(moment: string): string {
   switch (moment) {
     case 'early':
-      return 'from the gate';
+      return 'goes early';
     case 'earlyMid':
-      return 'down the back';
+      return 'goes before halfway';
     case 'midLate':
-      return 'round the turn';
-    case 'late':
-      return 'in the straight';
+      return 'goes off the turn';
+    default:
+      return 'goes late';
   }
 }
 

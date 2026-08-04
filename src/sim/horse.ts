@@ -1,26 +1,24 @@
 import type { Rng } from './rng.js';
-import type { Aptitudes, Gender, Horse, Stats } from './types.js';
+import type { DistancePreference, Gender, Horse, Stats } from './types.js';
 import { STAT_KEYS } from './types.js';
-import { COAT_IDS, DISTANCE_BANDS, MOMENTS, type DistanceBand, type Division, type Moment, RUNNING_STYLES, type RunningStyle } from '../data/index.js';
-import { MOMENT_WEIGHTS_BY_STYLE } from './race/constants.js';
+import {
+  COAT_IDS,
+  type Division,
+  type Moment,
+  MOMENT_WEIGHTS_BY_STYLE,
+  MOMENTS,
+  RUNNING_STYLES,
+  type RunningStyle,
+} from '../data/index.js';
+import {
+  DIST_CENTRE_MAX,
+  DIST_CENTRE_MIN,
+  DIST_WIDTH_MAX,
+  DIST_WIDTH_MIN,
+} from './race/constants.js';
 import { RACING_TRAIT_IDS, TRAITS, type TraitId } from '../data/traits.js';
 import type { NameGenerator } from '../data/names.js';
 
-/**
- * A horse's Moment, weighted by its running style so archetypes stay sensible
- * (MOMENT_WEIGHTS_BY_STYLE, sim/race/constants.ts) — independent otherwise, so
- * two horses of the same style can still kick at different points.
- */
-function rollMoment(rng: Rng, style: RunningStyle): Moment {
-  const weights = MOMENT_WEIGHTS_BY_STYLE[style];
-  const total = MOMENTS.reduce((sum, m) => sum + weights[m], 0);
-  let roll = rng.next() * total;
-  for (const moment of MOMENTS) {
-    roll -= weights[moment];
-    if (roll <= 0) return moment;
-  }
-  return MOMENTS[MOMENTS.length - 1]!;
-}
 
 /**
  * Quality band per division.
@@ -80,21 +78,40 @@ function rollPotential(rng: Rng, stats: Stats, generosity = 1): Stats {
 }
 
 /**
- * Aptitudes. One band is clearly best, the neighbouring band is decent, and the
- * far band is weak — so horses have a real distance identity without needing a
- * trait to say so (TRAITS.md rule 5).
+ * The distances a horse wants, in metres (REBUILD.md §7).
+ *
+ * Rolled as a centre and a width. The width matters as much as the centre: a
+ * narrow range is a specialist that peaks higher and falls off a cliff outside
+ * it, a wide one handles anything without ever being sharp. Neither is strictly
+ * better, which is what keeps it a trade rather than a tier (TRAITS.md rule 5).
+ *
+ * Rounded to 25 m so the label reads as a distance a racecourse would post.
  */
-function rollAptitudes(rng: Rng, primary: DistanceBand): Aptitudes {
-  const order: DistanceBand[] = ['sprint', 'mile', 'route'];
-  const primaryIndex = order.indexOf(primary);
+function rollPreferredDistance(rng: Rng, centre?: number): DistancePreference {
+  const mid = centre ?? rng.range(DIST_CENTRE_MIN, DIST_CENTRE_MAX);
+  const width = rng.range(DIST_WIDTH_MIN, DIST_WIDTH_MAX);
+  return {
+    min: Math.round((mid - width / 2) / 25) * 25,
+    max: Math.round((mid + width / 2) / 25) * 25,
+  };
+}
 
-  const out = {} as Aptitudes;
-  for (const band of DISTANCE_BANDS) {
-    const distance = Math.abs(order.indexOf(band) - primaryIndex);
-    const base = distance === 0 ? rng.range(74, 96) : distance === 1 ? rng.range(48, 72) : rng.range(22, 46);
-    out[band] = clamp100(base);
+/**
+ * WHEN a horse spends, weighted by its running style.
+ *
+ * Weighted rather than fixed so archetypes stay sensible without being
+ * uniform — a closer almost always rolls `late`, but not quite always, and two
+ * front-runners in the same field can genuinely differ.
+ */
+export function rollMoment(rng: Rng, style: RunningStyle): Moment {
+  const weights = MOMENT_WEIGHTS_BY_STYLE[style];
+  const total = MOMENTS.reduce((sum, m) => sum + weights[m], 0);
+  let roll = rng.next() * total;
+  for (const moment of MOMENTS) {
+    roll -= weights[moment];
+    if (roll <= 0) return moment;
   }
-  return out;
+  return MOMENTS[MOMENTS.length - 1]!;
 }
 
 /**
@@ -147,7 +164,9 @@ export interface GenerateOptions {
   division: Division;
   age?: number;
   style?: RunningStyle;
-  primaryBand?: DistanceBand;
+  moment?: Moment;
+  /** Centre of the preferred distance range, in metres. Rolled if absent. */
+  distanceCentre?: number;
   gender?: Gender;
   /** Starter horses roll deliberately weak so growth is felt (DESIGN.md §2). */
   starter?: boolean;
@@ -167,7 +186,7 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
   }
 
   const style = opts.style ?? rng.pick(RUNNING_STYLES);
-  const primaryBand = opts.primaryBand ?? rng.pick(DISTANCE_BANDS);
+  const moment = opts.moment ?? rollMoment(rng, style);
 
   return {
     // Derived purely from the rng so identity is reproducible from a seed.
@@ -179,8 +198,8 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     stats,
     potential: rollPotential(rng, stats, opts.starter ? 1.35 : 1),
     style,
-    moment: rollMoment(rng, style),
-    aptitudes: rollAptitudes(rng, primaryBand),
+    moment,
+    preferredDistance: rollPreferredDistance(rng, opts.distanceCentre),
     traits: rollTraits(rng, opts.legacy ?? 0),
     condition: opts.starter ? 70 : clamp100(rng.range(58, 88)),
     morale: 60,
@@ -210,14 +229,10 @@ export function generateStarterSix(rng: Rng, names: NameGenerator, legacy = 0): 
     rng.pick(RUNNING_STYLES),
     rng.pick(RUNNING_STYLES),
   ];
-  const bands: DistanceBand[] = rng.shuffle([
-    'sprint',
-    'sprint',
-    'mile',
-    'mile',
-    'route',
-    'route',
-  ] as DistanceBand[]);
+  // Two short, two middle, two long — so the opening choice always spans the
+  // whole distance ladder rather than offering six horses that want the same
+  // trip. Metres, matching the preferred-length label the player actually sees.
+  const centres: number[] = rng.shuffle([800, 950, 1400, 1600, 2000, 2300]);
 
   const seen = new Set<TraitId>();
   const horses: Horse[] = [];
@@ -227,7 +242,7 @@ export function generateStarterSix(rng: Rng, names: NameGenerator, legacy = 0): 
       division: 'maiden',
       age: 2,
       style,
-      primaryBand: bands[i]!,
+      distanceCentre: centres[i]!,
       starter: true,
       legacy,
     });

@@ -4,11 +4,29 @@ Companion to [DESIGN.md](DESIGN.md) and [TRAITS.md](TRAITS.md).
 
 ---
 
-## 🚧 IN PROGRESS — the energy economy has been replaced with kick charges
+> ## ⛔ EVERYTHING IN THE NEXT FOUR SECTIONS IS HISTORY, NOT INSTRUCTIONS
+>
+> The race simulation described below **no longer exists** — AI, movement, constants,
+> the charge economy and the Moment system were all deliberately removed (commit
+> `ace33f2`) after three failed redesigns.
+>
+> **[REBUILD.md](REBUILD.md) is the current specification.** Read it before touching
+> anything under `src/sim/race/`.
+>
+> Keep the sections below. They are the most valuable thing in this repository: a
+> measured record of what was tried, what it did to the numbers, and why it failed.
+> REBUILD.md's §17 "Do-not list" is drawn directly from them. Read them as evidence,
+> never as a description of the code.
 
-**Read this before touching `sim/race/` code.** The kick-charge rebuild itself is DONE and
+---
+
+## 📚 HISTORY — the energy economy was replaced with kick charges
+
+**Superseded by [REBUILD.md](REBUILD.md). Kept as a measured record.**
+
+The kick-charge rebuild itself is DONE and
 compiles/lints/tests clean. On top of it, WHEN a horse kicks has been split out from running style
-into its own independent `Moment` attribute (see "🚧 IN PROGRESS — Moment" further down) — that
+into its own independent `Moment` attribute (see the Moment history section further down) — that
 part is NOT yet balanced: style balance and pace-collapse both currently fail the harness, after a
 serious structural bug (effort commitment never coming back down) was found and fixed. Start there,
 not from scratch — the fix is done, the retune on top of it is not. Elsewhere still open: elite
@@ -159,7 +177,7 @@ mistimed" (6/150) and "hands off" (8/150) both well behind either. Re-verified a
 harness and `margin-profile` afterward — both unchanged, since neither AI riders nor style balance
 were ever mistimed enough for this to matter to them; it only bites naive/lazy play.
 
-### 🚧 IN PROGRESS — Moment: WHEN a horse kicks, split out from Style
+### 📚 HISTORY — Moment: WHEN a horse kicks, split out from Style
 
 **New independent attribute**, `Horse.moment` (`'early' | 'earlyMid' | 'midLate' | 'late'`,
 `data/index.ts`), added because the kick window used to be a fixed function of running style —
@@ -291,7 +309,7 @@ risks re-guessing on top of a bug. Pace-collapse remains failing at essentially 
 (closer 4.3%), Moment assignment matches weight table ✓, Moment win rate ✕ (midLate 34.2%), Pace
 collapse ✕ (pre-existing), Dominance curve ✓, Division sanity ✓.
 
-### 🚧 IN PROGRESS — full redesign: HOLD / CRUISE / KICK replaces the effort dial
+### 📚 HISTORY — full redesign: HOLD / CRUISE / KICK replaces the effort dial
 
 **Why a redesign, not another tuning pass.** After the fifth fix above, the owner asked directly:
 "are we bandaid-ing issues rather than fixing the roots?" Yes — `ai.ts`'s effort formula was fusing
@@ -392,7 +410,7 @@ from its pre-existing state, not caused by this round.
 
 ---
 
-### 🚧 IN PROGRESS — small UI wins landed; a bigger player-parity problem found
+### 📚 HISTORY — small UI wins landed; a bigger player-parity problem found
 
 Three small, low-risk fixes landed straight away (no design conversation needed, unlike the items
 below): a pre-race countdown (3-2-1, then "And they're off!" fires through the existing call-out

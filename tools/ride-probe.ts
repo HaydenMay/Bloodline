@@ -2,101 +2,247 @@ import { createRng } from '../src/sim/rng.js';
 import { createNameGenerator } from '../src/data/names.js';
 import { generateHorse } from '../src/sim/horse.js';
 import { FIELD_SIZE, RUNNING_STYLES } from '../src/data/index.js';
-import { createAiController } from '../src/sim/race/ai.js';
-import { simulateRace } from '../src/sim/race/engine.js';
-import * as K from '../src/sim/race/constants.js';
-import type { ControlInput, RaceEntrant } from '../src/sim/race/types.js';
-import type { Horse } from '../src/sim/types.js';
+import { createRace } from '../src/sim/race/engine.js';
+import { momentWindow } from '../src/sim/race/charges.js';
+import type { Moment } from '../src/data/index.js';
+import type { PlayerInput, RaceEntrant } from '../src/sim/race/types.js';
 
 /**
- * Does riding the horse actually change the result?
+ * Player parity — REBUILD.md §16.3.
  *
- * Gate 2 asks whether racing is fun, and the answer depends entirely on
- * whether the player's input matters. Under the kick-charge economy that
- * means TIMING, not effort — every ride here rides the same flat cruise
- * effort the real race screen does; the only variable is when (and how
- * often) the kick charge gets spent.
+ * Gate 1 asks whether AI vs AI is fair. This asks the different and more
+ * important question: CAN A HUMAN COMPETE AT ALL? The owner's own play history
+ * against the previous build was roughly fifty manual races, zero wins, best
+ * result second, and "beaten a distance" about 80% of the time. A simulation
+ * that passes every balance check and still cannot be won by hand has not
+ * passed anything that matters.
  *
- * What the numbers have to show, or the controls are decoration:
- *   - hands off must be well BELOW a fair share of wins
- *   - a well-timed kick must be ABOVE a fair share
- *   - a well-timed kick must beat a mistimed one, and beat spamming every
- *     charge on offer regardless of moment — or timing means nothing
+ * Each persona is a simple, human-plausible way to ride — none of them attempt
+ * the AI's own precise cadence, because a person tapping a screen from
+ * real-time feedback cannot.
  *
- * Run: npm run ride-probe
+ *   npm run ride-probe
  */
-function field(seed: string): { field: Horse[]; playerId: string } {
-  const rng = createRng(seed);
-  const names = createNameGenerator(rng);
-  const f: Horse[] = Array.from({ length: FIELD_SIZE }, (_, i) =>
-    generateHorse(rng, names, { division: 'open', style: RUNNING_STYLES[i % RUNNING_STYLES.length]!, age: 4 }),
-  );
-  return { field: f, playerId: f[Math.floor(rng.next() * f.length)]!.id };
+
+const RACES = Number(process.env.RACES ?? 150);
+const METRES = 1400;
+
+type Persona = {
+  name: string;
+  /** Called every tick. Mutates `input` in place. */
+  ride(
+    input: PlayerInput,
+    ctx: { progress: number; charges: number; moment: Moment },
+  ): void;
+};
+
+const PERSONAS: Persona[] = [
+  {
+    // No input at all. Measures whether the shared autopilot is competent —
+    // condition 3 below. A player who looks away must not be destroyed.
+    name: 'hands off',
+    ride() {},
+  },
+  {
+    name: 'spam',
+    ride(input, ctx) {
+      input.kickPending = ctx.charges >= 1;
+    },
+  },
+  {
+    name: 'save late',
+    ride(input, ctx) {
+      input.takingBack = ctx.progress < 0.7;
+      input.kickPending = ctx.progress >= 0.75 && ctx.charges >= 1;
+    },
+  },
+  {
+    name: 'spend early',
+    ride(input, ctx) {
+      input.kickPending = ctx.progress < 0.4 && ctx.charges >= 1;
+    },
+  },
+  {
+    // No holding at all — let the base ride settle the horse — and simply push
+    // the charges into the business end of the race.
+    name: 'late push',
+    ride(input, ctx) {
+      input.kickPending = ctx.progress >= 0.6 && ctx.charges >= 1;
+    },
+  },
+  {
+    name: 'finish only',
+    ride(input, ctx) {
+      input.kickPending = ctx.progress >= 0.8 && ctx.charges >= 1;
+    },
+  },
+  {
+    // Four kicks, evenly spread through the second half of the race. This is
+    // what a player who has learned the game would actually do: not hoard, not
+    // mash, just space them sensibly through the business end.
+    name: 'spread',
+    ride(input, ctx) {
+      const points = [0.45, 0.62, 0.78, 0.92];
+      input.kickPending = ctx.charges >= 1 && points.some((p) => ctx.progress >= p && ctx.progress < p + 0.02);
+    },
+  },
+  {
+    // Waits for the horse's window and then spends hard inside it. Half-right:
+    // it finds the right moment but does not settle beforehand to bank for it.
+    name: 'window only',
+    ride(input, ctx) {
+      const w = momentWindow(ctx.moment);
+      input.kickPending = ctx.charges >= 1 && ctx.progress >= w.from && ctx.progress <= w.to;
+    },
+  },
+  {
+    // THE CANONICAL GOOD RIDE, and the one the gate below is measured against.
+    //
+    // A player who has understood the game: hold fire until the horse's own
+    // moment arrives, then spend every charge from there on. Taking a pull to
+    // bank faster was tried here and measured WORSE — the ground it costs is
+    // not repaid by the charges it earns.
+    name: 'well ridden',
+    ride(input, ctx) {
+      // Nothing before the window — a charge spent early is a charge not there
+      // for the moment it was saved for. From the window onward, spend
+      // everything: an unspent charge at the wire is worth nothing at all.
+      const w = momentWindow(ctx.moment);
+      input.kickPending = ctx.charges >= 1 && ctx.progress >= w.from;
+    },
+  },
+];
+
+interface Tally {
+  wins: number;
+  top3: number;
+  places: number;
+  beaten: number;
+  kicks: number;
+  inWindow: number;
+  left: number;
 }
 
-type Ride = 'hands off' | 'kick mistimed' | 'kick in window' | 'spam every charge';
-
-function run(seed: string, ride: Ride): { pos: number; margin: number; kicksLeft: number; kicksFired: number } {
-  const { field: f, playerId } = field(seed);
-  const me = f.find((h) => h.id === playerId)!;
-  const [windowLo, windowHi] = K.MOMENT_WINDOWS[me.moment];
-  const entrants: RaceEntrant[] = f.map((horse) => {
-    if (horse.id !== playerId) return { horse };
-    const base = createAiController(horse);
-    let tapped = false;
-    return {
-      horse,
-      // Rides the AI's own hold/cruise/kick curve, exactly like the real
-      // race screen with no input — see raceScreen.ts's mountRaceScreen.
-      controller: (self, race): ControlInput => {
-        const b = base(self, race);
-        // Own progress, not the leader's — same reasoning as ai.ts/engine.ts.
-        const ownProgress = Math.min(1, Math.max(0, self.distance / race.totalYards));
-        const inWindow = ownProgress >= windowLo && ownProgress <= windowHi;
-        let kick = false;
-        if (ride === 'kick mistimed' && !tapped && ownProgress >= K.ESTABLISH_UNTIL) {
-          kick = true;
-          tapped = true;
-        } else if (ride === 'kick in window' && !tapped && inWindow) {
-          kick = true;
-          tapped = true;
-        } else if (ride === 'spam every charge' && self.kicksRemaining > 0) {
-          kick = true;
-        }
-        // A kick overrides HOLD the same way it does in ai.ts — never taking
-        // a pull the instant you're spending a charge.
-        const effort = kick ? K.CRUISE_EFFORT : b.effort;
-        const holding = kick ? false : b.holding;
-        return { effort, holding, kick, targetLane: b.targetLane };
-      },
-    };
-  });
-  const out = simulateRace(entrants, { furlongs: 8, going: 'good', hype: 0.65, seed: `${seed}-run` });
-  const r = out.results.find((x) => x.horseId === playerId)!;
-  // kicksLeft is the BANK at the finish, not how many actually fired — charges
-  // regenerate after being spent, so a horse that fired 2-3 kicks mid-race can
-  // still show a near-full bank by the wire. Count the actual 'kick' events
-  // instead, which is what tells apart "one well-timed kick" from "spammed
-  // every charge available and most of them regenerated back anyway."
-  const kicksFired = out.events.filter((e) => e.kind === 'kick' && e.horseId === playerId).length;
-  return { pos: r.finishPosition, margin: r.margin, kicksLeft: r.kicksLeft, kicksFired };
+const results = new Map<string, Tally>();
+for (const p of PERSONAS) {
+  results.set(p.name, { wins: 0, top3: 0, places: 0, beaten: 0, kicks: 0, inWindow: 0, left: 0 });
 }
 
-const N = 150;
-console.log('Does riding the horse change the result?  150 races each, same seeds.\n');
-console.log('ride                    avg place   wins   top-3   avg beaten   charges left   kicks fired');
-for (const ride of ['hands off', 'kick mistimed', 'kick in window', 'spam every charge'] as Ride[]) {
-  let pos = 0, wins = 0, top3 = 0, margin = 0, kicksLeft = 0, kicksFired = 0;
-  for (let i = 0; i < N; i++) {
-    const r = run(`ag-${i}`, ride);
-    pos += r.pos; margin += r.margin; kicksLeft += r.kicksLeft; kicksFired += r.kicksFired;
-    if (r.pos === 1) wins++;
-    if (r.pos <= 3) top3++;
+for (const persona of PERSONAS) {
+  const tally = results.get(persona.name)!;
+
+  for (let n = 0; n < RACES; n++) {
+    const rng = createRng(`ride-${n}`);
+    const names = createNameGenerator(rng);
+    const field = Array.from({ length: FIELD_SIZE }, (_, i) =>
+      generateHorse(rng, names, {
+        division: 'open',
+        style: RUNNING_STYLES[i % RUNNING_STYLES.length]!,
+        age: 4,
+        distanceCentre: METRES * rng.range(0.85, 1.15),
+      }),
+    );
+
+    // The same horse every time, so personas are compared on the RIDE.
+    const playerHorse = field[n % field.length]!;
+    const playerId = playerHorse.id;
+    const entrants: RaceEntrant[] = field.map((horse) => ({ horse }));
+    const race = createRace(entrants, {
+      metres: METRES,
+      going: 'good',
+      hype: 0.5,
+      seed: `ride-run-${n}`,
+    });
+
+    const input: PlayerInput = { takingBack: false, kickPending: false };
+    race.setPlayer(playerId, input);
+
+    while (race.step()) {
+      const snap = race.snapshot();
+      const me = snap.runners.find((r) => r.id === playerId)!;
+      if (me.finished) continue;
+      persona.ride(input, {
+        progress: me.distance / METRES,
+        charges: me.kicksRemaining,
+        moment: playerHorse.moment,
+      });
+    }
+
+    const outcome = race.outcome();
+    // Count what ACTUALLY fired, and how much of it landed in the window.
+    const w = momentWindow(playerHorse.moment);
+    let kicks = 0;
+    let inWindow = 0;
+    for (const e of outcome.events) {
+      if (e.kind !== 'kick' || e.horseId !== playerId) continue;
+      kicks += 1;
+      const at = e.at / outcome.duration;
+      if (at >= w.from && at <= w.to) inWindow += 1;
+    }
+    tally.inWindow += inWindow;
+    const me = outcome.results.find((r) => r.horseId === playerId)!;
+    tally.places += me.finishPosition;
+    tally.beaten += me.margin;
+    tally.left += me.kicksLeft;
+    tally.kicks += kicks;
+    if (me.finishPosition === 1) tally.wins += 1;
+    if (me.finishPosition <= 3) tally.top3 += 1;
   }
+}
+
+const FAIR = RACES / FIELD_SIZE;
+
+console.log(`\n${RACES} races, ${METRES} m. Fair share of wins is ${FAIR.toFixed(0)}.\n`);
+console.log('ride              avg place   wins   win%   top-3   avg beaten   left  kicks  in-win');
+for (const p of PERSONAS) {
+  const t = results.get(p.name)!;
   console.log(
-    `${ride.padEnd(22)}  ${(pos / N).toFixed(2).padStart(7)}  ${String(wins).padStart(4)}  ` +
-    `${String(top3).padStart(5)}   ${(margin / N).toFixed(1).padStart(8)}L   ${(kicksLeft / N).toFixed(1).padStart(10)}   ` +
-    `${(kicksFired / N).toFixed(2).padStart(9)}`,
+    `${p.name.padEnd(18)}` +
+      `${(t.places / RACES).toFixed(2).padStart(6)}` +
+      `${String(t.wins).padStart(8)}` +
+      `${((t.wins / RACES) * 100).toFixed(1).padStart(7)}%` +
+      `${String(t.top3).padStart(7)}` +
+      `${(t.beaten / RACES).toFixed(1).padStart(11)}L` +
+      `${(t.left / RACES).toFixed(1).padStart(6)}` +
+      `${(t.kicks / RACES).toFixed(1).padStart(7)}` +
+      `${(t.inWindow / RACES).toFixed(1).padStart(8)}`,
   );
 }
-console.log(`\n(a fair share of wins is ${(N / FIELD_SIZE).toFixed(0)}/${N})`);
+
+// ---- The four pass conditions (REBUILD.md §16.3) ---------------------------
+
+const rate = (name: string): number => results.get(name)!.wins / RACES;
+const beaten = (name: string): number => results.get(name)!.beaten / RACES;
+
+const wellRidden = rate('well ridden');
+const spam = rate('spam');
+const handsOff = rate('hands off');
+const worstBeaten = Math.max(...PERSONAS.map((p) => beaten(p.name)));
+
+const checks: [string, boolean, string][] = [
+  ['a good ride earns a fair share', wellRidden >= 0.125, `${(wellRidden * 100).toFixed(1)}% (want >=12.5%)`],
+  [
+    'timing beats mashing',
+    wellRidden - spam >= 0.03,
+    `well ridden ${(wellRidden * 100).toFixed(1)}% vs spam ${(spam * 100).toFixed(1)}% (want +3pts)`,
+  ],
+  // The jockey does not kick, so a player who never taps leaves every charge
+  // unspent. Riding has to beat not riding — this used to assert the opposite,
+  // back when the autopilot kicked for you.
+  [
+    'riding beats not riding',
+    wellRidden - handsOff >= 0.03,
+    `ridden ${(wellRidden * 100).toFixed(1)}% vs hands off ${(handsOff * 100).toFixed(1)}% (want +3pts)`,
+  ],
+  ['nobody is blown out', worstBeaten <= 20, `worst ${worstBeaten.toFixed(1)}L (want <=20L)`],
+];
+
+console.log('');
+for (const [name, pass, detail] of checks) {
+  console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${name.padEnd(34)} ${detail}`);
+}
+
+const failed = checks.filter(([, pass]) => !pass);
+console.log(`\n${checks.length - failed.length}/${checks.length} checks pass`);
+if (failed.length > 0) process.exitCode = 1;
+console.log('');

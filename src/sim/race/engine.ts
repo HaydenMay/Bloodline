@@ -1,118 +1,119 @@
 import { createRng, type Rng } from '../rng.js';
-import { hasTrait, type TraitId } from '../../data/traits.js';
 import type { Horse } from '../types.js';
-import { createAiController } from './ai.js';
-import * as K from './constants.js';
-import {
-  bandFor,
-  type ControlInput,
-  type Controller,
-  type Going,
-  type RaceConfig,
-  type RaceEntrant,
-  type RaceEvent,
-  type RaceOutcome,
-  type RaceResult,
-  type RaceView,
-  type RunnerView,
+import type {
+  PlayerInput,
+  RaceConfig,
+  RaceEntrant,
+  RaceEvent,
+  RaceOutcome,
+  RaceResult,
 } from './types.js';
-
-const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
-/** A horse is about 8 feet; margins are reported in lengths. */
-const YARDS_PER_LENGTH = 2.7;
-
-interface Runner {
-  horse: Horse;
-  controller: Controller;
-  traits: readonly TraitId[];
-
-  distance: number;
-  speed: number;
-  lane: number;
-  rank: number;
-  fieldPosition: number;
-
-  effort: number;
-  kicksRemaining: number;
-  /** Progress (0-1) toward the next charge; converts to kicksRemaining at 1. */
-  chargeProgress: number;
-  kickRemaining: number;
-  kickStrength: number;
-  /** 1 = kicked inside the window, lower = mistimed. */
-  kickWindowFit: number;
-  /** Charge-regen multiplier this tick — surfaced on screen as the regen indicator. */
-  regenMult: number;
-
-  blockedFor: number;
-  troubleTime: number;
-  wasBlocked: boolean;
-  hadTrouble: boolean;
-  drafting: boolean;
-
-  fumbleRemaining: number;
-  fumbledStart: boolean;
-  greenRemaining: number;
-
-  /** Continuous performance band — re-rolled on a timer. See constants. */
-  variation: number;
-  variationTimer: number;
-  bandDown: number;
-  bandUp: number;
-
-  /** Rolled once per race. Amplitude comes from Temper, not the mean. */
-  dailyForm: number;
-  offColour: boolean;
-
-  maxSpeed: number;
-  accel: number;
-  /** Charges per second at the neutral position/hold multiplier (Stamina-scaled). */
-  chargeRegenRate: number;
-
-  finishTime: number | null;
-  sectionals: number[];
-  nextSectional: number;
-}
-
-const goingBias = (going: Going): number => {
-  switch (going) {
-    case 'firm':
-      return 1;
-    case 'good':
-      return 0.5;
-    case 'soft':
-      return -0.5;
-    case 'heavy':
-      return -1;
-  }
-};
+import { paceFactor } from './pace.js';
+import { distanceFactor } from './aptitude.js';
+import {
+  type TankModifiers,
+  conditionReadout,
+  drainPerSecond,
+  fatigueFactor,
+  recoverPerSecond,
+} from './tank.js';
+import {
+  type ChargeState,
+  inMomentWindow,
+  kickWindowBonus,
+  regenCharges,
+  spendCharge,
+  startingCharges,
+} from './charges.js';
+import {
+  type KickPlanned,
+  type RideDecision,
+  type RiderState,
+  baseRide,
+  nextPendingKick,
+  nextUnfiredKick,
+  planKicks,
+  playerRide,
+} from './rider.js';
+import {
+  BASE_ACCEL,
+  BASE_SPEED,
+  BURST_ACCEL_SPAN,
+  CONDITION_MAX_FACTOR,
+  CONDITION_MIN_FACTOR,
+  DECEL_MULT,
+  DRAFT_LANE_TOLERANCE,
+  DRAFT_RANGE_METRES,
+  FORM_BASE_SPREAD,
+  FORM_TEMPER_AMPLIFY,
+  FUMBLE_BASE,
+  FUMBLE_DURATION,
+  GOING_MAX_FACTOR,
+  GOING_MIN_FACTOR,
+  GREEN_BASE,
+  GREEN_DURATION,
+  HOLD_DELTA,
+  HOLD_FLOOR,
+  KICK_BURST_WEIGHT,
+  KICK_DECAY,
+  KICK_DURATION,
+  KICK_GRIT_WEIGHT,
+  KICK_JOCKEY_WEIGHT,
+  KICK_COOLDOWN,
+  KICK_MAX_BONUS,
+  KICK_RAMP,
+  KICK_READY_FRACTION,
+  LANE_COUNT,
+  METRES_PER_LENGTH,
+  MORALE_MAX_FACTOR,
+  MORALE_MIN_FACTOR,
+  OFF_COLOUR_BASE,
+  OFF_COLOUR_PENALTY,
+  CONTACT_LENGTHS,
+  CONTACT_MAX_LIFT,
+  CONTACT_RAMP_LENGTHS,
+  PACE_MAX,
+  PACE_MIN,
+  PRESS_FROM,
+  PRESS_RANGE_METRES,
+  PRESS_RANK_LIMIT,
+  SPEED_STAT_SPAN,
+  TANK_START,
+  TICK_HZ,
+  TRAIT_ALERT_FUMBLE,
+  TRAIT_CRUISER_EXPONENT_RELIEF,
+  TRAIT_GATE_RUSHER_EARLY,
+  TRAIT_GATE_RUSHER_PAYBACK,
+  TRAIT_IRON_LUNGS_RECOVER,
+  TRAIT_QUICK_RECOVERY_DRAFT,
+  TRAIT_THIRSTY_RECOVER,
+} from './constants.js';
 
 /**
- * A race that can be advanced one tick at a time.
+ * The race simulation.
  *
- * The harness wants to run thousands of races instantly; the renderer wants to
- * watch one unfold at 30 ticks a second. Same engine, two consumers — so the
- * race is exposed as a steppable object and `simulateRace` is just a loop over
- * it. Neither knows the other exists.
+ * ONE SPEED PIPELINE, FIVE FACTORS, ONE OWNER EACH (REBUILD.md R1). Speed is
+ * written in exactly one place — marked below in `stepRunner` — and it is the
+ * product of:
+ *
+ *     cruise x preRace x pace x kick x fatigue
+ *
+ * Nothing else in this codebase may write to speed. No positional bonus, no
+ * catch-up multiplier, no phase profile, no moment lift. The previous three
+ * attempts all failed the same way: seven systems could move the same number,
+ * so no measurement could ever attribute a change to a cause.
+ *
+ * The kick is the only factor allowed above 1.0, and it is hard-clamped and
+ * non-stacking (R2). Overlapping kicks take the maximum, never the sum.
  */
-export interface LiveRace {
-  /** Advance one tick. Returns false once every horse has finished. */
-  step(): boolean;
-  /** Read-only snapshot for drawing. */
-  snapshot(): RaceSnapshot;
-  /** Only valid once step() has returned false. */
-  outcome(): RaceOutcome;
-  readonly totalYards: number;
-  readonly config: RaceConfig;
-}
 
-export interface RaceSnapshot {
-  elapsed: number;
-  progress: number;
-  leaderDistance: number;
-  runners: RunnerSnapshot[];
-  /** Events since the previous snapshot, for call-outs and sound. */
-  fresh: RaceEvent[];
-}
+const dt = 1 / TICK_HZ;
+
+const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+// ---------------------------------------------------------------------------
+// Snapshot types — the shape ui/raceScreen.ts reads
+// ---------------------------------------------------------------------------
 
 export interface RunnerSnapshot {
   id: string;
@@ -121,14 +122,24 @@ export interface RunnerSnapshot {
   speed: number;
   lane: number;
   rank: number;
+  /** The current pace factor, remapped to 0-1 for the render rig's `drive`. */
   effort: number;
   kicking: boolean;
-  /** Kicks not yet fired, out of CHARGE_CAPACITY. */
   kicksRemaining: number;
-  /** Progress (0-1) toward the next charge, for a partial-fill indicator. */
   chargeProgress: number;
-  /** Charge-regen multiplier right now — 1 is baseline; drafting/holding raise it. */
+  /** recover / drain this tick. Drives the 1-3 arrow regen indicator. */
   regenMult: number;
+  /**
+   * How well the horse is going, 1 (full of running) to 0 (cooked).
+   *
+   * The tank itself stays hidden — no stamina bar — but its EFFECT must not be,
+   * or a horse can be showing a full bank of charges while being completely out
+   * of petrol and the player has no way to know.
+   */
+  condition: number;
+  /** Inside its own Moment window, where its kick is worth most. */
+  inWindow: boolean;
+  /** Always false in v1 — there is no blocking (REBUILD.md §9). */
   blocked: boolean;
   drafting: boolean;
   offColour: boolean;
@@ -137,734 +148,582 @@ export interface RunnerSnapshot {
   coat: string;
 }
 
-export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRace {
-  const rng = createRng(config.seed);
-  const totalYards = config.furlongs * K.YARDS_PER_FURLONG;
-  const band = bandFor(config.furlongs);
-  const fieldSize = entrants.length;
-  const events: RaceEvent[] = [];
-
-  // THE GATE DRAW — see the note in the original implementation below.
-  const draw = rng.shuffle(entrants.map((_, i) => i));
-  const runners: Runner[] = entrants.map((entrant, i) =>
-    createRunner(entrant, draw[i]!, rng, config, band, fieldSize),
-  );
-
-  for (const r of runners) {
-    if (r.fumbledStart) {
-      events.push({ at: 0, kind: 'fumbledStart', horseId: r.horse.id, detail: 'Broke slowly' });
-    }
-    if (r.offColour) {
-      events.push({ at: 0, kind: 'phase', horseId: r.horse.id, detail: 'Below its best today' });
-    }
-  }
-  events.push({ at: 0, kind: 'start', horseId: '', detail: 'They are away' });
-
-  let tick = 0;
-  let elapsed = 0;
-  let finished = 0;
-  let reported = 0;
-  const maxTicks = K.TICK_HZ * 400;
-
-  const step = (): boolean => {
-    if (finished >= fieldSize || tick >= maxTicks) return false;
-
-    elapsed = tick * K.DT;
-    tick++;
-
-    updateRanks(runners, fieldSize);
-    const leaderDistance = Math.max(...runners.map((r) => r.distance));
-    const progress = clamp(leaderDistance / totalYards, 0, 1);
-
-    const pacePressure = runners.some(
-      (r) => r.finishTime === null && r.rank <= 2 && hasTrait(r.traits, 'pacePusher'),
-    )
-      ? 1
-      : 0;
-
-    const race: RaceView = {
-      progress,
-      elapsed,
-      totalYards,
-      fieldSize,
-      leaderDistance,
-      pacePressure,
-    };
-
-    for (const r of runners) {
-      if (r.finishTime !== null) continue;
-      stepRunner(r, runners, race, rng, events, elapsed, totalYards);
-
-      if (r.distance >= totalYards) {
-        const overshoot = r.distance - totalYards;
-        r.finishTime = elapsed - (r.speed > 0 ? overshoot / r.speed : 0);
-        finished++;
-        events.push({ at: r.finishTime, kind: 'finish', horseId: r.horse.id });
-      }
-    }
-
-    return finished < fieldSize;
-  };
-
-  return {
-    step,
-    totalYards,
-    config,
-    snapshot(): RaceSnapshot {
-      const fresh = events.slice(reported);
-      reported = events.length;
-      return {
-        elapsed,
-        progress: clamp(Math.max(...runners.map((r) => r.distance)) / totalYards, 0, 1),
-        leaderDistance: Math.max(...runners.map((r) => r.distance)),
-        fresh,
-        runners: runners.map((r) => ({
-          id: r.horse.id,
-          name: r.horse.name,
-          distance: r.distance,
-          speed: r.speed,
-          lane: r.lane,
-          rank: r.rank,
-          effort: r.effort,
-          kicking: r.kickRemaining > 0,
-          kicksRemaining: r.kicksRemaining,
-          chargeProgress: r.chargeProgress,
-          regenMult: r.regenMult,
-          blocked: r.blockedFor > 0,
-          drafting: r.drafting,
-          offColour: r.offColour,
-          finished: r.finishTime !== null,
-          finishTime: r.finishTime,
-          coat: r.horse.coat,
-        })),
-      };
-    },
-    outcome: () => buildOutcome(runners, events, elapsed, totalYards),
-  };
+export interface RaceSnapshot {
+  elapsed: number;
+  /** The LEADER's progress through the race. */
+  progress: number;
+  leaderDistance: number;
+  runners: RunnerSnapshot[];
+  fresh: RaceEvent[];
 }
 
-/**
- * Runs a complete race, deterministically, from a seed.
- *
- * Pure logic — no DOM, no rendering, no timers. The same seed and the same
- * inputs always produce the same race, which is what lets the balance harness
- * run this ten thousand times and mean something (DESIGN.md §14).
- */
-export function simulateRace(entrants: RaceEntrant[], config: RaceConfig): RaceOutcome {
-  const rng = createRng(config.seed);
-  const totalYards = config.furlongs * K.YARDS_PER_FURLONG;
-  const band = bandFor(config.furlongs);
-  const fieldSize = entrants.length;
-  const events: RaceEvent[] = [];
-
-  // THE GATE DRAW.
-  //
-  // Lanes and starting order must be drawn, not inherited from array order.
-  // Without this the first entrant always begins on the rail at the head of the
-  // field and never has to establish position — worth around +9 percentage
-  // points of win rate for free, in every race and every test.
-  const draw = rng.shuffle(entrants.map((_, i) => i));
-
-  const runners: Runner[] = entrants.map((entrant, i) =>
-    createRunner(entrant, draw[i]!, rng, config, band, fieldSize),
-  );
-
-  for (const r of runners) {
-    if (r.fumbledStart) {
-      events.push({ at: 0, kind: 'fumbledStart', horseId: r.horse.id, detail: 'Broke slowly' });
-    }
-    if (r.offColour) {
-      events.push({ at: 0, kind: 'phase', horseId: r.horse.id, detail: 'Below its best today' });
-    }
-  }
-  events.push({ at: 0, kind: 'start', horseId: '', detail: 'They are away' });
-
-  let elapsed = 0;
-  let finished = 0;
-  const maxTicks = K.TICK_HZ * 400; // hard stop; a real race never approaches this
-
-  for (let tick = 0; tick < maxTicks && finished < fieldSize; tick++) {
-    elapsed = tick * K.DT;
-
-    updateRanks(runners, fieldSize);
-
-    const leaderDistance = Math.max(...runners.map((r) => r.distance));
-    const progress = clamp(leaderDistance / totalYards, 0, 1);
-
-
-    // Pace Pusher reaches beyond its own horse: while one is on the lead, the
-    // whole front of the field is dragged into a faster tempo.
-    const pacePressure = runners.some(
-      (r) => r.finishTime === null && r.rank <= 2 && hasTrait(r.traits, 'pacePusher'),
-    )
-      ? 1
-      : 0;
-
-    const race: RaceView = {
-      progress,
-      elapsed,
-      totalYards,
-      fieldSize,
-      leaderDistance,
-      pacePressure,
-    };
-
-    for (const r of runners) {
-      if (r.finishTime !== null) continue;
-      stepRunner(r, runners, race, rng, events, elapsed, totalYards);
-
-      if (r.distance >= totalYards) {
-        // Interpolate across the tick so photo finishes are honest.
-        const overshoot = r.distance - totalYards;
-        r.finishTime = elapsed - (r.speed > 0 ? overshoot / r.speed : 0);
-        finished++;
-        events.push({ at: r.finishTime, kind: 'finish', horseId: r.horse.id });
-      }
-    }
-  }
-
-  return buildOutcome(runners, events, elapsed, totalYards);
+export interface LiveRace {
+  step(): boolean;
+  snapshot(): RaceSnapshot;
+  outcome(): RaceOutcome;
+  readonly totalMetres: number;
+  readonly config: RaceConfig;
+  /** Routes player input to one runner. Everything else rides itself. */
+  setPlayer(horseId: string, input: PlayerInput): void;
+  /**
+   * The frozen pre-race factor for a runner. Exposed so the harness can assert
+   * I2 against `cruise * preRace * CEILING` — the real invariant — rather than
+   * against `cruise` alone, which double-counts a well-suited horse's own
+   * legitimate pre-race edge as if it were a runaway kick.
+   */
+  preRaceFor(horseId: string): number;
 }
 
 // ---------------------------------------------------------------------------
+// Per-runner state
+// ---------------------------------------------------------------------------
 
-function createRunner(
-  entrant: RaceEntrant,
-  index: number,
-  rng: Rng,
-  config: RaceConfig,
-  band: ReturnType<typeof bandFor>,
-  fieldSize: number,
-): Runner {
-  const horse = entrant.horse;
-  const s = horse.stats;
-  const traits = horse.traits;
+interface Runner {
+  horse: Horse;
 
-  // --- Daily form: Temper sets the AMPLITUDE, never the mean ---------------
-  let spread = K.FORM_BASE_SPREAD + (1 - s.temper / 100) * K.FORM_TEMPER_AMPLIFY;
-  if (hasTrait(traits, 'hotHeaded')) spread *= 1.6;
-  const dailyForm = 1 + rng.normal(0, spread);
+  // Frozen at the gate ------------------------------------------------------
+  /** m/s ceiling from the Speed stat alone. */
+  cruise: number;
+  /** m/s². */
+  accel: number;
+  /** condition x morale x form x going x distance x delivery. Never moves. */
+  preRace: number;
+  lane: number;
+  tankMods: TankModifiers;
+  plan: KickPlanned;
+  fumbledStart: boolean;
+  offColour: boolean;
+  /** Own-progress points at which a green moment costs ground. */
+  greenAt: number[];
+  gateRusher: boolean;
 
-  // --- Top-end speed --------------------------------------------------------
-  const conditionFactor = 1 + ((horse.condition - 70) / 100) * K.CONDITION_INFLUENCE;
-  let maxSpeed =
-    K.BASE_SPEED * (1 + ((s.speed - 50) / 100) * K.SPEED_STAT_INFLUENCE) * dailyForm * conditionFactor;
+  // Live --------------------------------------------------------------------
+  distance: number;
+  speed: number;
+  tank: number;
+  /** The player's bank. Wholly separate from `tank` — a kick never costs tank. */
+  charges: ChargeState;
+  /** Elapsed seconds when the live kick fired, or -1. */
+  kickAt: number;
+  kickStrength: number;
+  kicksFired: number;
+  fired: boolean[];
+  drafting: boolean;
+  /** Rivals contesting this horse's position. Costs tank, never speed. */
+  press: number;
+  /** Leading, unpressed, dictating the tempo. Recovers tank faster. */
+  easyLead: boolean;
+  holding: boolean;
+  regenMult: number;
+  paceNow: number;
+  rank: number;
+  finished: boolean;
+  finishTime: number | null;
+  /** Elapsed time at each quarter of the race. */
+  sectionals: number[];
+  nextSectional: number;
+  greenUntil: number;
+  nextGreen: number;
+}
 
-  // --- Going: a trade, never a free pass -----------------------------------
-  const bias = goingBias(config.going);
-  if (!hasTrait(traits, 'allWeather')) {
-    if (hasTrait(traits, 'mudder')) maxSpeed *= 1 + -bias * 0.022;
-    else if (hasTrait(traits, 'firmSpecialist')) maxSpeed *= 1 + bias * 0.022;
-    else maxSpeed *= 1 - Math.max(0, -bias) * 0.012;
-  }
+// ---------------------------------------------------------------------------
+// Gate: everything computed once, before the race moves
+// ---------------------------------------------------------------------------
 
-  // --- Crowd traits ---------------------------------------------------------
-  if (hasTrait(traits, 'bigGame')) maxSpeed *= 1 + (config.hype - 0.5) * 0.03;
-  if (hasTrait(traits, 'stageFright')) maxSpeed *= 1 - (config.hype - 0.5) * 0.03;
-  if (hasTrait(traits, 'crowdFeeder')) maxSpeed *= 1 + (fieldSize - 8) * 0.004;
+function cruiseFor(horse: Horse): number {
+  return BASE_SPEED * (1 - SPEED_STAT_SPAN / 2 + SPEED_STAT_SPAN * (horse.stats.speed / 100));
+}
 
-  // --- Aptitude: a direct top-speed penalty, not a resource cost -------------
-  // A sprinter over a route runs SLOWER, not out of fuel — there is no fuel
-  // left to run out of.
-  const aptitude = horse.aptitudes[band];
-  maxSpeed *= 1 - (1 - aptitude / 100) * K.APTITUDE_SPEED_PENALTY;
+function accelFor(horse: Horse): number {
+  return BASE_ACCEL * (1 - BURST_ACCEL_SPAN / 2 + BURST_ACCEL_SPAN * (horse.stats.burst / 100));
+}
 
-  // --- Kick-charge regen rate -------------------------------------------------
-  // Stamina scales this CONTINUOUSLY — no capacity breakpoint, so every point
-  // trained always pays off, immediately. Position and holding (engine.ts,
-  // stepRunner) scale it further tick to tick; this is just the horse's own
-  // baseline going into that.
-  let chargeRegenRate = K.BASE_CHARGE_REGEN * (1 + ((s.stamina - 50) / 100) * K.STAMINA_CHARGE_REGEN_INFLUENCE);
-  if (hasTrait(traits, 'ironLungs')) chargeRegenRate *= 1.1;
-  if (hasTrait(traits, 'quickRecovery')) chargeRegenRate *= 1.2;
+function lerp(lo: number, hi: number, t: number): number {
+  return lo + (hi - lo) * clamp01(t);
+}
 
-  // --- Acceleration ---------------------------------------------------------
-  let accel = K.BASE_ACCEL * (1 + ((s.burst - 50) / 100) * K.BURST_ACCEL_INFLUENCE);
-  if (hasTrait(traits, 'coiled')) accel *= 1.15;
+/** Going suitability. Conditions traits live here and nowhere else. */
+function goingFor(horse: Horse, config: RaceConfig): number {
+  const soft = config.going === 'soft' || config.going === 'heavy';
+  const firm = config.going === 'firm';
+  const severity = config.going === 'heavy' ? 1 : config.going === 'soft' ? 0.55 : firm ? 0.35 : 0;
 
-  // --- Consistency: the fumbled start --------------------------------------
-  const fumbleChance = hasTrait(traits, 'alert')
-    ? 0
-    : K.FUMBLE_BASE_CHANCE * (1 - s.consistency / 100);
-  const fumbled = rng.chance(fumbleChance) && !hasTrait(traits, 'fastGate');
+  let suits = 0;
+  if (horse.traits.includes('allWeather')) suits = 1;
+  else if (soft && horse.traits.includes('mudder')) suits = 1;
+  else if (firm && horse.traits.includes('firmSpecialist')) suits = 1;
+  else if (soft && horse.traits.includes('firmSpecialist')) suits = -1;
+  else if (firm && horse.traits.includes('mudder')) suits = -1;
 
+  if (suits > 0) return GOING_MAX_FACTOR;
+  return lerp(GOING_MAX_FACTOR, GOING_MIN_FACTOR, severity * (suits < 0 ? 1.5 : 1));
+}
+
+function tankModsFor(horse: Horse): TankModifiers {
+  let recoverMult = 1;
+  if (horse.traits.includes('ironLungs')) recoverMult *= TRAIT_IRON_LUNGS_RECOVER;
+  if (horse.traits.includes('thirsty')) recoverMult *= TRAIT_THIRSTY_RECOVER;
   return {
-    horse,
-    controller: entrant.controller ?? createAiController(horse),
-    traits,
-    // A few inches of scatter off the gate, so ties in the opening tick break
-    // randomly rather than by array order.
-    distance: rng.range(0, 0.4),
-    speed: 0,
-    lane: index % K.LANE_COUNT,
-    rank: index + 1,
-    fieldPosition: index / Math.max(1, fieldSize - 1),
-    effort: 0,
-    // Every horse starts the race with a full bank — the resource is tempo
-    // across the trip, not a scarcity you arrive with.
-    kicksRemaining: K.CHARGE_CAPACITY,
-    chargeProgress: 0,
-    kickRemaining: 0,
-    kickStrength: 0,
-    kickWindowFit: 1,
-    regenMult: 1,
-    blockedFor: 0,
-    troubleTime: 0,
-    wasBlocked: false,
-    hadTrouble: false,
-    drafting: false,
-    fumbleRemaining: fumbled ? K.FUMBLE_DURATION : 0,
-    fumbledStart: fumbled,
-    greenRemaining: 0,
-    variation: 1,
-    variationTimer: 0,
-    // Asymmetric: a horse underperforms more easily than it exceeds itself.
-    bandDown: K.BAND_DOWN * (1 - s.consistency / 100),
-    bandUp: K.BAND_UP * (1 - s.consistency / 100),
-    dailyForm,
-    offColour: dailyForm < 0.985,
-    maxSpeed,
-    accel,
-    chargeRegenRate,
-    finishTime: null,
-    sectionals: [],
-    nextSectional: K.YARDS_PER_FURLONG,
+    recoverMult,
+    draftMult: horse.traits.includes('quickRecovery') ? TRAIT_QUICK_RECOVERY_DRAFT : 1,
+    exponentRelief: horse.traits.includes('cruiser') ? TRAIT_CRUISER_EXPONENT_RELIEF : 0,
   };
 }
 
-function updateRanks(runners: Runner[], fieldSize: number): void {
-  const order = [...runners].sort((a, b) => b.distance - a.distance);
-  order.forEach((r, i) => {
-    r.rank = i + 1;
-    r.fieldPosition = fieldSize > 1 ? i / (fieldSize - 1) : 0;
-  });
+function makeRunner(
+  horse: Horse,
+  lane: number,
+  config: RaceConfig,
+  rng: Rng,
+  raceSeconds: number,
+): Runner {
+  const consistency = horse.stats.consistency / 100;
+
+  // ---- Pre-race, computed ONCE and then frozen (REBUILD.md §10) ------------
+  // Six things that used to poke at speed mid-race collapse into one number
+  // that never moves again. The single biggest simplification in the rebuild.
+  const condition = lerp(CONDITION_MIN_FACTOR, CONDITION_MAX_FACTOR, horse.condition / 100);
+  const morale = lerp(MORALE_MIN_FACTOR, MORALE_MAX_FACTOR, horse.morale / 100);
+
+  // Daily form: low Temper swings bigger in BOTH directions (DESIGN.md §2).
+  const amplitude = FORM_BASE_SPREAD + FORM_TEMPER_AMPLIFY * (1 - horse.stats.temper / 100);
+  const form = 1 + rng.normal(0, amplitude);
+
+  const going = goingFor(horse, config);
+  const distance = distanceFactor(horse.preferredDistance, config.metres);
+
+  const fumbleChance =
+    FUMBLE_BASE * (1 - consistency) * (horse.traits.includes('alert') ? TRAIT_ALERT_FUMBLE : 1);
+  const fumbledStart = rng.chance(fumbleChance);
+  const offColour = rng.chance(OFF_COLOUR_BASE * (1 - consistency));
+  const delivery = offColour ? OFF_COLOUR_PENALTY : 1;
+
+  const greenAt: number[] = [];
+  for (let i = 0; i < 2; i++) {
+    if (rng.chance(GREEN_BASE * (1 - consistency))) greenAt.push(rng.range(0.1, 0.9));
+  }
+  greenAt.sort((a, b) => a - b);
+
+  const plan = planKicks(horse, rng, raceSeconds);
+
+  return {
+    horse,
+    cruise: cruiseFor(horse),
+    accel: accelFor(horse),
+    preRace: condition * morale * form * going * distance * delivery,
+    lane,
+    tankMods: tankModsFor(horse),
+    plan,
+    fumbledStart,
+    offColour,
+    greenAt,
+    gateRusher: horse.traits.includes('gateRusher'),
+
+    distance: 0,
+    speed: 0,
+    tank: TANK_START,
+    charges: startingCharges(),
+    kickAt: -1,
+    kickStrength: 0,
+    kicksFired: 0,
+    fired: plan.points.map(() => false),
+    drafting: false,
+    press: 0,
+    easyLead: false,
+    holding: false,
+    regenMult: 1,
+    paceNow: PACE_MIN,
+    rank: 1,
+    finished: false,
+    finishTime: null,
+    sectionals: [],
+    nextSectional: 0.25,
+    greenUntil: -1,
+    nextGreen: 0,
+  };
 }
 
-function stepRunner(
-  r: Runner,
-  all: Runner[],
-  race: RaceView,
-  rng: Rng,
-  events: RaceEvent[],
-  elapsed: number,
-  totalYards: number,
-): void {
-  const view: RunnerView = {
+// ---------------------------------------------------------------------------
+// The kick (REBUILD.md §8)
+// ---------------------------------------------------------------------------
+
+function kickStrengthFor(horse: Horse): number {
+  return clamp01(
+    KICK_GRIT_WEIGHT * (horse.stats.grit / 100) +
+      KICK_BURST_WEIGHT * (horse.stats.burst / 100) +
+      KICK_JOCKEY_WEIGHT * (horse.jockeySkill / 100),
+  );
+}
+
+/** Ramp in, hold, decay out. Zero outside the kick's own window. */
+export function kickShape(elapsed: number): number {
+  if (elapsed < 0 || elapsed > KICK_DURATION) return 0;
+  if (elapsed < KICK_RAMP) return elapsed / KICK_RAMP;
+  const decayFrom = KICK_DURATION - KICK_DECAY;
+  if (elapsed > decayFrom) return 1 - (elapsed - decayFrom) / KICK_DECAY;
+  return 1;
+}
+
+/**
+ * The kick factor, hard-clamped.
+ *
+ * R2: ten stacked bonuses and one bonus produce the identical ceiling. The
+ * 2x-launch bug came from four multiplicative modifiers with no clamp
+ * compounding on a closer running from behind, where the catch-up term grew
+ * with the deficit — a positive feedback loop. There is no catch-up term here
+ * at all (R3), and this Math.min is what keeps the rest honest.
+ */
+function kickFactorFor(runner: Runner, elapsed: number): number {
+  if (runner.kickAt < 0) return 1;
+  const shaped = kickShape(elapsed - runner.kickAt);
+  if (shaped <= 0) return 1;
+  return 1 + Math.min(KICK_MAX_BONUS, KICK_MAX_BONUS * runner.kickStrength * shaped);
+}
+
+// ---------------------------------------------------------------------------
+// The race
+// ---------------------------------------------------------------------------
+
+export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRace {
+  const rng = createRng(config.seed);
+  const totalMetres = config.metres;
+
+  // Rough, but all the rider needs: it only sets how far apart planned kicks
+  // must sit to clear the cooldown.
+  const raceSeconds = totalMetres / BASE_SPEED;
+
+  const runners: Runner[] = entrants.map((e, i) =>
+    makeRunner(e.horse, i % LANE_COUNT, config, rng, raceSeconds),
+  );
+
+  let elapsed = 0;
+  let fresh: RaceEvent[] = [];
+  const events: RaceEvent[] = [];
+  const playerInputs = new Map<string, PlayerInput>();
+
+  /** Guard against a pathological field never reaching the wire. */
+  const maxElapsed = (totalMetres / (BASE_SPEED * 0.5)) * 3;
+
+  const record = (kind: string, horseId: string, detail?: string): void => {
+    const ev: RaceEvent = detail === undefined
+      ? { at: elapsed, kind, horseId }
+      : { at: elapsed, kind, horseId, detail };
+    events.push(ev);
+    fresh.push(ev);
+  };
+
+  /**
+   * Pack interaction, read from positions BEFORE anyone moves this tick.
+   *
+   * Both effects are TANK-side. Neither touches speed (R1). Together they are
+   * the only way one runner affects another in v1 — there is no blocking.
+   */
+  const updatePack = (): void => {
+    for (const r of runners) {
+      if (r.finished) {
+        r.drafting = false;
+        r.press = 0;
+        r.easyLead = false;
+        continue;
+      }
+
+      // Drafting: someone close ahead, in a neighbouring lane, gives shelter.
+      r.drafting = runners.some(
+        (o) =>
+          o !== r &&
+          !o.finished &&
+          o.distance > r.distance &&
+          o.distance - r.distance <= DRAFT_RANGE_METRES &&
+          Math.abs(o.lane - r.lane) <= DRAFT_LANE_TOLERANCE,
+      );
+
+      // Press: up front with company. This is what makes a duel mutually
+      // destructive — every horse in the contested group pays, so three
+      // front-runners refusing to yield empty each other out and the race comes
+      // back from behind, exactly as DESIGN.md §4 describes.
+      const settled = r.distance / totalMetres >= PRESS_FROM;
+      r.press =
+        settled && r.rank <= PRESS_RANK_LIMIT
+          ? runners.filter(
+              (o) =>
+                o !== r &&
+                !o.finished &&
+                Math.abs(o.distance - r.distance) <= PRESS_RANGE_METRES,
+            ).length
+          : 0;
+
+      // The counterweight to press: a leader nobody is challenging is having an
+      // easy time of it. Three front-runners refusing to yield give this to
+      // nobody and pay press instead.
+      r.easyLead = settled && r.rank === 1 && r.press === 0;
+    }
+  };
+
+  const stepRunner = (r: Runner, leaderDistance: number): void => {
+    if (r.finished) return;
+
+    const ownProgress = clamp01(r.distance / totalMetres);
+
+    // ---- 1. Ask the rider -------------------------------------------------
+    const charges = r.charges.count;
+    // Measured against last tick's target, which is all a rider could know.
+    const atSpeed = r.speed >= r.cruise * r.preRace * r.paceNow * KICK_READY_FRACTION;
+    const state: RiderState = { ownProgress, tank: r.tank, charges, fired: r.fired, atSpeed };
+
+    const base = baseRide(state, r.plan);
+    const input = playerInputs.get(r.horse.id);
+    const playerTapped = Boolean(input?.kickPending) && atSpeed;
+    const decision: RideDecision = input ? playerRide(base, input, atSpeed) : base;
+
+    // A horse cannot lunge twice in the same stride. While a kick is live,
+    // further fire requests are IGNORED — no charge spent, no timer refreshed.
+    //
+    // This is a cooldown, not a cap: a horse may fire as many kicks across a
+    // race as its tank affords, which is the owner's rule ("if a player wants
+    // to use their kicks, let them"). What it removes is a purely
+    // self-destructive action. REBUILD.md §8.3 originally specified that
+    // re-firing refreshed the timer AND cost a charge, and measurement showed
+    // why that is wrong: it let a held tap drain the whole tank in a couple of
+    // seconds, and every active ride persona finished 0 for 150, beaten 18-36
+    // lengths, against a hands-off autopilot winning a fair 12.7%. Paying full
+    // price to refresh a kick already running is never the better play, so it
+    // was never a real choice — only a trap for anyone who touched the screen.
+    const kickLive = r.kickAt >= 0 && elapsed - r.kickAt < KICK_COOLDOWN;
+
+    if (decision.fireKick && charges >= 1 && atSpeed && !kickLive && spendCharge(r.charges)) {
+      r.kickAt = elapsed;
+      // A kick produced at the horse's own moment is worth more, on a smooth
+      // curve rather than a cliff — and how much more depends on the SHAPE of
+      // that horse's window. A late horse's window is narrow and fierce, an
+      // early horse's broad and mild, and the two are worth the same over a
+      // race. Outside it entirely a kick still works, just poorly.
+      r.kickStrength = kickStrengthFor(r.horse) * kickWindowBonus(r.horse.moment, ownProgress);
+      r.kicksFired += 1;
+
+      // A player tap brings the next planned kick FORWARD; the AI's own
+      // schedule consumes the one it is actually calling for. Either way the
+      // charge comes out of the same plan, so touching the screen changes WHEN
+      // a horse spends, not how much it has to spend.
+      const planned = playerTapped ? nextUnfiredKick(state) : nextPendingKick(state, r.plan);
+      if (planned >= 0) r.fired[planned] = true;
+      record('kick', r.horse.id);
+    }
+    // A tap during the gate break is HELD, not discarded — the rider fires it
+    // the moment the horse is up to speed.
+    if (input && atSpeed) input.kickPending = false;
+
+    r.holding = decision.gear === 'HOLD';
+
+    // ---- 2. Pace ----------------------------------------------------------
+    let pace = paceFactor(r.horse.style, r.horse.moment, ownProgress);
+
+    // Keeping in touch. A patient ride is not a passive one: a horse letting
+    // the field walk away is not being ridden patiently, it is coasting.
+    //
+    // Read carefully — this is NOT the catch-up mechanic R3 forbids. It adds to
+    // the horse's own pace curve and is then clamped by the same PACE_MAX every
+    // horse shares, so it can never produce speed a leader could not also reach.
+    // And because drain reads the resulting pace, chasing is charged for at the
+    // full superlinear rate: a horse that had to close arrives with less tank
+    // than one that did not. The old bug scaled kick STRENGTH by the deficit
+    // with no ceiling, which compounded; this cannot.
+    const behindLengths = (leaderDistance - r.distance) / METRES_PER_LENGTH;
+    if (behindLengths > CONTACT_LENGTHS) {
+      const urgency = clamp01(
+        (behindLengths - CONTACT_LENGTHS) / (CONTACT_RAMP_LENGTHS - CONTACT_LENGTHS),
+      );
+      pace += CONTACT_MAX_LIFT * urgency;
+    }
+    pace = Math.min(PACE_MAX, pace);
+
+    if (r.holding) pace = Math.max(HOLD_FLOOR, pace + HOLD_DELTA);
+
+    if (r.gateRusher) {
+      if (ownProgress < 0.15) pace += TRAIT_GATE_RUSHER_EARLY;
+      else if (ownProgress < 0.4) pace += TRAIT_GATE_RUSHER_PAYBACK;
+    }
+
+    // A fumbled start and a green moment cost ground the same way: the horse is
+    // briefly not running its own race.
+    if (r.fumbledStart && elapsed < FUMBLE_DURATION) pace = PACE_MIN;
+    if (r.nextGreen < r.greenAt.length && ownProgress >= r.greenAt[r.nextGreen]!) {
+      r.greenUntil = elapsed + GREEN_DURATION;
+      r.nextGreen += 1;
+      record('green', r.horse.id);
+    }
+    if (elapsed < r.greenUntil) pace = PACE_MIN;
+
+    r.paceNow = pace;
+
+    // ---- 3. Kick and fatigue ---------------------------------------------
+    const kick = kickFactorFor(r, elapsed);
+    const fatigue = fatigueFactor(r.tank);
+
+    // ---- 4. THE ONLY PLACE SPEED IS WRITTEN (REBUILD.md R1) ---------------
+    const target = r.cruise * r.preRace * pace * kick * fatigue;
+
+    if (r.speed < target) r.speed = Math.min(target, r.speed + r.accel * dt);
+    else r.speed = Math.max(target, r.speed - r.accel * DECEL_MULT * dt);
+
+    // ---- 5. Move ----------------------------------------------------------
+    r.distance += r.speed * dt;
+
+    // ---- 6. Tank ----------------------------------------------------------
+    const drain = drainPerSecond(pace, r.speed, totalMetres, r.tankMods, r.press);
+    const recover = recoverPerSecond(
+      r.horse.stats.stamina,
+      r.speed,
+      totalMetres,
+      r.drafting,
+      r.tankMods,
+      r.easyLead,
+    );
+    r.regenMult = drain > 0 ? recover / drain : 1;
+    r.tank = clamp01(r.tank + (recover - drain) * dt);
+
+    // ---- 6b. Charges — the player's bank, on its own clock ----------------
+    // Settled covers every way a horse is having an easier time of it, so
+    // taking a pull is a real tactical move and not just lost ground.
+    regenCharges(r.charges, dt, r.holding || r.drafting || r.easyLead);
+
+    // ---- 7. Sectionals and the wire --------------------------------------
+    const progress = r.distance / totalMetres;
+    while (r.nextSectional <= 1.0001 && progress >= r.nextSectional) {
+      r.sectionals.push(elapsed);
+      r.nextSectional += 0.25;
+    }
+
+    if (r.distance >= totalMetres) {
+      r.finished = true;
+      // Sub-tick precision. A whole tick is ~0.7 m at racing speed, nearly a
+      // third of a length — enough to invent or erase a photo finish.
+      const overshoot = r.distance - totalMetres;
+      r.finishTime = elapsed + dt - (r.speed > 0 ? overshoot / r.speed : 0);
+      record('finish', r.horse.id);
+    }
+  };
+
+  const rankAll = (): void => {
+    const order = [...runners].sort((a, b) => {
+      if (a.finished && b.finished) return (a.finishTime ?? 0) - (b.finishTime ?? 0);
+      if (a.finished) return -1;
+      if (b.finished) return 1;
+      return b.distance - a.distance;
+    });
+    order.forEach((r, i) => (r.rank = i + 1));
+  };
+
+  const step = (): boolean => {
+    fresh = [];
+    if (runners.every((r) => r.finished) || elapsed > maxElapsed) return false;
+
+    updatePack();
+    // Read once, before anyone moves, so every runner is measured against the
+    // same leader rather than against a target that shifts mid-tick.
+    const leaderDistance = Math.max(...runners.map((r) => r.distance));
+    for (const r of runners) stepRunner(r, leaderDistance);
+    elapsed += dt;
+    rankAll();
+
+    return !runners.every((r) => r.finished) && elapsed <= maxElapsed;
+  };
+
+  const snapshotRunner = (r: Runner): RunnerSnapshot => ({
     id: r.horse.id,
     name: r.horse.name,
     distance: r.distance,
     speed: r.speed,
     lane: r.lane,
-    fieldPosition: r.fieldPosition,
     rank: r.rank,
-    blocked: r.blockedFor > 0,
+    // Remap the pace band onto 0-1 so the render rig's `drive` reads sensibly.
+    effort: clamp01((r.paceNow - HOLD_FLOOR) / (1 - HOLD_FLOOR)),
+    kicking: r.kickAt >= 0 && elapsed - r.kickAt <= KICK_DURATION,
+    kicksRemaining: r.charges.count,
+    chargeProgress: r.charges.progress,
+    regenMult: r.regenMult,
+    condition: conditionReadout(r.tank),
+    inWindow: inMomentWindow(r.horse.moment, clamp01(r.distance / totalMetres)),
+    blocked: false,
     drafting: r.drafting,
-    kicksRemaining: r.kicksRemaining,
     offColour: r.offColour,
+    finished: r.finished,
+    finishTime: r.finishTime,
+    coat: r.horse.coat,
+  });
+
+  const snapshot = (): RaceSnapshot => {
+    const leaderDistance = Math.max(...runners.map((r) => r.distance));
+    return {
+      elapsed,
+      progress: clamp01(leaderDistance / totalMetres),
+      leaderDistance,
+      runners: runners.map(snapshotRunner),
+      fresh,
+    };
   };
 
-  const input: ControlInput = r.controller(view, race);
-  const profile = K.STYLE_PROFILES[r.horse.style];
-  r.effort = clamp(input.effort, 0, 1);
-  // The horse's OWN progress toward the finish, not race.progress (the
-  // LEADER's distance over the total) — a horse running behind the pace
-  // hasn't covered as much of ITS OWN race as the leader has of theirs, so
-  // its own timing (kick window, positional fade below) has to be judged
-  // against its own clock, not the leader's.
-  const ownProgress = clamp(r.distance / totalYards, 0, 1);
-  // But floored so it can't lag the leader's clock by more than
-  // MAX_MOMENT_LAG — see the note on that constant. Matches ai.ts's own
-  // momentProgress exactly, so windowFit here agrees with what ai.ts used to
-  // decide the kick was worth firing in the first place.
-  const momentProgress = Math.max(ownProgress, race.progress - K.MAX_MOMENT_LAG);
-
-  // How far up the field, and how CLEAR that spot is — used both by the kick
-  // (complacency discount, right below) and by charge regen further down.
-  // A CLEAR lead refills fine and (new) kicks weaker; a CONTESTED one refills
-  // worse and kicks at full strength — the front-runner's whole trade.
-  const forwardness = 1 - r.fieldPosition; // 1 at the front, 0 at the back
-  const nearest = all.reduce((best, o) => {
-    if (o === r || o.finishTime !== null) return best;
-    const gap = Math.abs(o.distance - r.distance);
-    return gap < best ? gap : best;
-  }, Number.POSITIVE_INFINITY);
-  const contest = clamp(1 - nearest / K.CLEAR_LEAD_GAP, 0, 1);
-
-  // Same idea, but measured against the BACK of the field rather than the
-  // nearest neighbor — a front pack that's mutually boxing itself in never
-  // reads as "clear" by the nearest-rival measure above even while it
-  // collectively pulls hundreds of yards clear of a back-marker (ROADMAP.md:
-  // traced directly — a `late` horse fell 150-200 yards behind before its
-  // own window even opened, while every horse ahead of it stayed "contested"
-  // by nearest-rival terms the whole time). Used only by kick complacency,
-  // not regen — being boxed in by a neighbor and being clear of the whole
-  // field are different things.
-  const furthestBehindGap = all.reduce((worst, o) => {
-    if (o === r || o.finishTime !== null) return worst;
-    const gap = r.distance - o.distance;
-    return gap > worst ? gap : worst;
-  }, 0);
-  // Smooth ramp, not a threshold — see CLEAR_FIELD_SCALE for why.
-  const fieldClearness = 1 - Math.exp(-furthestBehindGap / K.CLEAR_FIELD_SCALE);
-
-  // Actual rank-based complacency: only the leader gets penalized for kicking
-  // when clear. Horses chasing get minimal penalty even if clear of followers.
-  const horsesAhead = all.reduce((count, o) => {
-    if (o === r || o.finishTime !== null) return count;
-    return o.distance > r.distance ? count + 1 : count;
-  }, 0);
-  const isLeading = horsesAhead === 0;
-  const rankFactor = isLeading ? 0.4 : 0.05; // Leader: 40% penalty; chaser: minimal
-
-  // --- The kick -----------------------------------------------------------
-  // The ONLY thing that ever pushes a horse above its top speed (constants.ts,
-  // "Effort: HOLD / CRUISE / KICK"). Strength scales with GRIT x BURST x
-  // JOCKEY SKILL — a fixed measure of the horse and rider, not of how many
-  // charges happen to be banked right now. The bank only gates whether a
-  // kick can fire at all.
-  if (input.kick && r.kicksRemaining > 0) {
-    r.kicksRemaining--;
-    const gritFactor = 1 + ((r.horse.stats.grit - 50) / 100) * K.KICK_GRIT_INFLUENCE;
-    const burstFactor = 1 + ((r.horse.stats.burst - 50) / 100) * K.KICK_BURST_INFLUENCE;
-    const jockeyFactor = 1 + ((r.horse.jockeySkill - 50) / 100) * K.KICK_JOCKEY_INFLUENCE;
-
-    // TIMING IS THE SKILL. Kick anywhere inside the horse's Moment window and
-    // it lands at full force — enough to take a race. Kick outside it and you
-    // spend the same charge for a fraction of the surge: enough to hold your
-    // position, never enough to steal the lead.
-    const [momentLo, momentHi] = K.MOMENT_WINDOWS[r.horse.moment];
-    const off =
-      momentProgress < momentLo ? momentLo - momentProgress : Math.max(0, momentProgress - momentHi);
-    const insideWindow = off === 0;
-    r.kickWindowFit = insideWindow ? 1 : 0;
-
-    const styleFactor = 1 + K.KICK_STYLE_BONUS[r.horse.style];
-    const momentFactor = insideWindow ? (1 + K.KICK_MOMENT_BONUS[r.horse.moment]) : 1;
-    const complacency = rankFactor * fieldClearness;
-    const complacencyFactor = 1 - K.KICK_COMPLACENCY_PENALTY * complacency;
-    r.kickStrength =
-      K.KICK_MAX_BONUS *
-      gritFactor *
-      burstFactor *
-      jockeyFactor *
-      styleFactor *
-      momentFactor *
-      complacencyFactor;
-    // Duration scales with momentFactor only when inside window — kicks are always
-    // full duration, but the boost inside the window (momentFactor) makes them
-    // more effective over their time. This rewards good timing without penalizing
-    // kicks outside the window.
-    r.kickRemaining =
-      K.KICK_BASE_DURATION *
-      momentFactor;
-
-    if (hasTrait(r.traits, 'turnOfFoot')) {
-      r.kickStrength *= 1.55;
-      r.kickRemaining *= 0.5;
-    }
-    if (hasTrait(r.traits, 'relentless')) {
-      r.kickStrength *= 0.7;
-      r.kickRemaining *= 1.9;
-    }
-    if (hasTrait(r.traits, 'grinder')) {
-      r.kickStrength *= 0.35;
-      r.kickRemaining *= 2.4;
-    }
-    events.push({ at: elapsed, kind: 'kick', horseId: r.horse.id });
-  }
-
-  // --- Lane changes; the jockey's job, not the player's --------------------
-  if (input.targetLane !== r.lane) {
-    const target = clamp(Math.round(input.targetLane), 0, K.LANE_COUNT - 1);
-    const occupied = all.some(
-      (o) => o !== r && o.lane === target && Math.abs(o.distance - r.distance) < K.BLOCK_GAP,
+  const outcome = (): RaceOutcome => {
+    const order = [...runners].sort(
+      (a, b) => (a.finishTime ?? Infinity) - (b.finishTime ?? Infinity) || b.distance - a.distance,
     );
-    const skill = r.horse.jockeySkill / 100;
-    if (!occupied && rng.chance(0.35 + skill * 0.5)) r.lane = target;
-  }
+    const winnerTime = order[0]?.finishTime ?? elapsed;
 
-  // --- Traffic --------------------------------------------------------------
-  const ahead = all.find(
-    (o) =>
-      o !== r &&
-      o.lane === r.lane &&
-      o.distance > r.distance &&
-      o.distance - r.distance < K.BLOCK_GAP,
-  );
+    const results: RaceResult[] = order.map((r, i) => {
+      const time = r.finishTime ?? elapsed;
+      const avgSpeed = time > 0 ? totalMetres / time : BASE_SPEED;
+      const marginMetres = Math.max(0, (time - winnerTime) * avgSpeed);
+      return {
+        horseId: r.horse.id,
+        name: r.horse.name,
+        finishPosition: i + 1,
+        time,
+        margin: marginMetres / METRES_PER_LENGTH,
+        kicksLeft: r.charges.count,
+        sectionals: r.sectionals,
+        hadTrouble: false,
+        fumbledStart: r.fumbledStart,
+        offColour: r.offColour,
+      };
+    });
 
-  const wantsMore = ahead ? r.speed >= ahead.speed - 0.15 : false;
-  if (ahead && wantsMore) {
-    if (r.blockedFor === 0) events.push({ at: elapsed, kind: 'blocked', horseId: r.horse.id });
-    r.blockedFor += K.DT;
-    r.troubleTime += K.DT;
-    // Only a sustained shut-off counts as "trouble" — brushing a rival for a
-    // few frames is just racing, and flagging it made 90% of runners look
-    // unlucky in every single race.
-    if (r.troubleTime >= K.TROUBLE_THRESHOLD) r.hadTrouble = true;
-    r.wasBlocked = true;
+    // paceRating: the last quarter over the first. Above 1 means the race
+    // SLOWED — leaders went off too fast and emptied, which is the collapse an
+    // upset comes out of. recap.ts's paceOf() reads it this way.
+    const splits = runners
+      .map((r) => r.sectionals)
+      .filter((s) => s.length >= 4)
+      .map((s) => ({ first: s[0]!, last: s[3]! - s[2]! }));
+    const paceRating =
+      splits.length > 0
+        ? splits.reduce((sum, s) => sum + (s.first > 0 ? s.last / s.first : 1), 0) / splits.length
+        : 1;
 
-    // Temper governs how rattled it gets, Grit whether it fights through, and
-    // jockey skill how quickly a way out is found.
-    let escape =
-      K.BASE_ESCAPE_RATE *
-      (1 + (r.horse.jockeySkill / 100 - 0.5) * K.JOCKEY_ESCAPE_INFLUENCE) *
-      (1 + (r.horse.stats.temper / 100 - 0.5) * K.TEMPER_ESCAPE_INFLUENCE) *
-      (1 + (r.horse.stats.grit / 100 - 0.5) * K.GRIT_ESCAPE_INFLUENCE);
-    if (hasTrait(r.traits, 'bulldozer')) escape *= 1.6;
-    if (hasTrait(r.traits, 'highlyStrung')) escape *= 0.65;
-    if (hasTrait(r.traits, 'needsRoom')) escape *= 0.8;
+    return { results, events, paceRating, duration: elapsed };
+  };
 
-    if (rng.chance(escape * K.DT)) {
-      r.blockedFor = 0;
-      events.push({ at: elapsed, kind: 'freed', horseId: r.horse.id });
-    }
-  } else if (r.blockedFor > 0) {
-    r.blockedFor = 0;
-    events.push({ at: elapsed, kind: 'freed', horseId: r.horse.id });
-  }
-
-  // --- Drafting: recovery, not free speed ----------------------------------
-  r.drafting =
-    !!all.find(
-      (o) =>
-        o !== r &&
-        o.distance > r.distance &&
-        o.distance - r.distance < K.DRAFT_GAP &&
-        Math.abs(o.lane - r.lane) <= 1,
-    ) && r.blockedFor === 0;
-
-  // --- Position: changes the CHARGE REGEN rate, never spends on its own -----
-  //
-  // Charges only ever go up here — the only way to spend one is the kick,
-  // above. Position's whole job is to say how fast you regen — leading and
-  // being out of your style's slot regen slower, never negative, per
-  // RECOVERY_FLOOR. A front-runner does not escape the lead's regen penalty —
-  // its style merely lets it recharge better than another style would in the
-  // same spot, in exchange for never having ground to make up.
-  //
-  // forwardness/nearest/contest computed above, before the kick block —
-  // reused there for the complacency discount on kick strength.
-  const relief = K.FRONT_COST_RELIEF[r.horse.style];
-
-  // Two separate slowdowns, deliberately decoupled.
-  //
-  // The BASELINE slowdown from being up front is discounted by running style —
-  // that is what lets a front-runner hold a lead without its reserve
-  // stagnating. The CONTEST slowdown from being pressed is not: being hounded
-  // hurts everyone the same. One number doing both jobs would make efficient
-  // front-runners immune to being contested too, quietly disabling the whole
-  // upset mechanism.
-  const leadCost = Math.pow(forwardness, 1.5) * K.FRONT_COST_PENALTY * relief;
-  // Sharper exponent: being pressed should punish the horses actually
-  // fighting for the lead, not everyone stuck in mid-field traffic. Discounted
-  // by PRESS_COST_RELIEF so a front-runner isn't double-taxed on top of
-  // leadCost above for the one thing its style exists to do.
-  const pressRelief = K.PRESS_COST_RELIEF[r.horse.style];
-  const pressCost = Math.pow(forwardness, 3) * K.CONTESTED_LEAD_COST * contest * pressRelief;
-  const frontPenalty = 1 + leadCost + pressCost;
-  const backRecovery = 1 + K.BACK_RECOVERY_BONUS * r.fieldPosition;
-
-  const rawMisfit = Math.abs(r.fieldPosition - profile.preferred);
-  let misfit = clamp((rawMisfit - profile.tolerance) / (1 - profile.tolerance), 0, 1);
-  if (hasTrait(r.traits, 'tractable')) misfit *= 0.45;
-
-  // Positional preference only matters while a race is still being SET UP, and
-  // ramps in rather than snapping on at the gate.
-  //
-  // ai.ts prices reaching your slot as a bounded spike in EFFORT during the
-  // opening scramble (ESTABLISH_GAIN, up to CRUISE_EFFORT) — fading this in
-  // across the same window (ESTABLISH_UNTIL) means the drift itself is what's
-  // priced during the scramble, not the scramble and the drift together. Once
-  // everyone is committed in the stretch it fades OUT again — otherwise a
-  // closer is punished for executing its own strategy, since making its run
-  // means leaving the back of the field by definition. Own progress, not the
-  // leader's, for the same reason the kick window above uses it.
-  const positional = clamp(
-    Math.min(
-      ownProgress / K.ESTABLISH_UNTIL,
-      (K.POSITION_FADE_END - ownProgress) / (K.POSITION_FADE_END - K.POSITION_FADE_START),
-    ),
-    0,
-    1,
-  );
-  misfit *= positional;
-
-  // Two-sided: a perfect fit earns a genuine regen BONUS, a bad fit a genuine
-  // PENALTY — floored, never negative. Being in position must pay off, not
-  // merely avoid a fine.
-  const fit = (1 - misfit) * positional;
-
-  // Never below RECOVERY_FLOOR: leading, contested, and badly out of position
-  // all compound here, but nothing in this stack can push the regen rate to
-  // zero or negative.
-  let recoveryMult = clamp(
-    (backRecovery * (1 + K.POSITION_RECOVERY_BONUS * fit - K.OUT_POSITION_RECOVERY_PENALTY * misfit)) /
-      frontPenalty,
-    K.RECOVERY_FLOOR,
-    4,
-  );
-
-  if (hasTrait(r.traits, 'railHugger')) recoveryMult *= r.lane === 0 ? 1.06 : 0.95;
-  if (hasTrait(r.traits, 'herdAnimal')) recoveryMult *= r.drafting ? 1.15 : 0.92;
-  if (hasTrait(r.traits, 'loner')) recoveryMult *= r.drafting ? 0.9 : 1.12;
-  if (hasTrait(r.traits, 'needsRoom')) recoveryMult *= r.blockedFor > 0 ? 0.83 : 1.04;
-  if (r.drafting) recoveryMult *= 1 + K.DRAFT_RECOVERY_BONUS;
-  recoveryMult = Math.max(K.RECOVERY_FLOOR, recoveryMult);
-
-  // --- Charge regen: the only way charges move, other than the kick --------
-  //
-  // Holding (ControlInput.holding, ai.ts) is a deliberate choice to ride
-  // below top speed for a large regen payoff on top of the position
-  // multiplier above — the mirror of a kick. Charges never go down here;
-  // spending is the kick's job alone.
-  const kicking = r.kickRemaining > 0;
-  // "Very reactive to good riding" — Thirsty amplifies the payoff for
-  // holding without changing the baseline, so a well-ridden pull banks
-  // charges much faster and a horse never rested gains nothing extra.
-  const holdBonus = input.holding ? K.HOLD_REGEN_BONUS * (hasTrait(r.traits, 'thirsty') ? 1.6 : 1) : 1;
-  let regenMult = recoveryMult * holdBonus;
-
-  // "Burns extra energy through the first furlong" — Gate Rusher's explosive
-  // break now reads as slower regen in that window rather than a drain.
-  if (hasTrait(r.traits, 'gateRusher') && ownProgress < 0.125) regenMult *= 0.7;
-  // "Keyed up and slower to settle, delaying energy recovery early."
-  if (hasTrait(r.traits, 'alert') && ownProgress < 0.2) regenMult *= 0.85;
-  // "Extremely cheap at moderate effort, punishing at maximum."
-  if (hasTrait(r.traits, 'cruiser')) regenMult *= r.effort > 0.85 ? 0.7 : 1.3;
-
-  r.regenMult = regenMult;
-
-  if (r.kicksRemaining < K.CHARGE_CAPACITY) {
-    r.chargeProgress += r.chargeRegenRate * regenMult * K.DT;
-    if (r.chargeProgress >= 1) {
-      r.chargeProgress -= 1;
-      r.kicksRemaining++;
-    }
-  } else {
-    r.chargeProgress = 0;
-  }
-
-  // --- The performance band -------------------------------------------------
-  // Consistency decides how tightly the horse delivers its true ability,
-  // re-rolled periodically so races have texture rather than smooth curves.
-  r.variationTimer -= K.DT;
-  if (r.variationTimer <= 0) {
-    r.variationTimer = rng.range(K.VARIATION_INTERVAL_MIN, K.VARIATION_INTERVAL_MAX);
-    r.variation = 1 + rng.range(-r.bandDown, r.bandUp);
-  }
-
-  // --- Speed ----------------------------------------------------------------
-  // Style says where a horse belongs; Moment says when it shines — entirely
-  // through the kick now (KICK_MAX_BONUS etc. above), not a passive curve.
-  // Top speed is just maxSpeed x the performance band; a kick is the ONLY
-  // thing that ever pushes a horse above it (constants.ts, "Effort: HOLD /
-  // CRUISE / KICK").
-  let speedCap = r.maxSpeed * r.variation;
-
-  if (kicking) {
-    speedCap *= 1 + r.kickStrength;
-    r.kickRemaining -= K.DT;
-  }
-
-  // Heart: surges when in touch with the lead late.
-  if (hasTrait(r.traits, 'heart') && ownProgress > 0.8 && r.rank <= 3) speedCap *= 1.02;
-
-  // Consistency: green moments, only while the race is being run.
-  if (r.greenRemaining <= 0 && ownProgress > 0.1 && ownProgress < 0.9) {
-    const rate = K.GREEN_MOMENT_RATE * (1 - r.horse.stats.consistency / 100);
-    if (rng.chance(rate * K.DT)) {
-      r.greenRemaining = K.GREEN_MOMENT_DURATION;
-      r.hadTrouble = true;
-      events.push({ at: elapsed, kind: 'greenMoment', horseId: r.horse.id });
-    }
-  }
-  if (r.greenRemaining > 0) {
-    speedCap *= K.GREEN_MOMENT_PENALTY;
-    r.greenRemaining -= K.DT;
-  }
-
-  if (r.fumbleRemaining > 0) {
-    speedCap *= K.FUMBLE_SPEED_PENALTY;
-    r.fumbleRemaining -= K.DT;
-  }
-
-  if (r.blockedFor > 0 && ahead) {
-    speedCap = Math.min(speedCap, ahead.speed * K.BLOCKED_SPEED_FACTOR);
-  }
-
-  const effortSpeed = K.MIN_EFFORT_SPEED + (1 - K.MIN_EFFORT_SPEED) * r.effort;
-  const target = speedCap * effortSpeed;
-
-  const responsiveness = hasTrait(r.traits, 'highlyStrung') ? 1.25 : 1;
-  const delta = target - r.speed;
-  const step = r.accel * responsiveness * K.DT;
-  r.speed += clamp(delta, -step * 2.2, step);
-
-  r.distance += r.speed * K.DT;
-
-  // Sectionals, for the post-race analysis.
-  while (r.distance >= r.nextSectional && r.nextSectional <= totalYards) {
-    r.sectionals.push(elapsed);
-    r.nextSectional += K.YARDS_PER_FURLONG;
-  }
+  return {
+    step,
+    snapshot,
+    outcome,
+    totalMetres,
+    config,
+    setPlayer(horseId, input) {
+      playerInputs.set(horseId, input);
+    },
+    preRaceFor(horseId) {
+      return runners.find((r) => r.horse.id === horseId)?.preRace ?? 1;
+    },
+  };
 }
 
-function buildOutcome(
-  runners: Runner[],
-  events: RaceEvent[],
-  elapsed: number,
-  totalYards: number,
-): RaceOutcome {
-  const ordered = [...runners].sort((a, b) => {
-    if (a.finishTime !== null && b.finishTime !== null) return a.finishTime - b.finishTime;
-    if (a.finishTime !== null) return -1;
-    if (b.finishTime !== null) return 1;
-    return b.distance - a.distance;
-  });
-
-  const winnerTime = ordered[0]?.finishTime ?? elapsed;
-
-  const results: RaceResult[] = ordered.map((r, i) => {
-    const time = r.finishTime ?? elapsed;
-    const behind =
-      r.finishTime !== null
-        ? (r.finishTime - winnerTime) * Math.max(r.speed, 1)
-        : totalYards - r.distance;
-    return {
-      horseId: r.horse.id,
-      name: r.horse.name,
-      finishPosition: i + 1,
-      time,
-      margin: Math.max(0, behind / YARDS_PER_LENGTH),
-      kicksLeft: r.kicksRemaining,
-      sectionals: r.sectionals,
-      hadTrouble: r.hadTrouble,
-      fumbledStart: r.fumbledStart,
-      offColour: r.offColour,
-    };
-  });
-
-  // Pace rating: seconds-per-furlong late, divided by seconds-per-furlong
-  // early. Above 1 means the race SLOWED — a fast early tempo that emptied the
-  // leaders, which is the setup a closer needs.
-  //
-  // The first furlong is excluded deliberately: from a standing start it is
-  // always the slowest, and including it swamped the signal entirely.
-  const winner = ordered[0];
-  let paceRating = 1;
-  if (winner && winner.sectionals.length >= 4 && winner.finishTime !== null) {
-    const s = winner.sectionals;
-    const mid = Math.floor(s.length / 2);
-    const earlyFurlongs = mid - 1;
-    const lateFurlongs = s.length - mid;
-    if (earlyFurlongs > 0 && lateFurlongs > 0) {
-      const early = (s[mid]! - s[0]!) / earlyFurlongs;
-      const late = (winner.finishTime - s[mid]!) / lateFurlongs;
-      if (early > 0) paceRating = late / early;
-    }
+/** Headless: run a race to completion and return only the result. */
+export function simulateRace(entrants: RaceEntrant[], config: RaceConfig): RaceOutcome {
+  const race = createRace(entrants, config);
+  while (race.step()) {
+    /* run to the wire */
   }
-
-  return { results, events, paceRating, duration: winnerTime };
+  return race.outcome();
 }
 
-export type { RaceConfig, RaceEntrant, RaceOutcome, RaceResult };
+/** Exposed for the harness's speed-ceiling invariant (REBUILD.md I2). */
+export { cruiseFor };

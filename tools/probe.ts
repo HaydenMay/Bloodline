@@ -1,111 +1,94 @@
-/**
- * Single-race diagnostic. Dumps how each running style's kick charges and
- * track position evolve, so a balance failure can be read rather than
- * guessed at.
- *
- *   npx tsx tools/probe.ts
- */
-
 import { createRng } from '../src/sim/rng.js';
 import { createNameGenerator } from '../src/data/names.js';
 import { generateHorse } from '../src/sim/horse.js';
-import { simulateRace } from '../src/sim/race/engine.js';
-import { RUNNING_STYLES } from '../src/data/index.js';
-import { STAT_KEYS, type Horse } from '../src/sim/types.js';
-import type { Controller, RaceView, RunnerView } from '../src/sim/race/types.js';
-import { createAiController } from '../src/sim/race/ai.js';
+import { FIELD_SIZE, RUNNING_STYLES } from '../src/data/index.js';
+import { createRace } from '../src/sim/race/engine.js';
+import { CHARGE_CAPACITY, METRES_PER_LENGTH } from '../src/sim/race/constants.js';
+import type { RaceEntrant } from '../src/sim/race/types.js';
 
-const rng = createRng('probe');
+/**
+ * Single-race trace.
+ *
+ * Not a gate — a diagnostic. Every real bug this project has hit was found by
+ * tracing ONE race directly rather than reasoning about aggregates, so this
+ * exists to make that cheap.
+ *
+ *   npm run probe -- [seed] [metres]
+ */
+
+const seed = process.argv[2] ?? 'probe-1';
+const metres = Number(process.argv[3] ?? 1400);
+
+const rng = createRng(seed);
 const names = createNameGenerator(rng);
-
-const horses: Horse[] = RUNNING_STYLES.map((style) => {
-  const h = generateHorse(rng, names, { division: 'open', style, age: 4 });
-  for (const k of STAT_KEYS) h.stats[k] = 55;
-  h.aptitudes = { sprint: 80, mile: 80, route: 80 };
-  h.jockeySkill = 60;
-  h.condition = 75;
-  h.traits = [];
-  h.name = style;
-  return h;
-});
-// Two of each so the field is eight, like a real race.
-const field = [...horses, ...horses.map((h) => ({ ...h, id: h.id + 'b', name: h.name + '2' }))];
-
-interface Sample {
-  t: number;
-  rows: { name: string; kicksRemaining: number; pos: number; effort: number; rank: number; speed: number; blocked: boolean }[];
-}
-const samples: Sample[] = [];
-let lastSample = -1;
-
-const spy =
-  (h: Horse): Controller =>
-  (self: RunnerView, race: RaceView) => {
-    const base = createAiController(h);
-    const out = base(self, race);
-    const bucket = Math.floor(race.progress * 10);
-    if (bucket !== lastSample && self.id === field[0]!.id) {
-      lastSample = bucket;
-      samples.push({ t: race.progress, rows: [] });
-    }
-    const s = samples[samples.length - 1];
-    if (s && s.rows.length < field.length) {
-      s.rows.push({
-        name: self.name,
-        kicksRemaining: self.kicksRemaining,
-        pos: self.distance,
-        effort: out.effort,
-        rank: self.rank,
-        speed: self.speed,
-        blocked: self.blocked,
-      });
-    }
-    return out;
-  };
-
-const outcome = simulateRace(
-  field.map((horse) => ({ horse, controller: spy(horse) })),
-  { furlongs: 8, going: 'good', hype: 0.5, seed: 'probe-race' },
+// A realistic race card: horses entered for a trip they are broadly suited to.
+// Random preferences put 2200 m stayers in a 1400 m race, where DIST_FLOOR
+// correctly buries them — an honest result, but it tells you about the
+// field-building rather than about the riding you came here to look at.
+const field = Array.from({ length: FIELD_SIZE }, (_, i) =>
+  generateHorse(rng, names, {
+    division: 'open',
+    style: RUNNING_STYLES[i % RUNNING_STYLES.length]!,
+    age: 4,
+    distanceCentre: metres * rng.range(0.85, 1.15),
+  }),
 );
 
-console.log('\nCHARGES / RANK THROUGH THE RACE  (one of each style)\n');
-console.log(
-  'prog  ' +
-    RUNNING_STYLES.map((s) => s.slice(0, 9).padEnd(11)).join('') ,
-);
-for (const s of samples) {
-  const cells = RUNNING_STYLES.map((style) => {
-    const row = s.rows.find((r) => r.name === style);
-    return row ? `${row.kicksRemaining}c r${row.rank} `.padEnd(11) : ''.padEnd(11);
-  });
-  console.log(`${(s.t * 100).toFixed(0).padStart(3)}%  ` + cells.join(''));
-}
+const entrants: RaceEntrant[] = field.map((horse) => ({ horse }));
+const race = createRace(entrants, { metres, going: 'good', hype: 0.5, seed: `${seed}-run` });
 
-console.log('\nEFFORT THROUGH THE RACE\n');
-console.log('prog  ' + RUNNING_STYLES.map((s) => s.slice(0, 9).padEnd(11)).join(''));
-for (const s of samples) {
-  const cells = RUNNING_STYLES.map((style) => {
-    const row = s.rows.find((r) => r.name === style);
-    return row ? row.effort.toFixed(2).padEnd(11) : ''.padEnd(11);
-  });
-  console.log(`${(s.t * 100).toFixed(0).padStart(3)}%  ` + cells.join(''));
-}
-
-console.log('\nGAP TO LEADER, IN LENGTHS\n');
-console.log('prog  ' + RUNNING_STYLES.map((s) => s.slice(0, 9).padEnd(11)).join(''));
-for (const s of samples) {
-  const lead = Math.max(...s.rows.map((r) => r.pos));
-  const cells = RUNNING_STYLES.map((style) => {
-    const row = s.rows.find((r) => r.name === style);
-    return row ? `${((lead - row.pos) / 2.7).toFixed(1)}L`.padEnd(11) : ''.padEnd(11);
-  });
-  console.log(`${(s.t * 100).toFixed(0).padStart(3)}%  ` + cells.join(''));
-}
-
-console.log('\nRESULT\n');
-outcome.results.forEach((r) =>
+console.log(`\n${metres} m, good going, field of ${field.length}, seed "${seed}"\n`);
+console.log('runner                  style        moment    spd sta brs grt  jky   pref');
+for (const h of field) {
   console.log(
-    `  ${r.finishPosition}. ${r.name.padEnd(14)} ${r.time.toFixed(2)}s  ${r.margin.toFixed(1)}L  ${r.kicksLeft} charges left`,
-  ),
+    `${h.name.padEnd(22)}  ${h.style.padEnd(11)}  ${h.moment.padEnd(8)}  ` +
+      `${String(h.stats.speed).padStart(3)} ${String(h.stats.stamina).padStart(3)} ` +
+      `${String(h.stats.burst).padStart(3)} ${String(h.stats.grit).padStart(3)}  ` +
+      `${String(h.jockeySkill).padStart(3)}   ${h.preferredDistance.min}-${h.preferredDistance.max}m`,
+  );
+}
+
+// ---- Trace ----------------------------------------------------------------
+const SAMPLES = [0.1, 0.25, 0.5, 0.75, 0.9, 1.0];
+let nextSample = 0;
+
+console.log('\n--- trace: pace / tank / charges / rank, by leader progress ---');
+while (race.step()) {
+  const snap = race.snapshot();
+  if (nextSample < SAMPLES.length && snap.progress >= SAMPLES[nextSample]!) {
+    console.log(`\nat ${(SAMPLES[nextSample]! * 100).toFixed(0)}%  (t=${snap.elapsed.toFixed(1)}s)`);
+    console.log('  runner                  rank  pace   charges  regen  behind');
+    const leader = snap.leaderDistance;
+    for (const r of [...snap.runners].sort((a, b) => a.rank - b.rank)) {
+      const behind = (leader - r.distance) / METRES_PER_LENGTH;
+      const dots = '#'.repeat(r.kicksRemaining) + '.'.repeat(CHARGE_CAPACITY - r.kicksRemaining);
+      console.log(
+        `  ${r.name.padEnd(22)}  ${String(r.rank).padStart(2)}   ` +
+          `${r.effort.toFixed(2)}   ${dots}   ` +
+          `${r.regenMult.toFixed(2)}  ${behind.toFixed(1).padStart(6)}L` +
+          `${r.kicking ? '  KICK' : ''}${r.drafting ? '  draft' : ''}`,
+      );
+    }
+    nextSample++;
+  }
+}
+
+// ---- Result ---------------------------------------------------------------
+const outcome = race.outcome();
+console.log(
+  `\n--- result --- (${outcome.duration.toFixed(1)}s, pace rating ${outcome.paceRating.toFixed(3)})\n`,
 );
-console.log(`\n  pace rating ${outcome.paceRating.toFixed(3)}\n`);
+console.log('pos  runner                  style        moment      time   behind  chg  kicks');
+const kicksBy = new Map<string, number>();
+for (const e of outcome.events) {
+  if (e.kind === 'kick') kicksBy.set(e.horseId, (kicksBy.get(e.horseId) ?? 0) + 1);
+}
+for (const r of outcome.results) {
+  const h = field.find((f) => f.id === r.horseId)!;
+  console.log(
+    `${String(r.finishPosition).padStart(3)}  ${r.name.padEnd(22)}  ${h.style.padEnd(11)}  ` +
+      `${h.moment.padEnd(8)}  ${r.time.toFixed(2)}s  ${r.margin.toFixed(1).padStart(6)}L  ` +
+      `${String(r.kicksLeft).padStart(3)}  ${String(kicksBy.get(r.horseId) ?? 0).padStart(5)}`,
+  );
+}
+console.log('');

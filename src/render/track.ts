@@ -9,16 +9,22 @@ import { SCENE } from './palette.js';
  */
 
 export interface Camera {
-  /** Yards from the start that sits at the left edge of the view. */
-  scrollYards: number;
-  /** Screen pixels per yard. */
-  pixelsPerYard: number;
+  /** Metres from the start that sits at the left edge of the view. */
+  scrollMetres: number;
+  /** Screen pixels per metre. */
+  pixelsPerMetre: number;
 }
 
-const YARDS_PER_FURLONG = 220;
+/**
+ * Metres between distance poles.
+ *
+ * 200 rather than a furlong's 201.168, because the poles are a readout for the
+ * player and round numbers are what a readout is for.
+ */
+const MARKER_SPACING = 200;
 
-export function yardToScreen(yards: number, cam: Camera): number {
-  return (yards - cam.scrollYards) * cam.pixelsPerYard;
+export function metreToScreen(metres: number, cam: Camera): number {
+  return (metres - cam.scrollMetres) * cam.pixelsPerMetre;
 }
 
 /** A deterministic pseudo-random, so scenery doesn't shimmer between frames. */
@@ -44,7 +50,7 @@ export function drawBackdrop(
   ctx.fillRect(0, 0, width, horizon);
 
   // Distant hills, parallaxed slowly so there is depth without distraction.
-  const hillShift = -(cam.scrollYards * cam.pixelsPerYard * 0.06) % (width + 400);
+  const hillShift = -(cam.scrollMetres * cam.pixelsPerMetre * 0.06) % (width + 400);
   ctx.fillStyle = SCENE.distantHills;
   ctx.beginPath();
   ctx.moveTo(hillShift - 200, horizon);
@@ -90,7 +96,7 @@ function drawCrowd(
   // so the crowd scrolls with the track instead of crawling.
   const spacing = 7;
   const density = 0.18 + hype * 0.72;
-  const worldOffset = cam.scrollYards * cam.pixelsPerYard * 0.35;
+  const worldOffset = cam.scrollMetres * cam.pixelsPerMetre * 0.35;
   const first = Math.floor(worldOffset / spacing);
   const count = Math.ceil(width / spacing) + 2;
 
@@ -127,9 +133,9 @@ function drawTurf(
   ctx.fillRect(0, trackTop, width, height - trackTop);
 
   // Mown stripes, anchored in world space so they convey speed.
-  const stripeYards = 20;
-  const stripePx = stripeYards * cam.pixelsPerYard;
-  const offset = -((cam.scrollYards * cam.pixelsPerYard) % (stripePx * 2));
+  const stripeMetres = 18;
+  const stripePx = stripeMetres * cam.pixelsPerMetre;
+  const offset = -((cam.scrollMetres * cam.pixelsPerMetre) % (stripePx * 2));
   ctx.fillStyle = SCENE.dirtShade;
   for (let x = offset; x < width + stripePx * 2; x += stripePx * 2) {
     ctx.fillRect(x, trackTop, stripePx, height - trackTop);
@@ -147,9 +153,9 @@ function drawRail(
   cam: Camera,
 ): void {
   const railY = horizon + 6;
-  const spacingYards = 12;
-  const spacing = spacingYards * cam.pixelsPerYard;
-  const offset = -((cam.scrollYards * cam.pixelsPerYard) % spacing);
+  const spacingMetres = 11;
+  const spacing = spacingMetres * cam.pixelsPerMetre;
+  const offset = -((cam.scrollMetres * cam.pixelsPerMetre) % spacing);
 
   ctx.strokeStyle = SCENE.railPost;
   ctx.lineWidth = 2;
@@ -168,21 +174,31 @@ function drawRail(
   }
 }
 
-/** Furlong markers and the winning post, so distance is legible on the track. */
+/**
+ * Distance markers and the winning post, so distance is legible on the track.
+ *
+ * Posted every MARKER_SPACING metres, counting down to the wire — the game
+ * works in metres end to end (REBUILD.md §3), so the poles say what the HUD
+ * says and neither has to convert.
+ */
 export function drawDistanceMarkers(
   ctx: CanvasRenderingContext2D,
   height: number,
   cam: Camera,
-  totalYards: number,
+  totalMetres: number,
 ): void {
   const horizon = height * 0.44;
   const markerY = horizon + 10;
 
-  for (let yards = 0; yards <= totalYards; yards += YARDS_PER_FURLONG) {
-    const x = yardToScreen(yards, cam);
+  // Count back from the wire so the winning post lands exactly on the line,
+  // whatever the race distance — a race is any number of metres now, not a
+  // whole number of furlongs.
+  const first = totalMetres % MARKER_SPACING;
+  for (let metres = first; metres <= totalMetres; metres += MARKER_SPACING) {
+    const x = metreToScreen(metres, cam);
     if (x < -60 || x > 4000) continue;
 
-    const remaining = Math.round((totalYards - yards) / YARDS_PER_FURLONG);
+    const remaining = Math.round((totalMetres - metres) / MARKER_SPACING);
     const isWire = remaining === 0;
 
     ctx.fillStyle = isWire ? '#F2C14E' : SCENE.furlongPost;
@@ -201,7 +217,7 @@ export function drawDistanceMarkers(
       ctx.fillStyle = '#0E1218';
       ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(String(remaining), x, markerY + 20);
+      ctx.fillText(`${remaining * MARKER_SPACING}`, x, markerY + 20);
     }
   }
 }

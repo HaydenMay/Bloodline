@@ -6,18 +6,13 @@ import {
   drawBackdrop,
   drawDistanceMarkers,
   drawMinimap,
-  yardToScreen,
+  metreToScreen,
   type Camera,
 } from '../render/track.js';
-import { createAiController } from '../sim/race/ai.js';
 import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
-import { CHARGE_CAPACITY, HOLD_EFFORT, MOMENT_WINDOWS, TICK_HZ } from '../sim/race/constants.js';
 import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../sim/race/recap.js';
-import type {
-  ControlInput,
-  RaceConfig,
-  RaceEntrant,
-} from '../sim/race/types.js';
+import type { PlayerInput, RaceConfig, RaceEntrant } from '../sim/race/types.js';
+import { CHARGE_CAPACITY, TICK_HZ } from '../sim/race/constants.js';
 import type { Horse } from '../sim/types.js';
 
 /**
@@ -28,32 +23,28 @@ import type { Horse } from '../sim/types.js';
  * input, which is just another controller as far as the engine is concerned.
  */
 
-const YARDS_PER_FURLONG = 220;
-
 /**
- * A horse is about 2.7 yards nose to tail, and the rig is drawn 100 local units
- * long. Tying the two together is what stops the treadmill effect: previously
- * the horse was drawn roughly eight times too big for the track scale, so it
- * crossed barely one body length a second while its legs cycled three times.
+ * A horse is about 2.47 metres nose to tail, and the rig is drawn 100 local
+ * units long. Tying the two together is what stops the treadmill effect:
+ * previously the horse was drawn roughly eight times too big for the track
+ * scale, so it crossed barely one body length a second while its legs cycled
+ * three times.
+ *
+ * Metres throughout, matching the simulation. There is no conversion boundary
+ * anywhere in the game (REBUILD.md §3).
  */
-const HORSE_YARDS = 2.7;
+const HORSE_METRES = 2.47;
 const RIG_UNITS = 100;
 
 /**
- * Yards covered per stride. Real gallop is ~3 body lengths.
+ * Metres covered per stride. A real gallop is ~3 body lengths.
  *
- * Stride RATE is speed divided by this: 8.1 yards against the sim's own speed
- * gives ~2.3 cycles a second once TIME_SCALE (`sim/race/constants.ts`)
- * corrects the clock — matching a real gallop, and landing at about 55 sprite
- * frames a second on a 60 Hz display, under the refresh rate so the cycle
- * plays whole rather than strobing.
- *
- * This used to carry its own inflation factor to divide the sim's known-fast
- * clock back out. Now that the clock is corrected at the source (the sim's own
- * BASE_SPEED, BASE_DRAIN etc. are scaled by TIME_SCALE), a genuine speed value
- * arrives here and this is just the real number — nothing left to compensate.
+ * Stride RATE is speed divided by this. The simulation's speed is now honest at
+ * the source — BASE_SPEED is real metres per second and there is no TIME_SCALE
+ * lever to divide back out — so this is simply the real number, with nothing
+ * left to compensate for.
  */
-const STRIDE_YARDS = HORSE_YARDS * 3;
+const STRIDE_METRES = HORSE_METRES * 3;
 
 /**
  * Ceiling on how often the legs turn over, in stride cycles per second.
@@ -73,13 +64,13 @@ const STRIDE_YARDS = HORSE_YARDS * 3;
 const MAX_STRIDE_RATE = 0.9;
 
 /**
- * Speed a finished horse settles to after the wire, in yards/sec.
+ * Speed a finished horse settles to after the wire, in metres/sec.
  *
  * Non-zero on purpose: the stride rate is derived from speed, so a horse that
  * decays to a standstill also freezes its own gait, and the sheet holds whatever
  * gallop frame it happened to land on. Walking on keeps the cycle turning over.
  */
-const PULL_UP_WALK = 1.9;
+const PULL_UP_WALK = 1.74;
 
 /**
  * Sprite pixels per rig unit, so both draw the same horse at the same size.
@@ -93,9 +84,9 @@ const SPRITE_PER_RIG_UNIT = 123 / 181;
 /**
  * How much bigger than life the horses are drawn.
  *
- * Strictly, a horse should span exactly its own 2.7 yards of track, and that is
- * what the scale chain below computes. Drawn honestly it is also small: with 46
- * yards across the screen a horse is about a seventeenth of the width, and on a
+ * Strictly, a horse should span exactly its own 2.47 metres of track, and that
+ * is what the scale chain below computes. Drawn honestly it is also small: with
+ * 42 metres across the screen a horse is about a seventeenth of the width, and on a
  * phone that is a smudge with a coloured dot on top — you cannot read your silks
  * or tell a bay from a dark bay, which is most of what the art is for.
  *
@@ -110,13 +101,6 @@ const CALLOUTS = [
   { at: 0.56, text: 'Round the turn' },
   { at: 0.84, text: 'Down the stretch!' },
 ] as const;
-
-interface PlayerInput {
-  /** Hold to take a pull — settle back below cruise, regen faster. */
-  takingBack: boolean;
-  /** Set by a tap; consumed by the controller the next tick it reads it. */
-  kickPending: boolean;
-}
 
 export interface RaceScreenOptions {
   host: HTMLElement;
@@ -140,48 +124,15 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   };
 
   const playerHorse = field.find((h) => h.id === playerHorseId)!;
-  const [playerMomentLo, playerMomentHi] = MOMENT_WINDOWS[playerHorse.moment];
 
-  /**
-   * The player's jockey rides the horse exactly as the AI would by default —
-   * holding for its Moment, then cruising into the kick — the same
-   * competent ride "hand it to your jockey" auto-race gets (DESIGN.md §4).
-   * Input MODULATES that ride rather than replacing it:
-   *
-   *   nothing   ride to style: hold for the Moment, cruise, kick, same as any
-   *             AI horse
-   *   tap       spend one kick charge — the only thing that ever pushes above
-   *             top speed (constants.ts, "Effort: HOLD / CRUISE / KICK")
-   *   hold      take a pull — genuinely below top speed, for a large regen
-   *             payoff, same HOLD_EFFORT/holding the AI itself uses
-   *
-   * Positioning was already the jockey's automatic job (no player steering);
-   * there was never a design reason for pace to be the one piece withheld
-   * from an otherwise-competent default ride.
-   */
-  const baseRide = createAiController(playerHorse);
-
-  const entrants: RaceEntrant[] = field.map((horse) => {
-    if (horse.id !== playerHorseId) return { horse };
-    return {
-      horse,
-      controller: (self, race): ControlInput => {
-        const base = baseRide(self, race);
-
-        const effort = input.takingBack ? HOLD_EFFORT : base.effort;
-        const holding = input.takingBack || base.holding;
-        const targetLane = base.targetLane;
-
-        const kick = input.kickPending;
-        input.kickPending = false;
-
-        return { effort, holding, kick, targetLane };
-      },
-    };
-  });
-
+  const entrants: RaceEntrant[] = field.map((horse) => ({ horse }));
   const race: LiveRace = createRace(entrants, config);
-  const totalYards = race.totalYards;
+  const totalMetres = race.totalMetres;
+
+  // The player's horse runs the SAME base ride as every opponent; this input
+  // only modulates it (REBUILD.md §11.4). Registering it here is what makes a
+  // hands-off player competitive rather than a passenger.
+  race.setPlayer(playerHorseId, input);
 
   // Silks belong to the HORSE, not to its position in the field.
   //
@@ -237,7 +188,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     countdownEndsAt = performance.now() + COUNTDOWN_MS;
   };
 
-  const cam: Camera = { scrollYards: 0, pixelsPerYard: 1.6 };
+  const cam: Camera = { scrollMetres: 0, pixelsPerMetre: 1.6 };
 
   const tick = (): void => {
     if (!started) {
@@ -301,25 +252,25 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // Show a fixed window of TRACK, not a fixed number of pixels — so the
     // relationship between a horse's size and the ground it covers stays
     // correct at any screen size. That relationship is what sells the speed.
-    const visibleYards = 46;
-    cam.pixelsPerYard = width / visibleYards;
+    const visibleMetres = 42;
+    cam.pixelsPerMetre = width / visibleMetres;
 
-    const target = player.distance - (width * 0.36) / cam.pixelsPerYard;
-    cam.scrollYards += (target - cam.scrollYards) * 0.1;
+    const target = player.distance - (width * 0.36) / cam.pixelsPerMetre;
+    cam.scrollMetres += (target - cam.scrollMetres) * 0.1;
 
     drawBackdrop(ctx, width, height, cam, config.hype);
-    drawDistanceMarkers(ctx, height, cam, totalYards);
+    drawDistanceMarkers(ctx, height, cam, totalMetres);
 
     // Lane 0 is the rail (furthest from camera), so higher lanes draw nearer
     // and larger. Sorting by lane keeps the overlap correct.
     const laneY = (lane: number): number => height * 0.58 + lane * (height * 0.055);
     // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
-    const baseScale = (HORSE_YARDS * cam.pixelsPerYard * HORSE_SCALE) / RIG_UNITS;
+    const baseScale = (HORSE_METRES * cam.pixelsPerMetre * HORSE_SCALE) / RIG_UNITS;
     const laneScale = (lane: number): number => baseScale * (0.88 + lane * 0.04);
 
     for (const r of [...runners].sort((a, b) => a.lane - b.lane)) {
       const pu0 = pullUp.get(r.id);
-      const x = yardToScreen(r.distance + (pu0?.extra ?? 0), cam);
+      const x = metreToScreen(r.distance + (pu0?.extra ?? 0), cam);
       if (x < -140 || x > width + 140) continue;
 
       const y = laneY(r.lane);
@@ -340,7 +291,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         drawSpeed = pu.speed;
       }
 
-      const strideRate = Math.min(drawSpeed / STRIDE_YARDS, MAX_STRIDE_RATE);
+      const strideRate = Math.min(drawSpeed / STRIDE_METRES, MAX_STRIDE_RATE);
       const phase = ((stride.get(r.id) ?? 0) + strideRate * dt) % 1;
       stride.set(r.id, phase);
 
@@ -424,8 +375,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const pad = 14;
 
     // ---- Distance remaining ----------------------------------------------
-    const remainingYards = Math.max(0, totalYards - player.distance);
-    const furlongs = remainingYards / YARDS_PER_FURLONG;
+    const remaining = Math.max(0, totalMetres - player.distance);
     ctx.fillStyle = 'rgba(14,18,24,0.72)';
     roundRect(ctx, pad, pad, 168, 46, 10);
     ctx.fill();
@@ -437,54 +387,16 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
     ctx.fillStyle = '#E8EDF4';
     ctx.font = '700 20px ui-monospace, monospace';
-    ctx.fillText(
-      furlongs >= 1 ? `${furlongs.toFixed(1)}f` : `${Math.round(remainingYards)} yd`,
-      pad + 12,
-      pad + 38,
-    );
+    ctx.fillText(`${Math.round(remaining)} m`, pad + 12, pad + 38);
 
     ctx.fillStyle = '#8B98A9';
     ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(`${ordinal(player.rank)} of ${runners.length}`, pad + 156, pad + 38);
 
-    // ---- Race progress, with YOUR MOMENT marked on it ----------------------
-    // Without this you cannot see when your horse's window is, which makes the
-    // single most important decision in the race pure guesswork.
-    const pw = Math.min(340, width - 220);
-    const px0 = (width - pw) / 2;
-    const py0 = pad + 6;
-
-    ctx.fillStyle = 'rgba(14,18,24,0.72)';
-    roundRect(ctx, px0, py0, pw, 22, 11);
-    ctx.fill();
-
-    ctx.fillStyle = 'rgba(242,193,78,0.30)';
-    roundRect(
-      ctx,
-      px0 + 3 + (pw - 6) * playerMomentLo,
-      py0 + 3,
-      (pw - 6) * (playerMomentHi - playerMomentLo),
-      16,
-      6,
-    );
-    ctx.fill();
-
-    const prog = Math.min(1, player.distance / totalYards);
-    ctx.fillStyle = '#E8EDF4';
-    const dotX = px0 + 3 + (pw - 6) * prog;
-    ctx.beginPath();
-    ctx.arc(dotX, py0 + 11, 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#8B98A9';
-    ctx.font = '600 9.5px ui-sans-serif, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(
-      'YOUR MOMENT',
-      px0 + 3 + (pw - 6) * ((playerMomentLo + playerMomentHi) / 2),
-      py0 + 34,
-    );
+    // There is deliberately no "your moment" window drawn here. Moment no
+    // longer opens a window at all — it selects a pace-curve shape (REBUILD.md
+    // §6) — so there is nothing to mark and nothing to mistime.
 
     // ---- Minimap ----------------------------------------------------------
     drawMinimap(
@@ -494,7 +406,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       84,
       56,
       runners.map((r) => ({
-        progress: Math.min(1, r.distance / totalYards),
+        progress: Math.min(1, r.distance / totalMetres),
         colour: silksFor.get(r.id)!.primary,
         isPlayer: r.id === playerHorseId,
       })),
@@ -527,48 +439,50 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // using the dead space this bar already had to spare.
     const ARROW_FONT = '700 9px ui-sans-serif, system-ui, sans-serif';
     ctx.font = ARROW_FONT;
-    const arrowsMaxW = ctx.measureText('▲▲▲').width;
-    const regenTier = player.regenMult >= 1.6 ? 3 : player.regenMult >= 0.9 ? 2 : 1;
+    const arrowsMaxW = ctx.measureText('===').width;
+    const regenTier = player.regenMult >= 1.15 ? 3 : player.regenMult >= 0.95 ? 2 : 1;
     ctx.fillStyle =
       regenTier === 3 ? '#6FE39B' : regenTier === 2 ? 'rgba(233,238,245,0.75)' : 'rgba(139,152,169,0.6)';
     ctx.fillText('▲'.repeat(regenTier), barX + 20 + labelW, barY + 17);
 
+    // ---- The charge dots ---------------------------------------------------
+    // These ARE the tank, quantised (REBUILD.md §5.5). The hidden budget the
+    // whole simulation runs on is read off honestly here, with the wedge on the
+    // next empty dot showing progress toward it. The last dot goes out exactly
+    // as fatigue starts to bite, so an empty row of dots means a beaten horse.
     const dotR = 6;
     const dotGap = 20;
     const dotsY = barY + 13;
     const dotsX0 = barX + 28 + labelW + arrowsMaxW + 12;
+
     for (let i = 0; i < CHARGE_CAPACITY; i++) {
-      const x = dotsX0 + i * dotGap;
+      const cx = dotsX0 + i * dotGap;
+      const filled = i < player.kicksRemaining;
+
       ctx.beginPath();
-      ctx.arc(x, dotsY, dotR, 0, Math.PI * 2);
-      ctx.fillStyle = i < player.kicksRemaining ? '#F2C14E' : 'rgba(139,152,169,0.3)';
+      ctx.arc(cx, dotsY, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = filled ? '#F2C14E' : 'rgba(139,152,169,0.25)';
       ctx.fill();
 
-      if (i === player.kicksRemaining && player.kicksRemaining < CHARGE_CAPACITY) {
+      // The wedge on the first empty dot: how close the next one is.
+      if (!filled && i === player.kicksRemaining && player.chargeProgress > 0) {
         ctx.beginPath();
-        ctx.moveTo(x, dotsY);
-        ctx.arc(x, dotsY, dotR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * player.chargeProgress);
+        ctx.moveTo(cx, dotsY);
+        ctx.arc(cx, dotsY, dotR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * player.chargeProgress);
         ctx.closePath();
-        ctx.fillStyle = 'rgba(242,193,78,0.55)';
+        ctx.fillStyle = 'rgba(242,193,78,0.45)';
         ctx.fill();
       }
     }
 
-    // The window still marks where a kick lands hardest (timing decides its
-    // strength), but it no longer gates WHETHER you can fire one — that's
-    // kicksRemaining now, a charge you can spend early for position or hold
-    // for the finish.
-    const inWindow = curr.progress >= playerMomentLo && curr.progress <= playerMomentHi;
     ctx.font = LABEL_FONT;
     ctx.textAlign = 'right';
-    // What YOU are doing outranks what the race is doing to you: those states
-    // are transient, deliberate, and the moment you need to act on.
     if (input.takingBack) {
       ctx.fillStyle = '#4EC9A0';
       ctx.fillText('TAKING A PULL', barX + barW - 12, barY + 17);
-    } else if (inWindow && player.kicksRemaining > 0) {
-      ctx.fillStyle = '#F2C14E';
-      ctx.fillText('YOUR MOMENT', barX + barW - 12, barY + 17);
+    } else if (player.kicksRemaining === 0) {
+      ctx.fillStyle = '#D9534F';
+      ctx.fillText('EMPTY', barX + barW - 12, barY + 17);
     }
 
     // ---- Call-outs ---------------------------------------------------------
@@ -601,7 +515,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.fillStyle = '#8B98A9';
     ctx.font = '600 13px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText(
-      `${config.furlongs}f · ${config.going} going · field of ${field.length}`,
+      `${config.metres} m · ${config.going} going · field of ${field.length}`,
       cx,
       cy - 24,
     );
