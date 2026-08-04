@@ -31,16 +31,20 @@ export function mountSilksDemo(host: HTMLElement): void {
 
   const updatePreview = async () => {
     const silks: Silks = { primary: selectedSilksColor, secondary: selectedManeColor };
+    console.log('updatePreview called', { coat: selectedCoat, silks });
 
     // Update badge
     const badgeImg = host.querySelector<HTMLImageElement>('.sd-badge');
     if (badgeImg) {
+      console.log('Badge image element found, calling getBadgeDataUri');
       const uri = await getBadgeDataUri({
         coat: selectedCoat,
         silks,
       });
+      console.log('getBadgeDataUri returned:', uri ? 'data URI' : 'null');
       if (uri) {
         badgeImg.src = uri;
+        console.log('Badge image src updated');
       }
     }
 

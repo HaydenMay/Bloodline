@@ -163,13 +163,17 @@ const DEFAULT_ACCENT = '#6B8FA3'; // Muted blue-grey (subtle accent)
 export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
   if (!loaded) return null;
   const accentColor = scheme.silks?.primary ?? scheme.accentColor ?? DEFAULT_ACCENT;
-  const key = `${scheme.coat}|${accentColor}`;
+  const maneColor = scheme.silks?.secondary ?? accentColor;
+  const key = `${scheme.coat}|${accentColor}|${maneColor}`;
+  console.log('tintedBadge cache key:', key, 'cache size:', tinted.size);
   const hit = tinted.get(key);
   if (hit) {
+    console.log('Cache HIT for badge');
     tinted.delete(key);
     tinted.set(key, hit);
     return hit;
   }
+  console.log('Cache MISS for badge, rendering new');
 
   const coat = coatFor(scheme.coat);
   const bodyHsl = hexToHsl(coat.body);
