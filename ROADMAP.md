@@ -582,6 +582,7 @@ it doesn't, we change it now, and we will have spent five sessions finding out i
 
 - Starter selection — six horses, guaranteed archetype spread
 - Training weeks: sessions, condition, form states, injury, breakthroughs
+  - **midPack balance note:** midPack is the generalist archetype with no specific racing-strategy advantage (no signature moment, no position edge). Balance it via training: apply 1.1–1.2× stat-gain multipliers to midPack horses during training sessions so they compete through superior stats rather than tactics. This gives them a distinct identity: "well-trained generalist beats untrained specialists."
 - Race calendar — choose from 2–3 upcoming races
 - Divisions, points-based promotion and demotion
 - **The living world** — ~70 AI horses generated to match their division, training, ageing,
