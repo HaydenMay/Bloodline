@@ -317,6 +317,14 @@ export const EASY_LEAD_RECOVER_BONUS = 0.9;
  */
 export const EASY_LEAD_CLEAR_METRES = 2.5;
 
+/**
+ * Recovery bonus for frontRunner specifically, scaled by lead distance.
+ *
+ * Rewards frontRunner for establishing and maintaining clear leads. The bonus
+ * increases continuously with daylight: a frontRunner a few lengths clear gets
+ * a small bonus; one 30+ metres clear gets the full bonus. This is a targeted
+ * buff that makes the frontRunner archetype reward dominance.
+ */
 // (KICK_TANK_COST is gone. A kick costs a CHARGE and nothing else — see
 // charges.ts. Combining the two made spending stamina the price of every kick,
 // so hoarding could beat riding, which is not a game about riding.)
@@ -685,6 +693,16 @@ export const TRAIT_IRON_LUNGS_RECOVER = 1.12;
 export const TRAIT_THIRSTY_RECOVER = 0.9;
 export const TRAIT_QUICK_RECOVERY_DRAFT = 2.0;
 export const TRAIT_CRUISER_EXPONENT_RELIEF = 2;
+
+/**
+ * Drain exponent relief for frontRunner style.
+ *
+ * FrontRunner horses run fast early and set the pace. Reducing their drain
+ * exponent rewards their archetype directly: running fast early costs them
+ * less tank, so they can establish and maintain leads without depleting.
+ */
+export const FRONT_RUNNER_EXPONENT_RELIEF = 11;
+
 export const TRAIT_ALERT_FUMBLE = 0.4;
 export const TRAIT_GATE_RUSHER_EARLY = 0.015;
 export const TRAIT_GATE_RUSHER_PAYBACK = -0.01;

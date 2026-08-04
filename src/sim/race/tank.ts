@@ -114,6 +114,7 @@ export function recoverPerSecond(
     shelterForRank(rank, fieldSize) *
     (drafting ? 1 + DRAFT_RECOVER_BONUS * mods.draftMult : 1) *
     (1 + EASY_LEAD_RECOVER_BONUS * easyLead);
+
   return progressPerSecond * TANK_RECOVER_RATE * staminaFactor(stamina) * mods.recoverMult * shelter;
 }
 

@@ -84,6 +84,7 @@ import {
   TICK_HZ,
   TRAIT_ALERT_FUMBLE,
   TRAIT_CRUISER_EXPONENT_RELIEF,
+  FRONT_RUNNER_EXPONENT_RELIEF,
   TRAIT_GATE_RUSHER_EARLY,
   TRAIT_GATE_RUSHER_PAYBACK,
   TRAIT_IRON_LUNGS_RECOVER,
@@ -274,10 +275,13 @@ function tankModsFor(horse: Horse): TankModifiers {
   let recoverMult = 1;
   if (horse.traits.includes('ironLungs')) recoverMult *= TRAIT_IRON_LUNGS_RECOVER;
   if (horse.traits.includes('thirsty')) recoverMult *= TRAIT_THIRSTY_RECOVER;
+  let exponentRelief = 0;
+  if (horse.traits.includes('cruiser')) exponentRelief += TRAIT_CRUISER_EXPONENT_RELIEF;
+  if (horse.style === 'frontRunner') exponentRelief += FRONT_RUNNER_EXPONENT_RELIEF;
   return {
     recoverMult,
     draftMult: horse.traits.includes('quickRecovery') ? TRAIT_QUICK_RECOVERY_DRAFT : 1,
-    exponentRelief: horse.traits.includes('cruiser') ? TRAIT_CRUISER_EXPONENT_RELIEF : 0,
+    exponentRelief,
   };
 }
 
