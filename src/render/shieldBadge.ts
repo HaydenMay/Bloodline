@@ -146,7 +146,7 @@ export interface BadgeScheme {
 
 const tinted = new Map<string, HTMLCanvasElement>();
 const TINT_CACHE_MAX = 20;
-const DEFAULT_ACCENT = '#FFD700'; // Yellow
+const DEFAULT_ACCENT = '#6B8FA3'; // Muted blue-grey (subtle accent)
 
 /**
  * Recolor a badge for the given coat and accent color.

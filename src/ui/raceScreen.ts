@@ -1,7 +1,6 @@
 import { createSurface, startLoop, type Loop, type Surface } from '../render/canvas.js';
 import { drawHorse, drawHorseShadow } from '../render/horse.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
-import { drawShieldBadge, loadBadge } from '../render/shieldBadge.js';
 import { RIVAL_SILKS, type Silks } from '../render/palette.js';
 import {
   drawBackdrop,
@@ -119,7 +118,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   // Decoding and tinting happen off the critical path; the rig covers the
   // opening frames, so a race never waits on the art.
   void loadSprites();
-  void loadBadge();
   const input: PlayerInput = {
     takingBack: false,
     kickPending: false,
@@ -563,68 +561,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       if (countdownEndsAt !== 0) drawCountdown(ctx, width, height);
       else drawStart(ctx, width, height);
     } else if (!running) drawFinish(ctx, width, height, player);
-
-    // ---- Runner badges (mockup) -----------------------------------------
-    if (started && running && width >= 600) {
-      drawRunnerBadges(ctx, width, height, runners, playerHorseId);
-    }
-  };
-
-  /** Draw the field with badges on the left side of the screen. */
-  const drawRunnerBadges = (
-    ctx: CanvasRenderingContext2D,
-    _width: number,
-    height: number,
-    runners: RunnerSnapshot[],
-    _playerHorseId: string,
-  ): void => {
-    const badgeSize = 40;
-    const badgeGap = 48;
-    const startX = 14;
-    const startY = 120;
-
-    // Background panel
-    const panelH = Math.min(runners.length * badgeGap + 20, height - startY - 100);
-    ctx.fillStyle = 'rgba(14,18,24,0.72)';
-    roundRect(ctx, startX - 8, startY - 8, badgeSize + 16, panelH + 16, 10);
-    ctx.fill();
-
-    // Sort by rank for display
-    const sorted = [...runners].sort((a, b) => a.rank - b.rank);
-
-    for (let i = 0; i < Math.min(sorted.length, Math.floor((height - startY - 100) / badgeGap)); i++) {
-      const r = sorted[i]!;
-      const y = startY + i * badgeGap;
-
-      // Draw the badge
-      const badgeX = startX + badgeSize / 2;
-      const badgeY = y + badgeSize / 2;
-      drawShieldBadge(ctx, badgeX, badgeY, {
-        coat: r.coat,
-        accentColor: '#FFD700', // Default yellow accent
-        scale: badgeSize / 256,
-      });
-
-      // Horse name next to badge
-      ctx.fillStyle = '#E8EDF4';
-      ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      const nameX = startX + badgeSize + 12;
-      ctx.fillText(
-        field.find((h) => h.id === r.id)?.name ?? `Horse ${i + 1}`,
-        nameX,
-        y + badgeSize / 2 + 4,
-      );
-
-      // Gap behind leader
-      if (i > 0) {
-        const leader = sorted[0]!;
-        const gap = Math.max(0, leader.distance - r.distance);
-        ctx.fillStyle = 'rgba(139,152,169,0.7)';
-        ctx.font = '500 9px ui-sans-serif, system-ui, sans-serif';
-        ctx.fillText(`${Math.round(gap)}m`, nameX, y + badgeSize / 2 + 15);
-      }
-    }
   };
 
   /** Pre-race card, so a race begins when you are ready rather than on load. */
