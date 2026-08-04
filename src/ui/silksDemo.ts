@@ -48,11 +48,11 @@ export function mountSilksDemo(host: HTMLElement): void {
       if (ctx) {
         ctx.clearRect(0, 0, horseCanvas.width, horseCanvas.height);
         const silks: Silks = { primary: selectedSilksColor, secondary: selectedManeColor };
-        drawSpriteHorse(ctx, horseCanvas.width / 2, horseCanvas.height / 2, {
+        drawSpriteHorse(ctx, horseCanvas.width / 2, horseCanvas.height * 0.65, {
           coat: selectedCoat,
           silks,
           phase: 0.5,
-          scale: 3,
+          scale: 2,
         });
       }
     }
@@ -110,7 +110,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       <div class="sd-preview-container">
         <div class="sd-preview">
           <p>Horse Preview</p>
-          <canvas class="sd-horse-canvas" width="400" height="300"></canvas>
+          <canvas class="sd-horse-canvas" width="300" height="200"></canvas>
         </div>
         <div class="sd-preview">
           <p>Badge Preview</p>
