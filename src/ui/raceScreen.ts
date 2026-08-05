@@ -126,6 +126,23 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   const playerHorse = field.find((h) => h.id === playerHorseId)!;
 
+  // When autopilot is ON, input is always zeroed. When OFF, player controls.
+  // This is the only difference between the two modes.
+  const effectiveInput: PlayerInput = {
+    get takingBack() {
+      return autopilot ? false : input.takingBack;
+    },
+    get kickPending() {
+      return autopilot ? false : input.kickPending;
+    },
+    set takingBack(v: boolean) {
+      input.takingBack = v;
+    },
+    set kickPending(v: boolean) {
+      input.kickPending = v;
+    },
+  };
+
   const entrants: RaceEntrant[] = field.map((horse) => ({ horse }));
   const race: LiveRace = createRace(entrants, config);
   const totalMetres = race.totalMetres;
@@ -133,7 +150,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   // The player's horse runs the SAME base ride as every opponent; this input
   // only modulates it (REBUILD.md §11.4). Registering it here is what makes a
   // hands-off player competitive rather than a passenger.
-  race.setPlayer(playerHorseId, input);
+  race.setPlayer(playerHorseId, effectiveInput);
 
   // Silks belong to the HORSE, not to its position in the field.
   //
@@ -201,12 +218,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       return;
     }
     if (!running) return;
-
-    // Autopilot mode: zero out player input so the AI ride runs unmodulated.
-    if (autopilot) {
-      input.takingBack = false;
-      input.kickPending = false;
-    }
 
     prev = curr;
     running = race.step();
@@ -381,54 +392,44 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     runners: RunnerSnapshot[],
   ): void => {
     const pad = 14;
-    const isNarrow = width < 500;
 
     // ---- Distance remaining ----------------------------------------------
     const remaining = Math.max(0, totalMetres - player.distance);
-    const infoBoxW = isNarrow ? width - pad * 2 : 168;
-    const infoBoxH = isNarrow ? 32 : 46;
-
     ctx.fillStyle = 'rgba(14,18,24,0.72)';
-    roundRect(ctx, pad, pad, infoBoxW, infoBoxH, 10);
+    roundRect(ctx, pad, pad, 168, 46, 10);
     ctx.fill();
 
     ctx.fillStyle = '#8B98A9';
     ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('TO GO', pad + 12, pad + 14);
+    ctx.fillText('TO GO', pad + 12, pad + 18);
 
     ctx.fillStyle = '#E8EDF4';
-    ctx.font = isNarrow ? '600 14px ui-monospace, monospace' : '700 20px ui-monospace, monospace';
-    ctx.fillText(`${Math.round(remaining)} m`, pad + 12, pad + (isNarrow ? 26 : 38));
+    ctx.font = '700 20px ui-monospace, monospace';
+    ctx.fillText(`${Math.round(remaining)} m`, pad + 12, pad + 38);
 
     ctx.fillStyle = '#8B98A9';
     ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(
-      `${ordinal(player.rank)}/${runners.length}`,
-      pad + infoBoxW - 12,
-      pad + (isNarrow ? 26 : 38),
-    );
+    ctx.fillText(`${ordinal(player.rank)} of ${runners.length}`, pad + 156, pad + 38);
 
     // There is deliberately no "your moment" window drawn here. Moment no
     // longer opens a window at all — it selects a pace-curve shape (REBUILD.md
     // §6) — so there is nothing to mark and nothing to mistime.
 
-    // ---- Minimap (hidden on narrow widths) --------------------------------
-    if (!isNarrow) {
-      drawMinimap(
-        ctx,
-        width - pad - 84,
-        pad,
-        84,
-        56,
-        runners.map((r) => ({
-          progress: Math.min(1, r.distance / totalMetres),
-          colour: silksFor.get(r.id)!.primary,
-          isPlayer: r.id === playerHorseId,
-        })),
-      );
-    }
+    // ---- Minimap ----------------------------------------------------------
+    drawMinimap(
+      ctx,
+      width - pad - 84,
+      pad,
+      84,
+      56,
+      runners.map((r) => ({
+        progress: Math.min(1, r.distance / totalMetres),
+        colour: silksFor.get(r.id)!.primary,
+        isPlayer: r.id === playerHorseId,
+      })),
+    );
 
     // ---- Kick charges — the only resource ----------------------------------
     // Dots show the bank; the wedge on the next empty one shows progress

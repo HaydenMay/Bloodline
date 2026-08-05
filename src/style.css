@@ -742,16 +742,16 @@ body {
   left: 50%;
   bottom: calc(100% + 7px);
   transform: translateX(-50%);
-  width: 190px;
-  max-width: calc(100vw - 20px);
-  max-height: 150px;
+  width: 180px;
+  max-width: 90vw;
+  max-height: 120px;
   overflow-y: auto;
   background: #0e1218;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 7px 9px;
-  font-size: 10.5px;
-  line-height: 1.45;
+  padding: 6px 8px;
+  font-size: 9.5px;
+  line-height: 1.4;
   color: var(--text);
   text-align: left;
   opacity: 0;
@@ -759,7 +759,7 @@ body {
   transition: opacity 0.12s;
   z-index: 5;
   pointer-events: none;
-  white-space: normal;
+  word-break: break-word;
 }
 
 .info-box.is-pinned .ib-trait:hover .ib-tip {
