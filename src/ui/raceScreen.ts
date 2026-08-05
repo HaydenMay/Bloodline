@@ -221,6 +221,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     }
     if (!running) return;
 
+    if (autopilot) {
+      input.takingBack = false;
+      input.kickPending = false;
+    }
+
     prev = curr;
     running = race.step();
     curr = race.snapshot();
@@ -738,7 +743,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let holdTimer = 0;
 
   const tap = (): void => {
-    input.kickPending = true;
+    if (!autopilot) input.kickPending = true;
   };
 
   const down = (e: Event): void => {
@@ -748,6 +753,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       pressedAt = 0;
       return;
     }
+    if (autopilot) return;
     pressedAt = performance.now();
     holdTimer = window.setTimeout(() => {
       input.takingBack = true;
@@ -772,11 +778,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       e.preventDefault();
       if (e.type !== 'keydown') return;
       if (!started) beginCountdown();
-      else tap();
+      else if (!autopilot) tap();
     }
     if (e.code === 'ArrowDown' || e.code === 'ShiftLeft') {
       e.preventDefault();
-      input.takingBack = e.type === 'keydown';
+      if (!autopilot) input.takingBack = e.type === 'keydown';
     }
   };
   window.addEventListener('keydown', key);
