@@ -1,6 +1,6 @@
 import badgeUrl from '../assets/shield-badge.png';
 import maskUrl from '../assets/shield-badge-mask.png';
-import { coatFor } from './palette.js';
+import { INK, coatFor } from './palette.js';
 
 /**
  * Shield badge for horses.
@@ -174,7 +174,13 @@ export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
   const target: Partial<Record<number, [number, number, number]>> = {
     [MATERIAL.body]: hexToHsl(coat.body),
     [MATERIAL.hair]: hexToHsl(maneColor),
-    [MATERIAL.points]: hexToHsl(maneColor),
+    // The badge has no legs, so `points` carries the LINE ART instead — the
+    // black outline around the horse and around the shield. It is deliberately
+    // NOT part of the scheme: an outline that changes colour with the silks
+    // stops being an outline. Half the rival silks have a near-white secondary,
+    // and drawing the outline in it gave the badge a pale halo that merged into
+    // a pale mane, which at 40px is the difference between a horse and a smudge.
+    [MATERIAL.points]: hexToHsl(INK),
     [MATERIAL.silks]: hexToHsl(accentColor),
     [MATERIAL.trim]: hexToHsl(maneColor),
   };
