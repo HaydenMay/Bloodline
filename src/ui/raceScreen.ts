@@ -109,11 +109,12 @@ export interface RaceScreenOptions {
   playerSilks: Silks;
   config: RaceConfig;
   autopilot?: boolean;
+  onRaceStart?: () => void;
   onFinish?: (placings: RunnerSnapshot[]) => void;
 }
 
 export function mountRaceScreen(opts: RaceScreenOptions): () => void {
-  const { host, field, playerHorseId, playerSilks, config, autopilot = false } = opts;
+  const { host, field, playerHorseId, playerSilks, config, autopilot = false, onRaceStart } = opts;
 
   const surface = createSurface(host);
   // Decoding and tinting happen off the critical path; the rig covers the
@@ -214,6 +215,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         started = true;
         countdownEndsAt = 0;
         setCallout("And they're off!");
+        onRaceStart?.();
       }
       return;
     }
