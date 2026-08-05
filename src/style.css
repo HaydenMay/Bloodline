@@ -505,6 +505,12 @@ body {
   }
 }
 
+@media (min-width: 768px) {
+  .rb-moment {
+    display: none;
+  }
+}
+
 /* --- Info box ----------------------------------------------------------- */
 
 .info-box {
@@ -739,9 +745,9 @@ body {
 
 .ib-tip {
   position: absolute;
-  left: 50%;
+  right: 0;
   bottom: calc(100% + 7px);
-  transform: translateX(-50%);
+  transform: none;
   width: 160px;
   max-width: calc(100vw - 16px);
   max-height: 120px;
