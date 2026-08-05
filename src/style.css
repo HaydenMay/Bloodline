@@ -739,11 +739,11 @@ body {
 
 .ib-tip {
   position: absolute;
-  left: max(4px, min(50%, calc(100vw - 192px)));
+  left: 50%;
   bottom: calc(100% + 7px);
   transform: translateX(-50%);
-  width: 180px;
-  max-width: calc(100vw - 8px);
+  width: 160px;
+  max-width: calc(100vw - 16px);
   max-height: 120px;
   overflow-y: auto;
   background: #0e1218;
@@ -760,6 +760,15 @@ body {
   z-index: 5;
   pointer-events: none;
   word-break: break-word;
+}
+
+@media (max-width: 480px) {
+  .ib-tip {
+    width: 140px;
+    max-width: calc(100vw - 16px);
+    font-size: 9px;
+    padding: 5px 7px;
+  }
 }
 
 .info-box.is-pinned .ib-trait:hover .ib-tip {
