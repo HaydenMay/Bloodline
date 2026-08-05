@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 import { PNG } from 'pngjs';
-import { MATERIAL_NAMES, type Material, classifyByKey } from './material-key.js';
+import { MATERIAL, MATERIAL_NAMES, type Material, classifyByKey } from './material-key.js';
 
 /**
  * Bake a material mask for FLAT art, by colour alone.
@@ -23,6 +23,15 @@ import { MATERIAL_NAMES, type Material, classifyByKey } from './material-key.js'
  *
  * Run: npm run bake-flat -- src/assets/shield-badge.png
  * Out: src/assets/shield-badge-mask.png
+ *
+ * `--art` pairs the mask with a DIFFERENT image from the one being read. An ID
+ * sheet is a hand-edited copy of the labels, and an editor is free to write its
+ * alpha channel a little differently from the art's — LibreSprite trims the
+ * outermost semi-transparent ring. Grow the labels only as far as the ID sheet
+ * reaches and the art's own soft edge is left unlabelled, which the renderer
+ * passes through untinted: a grey halo around every recoloured horse. With
+ * `--art` the labels are grown to cover the ART's silhouette instead, which is
+ * the one that has to be covered.
  *
  * The art is read against the material key in `tools/material-key.ts` and
  * nothing else — no sidecar, no per-asset palette file. An asset that does not
@@ -54,10 +63,10 @@ function main(): void {
   const args = process.argv.slice(2);
   // Skip the value that belongs to --out, not just the flag itself.
   const taken = new Set<number>();
-  args.forEach((a, i) => { if (a === '--out') taken.add(i).add(i + 1); });
+  args.forEach((a, i) => { if (a === '--out' || a === '--art') taken.add(i).add(i + 1); });
   const src = args.find((a, i) => !taken.has(i) && !a.startsWith('--'));
   if (!src) {
-    console.error('usage: bake-flat <asset.png> [--out <mask.png>]');
+    console.error('usage: bake-flat <asset.png> [--out <mask.png>] [--art <art.png>]');
     process.exitCode = 1;
     return;
   }
@@ -72,6 +81,19 @@ function main(): void {
   const { width: W, height: H, data } = png;
   const N = W * H;
   const lab = new Uint8Array(N);
+
+  // The silhouette the mask has to cover: the art's, when one is named.
+  const artAt = args.indexOf('--art');
+  const artPath = artAt >= 0 ? args[artAt + 1] : undefined;
+  let cover = data;
+  if (artPath) {
+    const art = PNG.sync.read(readFileSync(resolve(artPath)));
+    if (art.width !== W || art.height !== H) {
+      throw new Error(`--art is ${art.width}x${art.height}, source is ${W}x${H}`);
+    }
+    cover = art.data;
+  }
+  const needsLabel = (p: number): boolean => cover[p * 4 + 3]! >= ALPHA_EDGE;
 
   const dist2 = (p: number, q: number): number =>
     (data[p * 4]! - data[q * 4]!) ** 2 +
@@ -100,7 +122,7 @@ function main(): void {
     const x = p % W;
     const y = (p / W) | 0;
     for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, y > 0 ? p - W : -1, y < H - 1 ? p + W : -1]) {
-      if (q < 0 || lab[q] || data[q * 4 + 3]! < ALPHA_EDGE) continue;
+      if (q < 0 || lab[q] || !needsLabel(q)) continue;
       const qx = q % W;
       const qy = (q / W) | 0;
       let best: Material = lab[p] as Material;
@@ -114,6 +136,15 @@ function main(): void {
       queue.push(q);
     }
   }
+
+  // ---- Anything the flood could not reach -----------------------------------
+  // Art can carry marks that are not connected to the figure at all — the
+  // gallop sheet has speed lines trailing the jockey, detached strokes in open
+  // background. If the ID sheet does not cover one, no label is adjacent to it
+  // and the flood never arrives. `fixed` is the honest answer: it means leave
+  // this alone, which is exactly what an unlabelled pixel does anyway, except
+  // now it says so instead of being an accident.
+  for (let p = 0; p < N; p++) if (!lab[p] && needsLabel(p)) lab[p] = MATERIAL.fixed;
 
   // ---- Smooth, but only what was guessed ------------------------------------
   // GROWN PIXELS ONLY. A solid pixel's own colour decided its material, exactly
@@ -148,6 +179,11 @@ function main(): void {
   }
 
   // ---- Write ----------------------------------------------------------------
+  // Nothing outside the art keeps a label: an ID sheet can overhang by a pixel
+  // where the editor rounded an edge outwards, and a mask that claims pixels
+  // the art does not have is a lie about the art.
+  if (artPath) for (let p = 0; p < N; p++) if (!needsLabel(p)) lab[p] = 0;
+
   const mask = new PNG({ width: W, height: H });
   const tally: Record<number, number> = {};
   for (let p = 0; p < N; p++) {
