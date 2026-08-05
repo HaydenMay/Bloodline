@@ -721,3 +721,56 @@ Other things worth knowing:
 - **Do not scale the art with a smooth filter.** Nearest-neighbour only —
   bilinear scaling invents intermediate colours everywhere, which is the blur
   problem applied to the entire image at once.
+
+### Undoing a blur
+
+A blur cannot be reversed, but it can be **snapped away**, because flat art only
+ever wanted a handful of colours in the first place. Converting to indexed
+against a palette that holds only those colours rounds every smeared pixel to
+its nearest legal neighbour, and the gradients collapse back into hard edges:
+
+1. Build a palette of just the colours this asset uses — the ramp steps from
+   §11 for each material present, and nothing else. Fewer entries is better;
+   every extra one is somewhere a blurred pixel can land wrongly.
+2. `Sprite → Color Mode → Indexed`. Take the plain one, **not the Ordered
+   Dither variant** — dithering is the opposite of what is wanted here, it
+   spreads a smeared pixel into a pattern of two colours instead of committing
+   to one.
+3. `npm run check-art` and look at the mask. Five seconds, and it catches a
+   boundary that snapped to the wrong side.
+
+Indexed sprites carry one transparent index rather than an alpha channel, so
+this hardens the outer silhouette as well. For anything shown small that is a
+gain, not a loss: the browser re-softens it on the way down, and a hard edge
+downscales more predictably than a pre-blurred one.
+
+### Adding an outline
+
+LibreSprite has no Outline command — it is Aseprite's `Edit → FX → Outline` and
+one of the better-known gaps between the two. Outlines are manual.
+
+For a drawn rim, like the border of a shield, just draw it on its own layer with
+the pencil. For a true silhouette outline around everything:
+
+1. `Layer → Duplicate Layer`.
+2. On the duplicate, magic-wand the transparent background with *Contiguous*
+   on, `Select → Invert` to get the whole shape, and fill it with the outline
+   colour. That gives a solid silhouette.
+3. Move the silhouette layer **below** the art.
+4. Duplicate it four times, nudge each copy one pixel — up, down, left, right —
+   and merge them. The silhouette now sticks out a pixel all round, which is
+   the outline.
+
+**Pick the outline's colour from a material, not from the ink jar.** It is
+tinted like everything else, so the choice decides what it follows:
+
+| outline colour | material | what it does |
+|---|---|---|
+| `#12447F` | `silks` | shield rims — darkens with the runner's silks |
+| `#55555A` | `body` | horse silhouettes — stays with the coat, always related to it |
+| `#1A1A1C` | `points` | a hard black line that follows the points gene |
+| `#0B6B40` | `fixed` | never changes — for lines that must not move at all |
+
+An outline is the most valuable pixel in an icon: at 40px it is close to the
+only thing that survives, which is exactly why blurring one away costs so much
+more than it looks like it should.
