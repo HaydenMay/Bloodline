@@ -743,6 +743,9 @@ body {
   bottom: calc(100% + 7px);
   transform: translateX(-50%);
   width: 190px;
+  max-width: calc(100vw - 20px);
+  max-height: 150px;
+  overflow-y: auto;
   background: #0e1218;
   border: 1px solid var(--line);
   border-radius: 8px;
