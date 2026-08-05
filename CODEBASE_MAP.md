@@ -50,7 +50,9 @@ Player/AI Input → Engine reads it → Rider applies it → Horse speed updated
   
 - **`horse.ts`** — Draws individual horse body/legs (used for preview)
   
-- **`spriteHorse.ts`** — Sprite-based horse rendering (fast, used in races)
+- **`spriteHorse.ts`** — Sprite-based horse rendering (fast, used in races).
+  Reads the material mask baked by `tools/bake-sprites.ts`; see
+  [SPRITE_MASK.md](SPRITE_MASK.md) for how that mask is built and verified.
   
 - **`track.ts`** — Draws the racetrack background, distance markers, minimap
   
