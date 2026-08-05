@@ -498,6 +498,15 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       condTier === 3 ? '#6FE39B' : condTier === 2 ? '#F2C14E' : '#D9534F';
     ctx.fillText('='.repeat(condTier), barX + 20 + labelW, barY + 17);
 
+    // ---- Drafting indicator ------------------------------------------------
+    // Visual cue that the horse is sheltering behind a rival and getting regen bonus.
+    if (player.drafting) {
+      ctx.fillStyle = '#6FB3E0';
+      ctx.font = '700 9px ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('◆', barX + 20 + labelW + arrowsMaxW + 6, barY + 17);
+    }
+
     // ---- The charge dots ---------------------------------------------------
     // These ARE the tank, quantised (REBUILD.md §5.5). The hidden budget the
     // whole simulation runs on is read off honestly here, with the wedge on the
