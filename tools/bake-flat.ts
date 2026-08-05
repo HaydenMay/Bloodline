@@ -51,13 +51,22 @@ const SMOOTH_AGREE = 6;
 const SMOOTH_PASSES = 2;
 
 function main(): void {
-  const src = process.argv[2];
+  const args = process.argv.slice(2);
+  // Skip the value that belongs to --out, not just the flag itself.
+  const taken = new Set<number>();
+  args.forEach((a, i) => { if (a === '--out') taken.add(i).add(i + 1); });
+  const src = args.find((a, i) => !taken.has(i) && !a.startsWith('--'));
   if (!src) {
-    console.error('usage: bake-flat <asset.png>');
+    console.error('usage: bake-flat <asset.png> [--out <mask.png>]');
     process.exitCode = 1;
     return;
   }
-  const outMask = `${join(dirname(src), basename(src, extname(src)))}-mask.png`;
+  // `--out` exists so a hand-corrected ID SHEET can write the mask its ART
+  // expects: racer-id.png has to become racer-mask.png, not racer-id-mask.png.
+  const outAt = args.indexOf('--out');
+  const outMask = outAt >= 0 && args[outAt + 1]
+    ? args[outAt + 1]!
+    : `${join(dirname(src), basename(src, extname(src)))}-mask.png`;
 
   const png = PNG.sync.read(readFileSync(resolve(src)));
   const { width: W, height: H, data } = png;

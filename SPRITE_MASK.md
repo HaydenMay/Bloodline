@@ -47,6 +47,7 @@ Both copies must agree.
 |---|---|
 | `src/assets/racer.png` | the delivered art, 1280×1280, 5×5 grid of 256px cells, 24 frames. **Never modified.** |
 | `src/assets/racer-mask.png` | generated. One material id per pixel. This is what the game loads. |
+| `src/assets/racer-id.png` | generated. The same regions in the KEY colours — the editable copy. See §5.9. |
 | `src/assets/racer.json` | generated. Grid dimensions and per-frame bounding boxes. |
 | `tools/bake-sprites.ts` | generates the mask and the registration for `racer.png`. |
 | `tools/bake-flat.ts` | masks any FLAT asset by colour alone — see §11. |
@@ -319,7 +320,24 @@ single pixels with no labelled neighbour at any distance within their island.
 ### 5.9 Write
 
 - `racer-mask.png` — red = id × 40, alpha 255/0.
+- `racer-id.png` — the same labels in the key colours, as an ordinary image.
 - `racer.json` — grid and frame boxes.
+
+**The ID sheet is the escape hatch.** Everything in §5 infers a material from a
+shaded render, and inference is fragile: seven geometric rules, each measured
+against the poses in the *current* sheet. `racer-id.png` is that inference
+painted flat, in colours you can bucket-fill. Correct a region in LibreSprite,
+then
+
+```
+npm run bake-flat -- src/assets/racer-id.png --out src/assets/racer-mask.png
+```
+
+reads it by colour alone. Verified: the untouched ID sheet round-trips to a
+byte-identical mask, so anything that changes is a change you made. The rules
+in §5.3 stop being the source of truth and become a first draft, which is the
+right job for them — and correcting labels is bucket work, not brush work, so
+frames need only be *correctly labelled*, never artistically consistent.
 
 Nothing else. Both bakers used to emit an SVG trace of the mask alongside the
 PNG, on the theory that a vector version would be the natural place to correct

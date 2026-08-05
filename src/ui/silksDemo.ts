@@ -1,5 +1,5 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
-import { getHorsePreviewDataUri, loadHorsePreview } from '../render/horsePreview.js';
+import { drawHorse, drawHorseShadow } from '../render/horse.js';
 import { loadSprites } from '../render/spriteHorse.js';
 import { COATS, RIVAL_SILKS, type Silks } from '../render/palette.js';
 
@@ -25,45 +25,32 @@ export function mountSilksDemo(host: HTMLElement): void {
 
   const updatePreview = async () => {
     const silks: Silks = { primary: selectedSilksColor, secondary: selectedManeColor };
-    console.log('updatePreview called', { coat: selectedCoat, silks });
 
-    // Update badge
     const badgeImg = host.querySelector<HTMLImageElement>('.sd-badge');
     if (badgeImg) {
-      console.log('Badge image element found, calling getBadgeDataUri');
-      const uri = await getBadgeDataUri({
-        coat: selectedCoat,
-        silks,
-      });
-      console.log('getBadgeDataUri returned:', uri ? 'data URI' : 'null');
-      if (uri) {
-        badgeImg.src = uri;
-        console.log('Badge image src updated');
-      }
+      const uri = await getBadgeDataUri({ coat: selectedCoat, silks });
+      if (uri) badgeImg.src = uri;
     }
 
-    // Update horse preview
-    const horseUri = await getHorsePreviewDataUri({
-      coat: selectedCoat,
-      silks,
-    });
-    if (horseUri) {
-      let horseImg = host.querySelector<HTMLImageElement>('.sd-horse-img');
-      if (!horseImg) {
-        const container = host.querySelector('.sd-preview:first-child');
-        if (container) {
-          const canvas = container.querySelector<HTMLCanvasElement>('.sd-horse-canvas');
-          if (canvas) {
-            horseImg = document.createElement('img');
-            horseImg.className = 'sd-horse-img';
-            horseImg.style.cssText = 'width: 100%; height: auto; image-rendering: crisp-edges; display: block;';
-            canvas.replaceWith(horseImg);
-          }
-        }
-      }
-      if (horseImg) {
-        horseImg.src = horseUri;
-      }
+    // The horse comes from the DRAWN RIG, not from a sprite and a mask. It is
+    // already layered and already tints from the coat genes, so there is no
+    // asset to keep in step and no mask to get wrong — which is exactly what
+    // went wrong with the reference image this replaced: its mask had the legs
+    // as mane and left the whole silhouette untinted.
+    const canvas = host.querySelector<HTMLCanvasElement>('.sd-horse-canvas');
+    const ctx = canvas?.getContext('2d');
+    if (canvas && ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const scale = Math.min(canvas.width / 175, canvas.height / 115);
+      const x = canvas.width / 2;
+      const y = canvas.height * 0.82;
+      drawHorseShadow(ctx, x, y + 2, scale);
+      drawHorse(ctx, x, y, {
+        coat: selectedCoat,
+        silks,
+        pose: { phase: 0.12, intensity: 0.35, drive: 0.4 },
+        scale,
+      });
     }
   };
 
@@ -240,5 +227,5 @@ export function mountSilksDemo(host: HTMLElement): void {
   });
 
   // Initial preview render
-  Promise.all([loadSprites(), loadHorsePreview()]).then(() => updatePreview());
+  loadSprites().then(() => updatePreview());
 }

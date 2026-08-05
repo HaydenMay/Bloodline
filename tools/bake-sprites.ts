@@ -2,11 +2,14 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { PNG } from 'pngjs';
 import {
+  KEY,
   MATERIAL,
   MATERIAL_NAMES,
   type Material,
   chromaOf,
+  hexToRgb,
   hueIn,
+  materialByName,
   rgbToHsl,
 } from './material-key.js';
 
@@ -21,7 +24,19 @@ import {
  * Run: npm run bake-sprites
  * In:  src/assets/racer.png           the delivered sheet, untouched
  * Out: src/assets/racer-mask.png      one material id per pixel
+ *      src/assets/racer-id.png        the same regions in the KEY colours
  *      src/assets/racer.json          grid and per-frame registration
+ *
+ * THE ID SHEET IS THE ESCAPE HATCH. Everything below infers a material from a
+ * shaded render, and inference is fragile: seven geometric rules, every one of
+ * them measured against the poses in the CURRENT sheet. `racer-id.png` is that
+ * inference painted in flat key colours — an ordinary image. Open it, fix any
+ * region that came out wrong, and run
+ *
+ *     npm run bake-flat -- src/assets/racer-id.png --out src/assets/racer-mask.png
+ *
+ * which reads it by colour alone. The rules below stop being the source of
+ * truth and become a first draft, which is the right job for them.
  *
  * The base art is NOT rewritten. The renderer reads luminance from the original
  * and colour from the mask, so replacing the art later means re-running this
@@ -47,6 +62,7 @@ import {
 
 const SRC = 'src/assets/racer.png';
 const OUT_MASK = 'src/assets/racer-mask.png';
+const OUT_ID = 'src/assets/racer-id.png';
 const OUT_META = 'src/assets/racer.json';
 
 /** Grid the sheet is laid out on. */
@@ -425,6 +441,22 @@ function main(): void {
   mkdirSync(dirname(resolve(OUT_MASK)), { recursive: true });
   writeFileSync(resolve(OUT_MASK), PNG.sync.write(mask));
 
+  // The same labels, painted in the key colours, as a normal editable image.
+  const swatch: Record<number, [number, number, number]> = {};
+  for (const [name, { hex }] of Object.entries(KEY)) {
+    const m = materialByName(name);
+    if (m) swatch[m] = hexToRgb(hex);
+  }
+  const id = new PNG({ width: W, height: H });
+  for (let p = 0; p < N; p++) {
+    const c = swatch[lab[p]!];
+    id.data[p * 4] = c?.[0] ?? 0;
+    id.data[p * 4 + 1] = c?.[1] ?? 0;
+    id.data[p * 4 + 2] = c?.[2] ?? 0;
+    id.data[p * 4 + 3] = c ? 255 : 0;
+  }
+  writeFileSync(resolve(OUT_ID), PNG.sync.write(id));
+
   const frames = boxes
     .map((b, i) => (b ? { cell: i, x: b.x0, y: b.y0, w: b.x1 - b.x0 + 1, h: b.y1 - b.y0 + 1 } : null))
     .filter((f): f is NonNullable<typeof f> => f !== null);
@@ -439,7 +471,7 @@ function main(): void {
     if (!+k) continue;
     console.log(`  ${MATERIAL_NAMES[+k]!.padEnd(7)} ${String(v).padStart(7)}  ${((100 * v) / opaque).toFixed(1)}%`);
   }
-  console.log(`\nwrote ${OUT_MASK}\nwrote ${OUT_META}`);
+  console.log(`\nwrote ${OUT_MASK}\nwrote ${OUT_ID}\nwrote ${OUT_META}`);
 }
 
 main();
