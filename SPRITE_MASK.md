@@ -688,8 +688,12 @@ npm run check-art -- --write-palette material-key.gpl
 Four blocks:
 
 - **PALETTE** — the flat colours the art is built from, each with the material
-  it currently reads as. Under ~512 distinct colours means the art is flat
-  enough to bake by lookup alone.
+  it currently reads as, and whether the art is flat or shaded. Flatness is
+  measured by **how much of the art its top sixteen colours cover**, not by how
+  many colours exist: `racer.png` is a photoreal render with only 201 distinct
+  colours, because it was compressed, but its top sixteen cover 20.7% of it.
+  The badge's five cover 100%. Only flat art can be masked by lookup, and only
+  flat art is held to the key.
 - **BANDS** — every pixel classified by the key, with lightness, chroma and hue
   spread per material. Compare against §4 when art is replaced.
 - **MARGINS** — how close each material sits to the threshold that would flip
@@ -702,7 +706,16 @@ Four blocks:
   window it is nearest and by how many degrees.
 
 With `--mask` it also checks coverage — every visible pixel labelled, nothing
-outside the art, no partial alpha.
+outside the art, no partial alpha — and that **every solid pixel is masked as
+its own colour says**.
+
+That last one is an error on flat art and expected on shaded art, so it is
+reported differently for each. `racer.png` paints its mane, tail and cannons in
+one identical black; the key physically cannot separate them, and §5.3 does it
+by geometry instead. Every pixel of mane recovered that way is a deliberate
+disagreement with colour — 51,912 of them, about a fifth of the sheet. On a
+shaded asset that number is information, not a defect, and there is nothing to
+hand-fix. On flat art it should be zero.
 
 ### `npm run bake-flat`
 

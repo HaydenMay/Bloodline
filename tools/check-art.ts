@@ -60,6 +60,29 @@ const RISK_HUE = 8;
 /** Ignore colours rarer than this when listing the palette. */
 const PALETTE_MIN_SHARE = 0.004;
 
+/** How many of the top colours have to cover the art before it counts as flat. */
+const FLAT_TOP_N = 16;
+const FLAT_COVERAGE = 0.9;
+
+/**
+ * Is this art painted in flat regions, or shaded?
+ *
+ * NOT by counting distinct colours, which is the obvious test and the wrong
+ * one: `racer.png` is a photoreal render and still has only 201 of them,
+ * because it was compressed. What separates them is how the art is DISTRIBUTED
+ * across those colours. Flat art puts nearly everything on a handful of them —
+ * the shield badge is 100% on five. A shaded render spreads itself down a ramp,
+ * and its top sixteen colours cover barely a fifth of it.
+ *
+ * The distinction decides whether the key applies at all, so getting it wrong
+ * means telling someone to hand-fix fifty thousand correct pixels.
+ */
+function isFlat(counts: Map<string, number>, total: number): { flat: boolean; coverage: number } {
+  const top = [...counts.values()].sort((a, b) => b - a).slice(0, FLAT_TOP_N);
+  const coverage = top.reduce((a, v) => a + v, 0) / (total || 1);
+  return { flat: coverage >= FLAT_COVERAGE, coverage };
+}
+
 const pct = (n: number, of: number): string => `${((100 * n) / (of || 1)).toFixed(1)}%`;
 
 const quantile = (sorted: number[], f: number): number =>
@@ -135,11 +158,14 @@ function measure(r: number, g: number, b: number): Sample {
 
 function reportPalette(counts: Map<string, number>, total: number): void {
   const flats = [...counts].sort((a, b) => b[1] - a[1]).filter(([, n]) => n / total >= PALETTE_MIN_SHARE);
+  const { flat, coverage } = isFlat(counts, total);
   console.log(`\nPALETTE  ${counts.size} distinct colours in ${total} opaque pixels`);
-  if (counts.size <= 512) {
+  console.log(`  top ${FLAT_TOP_N} cover ${(100 * coverage).toFixed(1)}% of the art`);
+  if (flat) {
     console.log('  Flat art — this can be masked by colour lookup alone (tools/bake-flat.ts).');
   } else {
-    console.log('  Shaded art — masking needs the band rules, and possibly per-asset geometry.');
+    console.log('  Shaded art — the key does not apply to it directly; masking needs');
+    console.log('  the measured band rules and the geometry in tools/bake-sprites.ts.');
   }
   console.log('\n  colour     share   hue  chroma     L  reads as');
   for (const [hex, n] of flats.slice(0, 16)) {
@@ -254,7 +280,7 @@ function reportVerdict(samples: Sample[]): void {
   }
 }
 
-function reportMask(artPng: PNG, maskPath: string): void {
+function reportMask(artPng: PNG, maskPath: string, flat: boolean): void {
   const mask = PNG.sync.read(readFileSync(resolve(maskPath)));
   console.log(`\nMASK  ${basename(maskPath)}`);
   if (mask.width !== artPng.width || mask.height !== artPng.height) {
@@ -303,14 +329,29 @@ function reportMask(artPng: PNG, maskPath: string): void {
   if (stray) console.log('  WARN  the mask claims pixels the art does not have');
   if (partial) console.log('  WARN  partial alpha in a mask decodes to the wrong id after un-premultiplying');
 
-  // The invariant that matters most, and the one that fails silently. A mask
-  // that disagrees with its own art is not a rounding error at an edge — it is
-  // a pixel the baker decided it knew better about, and it shows up in game as
-  // a fleck of the wrong colour in the middle of a flat region.
+  // The invariant that matters most on FLAT art, and the one that fails
+  // silently there: a mask that disagrees with its own art is a pixel the baker
+  // decided it knew better about, and it shows up in game as a fleck of the
+  // wrong colour in the middle of a flat region.
+  //
+  // On SHADED art the same measurement means the opposite. `racer.png` paints
+  // its mane, tail and cannons in one identical black, so the key physically
+  // cannot separate them and `bake-sprites` separates them by geometry instead.
+  // Every pixel of mane it recovers is a deliberate disagreement with colour.
+  // Reporting those as errors would send someone to hand-fix fifty thousand
+  // correct pixels, so this is a count, not a warning, unless the art is flat.
   const off = [...disagree].sort((a, b) => b[1] - a[1]);
   const n = off.reduce((a, [, v]) => a + v, 0);
   if (!n) {
     console.log('  ok    every solid pixel is masked as its own colour says');
+    return;
+  }
+  if (!flat) {
+    console.log(
+      `  info  ${n} solid pixels (${pct(n, covered)}) are masked as something their colour` +
+      '\n        does not say. On shaded art that is the point — the geometry in' +
+      '\n        bake-sprites.ts recovering what colour alone cannot. Judge it by eye.',
+    );
     return;
   }
   console.log(`\n  WARN  ${n} solid pixels are masked as something their colour does not say:`);
@@ -370,7 +411,7 @@ function main(): void {
   reportVerdict(samples);
 
   const maskAt = args.indexOf('--mask');
-  if (maskAt >= 0 && args[maskAt + 1]) reportMask(png, args[maskAt + 1]!);
+  if (maskAt >= 0 && args[maskAt + 1]) reportMask(png, args[maskAt + 1]!, isFlat(counts, samples.length).flat);
 }
 
 main();
