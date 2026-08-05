@@ -1,7 +1,7 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { drawHorseShadow } from '../render/horse.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
-import { COATS, RIVAL_SILKS, coatFor, type Silks } from '../render/palette.js';
+import { COATS, INK, RIVAL_SILKS, coatFor, type Silks } from '../render/palette.js';
 
 const COAT_COLORS = Object.values(COATS).map((coat) => ({
   id: coat.id,
@@ -13,10 +13,44 @@ const TRIM_COLORS = [...new Set(RIVAL_SILKS.map((s) => s.secondary))].map((hex, 
   name: `Trim ${i + 1}`,
 }));
 
-/** Every mane colour the coats define, offered on its own. */
+/**
+ * Every mane colour the coats define, offered on its own.
+ *
+ * A mane genuinely can be nothing like the body — a flaxen mane on a chestnut,
+ * a black mane on a bay — so the whole range is fair game here.
+ */
 const HAIR_COLORS = [...new Set(Object.values(COATS).map((c) => c.hair))].map((hex) => ({ hex }));
-/** Every points colour the coats define — cannons and hooves. */
-const POINT_COLORS = [...new Set(Object.values(COATS).map((c) => c.points))].map((hex) => ({ hex }));
+
+const hexToRgb = (hex: string): [number, number, number] => {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+const mix = (a: string, b: string, t: number): string => {
+  const [r1, g1, b1] = hexToRgb(a);
+  const [r2, g2, b2] = hexToRgb(b);
+  const ch = (x: number, y: number): string =>
+    Math.round(x + (y - x) * t).toString(16).padStart(2, '0');
+  return `#${ch(r1, r2)}${ch(g1, g2)}${ch(b1, b2)}`;
+};
+
+/**
+ * Points that could plausibly belong to THIS body colour.
+ *
+ * Points are not a free choice the way a mane is. On a real horse the lower
+ * legs are the body colour taken darker, or black — a bay's black points, a
+ * chestnut's slightly deeper legs. Offering every coat's points here meant you
+ * could put a palomino's tan legs on a black horse, which is not a colour any
+ * horse has ever been. So the row is DERIVED from the body: the coat's own
+ * genetic value first, then the body darkened by three amounts and lifted
+ * slightly, which covers everything from black points to pale socks and
+ * nothing that looks like a mistake.
+ */
+const pointsFor = (coatId: string): { hex: string }[] => {
+  const { body, points } = coatFor(coatId);
+  const ramp = [points, mix(body, INK, 0.7), mix(body, INK, 0.42), mix(body, INK, 0.2), mix(body, '#FFFFFF', 0.2)];
+  return [...new Set(ramp)].map((hex) => ({ hex }));
+};
 
 const SILKS_COLORS = RIVAL_SILKS.map((silks, i) => ({
   hex: silks.primary,
@@ -73,6 +107,8 @@ export function mountSilksDemo(host: HTMLElement): void {
     <div class="silks-demo">
       <h2>Color System Demo</h2>
       <p>Five tinted regions, one per material in the mask.</p>
+      <div class="sd-layout">
+      <div class="sd-controls">
 
       <div class="sd-section">
         <label>1. Body Color (Coat)</label>
@@ -103,8 +139,8 @@ export function mountSilksDemo(host: HTMLElement): void {
 
       <div class="sd-section">
         <label>3. Points (lower legs &amp; hooves)</label>
-        <div class="sd-colors">
-          ${POINT_COLORS.map(
+        <div class="sd-colors sd-points-row">
+          ${pointsFor(selectedCoat).map(
             (color) =>
               `<button
                 class="sd-color-btn sd-points ${color.hex === selectedPointColor ? 'active' : ''}"
@@ -148,6 +184,8 @@ export function mountSilksDemo(host: HTMLElement): void {
         <input type="text" class="sd-hex-input" id="silks-hex" value="${selectedSilksColor}" placeholder="#2F7FD1" />
       </div>
 
+      </div>
+
       <div class="sd-preview-container">
         <div class="sd-preview">
           <p>Horse Preview</p>
@@ -162,12 +200,39 @@ export function mountSilksDemo(host: HTMLElement): void {
         </div>
       </div>
 
+      </div>
+
       <div class="sd-actions">
         <button class="sd-start-btn">Start Race</button>
         <a href="/" class="sd-back-link">Back</a>
       </div>
     </div>
   `;
+
+  /** Redraw the points swatches for the current coat, and re-wire them. */
+  function renderPoints(): void {
+    const row = host.querySelector<HTMLElement>('.sd-points-row');
+    if (!row) return;
+    row.innerHTML = pointsFor(selectedCoat)
+      .map(
+        (c) =>
+          `<button class="sd-color-btn sd-points ${c.hex === selectedPointColor ? 'active' : ''}"` +
+          ` data-color="${c.hex}" style="background: ${c.hex}"></button>`,
+      )
+      .join('');
+    host.querySelector<HTMLInputElement>('#points-hex')!.value = selectedPointColor;
+    row.querySelectorAll('.sd-color-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const color = btn.getAttribute('data-color');
+        if (!color) return;
+        selectedPointColor = color;
+        row.querySelectorAll('.sd-color-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        host.querySelector<HTMLInputElement>('#points-hex')!.value = color;
+        updatePreview();
+      });
+    });
+  }
 
   /** Wire one swatch row plus its hex box to a single colour. */
   const wire = (cls: string, hexId: string, set: (v: string) => void): void => {
@@ -205,21 +270,26 @@ export function mountSilksDemo(host: HTMLElement): void {
       btn.classList.add('active');
       host.querySelector<HTMLSpanElement>('.sd-coat-name')!.textContent =
         COAT_COLORS.find((c) => c.id === id)?.name ?? id;
-      for (const [cls, hexId, value] of [
-        ['sd-hair', 'hair-hex', selectedHairColor],
-        ['sd-points', 'points-hex', selectedPointColor],
-      ] as const) {
-        host.querySelector<HTMLInputElement>(`#${hexId}`)!.value = value;
-        host.querySelectorAll(`.sd-color-btn.${cls}`).forEach((b) => {
-          b.classList.toggle('active', b.getAttribute('data-color') === value);
-        });
-      }
+      host.querySelector<HTMLInputElement>('#hair-hex')!.value = selectedHairColor;
+      host.querySelectorAll('.sd-color-btn.sd-hair').forEach((b) => {
+        b.classList.toggle('active', b.getAttribute('data-color') === selectedHairColor);
+      });
+      // The points ramp is derived from the body, so it is rebuilt rather than
+      // re-ticked — a black horse and a palomino do not share a single swatch.
+      renderPoints();
       updatePreview();
     });
   });
 
   wire('sd-hair', 'hair-hex', (v) => { selectedHairColor = v; });
-  wire('sd-points', 'points-hex', (v) => { selectedPointColor = v; });
+  renderPoints();
+  host.querySelector<HTMLInputElement>('#points-hex')!.addEventListener('change', (e) => {
+    const color = (e.target as HTMLInputElement).value.trim();
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return;
+    selectedPointColor = color;
+    host.querySelectorAll('.sd-color-btn.sd-points').forEach((b) => b.classList.remove('active'));
+    updatePreview();
+  });
   wire('sd-trim', 'trim-hex', (v) => { selectedTrimColor = v; });
   wire('sd-silks', 'silks-hex', (v) => { selectedSilksColor = v; });
 

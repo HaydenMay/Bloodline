@@ -841,12 +841,32 @@ body {
 
 /* Silks Demo */
 .silks-demo {
-  max-width: 600px;
-  margin: 40px auto;
+  max-width: 1040px;
+  margin: 24px auto;
   padding: 20px;
   background: var(--panel);
   border-radius: 8px;
   color: var(--text);
+  /* `html, body` are overflow:hidden so the race canvas cannot be scrolled off
+     the screen. This form is the one place that has more content than fits, so
+     it scrolls itself rather than lifting the rule for every other screen. */
+  max-height: calc(100svh - 48px);
+  overflow-y: auto;
+}
+
+/* Controls left, previews right. Below the breakpoint they stack, because a
+   320px preview column and a row of coat buttons cannot both have the width. */
+.sd-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .sd-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .silks-demo h2 {
@@ -861,7 +881,7 @@ body {
 }
 
 .sd-section {
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 .sd-section label {
@@ -939,13 +959,23 @@ body {
 
 .sd-preview-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
-  margin: 32px 0;
+  /* Stays put while the controls scroll past, so the thing you are changing is
+     never the thing that scrolled out of view. */
+  position: sticky;
+  top: 0;
+}
+
+@media (max-width: 900px) {
+  .sd-preview-container {
+    position: static;
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .sd-preview {
-  padding: 24px;
+  padding: 16px;
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -966,14 +996,14 @@ body {
   height: auto;
   background: var(--panel);
   border-radius: 4px;
-  margin-bottom: 16px;
+  margin-bottom: 0;
   image-rendering: crisp-edges;
 }
 
 .sd-badge {
   width: 120px;
   height: 120px;
-  margin: 0 auto 16px;
+  margin: 0 auto 8px;
   image-rendering: crisp-edges;
   border-radius: 8px;
 }
