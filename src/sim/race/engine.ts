@@ -524,7 +524,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
       // that horse's window. A late horse's window is narrow and fierce, an
       // early horse's broad and mild, and the two are worth the same over a
       // race. Outside it entirely a kick still works, just poorly.
-      r.kickStrength = kickStrengthFor(r.horse) * kickWindowBonus(r.horse.moment, ownProgress);
+      r.kickStrength = kickStrengthFor(r.horse) * kickWindowBonus(r.horse.moment, ownProgress, r.horse.style);
       r.kicksFired += 1;
 
       // A player tap brings the next planned kick FORWARD; the AI's own
