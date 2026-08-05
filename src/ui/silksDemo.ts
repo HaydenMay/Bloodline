@@ -1,6 +1,6 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
-import { drawHorse, drawHorseShadow } from '../render/horse.js';
-import { loadSprites } from '../render/spriteHorse.js';
+import { drawHorseShadow } from '../render/horse.js';
+import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
 import { COATS, RIVAL_SILKS, type Silks } from '../render/palette.js';
 
 const COAT_COLORS = Object.values(COATS).map((coat) => ({
@@ -32,25 +32,22 @@ export function mountSilksDemo(host: HTMLElement): void {
       if (uri) badgeImg.src = uri;
     }
 
-    // The horse comes from the DRAWN RIG, not from a sprite and a mask. It is
-    // already layered and already tints from the coat genes, so there is no
-    // asset to keep in step and no mask to get wrong — which is exactly what
-    // went wrong with the reference image this replaced: its mask had the legs
-    // as mane and left the whole silhouette untinted.
+    // The RACE SPRITE, not the drawn rig. This panel exists to answer "what
+    // will my horse look like out there", and the only honest answer is the
+    // thing the race actually draws — same sheet, same mask, same tint path.
+    // The rig is a different horse; showing it here would preview a coat the
+    // player never sees.
     const canvas = host.querySelector<HTMLCanvasElement>('.sd-horse-canvas');
     const ctx = canvas?.getContext('2d');
     if (canvas && ctx) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const scale = Math.min(canvas.width / 175, canvas.height / 115);
+      const scale = Math.min(canvas.width / 200, canvas.height / 150);
       const x = canvas.width / 2;
-      const y = canvas.height * 0.82;
-      drawHorseShadow(ctx, x, y + 2, scale);
-      drawHorse(ctx, x, y, {
-        coat: selectedCoat,
-        silks,
-        pose: { phase: 0.12, intensity: 0.35, drive: 0.4 },
-        scale,
-      });
+      const y = canvas.height * 0.88;
+      drawHorseShadow(ctx, x, y + 2, scale * 1.1);
+      // A phase with all four legs clear of each other, so coat, points and
+      // silks are all readable at a glance rather than overlapping.
+      drawSpriteHorse(ctx, x, y, { coat: selectedCoat, silks, phase: 0.12, scale });
     }
   };
 
