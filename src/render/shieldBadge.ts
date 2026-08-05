@@ -1,6 +1,6 @@
 import badgeUrl from '../assets/shield-badge.png';
 import maskUrl from '../assets/shield-badge-mask.png';
-import { INK, coatFor } from './palette.js';
+import { INK, coatFor, type Coat } from './palette.js';
 
 /**
  * Shield badge for horses.
@@ -10,10 +10,12 @@ import { INK, coatFor } from './palette.js';
  * saturation from the horse's scheme. `tools/bake-flat.ts` writes the mask; see
  * SPRITE_MASK.md.
  *
- * The badge deliberately does NOT take its mane colour from the coat genes.
- * Coat and mane are so often close in real genetics that a shield picked out in
- * both reads as one colour at icon size, so the mane takes the silks' secondary
- * instead and the badge stays legible in a pedigree tree.
+ * The badge shows the HORSE: its coat on the head, its mane on the mane, the
+ * runner's silks on the shield. It used to draw the mane in the silks'
+ * secondary instead, on the theory that a coat and its mane are often too close
+ * to tell apart at icon size — but the black outline separates them perfectly
+ * well, and a badge showing a colour the horse does not have was the more
+ * confusing of the two.
  */
 
 const MATERIAL = { body: 1, hair: 2, points: 3, silks: 4, trim: 5, fixed: 6 } as const;
@@ -142,7 +144,8 @@ export interface Silks {
 }
 
 export interface BadgeScheme {
-  coat: string;
+  /** A coat id, or the three colours themselves. See spriteHorse's `Scheme`. */
+  coat: string | Coat;
   /** Jockey silks — primary color is used as the accent for mane/legs/outline. */
   silks?: Silks;
   /** Fallback accent color if silks not provided. */
@@ -161,7 +164,8 @@ export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
   if (!loaded) return null;
   const accentColor = scheme.silks?.primary ?? scheme.accentColor ?? DEFAULT_ACCENT;
   const maneColor = scheme.silks?.secondary ?? accentColor;
-  const key = `${scheme.coat}|${accentColor}|${maneColor}`;
+  const coat = typeof scheme.coat === 'string' ? coatFor(scheme.coat) : scheme.coat;
+  const key = `${coat.body}|${coat.hair}|${accentColor}|${maneColor}`;
   const hit = tinted.get(key);
   if (hit) {
     // Re-insert so the map's order stays least-recently-used first.
@@ -170,10 +174,9 @@ export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
     return hit;
   }
 
-  const coat = coatFor(scheme.coat);
   const target: Partial<Record<number, [number, number, number]>> = {
     [MATERIAL.body]: hexToHsl(coat.body),
-    [MATERIAL.hair]: hexToHsl(maneColor),
+    [MATERIAL.hair]: hexToHsl(coat.hair),
     // The badge has no legs, so `points` carries the LINE ART instead — the
     // black outline around the horse and around the shield. It is deliberately
     // NOT part of the scheme: an outline that changes colour with the silks

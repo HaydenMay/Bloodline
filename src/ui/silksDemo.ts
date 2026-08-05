@@ -8,20 +8,15 @@ const COAT_COLORS = Object.values(COATS).map((coat) => ({
   name: coat.name,
 }));
 
-/**
- * Colours for the silks' SECONDARY, which is breeches, collar and the badge's
- * accent. Taken from the rival silks, because that is the slot it fills.
- *
- * It used to offer the coats' MANE colours here, under a label that said "Mane
- * & Leg Color", and that was simply a lie about what the control does: mane and
- * legs come from the coat gene (DESIGN.md §11 — appearance is genetic and not
- * editable), so picking a "mane colour" here recoloured the jockey's breeches
- * and nothing else.
- */
 const TRIM_COLORS = [...new Set(RIVAL_SILKS.map((s) => s.secondary))].map((hex, i) => ({
   hex,
   name: `Trim ${i + 1}`,
 }));
+
+/** Every mane colour the coats define, offered on its own. */
+const HAIR_COLORS = [...new Set(Object.values(COATS).map((c) => c.hair))].map((hex) => ({ hex }));
+/** Every points colour the coats define — cannons and hooves. */
+const POINT_COLORS = [...new Set(Object.values(COATS).map((c) => c.points))].map((hex) => ({ hex }));
 
 const SILKS_COLORS = RIVAL_SILKS.map((silks, i) => ({
   hex: silks.primary,
@@ -29,16 +24,29 @@ const SILKS_COLORS = RIVAL_SILKS.map((silks, i) => ({
 }));
 
 export function mountSilksDemo(host: HTMLElement): void {
+  // FIVE INDEPENDENT COLOURS, one per tinted material in the mask. In the game
+  // three of them arrive together from the coat gene — a horse does not choose
+  // its mane. This screen is the exception on purpose: it exists to exercise
+  // the colour system, and it cannot show what the mask can do if three of its
+  // five regions are welded to one control. Picking a coat still sets all
+  // three, so it behaves as a preset; then each can be moved off it.
   let selectedCoat = 'palomino';
+  let selectedHairColor = COATS.palomino.hair;
+  let selectedPointColor = COATS.palomino.points;
   let selectedTrimColor = RIVAL_SILKS[0]!.secondary;
   let selectedSilksColor = RIVAL_SILKS[0]!.primary;
 
   const updatePreview = async () => {
     const silks: Silks = { primary: selectedSilksColor, secondary: selectedTrimColor };
+    const coat = {
+      ...coatFor(selectedCoat),
+      hair: selectedHairColor,
+      points: selectedPointColor,
+    };
 
     const badgeImg = host.querySelector<HTMLImageElement>('.sd-badge');
     if (badgeImg) {
-      const uri = await getBadgeDataUri({ coat: selectedCoat, silks });
+      const uri = await getBadgeDataUri({ coat, silks });
       if (uri) badgeImg.src = uri;
     }
 
@@ -57,14 +65,14 @@ export function mountSilksDemo(host: HTMLElement): void {
       drawHorseShadow(ctx, x, y + 2, scale * 1.1);
       // A phase with all four legs clear of each other, so coat, points and
       // silks are all readable at a glance rather than overlapping.
-      drawSpriteHorse(ctx, x, y, { coat: selectedCoat, silks, phase: 0.12, scale });
+      drawSpriteHorse(ctx, x, y, { coat, silks, phase: 0.12, scale });
     }
   };
 
   host.innerHTML = `
     <div class="silks-demo">
       <h2>Color System Demo</h2>
-      <p>Customize the three color regions: body, mane/legs, and silks.</p>
+      <p>Five tinted regions, one per material in the mask.</p>
 
       <div class="sd-section">
         <label>1. Body Color (Coat)</label>
@@ -79,7 +87,37 @@ export function mountSilksDemo(host: HTMLElement): void {
       </div>
 
       <div class="sd-section">
-        <label>2. Silks Trim (breeches &amp; collar)</label>
+        <label>2. Mane &amp; Tail</label>
+        <div class="sd-colors">
+          ${HAIR_COLORS.map(
+            (color) =>
+              `<button
+                class="sd-color-btn sd-hair ${color.hex === selectedHairColor ? 'active' : ''}"
+                data-color="${color.hex}"
+                style="background: ${color.hex}"
+              ></button>`,
+          ).join('')}
+        </div>
+        <input type="text" class="sd-hex-input" id="hair-hex" value="${selectedHairColor}" placeholder="#221509" />
+      </div>
+
+      <div class="sd-section">
+        <label>3. Points (lower legs &amp; hooves)</label>
+        <div class="sd-colors">
+          ${POINT_COLORS.map(
+            (color) =>
+              `<button
+                class="sd-color-btn sd-points ${color.hex === selectedPointColor ? 'active' : ''}"
+                data-color="${color.hex}"
+                style="background: ${color.hex}"
+              ></button>`,
+          ).join('')}
+        </div>
+        <input type="text" class="sd-hex-input" id="points-hex" value="${selectedPointColor}" placeholder="#2A1A0E" />
+      </div>
+
+      <div class="sd-section">
+        <label>4. Silks Trim (breeches &amp; collar)</label>
         <div class="sd-colors">
           ${TRIM_COLORS.map(
             (color) =>
@@ -95,7 +133,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       </div>
 
       <div class="sd-section">
-        <label>3. Silks Color (Jockey & Shield Outline)</label>
+        <label>5. Silks Color (jockey &amp; shield)</label>
         <div class="sd-colors">
           ${SILKS_COLORS.map(
             (color) =>
@@ -120,24 +158,6 @@ export function mountSilksDemo(host: HTMLElement): void {
           <img class="sd-badge" src="" alt="Badge preview" />
           <div class="sd-info">
             <span class="sd-coat-name">${COAT_COLORS.find((c) => c.id === selectedCoat)?.name}</span>
-            <div class="sd-color-labels">
-              <div class="sd-color-info">
-                <span class="sd-color-label">Mane</span>
-                <span class="sd-color-swatch" style="background: ${coatFor(selectedCoat).hair}"></span>
-              </div>
-              <div class="sd-color-info">
-                <span class="sd-color-label">Points</span>
-                <span class="sd-color-swatch" style="background: ${coatFor(selectedCoat).points}"></span>
-              </div>
-              <div class="sd-color-info">
-                <span class="sd-color-label">Silks</span>
-                <span class="sd-color-swatch" style="background: ${selectedSilksColor}"></span>
-              </div>
-              <div class="sd-color-info">
-                <span class="sd-color-label">Trim</span>
-                <span class="sd-color-swatch" style="background: ${selectedTrimColor}"></span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -149,98 +169,74 @@ export function mountSilksDemo(host: HTMLElement): void {
     </div>
   `;
 
-  // Coat selection
+  /** Wire one swatch row plus its hex box to a single colour. */
+  const wire = (cls: string, hexId: string, set: (v: string) => void): void => {
+    const apply = (color: string, btn?: Element): void => {
+      set(color);
+      host.querySelectorAll(`.sd-color-btn.${cls}`).forEach((b) => b.classList.remove('active'));
+      btn?.classList.add('active');
+      host.querySelector<HTMLInputElement>(`#${hexId}`)!.value = color;
+      updatePreview();
+    };
+    host.querySelectorAll(`.sd-color-btn.${cls}`).forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const color = btn.getAttribute('data-color');
+        if (color) apply(color, btn);
+      });
+    });
+    host.querySelector<HTMLInputElement>(`#${hexId}`)!.addEventListener('change', (e) => {
+      const color = (e.target as HTMLInputElement).value.trim();
+      // Anything that is not a hex colour would tint the horse to NaN, so it is
+      // simply ignored and the box keeps showing the value in force.
+      if (/^#[0-9a-fA-F]{6}$/.test(color)) apply(color);
+    });
+  };
+
+  // A coat is a PRESET here: it sets body, mane and points together the way the
+  // gene does, and the two controls below can then be moved off it.
   host.querySelectorAll('.sd-coat-btn').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      const coat = (e.target as HTMLElement).getAttribute('data-coat');
-      if (coat) {
-        selectedCoat = coat;
-        host.querySelectorAll('.sd-coat-btn').forEach((b) => b.classList.remove('active'));
-        (e.target as HTMLElement).classList.add('active');
-        host.querySelector<HTMLSpanElement>('.sd-coat-name')!.textContent =
-          COAT_COLORS.find((c) => c.id === coat)?.name || coat;
-        updatePreview();
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-coat');
+      if (!id) return;
+      selectedCoat = id;
+      selectedHairColor = coatFor(id).hair;
+      selectedPointColor = coatFor(id).points;
+      host.querySelectorAll('.sd-coat-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      host.querySelector<HTMLSpanElement>('.sd-coat-name')!.textContent =
+        COAT_COLORS.find((c) => c.id === id)?.name ?? id;
+      for (const [cls, hexId, value] of [
+        ['sd-hair', 'hair-hex', selectedHairColor],
+        ['sd-points', 'points-hex', selectedPointColor],
+      ] as const) {
+        host.querySelector<HTMLInputElement>(`#${hexId}`)!.value = value;
+        host.querySelectorAll(`.sd-color-btn.${cls}`).forEach((b) => {
+          b.classList.toggle('active', b.getAttribute('data-color') === value);
+        });
       }
-    });
-  });
-
-  // Silks trim selection
-  const trimBtns = host.querySelectorAll('.sd-color-btn.sd-trim');
-  trimBtns.forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      const color = (e.target as HTMLElement).getAttribute('data-color');
-      if (color) {
-        selectedTrimColor = color;
-        host.querySelectorAll('.sd-color-btn.sd-trim').forEach((b) => b.classList.remove('active'));
-        (e.target as HTMLElement).classList.add('active');
-        host.querySelector<HTMLInputElement>('#trim-hex')!.value = color;
-        host.querySelectorAll('.sd-color-info')[0]!.querySelector('.sd-color-swatch')!.setAttribute(
-          'style',
-          `background: ${color}`,
-        );
-        updatePreview();
-      }
-    });
-  });
-
-  // Silks color selection
-  host.querySelectorAll('.sd-color-btn.sd-silks').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      const color = (e.target as HTMLElement).getAttribute('data-color');
-      if (color) {
-        selectedSilksColor = color;
-        host.querySelectorAll('.sd-color-btn.sd-silks').forEach((b) => b.classList.remove('active'));
-        (e.target as HTMLElement).classList.add('active');
-        host.querySelector<HTMLInputElement>('#silks-hex')!.value = color;
-        host.querySelectorAll('.sd-color-info')[1]!.querySelector('.sd-color-swatch')!.setAttribute(
-          'style',
-          `background: ${color}`,
-        );
-        updatePreview();
-      }
-    });
-  });
-
-  // Hex input updates
-  host.querySelector<HTMLInputElement>('#trim-hex')!.addEventListener('change', (e) => {
-    const hex = (e.target as HTMLInputElement).value;
-    if (/^#[0-9A-F]{6}$/i.test(hex)) {
-      selectedTrimColor = hex;
-      host.querySelectorAll('.sd-color-btn.sd-trim').forEach((b) => b.classList.remove('active'));
-      host.querySelectorAll('.sd-color-info')[0]!.querySelector('.sd-color-swatch')!.setAttribute(
-        'style',
-        `background: ${hex}`,
-      );
       updatePreview();
-    }
+    });
   });
 
-  host.querySelector<HTMLInputElement>('#silks-hex')!.addEventListener('change', (e) => {
-    const hex = (e.target as HTMLInputElement).value;
-    if (/^#[0-9A-F]{6}$/i.test(hex)) {
-      selectedSilksColor = hex;
-      host.querySelectorAll('.sd-color-btn.sd-silks').forEach((b) => b.classList.remove('active'));
-      host.querySelectorAll('.sd-color-info')[1]!.querySelector('.sd-color-swatch')!.setAttribute(
-        'style',
-        `background: ${hex}`,
-      );
-      updatePreview();
-    }
-  });
+  wire('sd-hair', 'hair-hex', (v) => { selectedHairColor = v; });
+  wire('sd-points', 'points-hex', (v) => { selectedPointColor = v; });
+  wire('sd-trim', 'trim-hex', (v) => { selectedTrimColor = v; });
+  wire('sd-silks', 'silks-hex', (v) => { selectedSilksColor = v; });
 
-  // Start race button
+
   host.querySelector('.sd-start-btn')!.addEventListener('click', () => {
     sessionStorage.setItem(
       'color-override',
       JSON.stringify({
         coat: selectedCoat,
-        maneColor: selectedTrimColor,
+        hairColor: selectedHairColor,
+        pointsColor: selectedPointColor,
+        trimColor: selectedTrimColor,
         silksColor: selectedSilksColor,
       }),
     );
     window.location.href = '/';
   });
 
-  // Initial preview render
   loadSprites().then(() => updatePreview());
 }

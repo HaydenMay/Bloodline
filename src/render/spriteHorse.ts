@@ -1,7 +1,7 @@
 import sheetUrl from '../assets/racer.png';
 import maskUrl from '../assets/racer-mask.png';
 import meta from '../assets/racer.json';
-import { coatFor, type Silks } from './palette.js';
+import { coatFor, type Coat, type Silks } from './palette.js';
 
 /**
  * The sprite horse.
@@ -157,7 +157,16 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 }
 
 export interface Scheme {
-  coat: string;
+  /**
+   * A coat id, or the three colours themselves.
+   *
+   * Normally an id: a horse's coat comes from its genes and body, mane and
+   * points arrive together. Passing the colours directly is for tools that
+   * drive the materials INDEPENDENTLY — the colour demo exists to exercise
+   * every region of the mask, which it cannot do if three of them are welded
+   * to one gene.
+   */
+  coat: string | Coat;
   silks: Silks;
 }
 
@@ -181,7 +190,10 @@ const TINT_CACHE_MAX = 10;
  */
 export function tintedSheet(scheme: Scheme): HTMLCanvasElement | null {
   if (!loaded) return null;
-  const key = `${scheme.coat}|${scheme.silks.primary}|${scheme.silks.secondary}`;
+  const coat = typeof scheme.coat === 'string' ? coatFor(scheme.coat) : scheme.coat;
+  // Keyed on the COLOURS, never on the coat id: two callers can ask for the
+  // same id and mean different things once the parts can be set separately.
+  const key = `${coat.body}|${coat.hair}|${coat.points}|${scheme.silks.primary}|${scheme.silks.secondary}`;
   const hit = tinted.get(key);
   if (hit) {
     // Re-insert so the map's order stays least-recently-used first.
@@ -190,7 +202,6 @@ export function tintedSheet(scheme: Scheme): HTMLCanvasElement | null {
     return hit;
   }
 
-  const coat = coatFor(scheme.coat);
   const target: Record<number, [number, number, number]> = {
     [MATERIAL.body]: hexToHsl(coat.body),
     [MATERIAL.hair]: hexToHsl(coat.hair),

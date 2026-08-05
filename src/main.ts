@@ -94,11 +94,12 @@ function startRace(seed: string): void {
   if (colorOverride) {
     try {
       const colors = JSON.parse(colorOverride);
-      // silksColor for shield outline and jockey silks
-      // maneColor for horse mane/legs and badge mane/legs
+      // The demo's silks pair: primary is the jockey and the shield, secondary
+      // is the breeches and collar. Mane and points travel with the coat, not
+      // with the silks, so they are not carried here.
       playerSilks = {
         primary: colors.silksColor || '#A8DADC',
-        secondary: colors.maneColor || '#12222B',
+        secondary: colors.trimColor || colors.maneColor || '#12222B',
       };
       sessionStorage.removeItem('color-override');
     } catch {
