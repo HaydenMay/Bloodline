@@ -106,7 +106,7 @@ function startRace(seed: string): void {
     }
   }
 
-  attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks);
+  const closeInfoBox = attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks);
 
   const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
   const hintText = bar.querySelector<HTMLElement>('#rb-hint-text')!;
@@ -133,6 +133,8 @@ function startRace(seed: string): void {
     onRaceStart: () => {
       // Lock autopilot once race starts — can't change during race
       autopilotToggle.disabled = true;
+      // Close info box so it doesn't obscure the race
+      closeInfoBox();
     },
   });
 }
