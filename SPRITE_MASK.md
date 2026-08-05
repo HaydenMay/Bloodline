@@ -746,30 +746,40 @@ downscales more predictably than a pre-blurred one.
 
 ### Adding an outline
 
-LibreSprite has no Outline command — it is Aseprite's `Edit → FX → Outline` and
-one of the better-known gaps between the two. Outlines are manual.
+LibreSprite has no Outline command — that is Aseprite's `Edit → FX → Outline`,
+and one of the better-known gaps between the two. **`Select → Modify → Border`
+does the job instead**, and does it better than any layer trick:
 
-For a drawn rim, like the border of a shield, just draw it on its own layer with
-the pencil. For a true silhouette outline around everything:
+1. Magic-wand the region you want outlined.
+2. `Select → Modify → Border`, and give it a width in pixels.
+3. Fill with the outline colour.
 
-1. `Layer → Duplicate Layer`.
-2. On the duplicate, magic-wand the transparent background with *Contiguous*
-   on, `Select → Invert` to get the whole shape, and fill it with the outline
-   colour. That gives a solid silhouette.
-3. Move the silhouette layer **below** the art.
-4. Duplicate it four times, nudge each copy one pixel — up, down, left, right —
-   and merge them. The silhouette now sticks out a pixel all round, which is
-   the outline.
+That is the whole thing, and it works on any region — the shield rim, the
+horse, one shape inside another — because the selection decides the scope
+rather than the layer does.
+
+Border produces a band **around the selection edge**, so at width 2 it will
+generally eat a pixel back into the shape as well as adding one outside. That is
+usually what you want for pixel art and it keeps the silhouette the same size.
+When the shape must not lose a pixel, use `Select → Modify → Expand` by the
+same amount instead, and fill it on a layer BELOW the art: the outline then sits
+entirely outside and the art covers the overlap.
 
 **Pick the outline's colour from a material, not from the ink jar.** It is
-tinted like everything else, so the choice decides what it follows:
+tinted like everything else, so the choice decides what the line follows:
 
 | outline colour | material | what it does |
 |---|---|---|
 | `#12447F` | `silks` | shield rims — darkens with the runner's silks |
-| `#55555A` | `body` | horse silhouettes — stays with the coat, always related to it |
-| `#1A1A1C` | `points` | a hard black line that follows the points gene |
-| `#0B6B40` | `fixed` | never changes — for lines that must not move at all |
+| `#55555A` | `body` | horse silhouettes — stays related to the coat |
+| `#1A1A1C` | `points` | line art. On the race sprite this is the leg colour, but a badge has no legs, so `shieldBadge.ts` maps `points` to a constant ink and this is the outline to reach for |
+| `#0B6B40` | `fixed` | never tinted at all, and renders the green you painted — only for lines that should genuinely stay that colour |
+
+The trap worth knowing: an outline drawn in a material whose target can be
+light stops being an outline. The shield badge outlined in the silks' SECONDARY
+came out white on five of the eight rival silks, and a white line around a
+white mane is not a line. Either use a material that is always dark, or map it
+to a constant in the renderer, which is what the badge now does.
 
 An outline is the most valuable pixel in an icon: at 40px it is close to the
 only thing that survives, which is exactly why blurring one away costs so much
