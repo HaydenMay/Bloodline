@@ -151,8 +151,8 @@ export function kickWindowBonus(moment: Moment, ownProgress: number, style?: str
   const shape = WINDOW_SHAPE[moment];
   if (style === 'midPack') {
     // Mid-pack gets flat bonus with no diminishing returns outside window
-    // Baseline 40% + moment peak 45% = 85% at moment (vs 75% for others)
-    const baseline = 0.40;
+    // Baseline 33% + moment peak 45% = 78% at moment (vs 75% for others)
+    const baseline = 0.33;
     return baseline + WINDOW_PEAK_LIFT * bump(ownProgress, shape.centre, shape.width);
   }
   return KICK_OUT_OF_WINDOW + WINDOW_PEAK_LIFT * bump(ownProgress, shape.centre, shape.width);
