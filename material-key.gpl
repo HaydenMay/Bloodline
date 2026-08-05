@@ -1,10 +1,35 @@
 GIMP Palette
 Name: Bloodline material key
-Columns: 6
+Columns: 5
 #
-140 140 143	body — neutral grey, mid lightness
-160  50 208	hair — violet — clear of the silks window and of skin
- 26  26  28	points — near-black
- 30 111 217	silks — blue
-240 240 242	trim — near-white
- 18 179 106	fixed — tack only; skin and leather keep natural tones
+# body — neutral grey, mid lightness
+ 85  85  90	body 1
+112 112 122	body 2
+140 140 143	body 3 (base)
+160 160 164	body 4
+# hair — violet — clear of the silks window and of skin
+ 90  28 117	hair 1
+123  38 162	hair 2
+160  50 208	hair 3 (base)
+192 112 232	hair 4
+# points — near-black
+ 16  16  18	points 1
+ 26  26  28	points 2 (base)
+ 38  38  42	points 3
+ 46  46  51	points 4
+# silks — blue
+ 18  68 127	silks 1
+ 24  87 171	silks 2
+ 30 111 217	silks 3 (base)
+107 166 240	silks 4
+# trim — near-white
+200 200 204	trim 1
+220 220 224	trim 2
+240 240 242	trim 3 (base)
+250 250 252	trim 4
+# fixed — tack only; skin and leather keep natural tones
+ 11 107  64	fixed 1
+ 18 179 106	fixed 2 (base)
+ 63 214 147	fixed 3
+138  90  60	fixed 4
+201 138  94	fixed 5
