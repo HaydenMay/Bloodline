@@ -109,13 +109,16 @@ export interface RaceScreenOptions {
   playerHorseId: string;
   playerSilks: Silks;
   config: RaceConfig;
-  autopilot?: boolean;
+  autopilotToggle?: HTMLInputElement;
   onRaceStart?: () => void;
   onFinish?: (placings: RunnerSnapshot[]) => void;
 }
 
 export function mountRaceScreen(opts: RaceScreenOptions): () => void {
-  const { host, field, playerHorseId, playerSilks, config, autopilot = false, onRaceStart } = opts;
+  const { host, field, playerHorseId, playerSilks, config, autopilotToggle, onRaceStart } = opts;
+
+  // Read autopilot state from toggle element when race starts, not when button clicked
+  const getAutopilot = (): boolean => autopilotToggle?.checked ?? false;
 
   const surface = createSurface(host);
   // Decoding and tinting happen off the critical path; the rig covers the
@@ -132,10 +135,10 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   // This is the only difference between the two modes.
   const effectiveInput: PlayerInput = {
     get takingBack() {
-      return autopilot ? false : input.takingBack;
+      return getAutopilot() ? false : input.takingBack;
     },
     get kickPending() {
-      return autopilot ? false : input.kickPending;
+      return getAutopilot() ? false : input.kickPending;
     },
     set takingBack(v: boolean) {
       input.takingBack = v;
@@ -224,7 +227,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     }
     if (!running) return;
 
-    if (autopilot) {
+    if (getAutopilot()) {
       input.takingBack = false;
       input.kickPending = false;
     }
@@ -749,7 +752,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let holdTimer = 0;
 
   const tap = (): void => {
-    if (!autopilot) input.kickPending = true;
+    if (!getAutopilot()) input.kickPending = true;
   };
 
   const down = (e: Event): void => {
@@ -759,7 +762,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       pressedAt = 0;
       return;
     }
-    if (autopilot) return;
+    if (getAutopilot()) return;
     pressedAt = performance.now();
     holdTimer = window.setTimeout(() => {
       input.takingBack = true;
@@ -784,11 +787,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       e.preventDefault();
       if (e.type !== 'keydown') return;
       if (!started) beginCountdown();
-      else if (!autopilot) tap();
+      else if (!getAutopilot()) tap();
     }
     if (e.code === 'ArrowDown' || e.code === 'ShiftLeft') {
       e.preventDefault();
-      if (!autopilot) input.takingBack = e.type === 'keydown';
+      if (!getAutopilot()) input.takingBack = e.type === 'keydown';
     }
   };
   window.addEventListener('keydown', key);

@@ -129,7 +129,7 @@ function startRace(seed: string): void {
     playerHorseId: playerId,
     playerSilks,
     config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
-    autopilot,
+    autopilotToggle,
     onRaceStart: () => {
       // Lock autopilot once race starts — can't change during race
       autopilotToggle.disabled = true;
