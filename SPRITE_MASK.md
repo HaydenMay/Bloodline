@@ -93,9 +93,11 @@ Three rules that are easy to get wrong:
   JPEG, no ICC conversion, no rescaling with a smooth filter. Nearest-neighbour
   only.
 
-> **Gotcha:** `src/assets/horse-reference-mask.png`, used by
-> `src/render/horsePreview.ts`, stores the **raw** id (1–6) in red, *not* ×40.
-> Two assets, two conventions. Do not bake one with the other's tool.
+> A second convention used to exist — `horse-reference-mask.png` stored the raw
+> id (1–6) rather than ×40 — and it was a live bug for as long as it lasted:
+> nothing in `tools/` could write it and `check-art` could not read it. That
+> asset is gone. **Every mask in the repo is now ×40.** Keep it that way; two
+> conventions is one more than any project needs.
 
 ---
 
