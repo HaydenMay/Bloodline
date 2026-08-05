@@ -263,6 +263,10 @@ function reportMask(artPng: PNG, maskPath: string): void {
   }
   let covered = 0, uncovered = 0, unseen = 0, stray = 0, partial = 0;
   const tally: Record<number, number> = {};
+  // Where a solid pixel's own colour says one material and the mask says
+  // another. On art that follows the key this should be exactly zero: the
+  // colour IS the answer, so any disagreement is the baker overruling it.
+  const disagree = new Map<string, number>();
   for (let p = 0; p < artPng.width * artPng.height; p++) {
     const a = mask.data[p * 4 + 3]!;
     if (a > 0 && a < 255) partial++;
@@ -278,6 +282,14 @@ function reportMask(artPng: PNG, maskPath: string): void {
     if (m) {
       const id = Math.round(mask.data[p * 4]! / 40);
       tally[id] = (tally[id] ?? 0) + 1;
+      if (artAlpha >= 200) {
+        const want = classifyByKey(artPng.data[p * 4]!, artPng.data[p * 4 + 1]!, artPng.data[p * 4 + 2]!);
+        if (want !== id) {
+          const k = `${rgbToHex(artPng.data[p * 4]!, artPng.data[p * 4 + 1]!, artPng.data[p * 4 + 2]!)}` +
+            ` is ${MATERIAL_NAMES[want]}, masked as ${MATERIAL_NAMES[id]}`;
+          disagree.set(k, (disagree.get(k) ?? 0) + 1);
+        }
+      }
     }
   }
   for (const [k, v] of Object.entries(tally).sort((a, b) => b[1] - a[1])) {
@@ -290,6 +302,24 @@ function reportMask(artPng: PNG, maskPath: string): void {
   if (uncovered > covered * 0.005) console.log('  WARN  visible art has no material — the soft edge was probably not grown into');
   if (stray) console.log('  WARN  the mask claims pixels the art does not have');
   if (partial) console.log('  WARN  partial alpha in a mask decodes to the wrong id after un-premultiplying');
+
+  // The invariant that matters most, and the one that fails silently. A mask
+  // that disagrees with its own art is not a rounding error at an edge — it is
+  // a pixel the baker decided it knew better about, and it shows up in game as
+  // a fleck of the wrong colour in the middle of a flat region.
+  const off = [...disagree].sort((a, b) => b[1] - a[1]);
+  const n = off.reduce((a, [, v]) => a + v, 0);
+  if (!n) {
+    console.log('  ok    every solid pixel is masked as its own colour says');
+    return;
+  }
+  console.log(`\n  WARN  ${n} solid pixels are masked as something their colour does not say:`);
+  for (const [k, v] of off.slice(0, 8)) console.log(`          ${String(v).padStart(4)}  ${k}`);
+  console.log(
+    '        On flat art this should be zero. It usually means a smoothing pass' +
+    '\n        overruled one-pixel detail — a strap or an outline drawn a single' +
+    '\n        pixel wide is outvoted by its neighbours by construction.',
+  );
 }
 
 function main(): void {

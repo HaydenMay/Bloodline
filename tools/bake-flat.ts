@@ -106,14 +106,25 @@ function main(): void {
     }
   }
 
-  // ---- Smooth ---------------------------------------------------------------
-  // Single stray pixels along a boundary, same as the sprite baker.
+  // ---- Smooth, but only what was guessed ------------------------------------
+  // GROWN PIXELS ONLY. A solid pixel's own colour decided its material, exactly
+  // and unambiguously, and no vote among its neighbours can know better than
+  // that. Letting the vote run over solid pixels too — which is what the sprite
+  // baker does, because there every label is an inference — quietly eats
+  // one-pixel detail: a bridle strap or an outline drawn a single pixel wide
+  // has six or more neighbours of some other material BY CONSTRUCTION, so the
+  // majority overrules it and the strap comes out coat-coloured. It cost this
+  // badge 50 pixels, scattered exactly where the art was finest.
+  //
+  // The fringe grown in the pass above is a different matter: those labels came
+  // from a neighbour rather than from the pixel, so a stray one is a real stray
+  // and voting is the right way to settle it.
   for (let pass = 0; pass < SMOOTH_PASSES; pass++) {
     const prev = Uint8Array.from(lab);
     for (let y = 1; y < H - 1; y++) {
       for (let x = 1; x < W - 1; x++) {
         const p = y * W + x;
-        if (!prev[p]) continue;
+        if (!prev[p] || data[p * 4 + 3]! >= ALPHA_SOLID) continue;
         const tally = new Map<number, number>();
         for (const q of [p - 1, p + 1, p - W, p + W, p - W - 1, p - W + 1, p + W - 1, p + W + 1]) {
           const v = prev[q]!;

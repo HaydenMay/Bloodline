@@ -346,7 +346,7 @@ npm run bake-flat -- src/assets/shield-badge.png
    hue or lightness picks the material.
 2. Grow those labels into the anti-aliasing and the soft edge, each blend pixel
    taking whichever *labelled neighbour* it is closest to in colour.
-3. Smooth away single strays.
+3. Smooth away single strays **in the grown fringe only**.
 
 Writes `<asset>-mask.png`. That is the entire tool: no geometry, no frame
 layout, nothing to re-measure when the art changes.
@@ -366,6 +366,16 @@ and a navy border is a mid blue-grey that can sit nearer the *body* band than
 to either of its actual neighbours, so classifying it by colour alone draws a
 grey line around every border. Left blank and filled from what surrounds it, it
 is right by construction.
+
+**A solid pixel is never overruled by its neighbours.** Its own colour decided
+its material, exactly, and no vote can know better. The smoothing pass runs
+only over the grown fringe, where the labels came from a neighbour rather than
+from the pixel. Running it over solid pixels too — which is what §5.6 does,
+because there every label is an inference — quietly eats one-pixel detail: a
+bridle strap or an outline drawn a single pixel wide has six or more neighbours
+of another material BY CONSTRUCTION, so the majority overrules it and the strap
+comes out coat-coloured. It cost the shield badge 50 pixels, scattered exactly
+where the art was finest. `check-art --mask` now asserts the invariant.
 
 There is no sidecar and no per-asset palette file. An asset that does not match
 the key is not a case to configure around, it is a repaint — `check-art` says
