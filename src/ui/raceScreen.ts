@@ -243,8 +243,14 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   // race.outcome() re-sorts and re-measures the whole field each call.
   let finalRecap: Recap | null = null;
   let finalRows: RecapRow[] | null = null;
-  // Track result row positions for click detection
-  const resultRowBounds: Map<string, { top: number; height: number }> = new Map();
+  // Track result row name positions, so a DOM hover target can be laid over
+  // each one — the recap is drawn on canvas, which has no hover of its own.
+  const resultRowBounds: Map<string, { top: number; height: number; left: number; width: number }> =
+    new Map();
+  // One invisible trigger element per horse, positioned over its name each
+  // frame. attachInfoBox already knows how to peek-on-hover and pin-on-click;
+  // this just gives it something sized and placed correctly to listen on.
+  const resultHoverTargets: Map<string, { trigger: HTMLDivElement; detach: () => void }> = new Map();
   /** Races wait for you rather than starting the moment the page loads. */
   let started = false;
   // 3 beats of a second each, then the field breaks and "And they're off!"
@@ -441,6 +447,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     }
 
     drawHud(ctx, width, height, player, runners);
+
+    // Update hover triggers over result names once the finish screen is drawn
+    if (!running) updateResultHoverTriggers();
   };
 
   const drawHud = (
@@ -763,13 +772,16 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         ctx.fill();
       }
 
-      resultRowBounds.set(r.horseId, { top: y - 1, height: rowH - 3 });
-
       ctx.fillStyle = r.isPlayer ? '#F2C14E' : '#8B98A9';
       ctx.font = `${r.isPlayer ? 700 : 500} 13px ui-sans-serif, system-ui, sans-serif`;
       ctx.textAlign = 'left';
       ctx.fillText(String(r.position), cx - panel / 2 + 12, y + 14);
-      ctx.fillText(r.name, cx - panel / 2 + 34, y + 14);
+
+      const nameX = cx - panel / 2 + 34;
+      const nameWidth = ctx.measureText(r.name).width;
+      ctx.fillText(r.name, nameX, y + 14);
+
+      resultRowBounds.set(r.horseId, { top: y - 1, height: rowH - 3, left: nameX, width: nameWidth });
 
       // The margin matters more than the clock — a race is won by lengths.
       ctx.textAlign = 'right';
@@ -843,35 +855,37 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   window.addEventListener('keydown', key);
   window.addEventListener('keyup', key);
 
-  let activeRivalInfoBox: (() => void) | null = null;
-
-  const handleResultClick = (e: PointerEvent): void => {
-    // Only allow clicking results after race finishes
-    if (running) return;
-
+  // Set up invisible hover triggers over result horse names so the info box
+  // can peek and pin over them, even though the names are drawn on canvas.
+  const updateResultHoverTriggers = (): void => {
     const rect = surface.canvas.getBoundingClientRect();
-    const clickY = e.clientY - rect.top;
 
-    // Check which result row was clicked
     for (const [horseId, bounds] of resultRowBounds) {
-      if (clickY >= bounds.top && clickY <= bounds.top + bounds.height) {
-        // Close previous rival info box
-        activeRivalInfoBox?.();
+      let target = resultHoverTargets.get(horseId);
+      if (!target) {
+        const trigger = document.createElement('div');
+        trigger.style.position = 'fixed';
+        trigger.style.pointerEvents = 'auto';
+        trigger.style.cursor = 'pointer';
+        trigger.style.zIndex = '10';
+        host.appendChild(trigger);
 
-        // Find the horse and show its info
         const horse = field.find((h) => h.id === horseId);
         if (horse) {
-          // Create a temporary element to attach the info box to
-          const tempEl = document.createElement('div');
-          const rivalSilks = silksFor.get(horseId) || playerSilks;
-          activeRivalInfoBox = attachInfoBox(tempEl, horse, rivalSilks);
+          const detach = attachInfoBox(trigger, horse, silksFor.get(horseId));
+          target = { trigger, detach };
+          resultHoverTargets.set(horseId, target);
         }
-        return;
+      }
+
+      if (target) {
+        target.trigger.style.left = `${rect.left + bounds.left}px`;
+        target.trigger.style.top = `${rect.top + bounds.top}px`;
+        target.trigger.style.width = `${bounds.width}px`;
+        target.trigger.style.height = `${bounds.height}px`;
       }
     }
   };
-
-  host.addEventListener('click', handleResultClick);
 
   const loop: Loop = startLoop(TICK_HZ, tick, draw);
 
@@ -884,8 +898,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     window.removeEventListener('pointercancel', up);
     window.removeEventListener('keydown', key);
     window.removeEventListener('keyup', key);
-    host.removeEventListener('click', handleResultClick);
-    activeRivalInfoBox?.();
+    for (const { trigger, detach } of resultHoverTargets.values()) {
+      detach();
+      trigger.remove();
+    }
+    resultHoverTargets.clear();
   };
 }
 

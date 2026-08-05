@@ -1,7 +1,7 @@
-import { toGrade, STAT_KEYS, type Horse, type StatKey } from '../sim/types.js';
-import { TRAITS } from '../data/traits.js';
-import { coatFor, type Silks } from '../render/palette.js';
-import { getBadgeDataUri } from '../render/shieldBadge.js';
+import { toGrade, STAT_KEYS, type Horse, type StatKey } from "../sim/types.js";
+import { TRAITS } from "../data/traits.js";
+import { coatFor, type Silks } from "../render/palette.js";
+import { getBadgeDataUri } from "../render/shieldBadge.js";
 
 /**
  * The info box.
@@ -16,42 +16,42 @@ import { getBadgeDataUri } from '../render/shieldBadge.js';
  */
 
 const STAT_LABELS: Record<StatKey, string> = {
-  speed: 'Speed',
-  stamina: 'Stamina',
-  burst: 'Burst',
-  grit: 'Grit',
-  temper: 'Temper',
-  consistency: 'Consistency',
+  speed: "Speed",
+  stamina: "Stamina",
+  burst: "Burst",
+  grit: "Grit",
+  temper: "Temper",
+  consistency: "Consistency",
 };
 
 // Field-position language only. Moment (labelled separately) says WHEN a horse
 // spends, so this must never describe timing or the two read as contradicting
 // each other.
 const MOMENT_LABELS: Record<string, string> = {
-  early: 'Goes early',
-  earlyMid: 'Goes before halfway',
-  midLate: 'Goes off the turn',
-  late: 'Goes late',
+  early: "Goes early",
+  earlyMid: "Goes before halfway",
+  midLate: "Goes off the turn",
+  late: "Goes late",
 };
 
 const STYLE_LABELS: Record<string, { name: string; seat: string }> = {
-  frontRunner: { name: 'Front-runner', seat: 'Runs up front' },
-  stalker: { name: 'Stalker', seat: 'Sits just off the pace' },
-  midPack: { name: 'Mid-pack', seat: 'Settles mid-field' },
-  closer: { name: 'Closer', seat: 'Settles at the back' },
+  frontRunner: { name: "Front-runner", seat: "Runs up front" },
+  stalker: { name: "Stalker", seat: "Sits just off the pace" },
+  midPack: { name: "Mid-pack", seat: "Settles mid-field" },
+  closer: { name: "Closer", seat: "Settles at the back" },
 };
 
 /** Potential shown as a band, since the exact ceiling is never revealed. */
 function potentialBand(current: number, potential: number): string {
   const room = potential - current;
-  if (room < 12) return 'close to its ceiling';
-  if (room < 26) return 'some room left';
-  if (room < 42) return 'plenty of room';
-  return 'barely scratched';
+  if (room < 12) return "close to its ceiling";
+  if (room < 26) return "some room left";
+  if (room < 42) return "plenty of room";
+  return "barely scratched";
 }
 
 export function renderInfoBox(horse: Horse): string {
-  const style = STYLE_LABELS[horse.style] ?? STYLE_LABELS['closer']!;
+  const style = STYLE_LABELS[horse.style] ?? STYLE_LABELS["closer"]!;
   const coat = coatFor(horse.coat);
 
   const stats = STAT_KEYS.map((key) => {
@@ -64,13 +64,18 @@ export function renderInfoBox(horse: Horse): string {
         <span class="ib-grade ib-g${grade}">${grade}</span>
         <span class="ib-num">${value}</span>
       </div>`;
-  }).join('');
+  }).join("");
 
   // A plain range in metres, not a grade per band. The bands needed explaining
   // every time; "Preferred Length 600-800 m" does not (REBUILD.md §7).
   const { min, max } = horse.preferredDistance;
   const width = max - min;
-  const versatility = width >= 550 ? 'handles most trips' : width <= 300 ? 'specialist' : 'some scope';
+  const versatility =
+    width >= 550
+      ? "handles most trips"
+      : width <= 300
+        ? "specialist"
+        : "some scope";
   const distance = `
       <div class="ib-apt">
         <span>Preferred length</span>
@@ -87,7 +92,7 @@ export function renderInfoBox(horse: Horse): string {
             `<span class="ib-trait">${TRAITS[id].name}` +
             `<span class="ib-tip">${TRAITS[id].description}</span></span>`,
         )
-        .join('')
+        .join("")
     : '<span class="ib-trait ib-none">None discovered</span>';
 
   const speedRoom = potentialBand(horse.stats.speed, horse.potential.speed);
@@ -100,14 +105,14 @@ export function renderInfoBox(horse: Horse): string {
       ${badgeHtml}
       <div>
         <p class="ib-name">${horse.name}</p>
-        <p class="ib-sub">${coat.name} ${horse.gender === 'stallion' ? 'colt' : 'filly'} · ${horse.age}yo</p>
+        <p class="ib-sub">${coat.name} ${horse.gender === "stallion" ? "colt" : "filly"} · ${horse.age}yo</p>
       </div>
     </div>
 
     <div class="ib-row">
       <div><span class="ib-k">Style</span><span class="ib-v">${style.name}</span></div>
       <div><span class="ib-k">Runs</span><span class="ib-v">${style.seat.toLowerCase()}</span></div>
-      <div><span class="ib-k">Moment</span><span class="ib-v">${(MOMENT_LABELS[horse.moment] ?? '').toLowerCase()}</span></div>
+      <div><span class="ib-k">Moment</span><span class="ib-v">${(MOMENT_LABELS[horse.moment] ?? "").toLowerCase()}</span></div>
     </div>
 
     <p class="ib-section">Attributes</p>
@@ -123,39 +128,44 @@ export function renderInfoBox(horse: Horse): string {
 }
 
 /** Attaches a hover/tap card to a trigger element. */
-export function attachInfoBox(trigger: HTMLElement, horse: Horse, silks?: Silks): () => void {
-  const card = document.createElement('div');
-  card.className = 'info-box';
+export function attachInfoBox(
+  trigger: HTMLElement,
+  horse: Horse,
+  silks?: Silks,
+): () => void {
+  const card = document.createElement("div");
+  card.className = "info-box";
   card.hidden = true;
   card.innerHTML = renderInfoBox(horse);
   document.body.appendChild(card);
 
   // Load badge asynchronously if silks provided
   if (silks) {
-    getBadgeDataUri({ coat: horse.coat, silks }).then((uri) => {
-      const placeholder = card.querySelector('.ib-badge-placeholder');
-      if (uri && placeholder) {
-        placeholder.replaceWith(Object.assign(document.createElement('img'), {
-          className: 'ib-badge',
-          src: uri,
-          alt: 'Shield badge',
-        }));
-      }
-    }).catch(() => {
-      // If badge fails, keep the placeholder swatch
-    });
+    getBadgeDataUri({ coat: horse.coat, silks })
+      .then((uri) => {
+        const placeholder = card.querySelector(".ib-badge-placeholder");
+        if (uri && placeholder) {
+          placeholder.replaceWith(
+            Object.assign(document.createElement("img"), {
+              className: "ib-badge",
+              src: uri,
+              alt: "Shield badge",
+            }),
+          );
+        }
+      })
+      .catch(() => {
+        // If badge fails, keep the placeholder swatch
+      });
   }
 
   const place = (): void => {
     const r = trigger.getBoundingClientRect();
     card.hidden = false;
     const cardRect = card.getBoundingClientRect();
-    const left = Math.min(
-      Math.max(8, r.left),
-      Math.max(8, window.innerWidth - cardRect.width - 8),
-    );
+    const left = Math.max(8, r.left - cardRect.width - 40);
     card.style.left = `${left}px`;
-    card.style.top = `${Math.max(8, r.top - cardRect.height - 10)}px`;
+    card.style.top = `${Math.max(8, r.top - cardRect.height - 40)}px`;
   };
 
   // Hovering peeks; clicking PINS it open so you can read it properly without
@@ -171,8 +181,8 @@ export function attachInfoBox(trigger: HTMLElement, horse: Horse, silks?: Silks)
   };
   const setPinned = (value: boolean): void => {
     pinned = value;
-    card.classList.toggle('is-pinned', value);
-    card.style.pointerEvents = value ? 'auto' : 'none';
+    card.classList.toggle("is-pinned", value);
+    card.style.pointerEvents = value ? "auto" : "none";
     if (value) place();
     else card.hidden = true;
   };
@@ -185,16 +195,16 @@ export function attachInfoBox(trigger: HTMLElement, horse: Horse, silks?: Silks)
     if (pinned && !card.contains(e.target as Node)) setPinned(false);
   };
 
-  trigger.addEventListener('pointerenter', show);
-  trigger.addEventListener('pointerleave', hide);
-  trigger.addEventListener('click', onTriggerClick);
-  document.addEventListener('click', onDocClick);
+  trigger.addEventListener("pointerenter", show);
+  trigger.addEventListener("pointerleave", hide);
+  trigger.addEventListener("click", onTriggerClick);
+  document.addEventListener("click", onDocClick);
 
   return (): void => {
-    trigger.removeEventListener('pointerenter', show);
-    trigger.removeEventListener('pointerleave', hide);
-    trigger.removeEventListener('click', onTriggerClick);
-    document.removeEventListener('click', onDocClick);
+    trigger.removeEventListener("pointerenter", show);
+    trigger.removeEventListener("pointerleave", hide);
+    trigger.removeEventListener("click", onTriggerClick);
+    document.removeEventListener("click", onDocClick);
     card.remove();
   };
 }

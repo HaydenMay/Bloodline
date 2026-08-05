@@ -9,8 +9,9 @@
   --muted: #8b98a9;
   --accent: #f2c14e;
   --ok: #4ec9a0;
-  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  --font:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
 }
 
 * {
@@ -35,7 +36,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+  padding: max(20px, env(safe-area-inset-top)) 20px
+    max(20px, env(safe-area-inset-bottom));
 }
 
 .boot {
@@ -329,7 +331,8 @@ body {
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 0 max(14px, env(safe-area-inset-left)) 0 max(14px, env(safe-area-inset-right));
+  padding: 0 max(14px, env(safe-area-inset-left)) 0
+    max(14px, env(safe-area-inset-right));
   background: var(--panel);
   border-top: 1px solid var(--line);
   overflow: hidden;
@@ -405,7 +408,7 @@ body {
   flex: none;
 }
 
-.rb-autopilot input[type='checkbox'] {
+.rb-autopilot input[type="checkbox"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
@@ -651,11 +654,21 @@ body {
   text-align: right;
 }
 
-.ib-gS { color: #f2c14e; }
-.ib-gA { color: #4ec9a0; }
-.ib-gB { color: #6fb3e0; }
-.ib-gC { color: #8b98a9; }
-.ib-gD { color: #b06a62; }
+.ib-gS {
+  color: #f2c14e;
+}
+.ib-gA {
+  color: #4ec9a0;
+}
+.ib-gB {
+  color: #6fb3e0;
+}
+.ib-gC {
+  color: #8b98a9;
+}
+.ib-gD {
+  color: #b06a62;
+}
 
 .ib-hint {
   margin: 8px 0 0;
@@ -722,11 +735,13 @@ body {
 /* Pinned info box — click the name to keep it open */
 .info-box.is-pinned {
   border-color: var(--accent);
-  box-shadow: 0 16px 40px rgb(0 0 0 / 0.55), 0 0 0 1px rgba(242, 193, 78, 0.25);
+  box-shadow:
+    0 16px 40px rgb(0 0 0 / 0.55),
+    0 0 0 1px rgba(242, 193, 78, 0.25);
 }
 
 .info-box.is-pinned::after {
-  content: 'pinned — click the name to close';
+  content: "pinned — click the name to close";
   display: block;
   margin-top: 11px;
   padding-top: 9px;
@@ -747,7 +762,7 @@ body {
   position: absolute;
   left: 50%;
   bottom: calc(100% + 7px);
-  transform: translateX(-50%);
+  transform: translateX(-25%);
   width: 160px;
   max-width: calc(100vw - 16px);
   max-height: 120px;
