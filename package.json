@@ -14,6 +14,8 @@
     "test:watch": "vitest",
     "harness": "tsx tools/harness.ts",
     "bake-sprites": "tsx tools/bake-sprites.ts",
+    "bake-flat": "tsx tools/bake-flat.ts",
+    "check-art": "tsx tools/check-art.ts",
     "ride-probe": "tsx tools/ride-probe.ts",
     "probe": "tsx tools/probe.ts",
     "sweep": "tsx tools/sweep.ts",

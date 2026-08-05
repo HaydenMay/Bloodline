@@ -50,7 +50,12 @@ Both copies must agree.
 | `src/assets/racer-mask.svg` | generated. The same regions as editable vector paths. Nothing loads it; it is for humans. |
 | `src/assets/racer.json` | generated. Grid dimensions and per-frame bounding boxes. |
 | `src/assets/racer-mask-old.png` | the previous mask, kept as a reference. Not loaded. |
-| `tools/bake-sprites.ts` | generates all three outputs. |
+| `tools/bake-sprites.ts` | generates all three outputs for `racer.png`. |
+| `tools/bake-flat.ts` | masks any FLAT asset by colour alone — see §11. |
+| `tools/check-art.ts` | reports whether an asset can be masked at all — see §11. |
+| `tools/material-key.ts` | the shared palette, bands and colour maths. |
+| `tools/trace-mask.ts` | the PNG→SVG tracer, shared by both bakers. |
+| `material-key.gpl` | the key as a palette file LibreSprite can load. |
 | `src/render/spriteHorse.ts` | loads the sheet + mask and does the runtime tint. |
 
 Run with:
@@ -540,7 +545,8 @@ any time goes into it.
 
 ### 9.2 Two repaints that would make this substantially more robust
 
-Neither is required — the pipeline works on the current sheet.
+Neither is required — the pipeline works on the current sheet. §11 gives the
+full key and the two tools that go with it.
 
 **Give the mane and tail their own colour.** They are currently the same black
 as the cannons, which is the only reason §5.3's geometry exists — and geometry
@@ -582,3 +588,166 @@ Symptoms seen in real bakes, and where to look.
 | grey halo around every recoloured horse | soft edge never labelled | 5.8 |
 | horse appears to sink into the track | `racer.json` regenerated with different frame boxes | 5.0 |
 | all ids wrong / everything reads as `body` | mask saved with partial alpha, or the ×40 encoding dropped | 3 |
+
+---
+
+## 11. Authoring new art against the material key
+
+Everything in §5.3 through §5.7 exists because `racer.png` is a shaded render
+whose mane, tail, cannons, boot and saddle are all the same black. None of that
+is inherent to masking — it is the cost of art that was not painted for it.
+
+`tools/material-key.ts` defines one palette that any new asset can be authored
+against. Paint each material's base colour from it and masking collapses to a
+colour lookup: no geometry, no blob analysis, no per-asset tuning, nothing to
+re-measure when a pose changes.
+
+| id | material | paint it | after shading, must satisfy |
+|----|----------|------------|------------------------------|
+| 1 | body | `#8C8C8F` | chroma < 28, L 0.28–0.68 |
+| 2 | hair | `#A032D0` | chroma ≥ 28, hue 260–325 |
+| 3 | points | `#1A1A1C` | chroma < 28, L < 0.22 |
+| 4 | silks | `#1E6FD9` | chroma ≥ 28, hue 185–250 |
+| 5 | trim | `#F0F0F2` | chroma < 28, L > 0.72 |
+| 6 | fixed | `#12B36A` for tack; skin and leather stay natural | anything else |
+
+Three neutrals separated on the **lightness** axis, two saturated separated on
+the **hue** ring, and `fixed` as the fall-through — which is what lets skin and
+leather keep the colours they were painted, since they are the only thing the
+player ever sees unmodified.
+
+`material-key.gpl` at the repo root is this palette as a GIMP palette file,
+which LibreSprite and Aseprite both open. Regenerate it with
+`npm run check-art -- --write-palette material-key.gpl`.
+
+### Shade by moving lightness, never hue
+
+Two limits fall out of the layout above, and both bite in practice.
+
+**A saturated material must stay between L 0.20 and L 0.85.** Chroma is
+`max − min`, so it collapses toward zero at both ends of the lightness range.
+Shade the violet mane down to L 0.10 and its chroma drops under 28, the hue
+test stops applying, and it reads as `points`.
+
+**Do not blur across a material boundary.** Blur is the opposite of what makes
+art maskable: it manufactures a wide band of intermediate colours between two
+materials, and every pixel in that band is a coin flip. A two-pixel
+anti-aliased edge is handled; a ten-pixel blurred one is a ten-pixel error.
+
+If flat art looks too flat, the fix is **shading, not blurring** — two or three
+extra lightness steps of the *same* hue, painted as their own flat regions. To
+soften something inside a single material, select that region first so the blur
+cannot reach across the boundary.
+
+### `npm run check-art`
+
+Answers "can this be masked?" before anything is built on the answer.
+
+```
+npm run check-art -- src/assets/shield-badge.png
+npm run check-art -- src/assets/racer.png --mask src/assets/racer-mask.png
+npm run check-art -- --write-palette material-key.gpl
+```
+
+Four blocks:
+
+- **PALETTE** — the flat colours the art is built from, each with the material
+  it currently reads as. Under ~512 distinct colours means the art is flat
+  enough to bake by lookup alone.
+- **BANDS** — every pixel classified by the key, with lightness, chroma and hue
+  spread per material. Compare against §4 when art is replaced.
+- **MARGINS** — how close each material sits to the threshold that would flip
+  it, in risk units (1 unit = 6 chroma, 0.03 lightness, or 8° of hue). *This is
+  the real verdict.* Two materials can both classify correctly today and still
+  be one regeneration away from colliding.
+- **VERDICT** — plain-language pass/warn. The warning that matters most: a
+  large, tight, saturated cluster that matches no hue window. That is a material
+  painted off-key which will silently never be tinted, and the report says which
+  window it is nearest and by how many degrees.
+
+With `--mask` it also checks coverage — every visible pixel labelled, nothing
+outside the art, no partial alpha.
+
+### `npm run bake-flat`
+
+The whole masking pipeline for art that was painted for it:
+
+```
+npm run bake-flat -- src/assets/shield-badge.png
+```
+
+1. Seed every pixel within `SEED_TOLERANCE` of a known material colour.
+2. Grow those labels into the anti-aliasing and the soft edge, each blend pixel
+   taking whichever *labelled neighbour* it is closest to in colour.
+3. Smooth away single strays.
+
+Writes `<asset>-mask.png` and `<asset>-mask.svg`. That is the entire tool —
+compare with §5.
+
+Blends are deliberately not seeded. A pixel halfway between a white field and a
+navy border is a mid blue-grey that can sit nearer the *body* swatch than to
+either of its actual neighbours, so classifying it by colour alone draws a grey
+line around every border.
+
+### Sidecars, for art that predates the key
+
+`<asset>.materials.json` overrides the key with the palette an asset actually
+uses:
+
+```json
+{
+  "note": "why this exists",
+  "palette": {
+    "body":  ["#7f7f81", "#898b8c"],
+    "hair":  ["#a02840", "#af153f"],
+    "silks": ["#3360a8", "#1f346a", "#153171"],
+    "fixed": ["#e2e4d9"]
+  }
+}
+```
+
+List the flat colours from `check-art`'s PALETTE block; every shade and blend
+around them follows. `src/assets/shield-badge.materials.json` is a live example
+— that badge was painted with a crimson mane, 23° off the hair window, before
+the key existed.
+
+A sidecar is the escape hatch, not the goal. It pins the mask to exact colours
+in a second file, so recolouring the art silently invalidates it. Repaint to the
+key and delete the sidecar when you can.
+
+---
+
+## 12. Working in LibreSprite
+
+The one setting that changes everything: **`Sprite → Color Mode → Indexed`.**
+
+In indexed mode every pixel stores a palette index rather than a colour, so
+editing a palette entry recolours every pixel of that material at once. That is
+the find-and-replace you want, and it is exact — no tolerance, no missed
+anti-aliased pixels, no drift.
+
+The workflow:
+
+1. `Sprite → Color Mode → Indexed`.
+2. In the Palette panel, **Load Palette** → `material-key.gpl`.
+3. Paint each material with its key entry. Add extra entries for shading, but
+   only ones that keep the hue and move the lightness (§11).
+4. Export as PNG. Indexed PNG is fine — `pngjs` expands it on read.
+5. `npm run check-art -- <file>`, then `npm run bake-flat -- <file>`.
+
+Other things worth knowing:
+
+- **Replace a colour without indexed mode:** `Edit → Replace Color`. Set
+  tolerance to 0 for an exact swap; raise it only to sweep up anti-aliasing,
+  and check the result, because tolerance in RGB space does not respect the
+  material bands.
+- **Select every pixel of one colour:** magic wand with *Contiguous* turned off,
+  tolerance 0. Useful for selecting a region before blurring inside it.
+- **Keep materials on separate layers** while working. Merging is a one-way
+  door, and a layer per material means the mask can be exported directly if the
+  colour route ever gets awkward.
+- **Turn off any anti-aliasing option on the pencil and bucket.** Hard pixel
+  edges bake perfectly; soft ones cost a growth pass and some guessing.
+- **Do not scale the art with a smooth filter.** Nearest-neighbour only —
+  bilinear scaling invents intermediate colours everywhere, which is the blur
+  problem applied to the entire image at once.

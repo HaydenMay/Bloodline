@@ -1,19 +1,27 @@
 import badgeUrl from '../assets/shield-badge.png';
+import maskUrl from '../assets/shield-badge-mask.png';
 import { coatFor } from './palette.js';
 
 /**
- * Shield badge for horses — mockup implementation.
+ * Shield badge for horses.
  *
- * Uses color-region detection on the badge PNG itself:
- * - Grey pixels → body (tinted with coat color)
- * - Red/magenta pixels → mane (tinted with accent color)
- * - Magenta pixels → legs (tinted with accent color)
- * - Blue pixels → outline (kept as accent or tinted)
- * - White/transparent → background (untouched)
+ * Recoloured the same way the race sprite is: a baked MATERIAL MASK says what
+ * each pixel is, and the tint keeps the art's luminance while taking hue and
+ * saturation from the horse's scheme. `tools/bake-flat.ts` writes the mask; see
+ * SPRITE_MASK.md.
+ *
+ * The badge deliberately does NOT take its mane colour from the coat genes.
+ * Coat and mane are so often close in real genetics that a shield picked out in
+ * both reads as one colour at icon size, so the mane takes the silks' secondary
+ * instead and the badge stays legible in a pedigree tree.
  */
+
+const MATERIAL = { body: 1, hair: 2, points: 3, silks: 4, trim: 5, fixed: 6 } as const;
 
 interface Loaded {
   base: ImageData;
+  /** One material id per pixel, or all zero if the mask failed to load. */
+  mask: Uint8Array;
   width: number;
   height: number;
 }
@@ -42,7 +50,7 @@ export function loadBadge(): Promise<Loaded> {
   if (loaded) return Promise.resolve(loaded);
   if (loading) return loading;
   loading = (async () => {
-    const baseImg = await loadImage(badgeUrl);
+    const [baseImg, maskImg] = await Promise.all([loadImage(badgeUrl), loadImage(maskUrl)]);
     const W = 256;
     const H = 256;
 
@@ -83,7 +91,18 @@ export function loadBadge(): Promise<Loaded> {
     }
     const base = bctx.getImageData(0, 0, W, H);
 
-    loaded = { base, width: W, height: H };
+    // Material id is stored as id * 40 in red, so the file is legible by eye.
+    // No mask means no tinting rather than wrong tinting: every pixel falls to
+    // 0, which the tint below passes straight through.
+    const mask = new Uint8Array(W * H);
+    if (maskImg) {
+      const mctx = scratch(W, H);
+      mctx.drawImage(maskImg, 0, 0);
+      const data = mctx.getImageData(0, 0, W, H).data;
+      for (let p = 0; p < W * H; p++) mask[p] = Math.round(data[p * 4]! / 40);
+    }
+
+    loaded = { base, mask, width: W, height: H };
     return loaded;
   })();
   return loading;
@@ -117,28 +136,6 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   return [Math.round(255 * f(0)), Math.round(255 * f(8)), Math.round(255 * f(4))];
 }
 
-// Detect which region a pixel belongs to based on color.
-// Tolerance allows for slight variations in the source PNG.
-function detectRegion(r: number, g: number, b: number, tolerance: number = 20): string {
-  // Grey body (neutral grey)
-  if (Math.abs(r - g) < tolerance && Math.abs(g - b) < tolerance && Math.abs(r - b) < tolerance && r > 100) {
-    return 'body';
-  }
-  // Red/Dark red mane (high red, lower green and blue)
-  if (r > g + 30 && r > b + 30 && r > 100) {
-    return 'mane';
-  }
-  // Magenta legs (high red and blue, low green)
-  if (r > 150 && b > 150 && g < 100) {
-    return 'legs';
-  }
-  // Blue outline (high blue, low red)
-  if (b > g + 30 && b > r + 30) {
-    return 'outline';
-  }
-  return 'fixed';
-}
-
 export interface Silks {
   primary: string;
   secondary: string;
@@ -165,66 +162,44 @@ export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
   const accentColor = scheme.silks?.primary ?? scheme.accentColor ?? DEFAULT_ACCENT;
   const maneColor = scheme.silks?.secondary ?? accentColor;
   const key = `${scheme.coat}|${accentColor}|${maneColor}`;
-  console.log('tintedBadge cache key:', key, 'cache size:', tinted.size);
   const hit = tinted.get(key);
   if (hit) {
-    console.log('Cache HIT for badge');
+    // Re-insert so the map's order stays least-recently-used first.
     tinted.delete(key);
     tinted.set(key, hit);
     return hit;
   }
-  console.log('Cache MISS for badge, rendering new');
 
   const coat = coatFor(scheme.coat);
-  const bodyHsl = hexToHsl(coat.body);
-  const accentHsl = hexToHsl(accentColor);
-  const maneHsl = scheme.silks ? hexToHsl(scheme.silks.secondary) : accentHsl;
+  const target: Partial<Record<number, [number, number, number]>> = {
+    [MATERIAL.body]: hexToHsl(coat.body),
+    [MATERIAL.hair]: hexToHsl(maneColor),
+    [MATERIAL.points]: hexToHsl(maneColor),
+    [MATERIAL.silks]: hexToHsl(accentColor),
+    [MATERIAL.trim]: hexToHsl(maneColor),
+  };
 
-  const { width: W, height: H } = loaded;
+  const { width: W, height: H, base, mask } = loaded;
   const ctx = scratch(W, H);
   const out = ctx.createImageData(W, H);
-  const { base } = loaded;
 
-  // Calculate mean luminance for each region to preserve shading
-  const regionMeans: Record<string, number> = {
-    body: 0,
-    mane: 0,
-    legs: 0,
-    outline: 0,
-    fixed: 0,
-  };
-  const regionCounts: Record<string, number> = {
-    body: 0,
-    mane: 0,
-    legs: 0,
-    outline: 0,
-    fixed: 0,
-  };
-
-  // First pass: calculate mean luminance per region
+  // Mean luminance per material, so the tint lands on each region's MIDTONE
+  // and its modelling survives as an offset either side. Scaling the whole
+  // region toward the target instead would crush a dark scheme to black.
+  const sum = new Float64Array(8);
+  const count = new Float64Array(8);
   for (let p = 0; p < W * H; p++) {
-    const i = p * 4;
-    const a = base.data[i + 3]!;
-    if (a === 0) continue;
-
-    const r = base.data[i]!;
-    const g = base.data[i + 1]!;
-    const b = base.data[i + 2]!;
-    const region = detectRegion(r, g, b);
-    const l = (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
-
-    regionMeans[region] = (regionMeans[region] ?? 0) + l;
-    regionCounts[region] = (regionCounts[region] ?? 0) + 1;
+    const m = mask[p]!;
+    if (!m || m > 7 || base.data[p * 4 + 3]! === 0) continue;
+    const r = base.data[p * 4]!;
+    const g = base.data[p * 4 + 1]!;
+    const b = base.data[p * 4 + 2]!;
+    sum[m] = sum[m]! + (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
+    count[m] = count[m]! + 1;
   }
-  for (const region of Object.keys(regionMeans)) {
-    if (regionCounts[region]! > 0) {
-      regionMeans[region] = regionMeans[region]! / regionCounts[region]!;
-    } else {
-      regionMeans[region] = 0.5;
-    }
-  }
+  const meanL = new Float64Array(8);
+  for (let m = 1; m < 8; m++) meanL[m] = count[m] ? sum[m]! / count[m]! : 0.5;
 
-  // Second pass: tint pixels
   for (let p = 0; p < W * H; p++) {
     const i = p * 4;
     const a = base.data[i + 3]!;
@@ -234,10 +209,9 @@ export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
     const r = base.data[i]!;
     const g = base.data[i + 1]!;
     const b = base.data[i + 2]!;
-    const region = detectRegion(r, g, b);
-
-    if (region === 'fixed') {
-      // Untinted regions pass through
+    const tint = target[mask[p]!];
+    if (!tint) {
+      // `fixed` and unmasked pixels — the bridle, the outline — pass through.
       out.data[i] = r;
       out.data[i + 1] = g;
       out.data[i + 2] = b;
@@ -245,17 +219,8 @@ export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
     }
 
     const l = (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
-    let tintHsl: [number, number, number];
-    if (region === 'body') {
-      tintHsl = bodyHsl;
-    } else if (region === 'mane' || region === 'legs') {
-      tintHsl = maneHsl;
-    } else {
-      tintHsl = accentHsl;
-    }
-    const meanL = regionMeans[region] ?? 0.5;
-    const lit = Math.max(0.02, Math.min(0.98, tintHsl[2] + (l - meanL) * 0.9));
-    const [nr, ng, nb] = hslToRgb(tintHsl[0], tintHsl[1], lit);
+    const lit = Math.max(0.02, Math.min(0.98, tint[2] + (l - meanL[mask[p]!]!) * 0.9));
+    const [nr, ng, nb] = hslToRgb(tint[0], tint[1], lit);
     out.data[i] = nr;
     out.data[i + 1] = ng;
     out.data[i + 2] = nb;
