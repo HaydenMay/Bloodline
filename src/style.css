@@ -1050,6 +1050,7 @@ body {
   margin-top: 24px;
 }
 
+.sd-test-btn,
 .sd-start-btn,
 .sd-back-link {
   flex: 1;

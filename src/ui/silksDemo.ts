@@ -21,6 +21,22 @@ const hexToRgb = (hex: string): [number, number, number] => {
 /** Toward this rather than pure white: a flaxen mane is warm, not bleached. */
 const CREAM = '#F2E7D2';
 
+/**
+ * One unmistakable colour per material, for seeing WHERE each one is.
+ *
+ * No horse is green, which is the point: with plausible colours it is genuinely
+ * hard to tell whether a pixel took the coat or the points, and any region the
+ * mask has wrong hides inside that ambiguity. Set these and every boundary in
+ * the mask is visible at a glance.
+ */
+const TEST_SCHEME = {
+  body: '#22CC55',
+  hair: '#E028D0',
+  points: '#FF8000',
+  silks: '#2060FF',
+  trim: '#FFE81A',
+};
+
 const mix = (a: string, b: string, t: number): string => {
   const [r1, g1, b1] = hexToRgb(a);
   const [r2, g2, b2] = hexToRgb(b);
@@ -75,6 +91,8 @@ export function mountSilksDemo(host: HTMLElement): void {
   // five regions are welded to one control. Picking a coat still sets all
   // three, so it behaves as a preset; then each can be moved off it.
   let selectedCoat = 'palomino';
+  /** Set only by Test Colours; a coat button clears it. */
+  let testBody: string | null = null;
   let selectedHairColor = COATS.palomino.hair;
   let selectedPointColor = COATS.palomino.points;
   let selectedTrimColor = RIVAL_SILKS[0]!.secondary;
@@ -84,6 +102,7 @@ export function mountSilksDemo(host: HTMLElement): void {
     const silks: Silks = { primary: selectedSilksColor, secondary: selectedTrimColor };
     const coat = {
       ...coatFor(selectedCoat),
+      body: testBody ?? coatFor(selectedCoat).body,
       hair: selectedHairColor,
       points: selectedPointColor,
     };
@@ -213,6 +232,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       </div>
 
       <div class="sd-actions">
+        <button class="sd-test-btn">Test Colours</button>
         <button class="sd-start-btn">Start Race</button>
         <a href="/" class="sd-back-link">Back</a>
       </div>
@@ -292,6 +312,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       const id = btn.getAttribute('data-coat');
       if (!id) return;
       selectedCoat = id;
+      testBody = null;
       selectedHairColor = coatFor(id).hair;
       selectedPointColor = coatFor(id).points;
       host.querySelectorAll('.sd-coat-btn').forEach((b) => b.classList.remove('active'));
@@ -316,6 +337,23 @@ export function mountSilksDemo(host: HTMLElement): void {
   wire('sd-trim', 'trim-hex', (v) => { selectedTrimColor = v; });
   wire('sd-silks', 'silks-hex', (v) => { selectedSilksColor = v; });
 
+
+  // Slams the test scheme into all five, so the mask's regions can be seen.
+  host.querySelector('.sd-test-btn')!.addEventListener('click', () => {
+    selectedHairColor = TEST_SCHEME.hair;
+    selectedPointColor = TEST_SCHEME.points;
+    selectedTrimColor = TEST_SCHEME.trim;
+    selectedSilksColor = TEST_SCHEME.silks;
+    testBody = TEST_SCHEME.body;
+    renderHair();
+    renderPoints();
+    for (const [id, v] of [['trim-hex', selectedTrimColor], ['silks-hex', selectedSilksColor]] as const) {
+      host.querySelector<HTMLInputElement>(`#${id}`)!.value = v;
+    }
+    host.querySelectorAll('.sd-color-btn.sd-trim, .sd-color-btn.sd-silks')
+      .forEach((b) => b.classList.remove('active'));
+    updatePreview();
+  });
 
   host.querySelector('.sd-start-btn')!.addEventListener('click', () => {
     sessionStorage.setItem(
