@@ -739,11 +739,11 @@ body {
 
 .ib-tip {
   position: absolute;
-  left: 50%;
+  left: max(4px, min(50%, calc(100vw - 192px)));
   bottom: calc(100% + 7px);
   transform: translateX(-50%);
   width: 180px;
-  max-width: 90vw;
+  max-width: calc(100vw - 8px);
   max-height: 120px;
   overflow-y: auto;
   background: #0e1218;
