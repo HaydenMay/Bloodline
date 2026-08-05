@@ -745,9 +745,10 @@ body {
 
 .ib-tip {
   position: absolute;
-  right: 0;
+  left: 100%;
   bottom: calc(100% + 7px);
   transform: none;
+  margin-left: 8px;
   width: 160px;
   max-width: calc(100vw - 16px);
   max-height: 120px;
