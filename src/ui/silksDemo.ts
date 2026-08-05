@@ -127,7 +127,7 @@ export function mountSilksDemo(host: HTMLElement): void {
   // that reads well on a still frame can still flicker across the stride, and a
   // still frame is exactly where that hides. Same sheet, same mask, same tint
   // path a race uses — a stride here IS the horse you will get.
-  const STRIDES_PER_SECOND = 1.6;
+  const STRIDES_PER_SECOND = .5;
   let phase = 0;
   let last = performance.now();
 
@@ -143,7 +143,7 @@ export function mountSilksDemo(host: HTMLElement): void {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const scale = Math.min(canvas.width / 210, canvas.height / 165);
     const x = canvas.width / 2;
-    const y = canvas.height * 0.86;
+    const y = canvas.height * 0.95;
     drawHorseShadow(ctx, x, y + 2, scale * 1.1);
     drawSpriteHorse(ctx, x, y, { ...scheme, phase, scale });
     requestAnimationFrame(frame);
