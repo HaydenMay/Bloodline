@@ -792,6 +792,12 @@ and re-tuning after foals exist means re-tuning the genetics too.
 
 ---
 
+## Phase 6 — UI overhaul
+
+**Moment window indicator** — The HUD no longer shows when a horse is inside its moment window, leaving players flying blind on timing. This was surfaced in playtesting: a frontRunner with `early` Moment has a 52%-of-race window (naturally forgiving), but `late`-moment horses have only 27% and need the visual cue to read the moment precisely. The indicator existed pre-rebuild (`raceScreen.ts:672` checks `inMomentWindow` for exactly this) and should be restored — a visual highlight or flash on the HUD when the horse enters/exits its window, consistent with the phase call-outs. **Restore before 3.7, since player parity work depends on the player being able to time kicks at all.** This is not a feature request — it's a regression from a working system and blocks realistic playtesting.
+
+---
+
 ## Known issue — winning margins are too wide
 
 **Currently ~6 lengths between first and second**, down from 6–7. Real racing
