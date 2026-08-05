@@ -1,9 +1,0 @@
-{
-  "note": "badge painted before the material key existed; its mane red sits 23 degrees off the hair window, so the palette is declared here instead. Repaint toward #A032D0 and this file can be deleted. The bridle is fixed rather than trim on purpose: it is tack, and leaving it pale keeps it legible against both the head and the mane whatever those are tinted.",
-  "palette": {
-    "body": ["#7f7f81", "#898b8c", "#817f81"],
-    "hair": ["#a02840", "#af153f", "#a32537", "#ad163f", "#aa193e"],
-    "silks": ["#3360a8", "#1f346a", "#153171"],
-    "fixed": ["#e2e4d9"]
-  }
-}
