@@ -14,6 +14,7 @@ import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../
 import type { PlayerInput, RaceConfig, RaceEntrant } from '../sim/race/types.js';
 import { CHARGE_CAPACITY, TICK_HZ } from '../sim/race/constants.js';
 import type { Horse } from '../sim/types.js';
+import { attachInfoBox } from './infoBox.js';
 
 /**
  * The race screen.
@@ -194,6 +195,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   // race.outcome() re-sorts and re-measures the whole field each call.
   let finalRecap: Recap | null = null;
   let finalRows: RecapRow[] | null = null;
+  // Track result row positions for click detection
+  const resultRowBounds: Map<string, { top: number; height: number }> = new Map();
   /** Races wait for you rather than starting the moment the page loads. */
   let started = false;
   // 3 beats of a second each, then the field breaks and "And they're off!"
@@ -702,6 +705,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     y += 18;
 
     // ---- Placings ----------------------------------------------------------
+    resultRowBounds.clear();
     for (let i = 0; i < visible; i++) {
       const r = rows[i]!;
       if (r.isPlayer) {
@@ -709,6 +713,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         roundRect(ctx, cx - panel / 2, y - 1, panel, rowH - 3, 7);
         ctx.fill();
       }
+
+      resultRowBounds.set(r.horseId, { top: y - 1, height: rowH - 3 });
 
       ctx.fillStyle = r.isPlayer ? '#F2C14E' : '#8B98A9';
       ctx.font = `${r.isPlayer ? 700 : 500} 13px ui-sans-serif, system-ui, sans-serif`;
@@ -788,6 +794,36 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   window.addEventListener('keydown', key);
   window.addEventListener('keyup', key);
 
+  let activeRivalInfoBox: (() => void) | null = null;
+
+  const handleResultClick = (e: PointerEvent): void => {
+    // Only allow clicking results after race finishes
+    if (running) return;
+
+    const rect = surface.canvas.getBoundingClientRect();
+    const clickY = e.clientY - rect.top;
+
+    // Check which result row was clicked
+    for (const [horseId, bounds] of resultRowBounds) {
+      if (clickY >= bounds.top && clickY <= bounds.top + bounds.height) {
+        // Close previous rival info box
+        activeRivalInfoBox?.();
+
+        // Find the horse and show its info
+        const horse = field.find((h) => h.id === horseId);
+        if (horse) {
+          // Create a temporary element to attach the info box to
+          const tempEl = document.createElement('div');
+          const rivalSilks = silksFor.get(horseId) || playerSilks;
+          activeRivalInfoBox = attachInfoBox(tempEl, horse, rivalSilks);
+        }
+        return;
+      }
+    }
+  };
+
+  host.addEventListener('click', handleResultClick);
+
   const loop: Loop = startLoop(TICK_HZ, tick, draw);
 
   return (): void => {
@@ -799,6 +835,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     window.removeEventListener('pointercancel', up);
     window.removeEventListener('keydown', key);
     window.removeEventListener('keyup', key);
+    host.removeEventListener('click', handleResultClick);
+    activeRivalInfoBox?.();
   };
 }
 

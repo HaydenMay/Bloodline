@@ -181,6 +181,7 @@ export function buildRecap(
 
 /** A placing line, ready to be drawn. */
 export interface RecapRow {
+  horseId: string;
   position: number;
   name: string;
   /** Blank for the winner. */
@@ -191,6 +192,7 @@ export interface RecapRow {
 
 export function recapRows(outcome: RaceOutcome, playerId: string): RecapRow[] {
   return outcome.results.map((r: RaceResult) => ({
+    horseId: r.horseId,
     position: r.finishPosition,
     name: r.name,
     margin: r.finishPosition === 1 ? '' : lengths(r.margin),
