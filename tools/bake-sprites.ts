@@ -9,7 +9,6 @@ import {
   hueIn,
   rgbToHsl,
 } from './material-key.js';
-import { traceSvg } from './trace-mask.js';
 
 /**
  * Bake the delivered sprite sheet into material masks.
@@ -22,7 +21,6 @@ import { traceSvg } from './trace-mask.js';
  * Run: npm run bake-sprites
  * In:  src/assets/racer.png           the delivered sheet, untouched
  * Out: src/assets/racer-mask.png      one material id per pixel
- *      src/assets/racer-mask.svg      the same regions as editable vector paths
  *      src/assets/racer.json          grid and per-frame registration
  *
  * The base art is NOT rewritten. The renderer reads luminance from the original
@@ -49,7 +47,6 @@ import { traceSvg } from './trace-mask.js';
 
 const SRC = 'src/assets/racer.png';
 const OUT_MASK = 'src/assets/racer-mask.png';
-const OUT_SVG = 'src/assets/racer-mask.svg';
 const OUT_META = 'src/assets/racer.json';
 
 /** Grid the sheet is laid out on. */
@@ -427,7 +424,6 @@ function main(): void {
   }
   mkdirSync(dirname(resolve(OUT_MASK)), { recursive: true });
   writeFileSync(resolve(OUT_MASK), PNG.sync.write(mask));
-  writeFileSync(resolve(OUT_SVG), traceSvg(lab, W, H, SRC));
 
   const frames = boxes
     .map((b, i) => (b ? { cell: i, x: b.x0, y: b.y0, w: b.x1 - b.x0 + 1, h: b.y1 - b.y0 + 1 } : null))
@@ -443,7 +439,7 @@ function main(): void {
     if (!+k) continue;
     console.log(`  ${MATERIAL_NAMES[+k]!.padEnd(7)} ${String(v).padStart(7)}  ${((100 * v) / opaque).toFixed(1)}%`);
   }
-  console.log(`\nwrote ${OUT_MASK}\nwrote ${OUT_SVG}\nwrote ${OUT_META}`);
+  console.log(`\nwrote ${OUT_MASK}\nwrote ${OUT_META}`);
 }
 
 main();

@@ -47,14 +47,11 @@ Both copies must agree.
 |---|---|
 | `src/assets/racer.png` | the delivered art, 1280×1280, 5×5 grid of 256px cells, 24 frames. **Never modified.** |
 | `src/assets/racer-mask.png` | generated. One material id per pixel. This is what the game loads. |
-| `src/assets/racer-mask.svg` | generated. The same regions as editable vector paths. Nothing loads it; it is for humans. |
 | `src/assets/racer.json` | generated. Grid dimensions and per-frame bounding boxes. |
-| `src/assets/racer-mask-old.png` | the previous mask, kept as a reference. Not loaded. |
-| `tools/bake-sprites.ts` | generates all three outputs for `racer.png`. |
+| `tools/bake-sprites.ts` | generates the mask and the registration for `racer.png`. |
 | `tools/bake-flat.ts` | masks any FLAT asset by colour alone — see §11. |
 | `tools/check-art.ts` | reports whether an asset can be masked at all — see §11. |
 | `tools/material-key.ts` | the shared palette, bands and colour maths. |
-| `tools/trace-mask.ts` | the PNG→SVG tracer, shared by both bakers. |
 | `material-key.gpl` | the key as a palette file LibreSprite can load. |
 | `src/render/spriteHorse.ts` | loads the sheet + mask and does the runtime tint. |
 
@@ -323,58 +320,62 @@ single pixels with no labelled neighbour at any distance within their island.
 
 - `racer-mask.png` — red = id × 40, alpha 255/0.
 - `racer.json` — grid and frame boxes.
-- `racer-mask.svg` — see below.
+
+Nothing else. Both bakers used to emit an SVG trace of the mask alongside the
+PNG, on the theory that a vector version would be the natural place to correct
+a region by hand. Nobody ever did; what actually gets corrected is the ART, and
+then the mask is rebaked. A second generated file that has to stay in step with
+the first and never earns its keep is a liability, so it is gone.
 
 ---
 
-## 6. The SVG
+## 6. Masking flat assets
 
-`racer-mask.svg` is the same regions traced as vector paths, one `<g>` per
-material:
+`racer.png` is the hard case. Everything from §5.1 to §5.7 exists because it is
+a shaded render whose mane, tail, cannons, boot and saddle are all the same
+black, so the difference has to be recovered from geometry.
 
-```xml
-<g id="body"   fill="#280000" fill-rule="evenodd"><path d="…"/></g>
-<g id="hair"   fill="#500000" …>
-<g id="points" fill="#780000" …>
-<g id="silks"  fill="#a00000" …>
-<g id="trim"   fill="#c80000" …>
-<g id="fixed"  fill="#f00000" …>
-```
-
-The fills are the same red values as the PNG, so **rasterising the SVG at
-1280×1280 with nearest-neighbour reproduces `racer-mask.png` exactly** — this
-is asserted in §7 and currently gives zero differing pixels out of 1,638,400.
-That round-trip is what makes hand-editing the SVG a safe way to correct a
-region: fix it in a vector editor, rasterise, done.
-
-The tracer is crack following on the corner lattice. Vertices are the corners
-*between* pixels; a crack is on the boundary when the material is on exactly
-one side. Every crack is walked with the material kept on the left:
+Assets painted to the **material key** (§11) need none of that.
+`tools/bake-flat.ts` is the whole pipeline for them:
 
 ```
-up     needs the material west of the crack, open air east
-down   needs it east,  open air west
-left   needs it south, open air north
-right  needs it north, open air south
+npm run bake-flat -- src/assets/shield-badge.png
 ```
 
-Outer contours come out anticlockwise and holes clockwise, so
-`fill-rule="evenodd"` punches the holes out for free. At a corner where two
-diagonal pixels are in and the other two out, both a left and a right turn are
-legal; going back the way we came is always excluded, and where both remain we
-turn left. Either choice fills correctly — being *consistent* is what
-guarantees the walk terminates. Collinear midpoints are dropped, so a straight
-40-pixel run is two points, which is why the file is 350 KB rather than
-several MB.
+1. Classify every solid pixel with `classifyByKey` — chroma picks the axis, then
+   hue or lightness picks the material.
+2. Grow those labels into the anti-aliasing and the soft edge, each blend pixel
+   taking whichever *labelled neighbour* it is closest to in colour.
+3. Smooth away single strays.
 
-The previous `racer-mask.svg` was a potrace silhouette of the whole horse, in a
-single black fill, with no material information. It was unloadable and unused.
+Writes `<asset>-mask.png`. That is the entire tool: no geometry, no frame
+layout, nothing to re-measure when the art changes.
+
+**Seed by the key's bands, never by RGB distance to its hex values.** These
+sound equivalent and are not. `shield-badge.png` shades its blue across
+`#3360A8`, `#1F346A` and `#153171` — all three unambiguously silks, chroma over
+75, hue within six degrees of each other — yet the nearest of them is 55 away
+from the key's `#1E6FD9` in plain RGB. A version of this tool that seeded by
+distance let every one of them fall through to `fixed`, and the badge lost its
+border. Shading moves a colour a long way in RGB while leaving its hue and
+chroma where they were, which is the whole reason the bands are defined the way
+they are.
+
+**Blends are deliberately not seeded.** A pixel halfway between a white field
+and a navy border is a mid blue-grey that can sit nearer the *body* band than
+to either of its actual neighbours, so classifying it by colour alone draws a
+grey line around every border. Left blank and filled from what surrounds it, it
+is right by construction.
+
+There is no sidecar and no per-asset palette file. An asset that does not match
+the key is not a case to configure around, it is a repaint — `check-art` says
+which material is off and by how many degrees.
 
 ---
 
 ## 7. Verifying a bake
 
-Never trust the summary counts alone. Run all four.
+Never trust the summary counts alone. Run all of these.
 
 Scripts assume `NODE_PATH=./node_modules` and are run from the repo root.
 
@@ -422,30 +423,7 @@ secondary silks, no dark speckle), the mane along the crest (present, not
 absorbed into the coat), boots (black, not mane-coloured), and the silhouette
 edge (no grey halo).
 
-### 7.3 Round-trip the SVG
-
-Must be zero.
-
-```js
-const sharp = require('sharp');
-const { PNG } = require('pngjs');
-const fs = require('fs');
-(async () => {
-  const buf = await sharp('src/assets/racer-mask.svg')
-    .resize(1280, 1280, { kernel: 'nearest' }).png().toBuffer();
-  const a = PNG.sync.read(fs.readFileSync('src/assets/racer-mask.png'));
-  const b = PNG.sync.read(buf);
-  let diff = 0;
-  for (let p = 0; p < 1280 * 1280; p++) {
-    const ia = a.data[p * 4 + 3] ? Math.round(a.data[p * 4] / 40) : 0;
-    const ib = b.data[p * 4 + 3] > 127 ? Math.round(b.data[p * 4] / 40) : 0;
-    if (ia !== ib) diff++;
-  }
-  console.log('round-trip mismatches:', diff);   // expect 0
-})();
-```
-
-### 7.4 Coverage against the art
+### 7.3 Coverage against the art
 
 Every visible pixel of art should carry a material, and the mask should never
 extend past the art.
@@ -469,7 +447,7 @@ is fine — they are isolated alpha-1 specks. Uncovered in the thousands means
 grey halo. `stray` above zero means the mask claims pixels the art does not
 have; the previous mask had 1,720 of them.
 
-### 7.5 And the ordinary checks
+### 7.4 And the ordinary checks
 
 ```
 npm run lint && npx tsc --noEmit && npm test
@@ -602,22 +580,50 @@ against. Paint each material's base colour from it and masking collapses to a
 colour lookup: no geometry, no blob analysis, no per-asset tuning, nothing to
 re-measure when a pose changes.
 
-| id | material | paint it | after shading, must satisfy |
-|----|----------|------------|------------------------------|
-| 1 | body | `#8C8C8F` | chroma < 28, L 0.28–0.68 |
-| 2 | hair | `#A032D0` | chroma ≥ 28, hue 260–325 |
-| 3 | points | `#1A1A1C` | chroma < 28, L < 0.22 |
-| 4 | silks | `#1E6FD9` | chroma ≥ 28, hue 185–250 |
-| 5 | trim | `#F0F0F2` | chroma < 28, L > 0.72 |
-| 6 | fixed | `#12B36A` for tack; skin and leather stay natural | anything else |
+### The colours to paint with
+
+Every one of these is asserted by `tools/material-key.test.ts` to classify as
+its own material, so the table cannot drift away from the rules it came from.
+
+| id | material | what it is on a horse | **paint it** | shading ramp, dark → light |
+|----|----------|------------------------|--------------|-----------------------------|
+| 1 | `body` | coat: barrel, neck, head, upper legs | **`#8C8C8F`** | `#55555A` `#70707A` `#8C8C8F` `#A0A0A4` |
+| 2 | `hair` | mane and tail | **`#A032D0`** | `#5A1C75` `#7B26A2` `#A032D0` `#C070E8` |
+| 3 | `points` | cannons and hooves | **`#1A1A1C`** | `#101012` `#1A1A1C` `#26262A` `#2E2E33` |
+| 4 | `silks` | jacket, cap, saddle cloth, shield | **`#1E6FD9`** | `#12447F` `#1857AB` `#1E6FD9` `#6BA6F0` |
+| 5 | `trim` | breeches, collar, secondary accent | **`#F0F0F2`** | `#C8C8CC` `#DCDCE0` `#F0F0F2` `#FAFAFC` |
+| 6 | `fixed` | tack, boots, saddle — never tinted | **`#12B36A`** | `#0B6B40` `#12B36A` `#3FD693` |
+| 6 | `fixed` | skin, leather — never tinted | natural warm tones | `#8A5A3C` `#C98A5E` |
+| 0 | `none` | not drawn at all | **fully transparent** | — |
+
+Two ways to say "leave this alone", and they differ: `fixed` is **drawn but
+never recoloured**, which is what skin, leather and hoof horn want. Alpha 0 is
+**not drawn at all**. Reach for `fixed` unless the pixel should genuinely not
+exist.
+
+`hair` and `points` are separate materials with separate genes — a horse can
+have a flaxen mane over black legs — so give them separate colours even on a
+badge that only shows one of them.
+
+The rules those colours satisfy, if you need to check a shade of your own:
+
+| material | must satisfy |
+|----------|--------------|
+| `body` | chroma < 28, L 0.28–0.68 |
+| `hair` | chroma ≥ 28, hue 260–325 |
+| `points` | chroma < 28, L < 0.22 |
+| `silks` | chroma ≥ 28, hue 185–250 |
+| `trim` | chroma < 28, L > 0.72 |
+| `fixed` | anything else |
 
 Three neutrals separated on the **lightness** axis, two saturated separated on
 the **hue** ring, and `fixed` as the fall-through — which is what lets skin and
 leather keep the colours they were painted, since they are the only thing the
 player ever sees unmodified.
 
-`material-key.gpl` at the repo root is this palette as a GIMP palette file,
-which LibreSprite and Aseprite both open. Regenerate it with
+`material-key.gpl` at the repo root is every ramp above as a GIMP palette file,
+which LibreSprite and Aseprite both open — 23 swatches, grouped and labelled.
+Regenerate it from `tools/material-key.ts` with
 `npm run check-art -- --write-palette material-key.gpl`.
 
 ### Shade by moving lightness, never hue
@@ -670,50 +676,14 @@ outside the art, no partial alpha.
 
 ### `npm run bake-flat`
 
-The whole masking pipeline for art that was painted for it:
+The whole masking pipeline for art that was painted for it — see §6 for the
+three passes and the two traps. Writes `<asset>-mask.png` and nothing else.
 
-```
-npm run bake-flat -- src/assets/shield-badge.png
-```
-
-1. Seed every pixel within `SEED_TOLERANCE` of a known material colour.
-2. Grow those labels into the anti-aliasing and the soft edge, each blend pixel
-   taking whichever *labelled neighbour* it is closest to in colour.
-3. Smooth away single strays.
-
-Writes `<asset>-mask.png` and `<asset>-mask.svg`. That is the entire tool —
-compare with §5.
-
-Blends are deliberately not seeded. A pixel halfway between a white field and a
-navy border is a mid blue-grey that can sit nearer the *body* swatch than to
-either of its actual neighbours, so classifying it by colour alone draws a grey
-line around every border.
-
-### Sidecars, for art that predates the key
-
-`<asset>.materials.json` overrides the key with the palette an asset actually
-uses:
-
-```json
-{
-  "note": "why this exists",
-  "palette": {
-    "body":  ["#7f7f81", "#898b8c"],
-    "hair":  ["#a02840", "#af153f"],
-    "silks": ["#3360a8", "#1f346a", "#153171"],
-    "fixed": ["#e2e4d9"]
-  }
-}
-```
-
-List the flat colours from `check-art`'s PALETTE block; every shade and blend
-around them follows. `src/assets/shield-badge.materials.json` is a live example
-— that badge was painted with a crimson mane, 23° off the hair window, before
-the key existed.
-
-A sidecar is the escape hatch, not the goal. It pins the mask to exact colours
-in a second file, so recolouring the art silently invalidates it. Repaint to the
-key and delete the sidecar when you can.
+There is no sidecar and no per-asset palette file, on purpose. Pinning a mask
+to one set of hex values puts the art's palette in two places at once, and the
+next edit silently invalidates the copy nobody looked at. If an asset does not
+match the key, `check-art` names the material and the number of degrees, and
+the fix is a repaint that helps every tool at once.
 
 ---
 

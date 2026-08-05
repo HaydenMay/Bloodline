@@ -97,6 +97,35 @@ export const KEY: Record<string, { hex: string; note: string }> = {
   fixed: { hex: '#12B36A', note: 'tack only; skin and leather keep natural tones' },
 };
 
+/**
+ * Shading ramps — the colours to actually paint with, dark to light.
+ *
+ * "Stay inside the band" is a rule about numbers, and nobody mixes paint by
+ * checking numbers. These are pre-checked steps, wide enough to model with and
+ * far enough inside each band to survive a resave; `material-key.test.ts`
+ * asserts every one of them still classifies as its own material, so the ramps
+ * cannot drift away from the rules they were derived from.
+ *
+ * Ramps move LIGHTNESS and hold HUE. Look at the two saturated ones and notice
+ * their hue barely moves — 280-282 for hair, 212-214 for silks — while their
+ * lightness spans 0.28 to 0.68. That is the shape every extra shade should
+ * have. Note also that neither ramp reaches for black or white at its ends:
+ * chroma is max-minus-min, so it collapses at both extremes, and a violet
+ * shaded to L 0.10 stops being violet as far as the classifier is concerned.
+ *
+ * `fixed` gets a longer list because it is the fall-through and holds unlike
+ * things: a green for tack, and natural leather and skin tones that are only
+ * `fixed` by virtue of being nothing else.
+ */
+export const RAMPS: Record<string, string[]> = {
+  body: ['#55555A', '#70707A', '#8C8C8F', '#A0A0A4'],
+  hair: ['#5A1C75', '#7B26A2', '#A032D0', '#C070E8'],
+  points: ['#101012', '#1A1A1C', '#26262A', '#2E2E33'],
+  silks: ['#12447F', '#1857AB', '#1E6FD9', '#6BA6F0'],
+  trim: ['#C8C8CC', '#DCDCE0', '#F0F0F2', '#FAFAFC'],
+  fixed: ['#0B6B40', '#12B36A', '#3FD693', '#8A5A3C', '#C98A5E'],
+};
+
 // ---- Colour maths -----------------------------------------------------------
 
 /**
@@ -171,11 +200,14 @@ export function classifyByKey(r: number, g: number, b: number): Material {
  * §11 for the workflow.
  */
 export function paletteGpl(): string {
-  const lines = ['GIMP Palette', 'Name: Bloodline material key', 'Columns: 6', '#'];
-  for (const [name, { hex, note }] of Object.entries(KEY)) {
-    const [r, g, b] = hexToRgb(hex);
-    const pad = (v: number): string => String(v).padStart(3, ' ');
-    lines.push(`${pad(r)} ${pad(g)} ${pad(b)}\t${name} — ${note}`);
+  const lines = ['GIMP Palette', 'Name: Bloodline material key', 'Columns: 5', '#'];
+  const pad = (v: number): string => String(v).padStart(3, ' ');
+  for (const [name, ramp] of Object.entries(RAMPS)) {
+    lines.push(`# ${name} — ${KEY[name]!.note}`);
+    ramp.forEach((hex, i) => {
+      const [r, g, b] = hexToRgb(hex);
+      lines.push(`${pad(r)} ${pad(g)} ${pad(b)}\t${name} ${i + 1}${hex === KEY[name]!.hex ? ' (base)' : ''}`);
+    });
   }
   return `${lines.join('\n')}\n`;
 }
