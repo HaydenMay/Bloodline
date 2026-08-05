@@ -29,6 +29,7 @@ if (!appEl) throw new Error('#app not found');
 const app: HTMLDivElement = appEl;
 
 let teardown: (() => void) | null = null;
+let autopilot = false;
 
 function buildField(seed: string): { field: Horse[]; playerId: string } {
   const rng = createRng(seed);
@@ -75,7 +76,13 @@ function startRace(seed: string): void {
       <span class="rb-moment-label">Preferred length</span>
       <span class="rb-pref">${player.preferredDistance.min}–${player.preferredDistance.max} m</span>
     </div>
-    <div class="rb-hint">Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b></div>
+    <div class="rb-controls">
+      <label class="rb-autopilot">
+        <input type="checkbox" id="autopilot-toggle" ${autopilot ? 'checked' : ''}>
+        <span>Autopilot</span>
+      </label>
+    </div>
+    <div class="rb-hint" id="rb-hint-text">Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b></div>
     <button class="rb-again">New race</button>
   `;
   app.appendChild(bar);
@@ -101,6 +108,16 @@ function startRace(seed: string): void {
 
   attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks);
 
+  const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
+  const hintText = bar.querySelector<HTMLElement>('#rb-hint-text')!;
+
+  autopilotToggle.addEventListener('change', (e) => {
+    autopilot = (e.target as HTMLInputElement).checked;
+    hintText.innerHTML = autopilot
+      ? 'Watch the race · autopilot is on'
+      : 'Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b>';
+  });
+
   bar.querySelector('.rb-again')!.addEventListener('click', (e) => {
     e.stopPropagation();
     startRace(`race-${Math.floor(Math.random() * 1e9)}`);
@@ -112,6 +129,7 @@ function startRace(seed: string): void {
     playerHorseId: playerId,
     playerSilks,
     config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
+    autopilot,
   });
 }
 

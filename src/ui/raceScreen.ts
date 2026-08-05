@@ -108,11 +108,12 @@ export interface RaceScreenOptions {
   playerHorseId: string;
   playerSilks: Silks;
   config: RaceConfig;
+  autopilot?: boolean;
   onFinish?: (placings: RunnerSnapshot[]) => void;
 }
 
 export function mountRaceScreen(opts: RaceScreenOptions): () => void {
-  const { host, field, playerHorseId, playerSilks, config } = opts;
+  const { host, field, playerHorseId, playerSilks, config, autopilot = false } = opts;
 
   const surface = createSurface(host);
   // Decoding and tinting happen off the critical path; the rig covers the
@@ -200,6 +201,13 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       return;
     }
     if (!running) return;
+
+    // Autopilot mode: zero out player input so the AI ride runs unmodulated.
+    if (autopilot) {
+      input.takingBack = false;
+      input.kickPending = false;
+    }
+
     prev = curr;
     running = race.step();
     curr = race.snapshot();
