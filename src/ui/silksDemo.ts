@@ -1,7 +1,7 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { drawHorseShadow } from '../render/horse.js';
-import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
-import { COATS, INK, RIVAL_SILKS, coatFor, type Silks } from '../render/palette.js';
+import { drawSpriteHorse, loadSprites, type Scheme } from '../render/spriteHorse.js';
+import { COATS, INK, RIVAL_SILKS, coatFor } from '../render/palette.js';
 
 const COAT_COLORS = Object.values(COATS).map((coat) => ({
   id: coat.id,
@@ -98,38 +98,55 @@ export function mountSilksDemo(host: HTMLElement): void {
   let selectedTrimColor = RIVAL_SILKS[0]!.secondary;
   let selectedSilksColor = RIVAL_SILKS[0]!.primary;
 
+  /** What the preview is currently drawing. The loop below reads it. */
+  let scheme: Scheme = {
+    coat: coatFor(selectedCoat),
+    silks: { primary: selectedSilksColor, secondary: selectedTrimColor },
+  };
+
   const updatePreview = async () => {
-    const silks: Silks = { primary: selectedSilksColor, secondary: selectedTrimColor };
-    const coat = {
-      ...coatFor(selectedCoat),
-      body: testBody ?? coatFor(selectedCoat).body,
-      hair: selectedHairColor,
-      points: selectedPointColor,
+    scheme = {
+      coat: {
+        ...coatFor(selectedCoat),
+        body: testBody ?? coatFor(selectedCoat).body,
+        hair: selectedHairColor,
+        points: selectedPointColor,
+      },
+      silks: { primary: selectedSilksColor, secondary: selectedTrimColor },
     };
 
     const badgeImg = host.querySelector<HTMLImageElement>('.sd-badge');
     if (badgeImg) {
-      const uri = await getBadgeDataUri({ coat, silks });
+      const uri = await getBadgeDataUri({ coat: scheme.coat, silks: scheme.silks });
       if (uri) badgeImg.src = uri;
     }
+  };
 
-    // The RACE SPRITE, not the drawn rig. This panel exists to answer "what
-    // will my horse look like out there", and the only honest answer is the
-    // thing the race actually draws — same sheet, same mask, same tint path.
-    // The rig is a different horse; showing it here would preview a coat the
-    // player never sees.
+  // ---- The preview gallops ---------------------------------------------------
+  // The RACE SPRITE, not the drawn rig, and running rather than posed: a coat
+  // that reads well on a still frame can still flicker across the stride, and a
+  // still frame is exactly where that hides. Same sheet, same mask, same tint
+  // path a race uses — a stride here IS the horse you will get.
+  const STRIDES_PER_SECOND = 1.6;
+  let phase = 0;
+  let last = performance.now();
+
+  const frame = (now: number): void => {
+    // Looked up per frame, not captured: this runs before `host.innerHTML` is
+    // assigned below, so anything captured here would be null forever.
     const canvas = host.querySelector<HTMLCanvasElement>('.sd-horse-canvas');
     const ctx = canvas?.getContext('2d');
-    if (canvas && ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const scale = Math.min(canvas.width / 200, canvas.height / 150);
-      const x = canvas.width / 2;
-      const y = canvas.height * 0.88;
-      drawHorseShadow(ctx, x, y + 2, scale * 1.1);
-      // A phase with all four legs clear of each other, so coat, points and
-      // silks are all readable at a glance rather than overlapping.
-      drawSpriteHorse(ctx, x, y, { coat, silks, phase: 0.12, scale });
-    }
+    // Stops when the demo leaves the page, so the loop cannot outlive it.
+    if (!canvas?.isConnected || !ctx) return;
+    phase = (phase + ((now - last) / 1000) * STRIDES_PER_SECOND) % 1;
+    last = now;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const scale = Math.min(canvas.width / 210, canvas.height / 165);
+    const x = canvas.width / 2;
+    const y = canvas.height * 0.86;
+    drawHorseShadow(ctx, x, y + 2, scale * 1.1);
+    drawSpriteHorse(ctx, x, y, { ...scheme, phase, scale });
+    requestAnimationFrame(frame);
   };
 
   host.innerHTML = `
@@ -218,7 +235,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       <div class="sd-preview-container">
         <div class="sd-preview">
           <p>Horse Preview</p>
-          <canvas class="sd-horse-canvas" width="300" height="200"></canvas>
+          <canvas class="sd-horse-canvas" width="440" height="320"></canvas>
         </div>
         <div class="sd-preview">
           <p>Badge Preview</p>
@@ -369,5 +386,20 @@ export function mountSilksDemo(host: HTMLElement): void {
     window.location.href = '/';
   });
 
-  loadSprites().then(() => updatePreview());
+  loadSprites()
+    .then(() => {
+      updatePreview();
+      last = performance.now();
+      requestAnimationFrame(frame);
+    })
+    .catch(() => {
+      // The sheet failed to load. Say so rather than leaving an empty box.
+      const canvas = host.querySelector<HTMLCanvasElement>('.sd-horse-canvas');
+      const ctx = canvas?.getContext('2d');
+      if (!ctx || !canvas) return;
+      ctx.fillStyle = 'rgba(232,237,244,0.4)';
+      ctx.font = '14px ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('sprite sheet failed to load', canvas.width / 2, canvas.height / 2);
+    });
 }

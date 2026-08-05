@@ -841,7 +841,7 @@ body {
 
 /* Silks Demo */
 .silks-demo {
-  max-width: 1040px;
+  max-width: 1120px;
   margin: 24px auto;
   padding: 20px;
   background: var(--panel);
@@ -858,12 +858,12 @@ body {
    320px preview column and a row of coat buttons cannot both have the width. */
 .sd-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 400px;
   gap: 24px;
   align-items: start;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .sd-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -967,7 +967,7 @@ body {
   top: 0;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .sd-preview-container {
     position: static;
     grid-template-columns: 1fr 1fr;
