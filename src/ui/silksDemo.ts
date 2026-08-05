@@ -1,16 +1,26 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { drawHorseShadow } from '../render/horse.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
-import { COATS, RIVAL_SILKS, type Silks } from '../render/palette.js';
+import { COATS, RIVAL_SILKS, coatFor, type Silks } from '../render/palette.js';
 
 const COAT_COLORS = Object.values(COATS).map((coat) => ({
   id: coat.id,
   name: coat.name,
 }));
 
-const MANE_COLORS = Object.values(COATS).map((coat) => ({
-  hex: coat.hair,
-  name: `${coat.name} Mane`,
+/**
+ * Colours for the silks' SECONDARY, which is breeches, collar and the badge's
+ * accent. Taken from the rival silks, because that is the slot it fills.
+ *
+ * It used to offer the coats' MANE colours here, under a label that said "Mane
+ * & Leg Color", and that was simply a lie about what the control does: mane and
+ * legs come from the coat gene (DESIGN.md §11 — appearance is genetic and not
+ * editable), so picking a "mane colour" here recoloured the jockey's breeches
+ * and nothing else.
+ */
+const TRIM_COLORS = [...new Set(RIVAL_SILKS.map((s) => s.secondary))].map((hex, i) => ({
+  hex,
+  name: `Trim ${i + 1}`,
 }));
 
 const SILKS_COLORS = RIVAL_SILKS.map((silks, i) => ({
@@ -20,11 +30,11 @@ const SILKS_COLORS = RIVAL_SILKS.map((silks, i) => ({
 
 export function mountSilksDemo(host: HTMLElement): void {
   let selectedCoat = 'palomino';
-  let selectedManeColor = COATS.palomino.hair;
+  let selectedTrimColor = RIVAL_SILKS[0]!.secondary;
   let selectedSilksColor = RIVAL_SILKS[0]!.primary;
 
   const updatePreview = async () => {
-    const silks: Silks = { primary: selectedSilksColor, secondary: selectedManeColor };
+    const silks: Silks = { primary: selectedSilksColor, secondary: selectedTrimColor };
 
     const badgeImg = host.querySelector<HTMLImageElement>('.sd-badge');
     if (badgeImg) {
@@ -69,19 +79,19 @@ export function mountSilksDemo(host: HTMLElement): void {
       </div>
 
       <div class="sd-section">
-        <label>2. Mane & Leg Color</label>
+        <label>2. Silks Trim (breeches &amp; collar)</label>
         <div class="sd-colors">
-          ${MANE_COLORS.map(
+          ${TRIM_COLORS.map(
             (color) =>
               `<button
-                class="sd-color-btn sd-mane ${color.hex === selectedManeColor ? 'active' : ''}"
+                class="sd-color-btn sd-trim ${color.hex === selectedTrimColor ? 'active' : ''}"
                 data-color="${color.hex}"
                 title="${color.name}"
                 style="background: ${color.hex}"
               ></button>`,
           ).join('')}
         </div>
-        <input type="text" class="sd-hex-input" id="mane-hex" value="${selectedManeColor}" placeholder="#F2E7D2" />
+        <input type="text" class="sd-hex-input" id="trim-hex" value="${selectedTrimColor}" placeholder="#F2F4F7" />
       </div>
 
       <div class="sd-section">
@@ -113,11 +123,19 @@ export function mountSilksDemo(host: HTMLElement): void {
             <div class="sd-color-labels">
               <div class="sd-color-info">
                 <span class="sd-color-label">Mane</span>
-                <span class="sd-color-swatch" style="background: ${selectedManeColor}"></span>
+                <span class="sd-color-swatch" style="background: ${coatFor(selectedCoat).hair}"></span>
+              </div>
+              <div class="sd-color-info">
+                <span class="sd-color-label">Points</span>
+                <span class="sd-color-swatch" style="background: ${coatFor(selectedCoat).points}"></span>
               </div>
               <div class="sd-color-info">
                 <span class="sd-color-label">Silks</span>
                 <span class="sd-color-swatch" style="background: ${selectedSilksColor}"></span>
+              </div>
+              <div class="sd-color-info">
+                <span class="sd-color-label">Trim</span>
+                <span class="sd-color-swatch" style="background: ${selectedTrimColor}"></span>
               </div>
             </div>
           </div>
@@ -146,16 +164,16 @@ export function mountSilksDemo(host: HTMLElement): void {
     });
   });
 
-  // Mane color selection
-  const maneBtns = host.querySelectorAll('.sd-color-btn.sd-mane');
-  maneBtns.forEach((btn) => {
+  // Silks trim selection
+  const trimBtns = host.querySelectorAll('.sd-color-btn.sd-trim');
+  trimBtns.forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const color = (e.target as HTMLElement).getAttribute('data-color');
       if (color) {
-        selectedManeColor = color;
-        host.querySelectorAll('.sd-color-btn.sd-mane').forEach((b) => b.classList.remove('active'));
+        selectedTrimColor = color;
+        host.querySelectorAll('.sd-color-btn.sd-trim').forEach((b) => b.classList.remove('active'));
         (e.target as HTMLElement).classList.add('active');
-        host.querySelector<HTMLInputElement>('#mane-hex')!.value = color;
+        host.querySelector<HTMLInputElement>('#trim-hex')!.value = color;
         host.querySelectorAll('.sd-color-info')[0]!.querySelector('.sd-color-swatch')!.setAttribute(
           'style',
           `background: ${color}`,
@@ -184,11 +202,11 @@ export function mountSilksDemo(host: HTMLElement): void {
   });
 
   // Hex input updates
-  host.querySelector<HTMLInputElement>('#mane-hex')!.addEventListener('change', (e) => {
+  host.querySelector<HTMLInputElement>('#trim-hex')!.addEventListener('change', (e) => {
     const hex = (e.target as HTMLInputElement).value;
     if (/^#[0-9A-F]{6}$/i.test(hex)) {
-      selectedManeColor = hex;
-      host.querySelectorAll('.sd-color-btn.sd-mane').forEach((b) => b.classList.remove('active'));
+      selectedTrimColor = hex;
+      host.querySelectorAll('.sd-color-btn.sd-trim').forEach((b) => b.classList.remove('active'));
       host.querySelectorAll('.sd-color-info')[0]!.querySelector('.sd-color-swatch')!.setAttribute(
         'style',
         `background: ${hex}`,
@@ -216,7 +234,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       'color-override',
       JSON.stringify({
         coat: selectedCoat,
-        maneColor: selectedManeColor,
+        maneColor: selectedTrimColor,
         silksColor: selectedSilksColor,
       }),
     );
