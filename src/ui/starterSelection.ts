@@ -115,6 +115,10 @@ export function mountStarterSelection(
           <span class="stat-label">Burst</span>
           <span class="stat-value">${Math.round(horse.stats.burst)}</span>
         </div>
+        <div class="stat">
+          <span class="stat-label">Temper</span>
+          <span class="stat-value">${Math.round(horse.stats.temper)}</span>
+        </div>
       </div>
       <div class="sc-traits">
         <span class="sc-label">Traits &middot; tap to see what one does</span>

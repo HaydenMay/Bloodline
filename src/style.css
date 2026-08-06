@@ -1245,11 +1245,11 @@ body {
 }
 
 .sc-info {
-  flex: none;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: clamp(6px, 1.5vh, 10px);
-  max-height: 34vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -1293,7 +1293,7 @@ body {
 
 .sc-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
   gap: 8px;
   padding: 10px;
   background: var(--panel);
@@ -1351,12 +1351,12 @@ body {
 .trait-desc {
   background: rgba(200, 200, 200, 0.08);
   border-radius: 6px;
-  padding: 12px;
+  padding: clamp(8px, 2vw, 12px);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  font-size: clamp(12px, 3vw, 14px);
-  line-height: 1.5;
+  gap: clamp(6px, 1.5vw, 10px);
+  font-size: clamp(11px, 2.5vw, 13px);
+  line-height: 1.4;
   text-align: center;
 }
 
@@ -1373,30 +1373,18 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   align-self: center;
+  background: rgba(242, 193, 78, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(242, 193, 78, 0.35);
 }
 
-.trait-aff-speed {
-  background: rgba(66, 165, 245, 0.2);
-  color: #42a5f5;
-  border: 1px solid rgba(66, 165, 245, 0.4);
-}
-
-.trait-aff-stamina {
-  background: rgba(76, 201, 160, 0.2);
-  color: #4cc9a0;
-  border: 1px solid rgba(76, 201, 160, 0.4);
-}
-
-.trait-aff-grit {
-  background: rgba(255, 152, 0, 0.2);
-  color: #ff9800;
-  border: 1px solid rgba(255, 152, 0, 0.4);
-}
-
+.trait-aff-speed,
+.trait-aff-stamina,
+.trait-aff-grit,
 .trait-aff-burst {
-  background: rgba(244, 67, 54, 0.2);
-  color: #f44336;
-  border: 1px solid rgba(244, 67, 54, 0.4);
+  background: rgba(242, 193, 78, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(242, 193, 78, 0.35);
 }
 
 .trait-tags-list {
