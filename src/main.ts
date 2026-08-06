@@ -9,11 +9,12 @@ import { mountRaceScreen } from './ui/raceScreen.js';
 import { mountHorsePreview } from './ui/horsePreview.js';
 import { mountSilksDemo } from './ui/silksDemo.js';
 import { mountRoadmap } from './ui/roadmap.js';
-import { mountMainMenu } from './ui/mainMenu.js';
+import { mountMainMenu, type MainMenuCallbacks } from './ui/mainMenu.js';
 import { mountStarterSelection } from './ui/starterSelection.js';
 import { mountResultsScreen } from './ui/resultsScreen.js';
 import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
+import { loadCareer, saveCareer, createNewCareer, type Career } from './ui/career.js';
 import type { Horse } from './sim/types.js';
 
 /**
@@ -198,10 +199,22 @@ function showMainMenu(): void {
   teardown?.();
   app.innerHTML = '';
 
-  const teardownMenu = mountMainMenu(app, () => {
-    teardownMenu();
-    showStarterSelection();
-  });
+  const savedCareer = loadCareer();
+
+  const callbacks: MainMenuCallbacks = {
+    onNewGame: () => {
+      teardownMenu();
+      showStarterSelection();
+    },
+    ...(savedCareer && {
+      onContinue: () => {
+        teardownMenu();
+        resumeCareer(savedCareer);
+      },
+    }),
+  };
+
+  const teardownMenu = mountMainMenu(app, callbacks);
 }
 
 function showStarterSelection(): void {
@@ -214,29 +227,39 @@ function showStarterSelection(): void {
 }
 
 function startCareer(starterHorse: Horse): void {
-  // Show training screen first
-  showTrainingScreen(starterHorse);
+  // Create new career with selected starter
+  const career = createNewCareer(starterHorse);
+  saveCareer(career);
+  showTrainingScreen(career);
 }
 
-function showTrainingScreen(horse: Horse): void {
+function resumeCareer(career: Career): void {
+  // Resume existing career
+  showTrainingScreen(career);
+}
+
+function showTrainingScreen(career: Career): void {
   teardown?.();
   app.innerHTML = '';
 
-  teardown = mountTrainingScreen(app, horse, (updatedHorse) => {
-    showRaceCalendar(updatedHorse);
+  teardown = mountTrainingScreen(app, career.horse, (updatedHorse, _session) => {
+    const updatedCareer = { ...career, horse: updatedHorse };
+    saveCareer(updatedCareer);
+    showRaceCalendar(updatedCareer);
   });
 }
 
-function showRaceCalendar(horse: Horse): void {
+function showRaceCalendar(career: Career): void {
   teardown?.();
   app.innerHTML = '';
 
   teardown = mountRaceCalendar(app, (race) => {
-    startRaceWithHorse(horse, race);
+    startRaceWithHorse(career, race);
   });
 }
 
-function startRaceWithHorse(player: Horse, race?: RaceOption): void {
+function startRaceWithHorse(career: Career, race?: RaceOption): void {
+  const player = career.horse;
   const raceDistance = race?.distance || 1400;
   const raceGoing = race?.going || 'good';
   const raceHype = race?.hype || 0.5;
@@ -298,9 +321,24 @@ function startRaceWithHorse(player: Horse, race?: RaceOption): void {
     teardown?.();
     app.innerHTML = '';
 
+    // Update career stats based on race result
+    const playerIndex = placings.findIndex((p) => p.id === player.id);
+    const updatedCareer = { ...career };
+
+    if (playerIndex === 0) {
+      updatedCareer.stats.wins += 1;
+      updatedCareer.stats.totalEarnings += 1000; // TODO: Dynamic earnings
+    } else {
+      updatedCareer.stats.losses += 1;
+    }
+
+    updatedCareer.week += 1;
+    saveCareer(updatedCareer);
+
     const teardownResults = mountResultsScreen(app, placings, player.id, () => {
       teardownResults();
-      showMainMenu();
+      // Loop back to training instead of main menu
+      showTrainingScreen(updatedCareer);
     });
   };
 

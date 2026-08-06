@@ -1,8 +1,13 @@
 /**
- * Main menu: landing page with game title and "New Game" button.
+ * Main menu: landing page with game title and "New Game"/"Continue" buttons.
  */
 
-export function mountMainMenu(container: HTMLElement, onNewGame: () => void): () => void {
+export interface MainMenuCallbacks {
+  onNewGame: () => void;
+  onContinue?: () => void;
+}
+
+export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbacks): () => void {
   const menu = document.createElement('div');
   menu.className = 'main-menu';
 
@@ -12,6 +17,7 @@ export function mountMainMenu(container: HTMLElement, onNewGame: () => void): ()
         <h1>Bloodline</h1>
       </div>
       <div class="main-menu-actions">
+        ${callbacks.onContinue ? '<button class="btn btn-primary" id="continue-btn">Continue Career</button>' : ''}
         <button class="btn btn-primary" id="new-game-btn">New Game</button>
       </div>
     </div>
@@ -19,8 +25,13 @@ export function mountMainMenu(container: HTMLElement, onNewGame: () => void): ()
 
   container.appendChild(menu);
 
+  if (callbacks.onContinue) {
+    const continueBtn = menu.querySelector<HTMLButtonElement>('#continue-btn')!;
+    continueBtn.addEventListener('click', callbacks.onContinue);
+  }
+
   const newGameBtn = menu.querySelector<HTMLButtonElement>('#new-game-btn')!;
-  newGameBtn.addEventListener('click', onNewGame);
+  newGameBtn.addEventListener('click', callbacks.onNewGame);
 
   return () => {
     menu.remove();
