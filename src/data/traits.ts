@@ -34,6 +34,10 @@ export interface Trait {
   /** Affects horses other than its own (TRAITS.md "traits with reach"). */
   reach?: boolean;
   description: string;
+  /** Primary stat this trait relates to. */
+  statAffinity?: 'speed' | 'stamina' | 'grit' | 'burst';
+  /** Concrete gameplay effects. */
+  tags?: string[];
 }
 
 export type TraitId =
@@ -94,68 +98,77 @@ const t = (
   kind: TraitKind,
   category: TraitCategory,
   description: string,
-  reach = false,
-): Trait => ({ id, name, kind, category, description, ...(reach ? { reach } : {}) });
+  options?: { reach?: boolean; affinity?: 'speed' | 'stamina' | 'grit' | 'burst'; tags?: string[] },
+): Trait => ({
+  id,
+  name,
+  kind,
+  category,
+  description,
+  ...(options?.reach ? { reach: true } : {}),
+  ...(options?.affinity ? { statAffinity: options.affinity } : {}),
+  ...(options?.tags ? { tags: options.tags } : {}),
+});
 
 export const TRAITS: Record<TraitId, Trait> = {
   // ---- Gate & start ----
-  fastGate: t('fastGate', 'Fast Gate', 'upside', 'gate', 'Breaks a length quicker; less likely to fumble the start.'),
-  gateRusher: t('gateRusher', 'Gate Rusher', 'trade', 'gate', 'Explosive break — but kick-charge regen is slowed through the first furlong.'),
-  coiled: t('coiled', 'Coiled', 'trade', 'gate', 'Slow away, exceptional burst once rolling.'),
-  alert: t('alert', 'Alert', 'trade', 'gate', 'Never fumbles a start — but is keyed up and slower to settle, delaying charge regen early.'),
+  fastGate: t('fastGate', 'Fast Gate', 'upside', 'gate', 'Breaks a length quicker; less likely to fumble the start.', { affinity: 'speed', tags: ['Fast Break', 'Start Bonus'] }),
+  gateRusher: t('gateRusher', 'Gate Rusher', 'trade', 'gate', 'Explosive break — but kick-charge regen is slowed through the first furlong.', { affinity: 'burst', tags: ['Fast Break', 'Kick Regen -early'] }),
+  coiled: t('coiled', 'Coiled', 'trade', 'gate', 'Slow away, exceptional burst once rolling.', { affinity: 'burst', tags: ['Slow Start', 'Burst ↑'] }),
+  alert: t('alert', 'Alert', 'trade', 'gate', 'Never fumbles a start — but is keyed up and slower to settle, delaying charge regen early.', { affinity: 'grit', tags: ['Sure Start', 'Settles -'] }),
 
   // ---- Pace & position ----
-  tractable: t('tractable', 'Tractable', 'upside', 'pace', 'Settles anywhere; much smaller out-of-position regen penalty.'),
-  freeRunner: t('freeRunner', 'Free Runner', 'trade', 'pace', 'Fights to go faster early — wasteful unless Temper is high, but sets a fierce pace.'),
-  pacePusher: t('pacePusher', 'Pace Pusher', 'trade', 'pace', 'Forces a faster early pace when leading, burning rivals and itself.', true),
-  railHugger: t('railHugger', 'Rail Hugger', 'trade', 'pace', 'Faster charge regen on the inside, slower forced wide.'),
-  wideRunner: t('wideRunner', 'Wide Runner', 'trade', 'pace', 'Avoids traffic almost entirely, but travels further.'),
-  herdAnimal: t('herdAnimal', 'Herd Animal', 'trade', 'pace', 'Regens faster surrounded by horses, worse isolated in front.'),
-  loner: t('loner', 'Loner', 'trade', 'pace', 'Weaker in a tight pack, excellent with clear air.'),
+  tractable: t('tractable', 'Tractable', 'upside', 'pace', 'Settles anywhere; much smaller out-of-position regen penalty.', { affinity: 'grit', tags: ['Position Flexible', 'Settles ↑'] }),
+  freeRunner: t('freeRunner', 'Free Runner', 'trade', 'pace', 'Fights to go faster early — wasteful unless Temper is high, but sets a fierce pace.', { affinity: 'speed', tags: ['Pace Setter', 'Temper Dependent'] }),
+  pacePusher: t('pacePusher', 'Pace Pusher', 'trade', 'pace', 'Forces a faster early pace when leading, burning rivals and itself.', { reach: true, affinity: 'speed', tags: ['Fast Pace', 'Affects Rivals'] }),
+  railHugger: t('railHugger', 'Rail Hugger', 'trade', 'pace', 'Faster charge regen on the inside, slower forced wide.', { affinity: 'speed', tags: ['Rail Preference', 'Track Position'] }),
+  wideRunner: t('wideRunner', 'Wide Runner', 'trade', 'pace', 'Avoids traffic almost entirely, but travels further.', { affinity: 'grit', tags: ['Traffic -', 'Extra Distance'] }),
+  herdAnimal: t('herdAnimal', 'Herd Animal', 'trade', 'pace', 'Regens faster surrounded by horses, worse isolated in front.', { affinity: 'grit', tags: ['Pack Runner', 'Front Worse'] }),
+  loner: t('loner', 'Loner', 'trade', 'pace', 'Weaker in a tight pack, excellent with clear air.', { affinity: 'speed', tags: ['Clear Air ↑', 'Traffic -'] }),
 
   // ---- The charge economy ----
-  ironLungs: t('ironLungs', 'Iron Lungs', 'upside', 'energy', 'Faster kick-charge regen at every effort level.'),
-  quickRecovery: t('quickRecovery', 'Quick Recovery', 'upside', 'energy', 'Regenerates charges faster when settled.'),
-  thirsty: t('thirsty', 'Thirsty', 'trade', 'energy', 'Regen swings harder with how you ride — very reactive to good riding.'),
-  cruiser: t('cruiser', 'Cruiser', 'trade', 'energy', 'Regens charges cheaply at moderate effort, badly at maximum.'),
+  ironLungs: t('ironLungs', 'Iron Lungs', 'upside', 'energy', 'Faster kick-charge regen at every effort level.', { affinity: 'stamina', tags: ['Kick Regen ↑', 'Always Active'] }),
+  quickRecovery: t('quickRecovery', 'Quick Recovery', 'upside', 'energy', 'Regenerates charges faster when settled.', { affinity: 'stamina', tags: ['Kick Regen ↑', 'When Settled'] }),
+  thirsty: t('thirsty', 'Thirsty', 'trade', 'energy', 'Regen swings harder with how you ride — very reactive to good riding.', { affinity: 'stamina', tags: ['Rider Reactive', 'Volatile'] }),
+  cruiser: t('cruiser', 'Cruiser', 'trade', 'energy', 'Regens charges cheaply at moderate effort, badly at maximum.', { affinity: 'stamina', tags: ['Mid-Pace ↑', 'Max Effort -'] }),
 
   // ---- The finish ----
-  heart: t('heart', 'Heart', 'upside', 'finish', 'Surges when within a length of the lead in the stretch.'),
-  turnOfFoot: t('turnOfFoot', 'Turn of Foot', 'trade', 'finish', 'Kick is stronger but much shorter — punishes an early call.'),
-  relentless: t('relentless', 'Relentless', 'trade', 'finish', 'Kick is weaker but sustains far longer.'),
-  grinder: t('grinder', 'Grinder', 'trade', 'finish', 'Almost no kick; simply does not decelerate while others fade.'),
+  heart: t('heart', 'Heart', 'upside', 'finish', 'Surges when within a length of the lead in the stretch.', { affinity: 'grit', tags: ['Late Surge', 'Competitive'] }),
+  turnOfFoot: t('turnOfFoot', 'Turn of Foot', 'trade', 'finish', 'Kick is stronger but much shorter — punishes an early call.', { affinity: 'burst', tags: ['Kick Power ↑', 'Late Closer'] }),
+  relentless: t('relentless', 'Relentless', 'trade', 'finish', 'Kick is weaker but sustains far longer.', { affinity: 'stamina', tags: ['Kick Length ↑', 'Sustained'] }),
+  grinder: t('grinder', 'Grinder', 'trade', 'finish', 'Almost no kick; simply does not decelerate while others fade.', { affinity: 'stamina', tags: ['No Kick', 'Relentless Pace'] }),
 
   // ---- Conditions ----
-  mudder: t('mudder', 'Mudder', 'upside', 'conditions', 'Thrives on soft and heavy going; ordinary on firm.'),
-  firmSpecialist: t('firmSpecialist', 'Firm Specialist', 'upside', 'conditions', 'Thrives on firm; ordinary on soft.'),
-  allWeather: t('allWeather', 'All-Weather', 'trade', 'conditions', 'Never penalised by the going — but never gains a specialist bonus either.'),
+  mudder: t('mudder', 'Mudder', 'upside', 'conditions', 'Thrives on soft and heavy going; ordinary on firm.', { affinity: 'grit', tags: ['Soft Ground ↑', 'Going Dependent'] }),
+  firmSpecialist: t('firmSpecialist', 'Firm Specialist', 'upside', 'conditions', 'Thrives on firm; ordinary on soft.', { affinity: 'speed', tags: ['Firm Ground ↑', 'Going Dependent'] }),
+  allWeather: t('allWeather', 'All-Weather', 'trade', 'conditions', 'Never penalised by the going — but never gains a specialist bonus either.', { affinity: 'grit', tags: ['Consistent', 'No Bonus'] }),
 
   // ---- Traffic & field ----
-  needsRoom: t('needsRoom', 'Needs Room', 'trade', 'traffic', 'Badly affected when shut off, noticeably stronger with clear air.'),
-  bulldozer: t('bulldozer', 'Bulldozer', 'upside', 'traffic', 'Grit-driven; forces through traffic and shortens trouble.'),
-  highlyStrung: t('highlyStrung', 'Highly Strung', 'trade', 'traffic', 'Slower to shake off trouble, but responds to the drive faster.'),
-  crowdFeeder: t('crowdFeeder', 'Crowd Feeder', 'trade', 'traffic', 'Better in large fields, flatter in small ones.'),
+  needsRoom: t('needsRoom', 'Needs Room', 'trade', 'traffic', 'Badly affected when shut off, noticeably stronger with clear air.', { affinity: 'speed', tags: ['Clear Air ↑', 'Traffic --'] }),
+  bulldozer: t('bulldozer', 'Bulldozer', 'upside', 'traffic', 'Grit-driven; forces through traffic and shortens trouble.', { affinity: 'grit', tags: ['Traffic ↑', 'Forceful'] }),
+  highlyStrung: t('highlyStrung', 'Highly Strung', 'trade', 'traffic', 'Slower to shake off trouble, but responds to the drive faster.', { affinity: 'burst', tags: ['Recovery -', 'Drive Response ↑'] }),
+  crowdFeeder: t('crowdFeeder', 'Crowd Feeder', 'trade', 'traffic', 'Better in large fields, flatter in small ones.', { affinity: 'grit', tags: ['Field Size Dependent'] }),
 
   // ---- Temperament & morale ----
-  professional: t('professional', 'Professional', 'upside', 'temperament', 'Consistency climbs faster with race starts.'),
-  hotHeaded: t('hotHeaded', 'Hot-Headed', 'trade', 'temperament', 'Amplifies every low-Temper swing, good and bad.'),
-  bigGame: t('bigGame', 'Big Game', 'trade', 'temperament', 'Rises for high-hype races, flat at quiet meetings.'),
-  stageFright: t('stageFright', 'Stage Fright', 'trade', 'temperament', 'Struggles with big crowds, sharper at quiet meetings.'),
-  grudgeHolder: t('grudgeHolder', 'Grudge Holder', 'trade', 'temperament', 'Bonus against a horse that has beaten it before.', true),
+  professional: t('professional', 'Professional', 'upside', 'temperament', 'Consistency climbs faster with race starts.', { affinity: 'grit', tags: ['Experience ↑', 'Consistent'] }),
+  hotHeaded: t('hotHeaded', 'Hot-Headed', 'trade', 'temperament', 'Amplifies every low-Temper swing, good and bad.', { affinity: 'burst', tags: ['Volatile', 'Temper Sensitive'] }),
+  bigGame: t('bigGame', 'Big Game', 'trade', 'temperament', 'Rises for high-hype races, flat at quiet meetings.', { affinity: 'burst', tags: ['Big Stage ↑', 'Hype Dependent'] }),
+  stageFright: t('stageFright', 'Stage Fright', 'trade', 'temperament', 'Struggles with big crowds, sharper at quiet meetings.', { affinity: 'grit', tags: ['Big Stage -', 'Quiet ↑'] }),
+  grudgeHolder: t('grudgeHolder', 'Grudge Holder', 'trade', 'temperament', 'Bonus against a horse that has beaten it before.', { reach: true, affinity: 'grit', tags: ['Motivated', 'Affects Rivals'] }),
 
   // ---- Training & development ----
-  lateBloomer: t('lateBloomer', 'Late Bloomer', 'trade', 'development', 'Weak early growth, enormous late.'),
-  earlyBloomer: t('earlyBloomer', 'Early Bloomer', 'trade', 'development', 'Fast gains young, plateaus early.'),
-  ironHorse: t('ironHorse', 'Iron Horse', 'upside', 'development', 'Very low injury risk, high training tolerance.'),
-  glassCannon: t('glassCannon', 'Glass Cannon', 'trade', 'development', 'High ceiling, fragile.'),
-  goodDoer: t('goodDoer', 'Good Doer', 'upside', 'development', 'Consumables markedly more effective.'),
-  hardKnocker: t('hardKnocker', 'Hard Knocker', 'trade', 'development', 'Recovers fast between starts and thrives on a busy campaign; dulls if rested.'),
-  needsTime: t('needsTime', 'Needs Time', 'trade', 'development', 'Requires longer between starts, but gains more from every rest.'),
+  lateBloomer: t('lateBloomer', 'Late Bloomer', 'trade', 'development', 'Weak early growth, enormous late.', { affinity: 'stamina', tags: ['Age Dependent', 'Late Peak'] }),
+  earlyBloomer: t('earlyBloomer', 'Early Bloomer', 'trade', 'development', 'Fast gains young, plateaus early.', { affinity: 'speed', tags: ['Age Dependent', 'Early Peak'] }),
+  ironHorse: t('ironHorse', 'Iron Horse', 'upside', 'development', 'Very low injury risk, high training tolerance.', { affinity: 'grit', tags: ['Durable', 'Injury -'] }),
+  glassCannon: t('glassCannon', 'Glass Cannon', 'trade', 'development', 'High ceiling, fragile.', { affinity: 'burst', tags: ['High Potential', 'Injury ++'] }),
+  goodDoer: t('goodDoer', 'Good Doer', 'upside', 'development', 'Consumables markedly more effective.', { affinity: 'stamina', tags: ['Feed Efficient'] }),
+  hardKnocker: t('hardKnocker', 'Hard Knocker', 'trade', 'development', 'Recovers fast between starts and thrives on a busy campaign; dulls if rested.', { affinity: 'grit', tags: ['Busy Schedule ↑', 'Rest -'] }),
+  needsTime: t('needsTime', 'Needs Time', 'trade', 'development', 'Requires longer between starts, but gains more from every rest.', { affinity: 'stamina', tags: ['Rest Dependent', 'Gains ↑'] }),
 
   // ---- Breeding & legacy ----
-  prepotent: t('prepotent', 'Prepotent', 'upside', 'breeding', 'Passes its traits to foals far more reliably.', true),
-  outcrossGem: t('outcrossGem', 'Outcross Gem', 'upside', 'breeding', 'Larger first-cross bonus.'),
-  enduring: t('enduring', 'Enduring', 'upside', 'breeding', 'Unusually long fertile window.'),
+  prepotent: t('prepotent', 'Prepotent', 'upside', 'breeding', 'Passes its traits to foals far more reliably.', { reach: true, tags: ['Inheritance ↑'] }),
+  outcrossGem: t('outcrossGem', 'Outcross Gem', 'upside', 'breeding', 'Larger first-cross bonus.', { tags: ['Outcross ↑'] }),
+  enduring: t('enduring', 'Enduring', 'upside', 'breeding', 'Unusually long fertile window.', { tags: ['Long Career'] }),
 };
 
 export const ALL_TRAIT_IDS = Object.keys(TRAITS) as TraitId[];

@@ -126,21 +126,32 @@ export function mountStarterSelection(
             )
             .join('')}
         </div>
-        <p class="trait-desc" id="trait-desc" hidden></p>
+        <div class="trait-desc" id="trait-desc" hidden></div>
       </div>
     `;
 
-    const traitDesc = infoEl.querySelector<HTMLParagraphElement>('#trait-desc')!;
-    const tags = infoEl.querySelectorAll<HTMLButtonElement>('.trait-tag');
-    tags.forEach((tag) => {
+    const traitDesc = infoEl.querySelector<HTMLDivElement>('#trait-desc')!;
+    const traitTags = infoEl.querySelectorAll<HTMLButtonElement>('.trait-tag');
+    traitTags.forEach((tag) => {
       tag.addEventListener('click', () => {
         const id = tag.dataset.trait as keyof typeof TRAITS;
         const opening = !tag.classList.contains('is-open');
-        tags.forEach((other) => other.classList.remove('is-open'));
+        traitTags.forEach((other) => other.classList.remove('is-open'));
         traitDesc.hidden = true;
         if (opening) {
           tag.classList.add('is-open');
-          traitDesc.textContent = TRAITS[id].description;
+          const trait = TRAITS[id];
+          const affinityHtml = trait.statAffinity
+            ? `<span class="trait-affinity trait-aff-${trait.statAffinity}">${trait.statAffinity}</span>`
+            : '';
+          const tagsHtml = trait.tags && trait.tags.length > 0
+            ? `<div class="trait-tags-list">${trait.tags.map((t) => `<span class="trait-tag-item">${t}</span>`).join('')}</div>`
+            : '';
+          traitDesc.innerHTML = `
+            <p class="trait-desc-text">${trait.description}</p>
+            ${affinityHtml}
+            ${tagsHtml}
+          `;
           traitDesc.hidden = false;
         }
       });

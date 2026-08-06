@@ -1348,6 +1348,76 @@ body {
   touch-action: manipulation;
 }
 
+.trait-desc {
+  background: rgba(200, 200, 200, 0.08);
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: clamp(12px, 3vw, 14px);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.trait-desc-text {
+  margin: 0;
+  color: var(--text);
+}
+
+.trait-affinity {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  align-self: center;
+}
+
+.trait-aff-speed {
+  background: rgba(66, 165, 245, 0.2);
+  color: #42a5f5;
+  border: 1px solid rgba(66, 165, 245, 0.4);
+}
+
+.trait-aff-stamina {
+  background: rgba(76, 201, 160, 0.2);
+  color: #4cc9a0;
+  border: 1px solid rgba(76, 201, 160, 0.4);
+}
+
+.trait-aff-grit {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+  border: 1px solid rgba(255, 152, 0, 0.4);
+}
+
+.trait-aff-burst {
+  background: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+  border: 1px solid rgba(244, 67, 54, 0.4);
+}
+
+.trait-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.trait-tag-item {
+  display: inline-block;
+  background: rgba(242, 193, 78, 0.15);
+  border: 1px solid rgba(242, 193, 78, 0.35);
+  color: var(--accent);
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
 .trait-tag:hover {
   background: rgba(242, 193, 78, 0.18);
 }
