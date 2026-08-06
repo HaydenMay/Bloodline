@@ -1603,9 +1603,16 @@ body {
 }
 
 .trait-desc {
-  margin: 0 auto;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160px;
+  max-width: calc(100vw - 16px);
+  max-height: 120px;
+  overflow-y: auto;
+  margin: 8px auto 0;
   padding: 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--line);
   border-radius: 6px;
   color: var(--text);
@@ -1615,10 +1622,22 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  z-index: 10;
+  pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s, visibility 0.12s;
 }
 
 .trait-desc[hidden] {
   display: none;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.trait-desc:not([hidden]) {
+  opacity: 1;
+  visibility: visible;
 }
 
 /* Carousel semantic box structure (starter selection) */
@@ -1655,6 +1674,7 @@ body {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  position: relative;
 }
 
 .sc-head {
@@ -1802,6 +1822,7 @@ body {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  position: relative;
 }
 
 .dc-head {

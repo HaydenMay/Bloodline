@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Horse racing, training and breeding game. Browser + mobile web.",
   "scripts": {
-    "dev": "vite --open",
+    "dev": "vite",
+    "dev-open": "vite --open",
     "dev:host": "vite --host --open",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
