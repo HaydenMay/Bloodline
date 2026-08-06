@@ -179,22 +179,45 @@ export function mountTrainingScreen(
       const trainingId = card.dataset.training as string;
       const session = TRAINING_SESSIONS[trainingId]!;
 
+      // Breakthrough chance based on morale and temper
+      const breakthroughChance = (horse.morale / 100) * (horse.stats.temper / 100) * 0.3; // 0-30% max
+      const isBreakthrough = Math.random() < breakthroughChance;
+
+      // Calculate stat changes
+      let statChanges = { ...session.statEffects };
+
+      if (isBreakthrough) {
+        // Remove negative effects and add bonus gains
+        const affectedStats = Object.keys(statChanges) as Array<keyof typeof session.statEffects>;
+        const positiveStats = affectedStats.filter((stat) => statChanges[stat]! > 0);
+
+        // Clear all effects
+        statChanges = {};
+
+        // Re-apply only positive effects with bonus
+        for (const stat of positiveStats) {
+          const originalGain = session.statEffects[stat]!;
+          statChanges[stat] = originalGain + 2; // Bonus of +2
+        }
+      }
+
       // Apply training effects to horse
       const updatedHorse: Horse = {
         ...horse,
         stats: {
-          speed: Math.max(0, horse.stats.speed + (session.statEffects.speed || 0)),
-          stamina: Math.max(0, horse.stats.stamina + (session.statEffects.stamina || 0)),
-          grit: Math.max(0, horse.stats.grit + (session.statEffects.grit || 0)),
-          burst: Math.max(0, horse.stats.burst + (session.statEffects.burst || 0)),
-          temper: Math.max(0, horse.stats.temper + (session.statEffects.temper || 0)),
+          speed: Math.max(0, horse.stats.speed + (statChanges.speed || 0)),
+          stamina: Math.max(0, horse.stats.stamina + (statChanges.stamina || 0)),
+          grit: Math.max(0, horse.stats.grit + (statChanges.grit || 0)),
+          burst: Math.max(0, horse.stats.burst + (statChanges.burst || 0)),
+          temper: Math.max(0, horse.stats.temper + (statChanges.temper || 0)),
           consistency: horse.stats.consistency,
         },
       };
 
-      // Rare trait instillment (5% chance)
+      // Rare trait instillment (5% chance, or higher if breakthrough)
       let newTrait: TraitId | null = null;
-      if (Math.random() < 0.05 && session.traitPool.length > 0) {
+      const traitChance = isBreakthrough ? 0.15 : 0.05;
+      if (Math.random() < traitChance && session.traitPool.length > 0) {
         const trait = session.traitPool[Math.floor(Math.random() * session.traitPool.length)]!;
         if (!updatedHorse.traits.includes(trait)) {
           newTrait = trait;
@@ -202,9 +225,17 @@ export function mountTrainingScreen(
         }
       }
 
-      showTrainingAnimation(root, session, horse.stats, updatedHorse.stats, newTrait, () => {
-        onTrainingSelect(updatedHorse, session);
-      });
+      showTrainingAnimation(
+        root,
+        session,
+        horse.stats,
+        updatedHorse.stats,
+        newTrait,
+        isBreakthrough,
+        () => {
+          onTrainingSelect(updatedHorse, session);
+        },
+      );
     });
   });
 
@@ -219,6 +250,7 @@ function showTrainingAnimation(
   oldStats: Horse['stats'],
   newStats: Horse['stats'],
   newTrait: TraitId | null,
+  isBreakthrough: boolean,
   onComplete: () => void,
 ): void {
   const overlay = document.createElement('div');
@@ -233,9 +265,20 @@ function showTrainingAnimation(
   };
 
   overlay.innerHTML = `
-    <div class="training-animation">
+    <div class="training-animation ${isBreakthrough ? 'breakthrough' : ''}">
+      ${
+        isBreakthrough
+          ? '<div class="breakthrough-banner">🌟 BREAKTHROUGH! 🌟</div>'
+          : ''
+      }
       <h2>${session.name}</h2>
       <p class="training-anim-desc">${session.description}</p>
+
+      ${
+        isBreakthrough
+          ? '<p class="breakthrough-message">Your horse had a breakthrough while training,<br>resulting in exceptional growth!</p>'
+          : ''
+      }
 
       <div class="stat-animations">
         ${Object.entries(statChanges)
@@ -270,6 +313,9 @@ function showTrainingAnimation(
     overlay.classList.add('show');
   }, 50);
 
+  // Longer duration for breakthroughs
+  const duration = isBreakthrough ? 2000 : 1500;
+
   // Wait for animation to complete and transition
   setTimeout(() => {
     overlay.classList.add('fade-out');
@@ -277,5 +323,5 @@ function showTrainingAnimation(
       overlay.remove();
       onComplete();
     }, 400);
-  }, 1500);
+  }, duration);
 }
