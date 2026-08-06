@@ -36,20 +36,13 @@ export function mountDossierScreen(
       : 'No prior races';
 
     const container = document.createElement('div');
-    container.className = 'dc-container';
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'dc-inner';
-    container.appendChild(wrapper);
-
-    const badgeCol = document.createElement('div');
-    badgeCol.className = 'dc-badge-col';
+    container.className = 'dc-carousel-box';
 
     const badgeWrap = document.createElement('div');
     badgeWrap.className = 'dc-badge-wrap';
 
-    const infoCol = document.createElement('div');
-    infoCol.className = 'dc-info-col';
+    const infoEl = document.createElement('div');
+    infoEl.className = 'dc-carousel-info';
 
     // Load or use cached badge
     if (badgeCache.has(rival.id)) {
@@ -72,25 +65,24 @@ export function mountDossierScreen(
       badgeWrap.appendChild(img);
     }
 
-    badgeCol.appendChild(badgeWrap);
-    const infoEl = document.createElement('div');
-    infoEl.className = 'dc-info-wrap';
-    infoCol.appendChild(infoEl);
+    container.appendChild(badgeWrap);
+    container.appendChild(infoEl);
+
     infoEl.innerHTML = `
-      <h3>${rival.name}</h3>
-      <p class="dc-form">${formText}</p>
-      <div class="dc-style">
-        <span class="dc-label">Style:</span>
-        <span class="dc-value">${styleLabel(rival.style)}</span>
+      <div class="dc-head">
+        <h3>${rival.name}</h3>
+        <p class="dc-sub">${formText}</p>
       </div>
-      <div class="dc-timing">
-        <span class="dc-label">Timing:</span>
-        <span class="dc-value">${momentLabel(rival.moment)}</span>
+      <div class="dc-section">Details</div>
+      <div class="dc-row">
+        <div><span class="dc-k">Style</span><span class="dc-v">${styleLabel(rival.style)}</span></div>
+        <div><span class="dc-k">Timing</span><span class="dc-v">${momentLabel(rival.moment)}</span></div>
       </div>
-      <div class="dc-distance">
-        <span class="dc-label">Preferred distance</span>
-        <span class="dc-value">${rival.preferredDistance.min}–${rival.preferredDistance.max} m</span>
+      <div class="dc-section">Distance</div>
+      <div class="dc-apt">
+        <span>${rival.preferredDistance.min}–${rival.preferredDistance.max} m</span>
       </div>
+      <div class="dc-section">Attributes</div>
       <div class="dc-stats">
         <div class="dc-stat">
           <span class="dc-stat-label">Speed</span>
@@ -118,9 +110,6 @@ export function mountDossierScreen(
         </div>
       </div>
     `;
-
-    wrapper.appendChild(badgeCol);
-    wrapper.appendChild(infoCol);
 
     return container;
   };

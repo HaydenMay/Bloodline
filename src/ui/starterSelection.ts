@@ -28,28 +28,13 @@ export function mountStarterSelection(
 
   const renderItem = (horse: Horse): HTMLElement => {
     const container = document.createElement('div');
-    container.className = 'sc-container';
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'sc-inner';
-    container.appendChild(wrapper);
+    container.className = 'sc-carousel-box';
 
     const badgeWrap = document.createElement('div');
     badgeWrap.className = 'sc-badge-wrap';
 
-    const badgeCol = document.createElement('div');
-    badgeCol.className = 'sc-badge-col';
-
-    const infoCol = document.createElement('div');
-    infoCol.className = 'sc-info-col';
-
     const infoEl = document.createElement('div');
-    infoEl.className = 'sc-info';
-
-    badgeCol.appendChild(badgeWrap);
-    infoCol.appendChild(infoEl);
-    wrapper.appendChild(badgeCol);
-    wrapper.appendChild(infoCol);
+    infoEl.className = 'sc-carousel-info';
 
     // Load or use cached badge
     if (badgeCache.has(horse.id)) {
@@ -72,51 +57,55 @@ export function mountStarterSelection(
       badgeWrap.appendChild(img);
     }
 
+    container.appendChild(badgeWrap);
+    container.appendChild(infoEl);
+
     infoEl.innerHTML = `
-      <h3>${horse.name}</h3>
-      <p class="sc-style">${styleLabel(horse.style)} &middot; ${momentLabel(horse.moment)}</p>
-      <div class="sc-distance">
-        <span class="sc-label">Preferred distance</span>
-        <span class="sc-value">${horse.preferredDistance.min}&ndash;${horse.preferredDistance.max} m</span>
+      <div class="sc-head">
+        <h3>${horse.name}</h3>
+        <p class="sc-sub">${styleLabel(horse.style)} &middot; ${momentLabel(horse.moment)}</p>
       </div>
+      <div class="sc-section">Distance</div>
+      <div class="sc-apt">
+        <span>${horse.preferredDistance.min}–${horse.preferredDistance.max} m</span>
+      </div>
+      <div class="sc-section">Attributes</div>
       <div class="sc-stats">
-        <div class="stat">
-          <span class="stat-label">Speed</span>
-          <span class="stat-value">${Math.round(horse.stats.speed)}</span>
+        <div class="sc-stat">
+          <span class="sc-stat-label">Speed</span>
+          <span class="sc-stat-value">${Math.round(horse.stats.speed)}</span>
         </div>
-        <div class="stat">
-          <span class="stat-label">Stamina</span>
-          <span class="stat-value">${Math.round(horse.stats.stamina)}</span>
+        <div class="sc-stat">
+          <span class="sc-stat-label">Stamina</span>
+          <span class="sc-stat-value">${Math.round(horse.stats.stamina)}</span>
         </div>
-        <div class="stat">
-          <span class="stat-label">Burst</span>
-          <span class="stat-value">${Math.round(horse.stats.burst)}</span>
+        <div class="sc-stat">
+          <span class="sc-stat-label">Burst</span>
+          <span class="sc-stat-value">${Math.round(horse.stats.burst)}</span>
         </div>
-        <div class="stat">
-          <span class="stat-label">Grit</span>
-          <span class="stat-value">${Math.round(horse.stats.grit)}</span>
+        <div class="sc-stat">
+          <span class="sc-stat-label">Grit</span>
+          <span class="sc-stat-value">${Math.round(horse.stats.grit)}</span>
         </div>
-        <div class="stat">
-          <span class="stat-label">Temper</span>
-          <span class="stat-value">${Math.round(horse.stats.temper)}</span>
+        <div class="sc-stat">
+          <span class="sc-stat-label">Temper</span>
+          <span class="sc-stat-value">${Math.round(horse.stats.temper)}</span>
         </div>
-        <div class="stat">
-          <span class="stat-label">Consistency</span>
-          <span class="stat-value">${Math.round(horse.stats.consistency)}</span>
+        <div class="sc-stat">
+          <span class="sc-stat-label">Consistency</span>
+          <span class="sc-stat-value">${Math.round(horse.stats.consistency)}</span>
         </div>
       </div>
+      <div class="sc-section">Traits</div>
       <div class="sc-traits">
-        <span class="sc-label">Traits &middot; tap to see what one does</span>
-        <div class="traits-list">
-          ${horse.traits
-            .map(
-              (t) =>
-                `<button type="button" class="trait-tag" data-trait="${t}">${TRAITS[t].name}</button>`,
-            )
-            .join('')}
-        </div>
-        <div class="trait-desc" id="trait-desc-${horse.id}" hidden></div>
+        ${horse.traits
+          .map(
+            (t) =>
+              `<button type="button" class="trait-tag" data-trait="${t}">${TRAITS[t].name}</button>`,
+          )
+          .join('')}
       </div>
+      <div class="trait-desc" id="trait-desc-${horse.id}" hidden></div>
     `;
 
     const traitDesc = infoEl.querySelector<HTMLDivElement>(`#trait-desc-${horse.id}`)!;
