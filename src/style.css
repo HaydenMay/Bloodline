@@ -1299,6 +1299,9 @@ body {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 6px;
+  justify-items: center;
+  max-width: fit-content;
+  margin: 0 auto;
 }
 
 .sc-traits {
