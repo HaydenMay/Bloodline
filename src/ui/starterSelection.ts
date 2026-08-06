@@ -2,124 +2,89 @@ import { createRng } from '../sim/rng.js';
 import { createNameGenerator } from '../data/names.js';
 import { generateStarterSix } from '../sim/horse.js';
 import type { Horse } from '../sim/types.js';
-import { loadSprites, drawSpriteHorse } from '../render/spriteHorse.js';
+import { createSurface, startLoop, type Loop } from '../render/canvas.js';
+import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
 import { RIVAL_SILKS } from '../render/palette.js';
 
+/**
+ * Starter selection, as a full-screen carousel.
+ *
+ * One horse at a time rather than a scrolling grid: six cards side by side
+ * either got too small to read on a phone or needed a hover/scroll gesture
+ * that doesn't exist on touch. A stepper needs neither — swipe, tap an arrow,
+ * or tap a dot, and the horse being looked at always fills the screen.
+ */
 export function mountStarterSelection(
   container: HTMLElement,
   onSelect: (horse: Horse) => void,
 ): () => void {
-  const selection = document.createElement('div');
-  selection.className = 'starter-selection';
+  const root = document.createElement('div');
+  root.className = 'starter-carousel';
 
-  selection.innerHTML = `
-    <div class="starter-header">
+  root.innerHTML = `
+    <div class="sc-header">
       <h2>Choose Your Starter</h2>
-      <p>Select a horse to begin your career</p>
+      <span class="sc-counter" id="sc-counter"></span>
     </div>
-    <div class="starter-grid" id="starter-grid"></div>
-    <div class="starter-details" id="starter-details" style="display: none;"></div>
+    <div class="sc-stage">
+      <button class="sc-arrow sc-arrow-prev" id="sc-prev" aria-label="Previous horse">&#8249;</button>
+      <div class="sc-canvas-wrap" id="sc-canvas-wrap"></div>
+      <button class="sc-arrow sc-arrow-next" id="sc-next" aria-label="Next horse">&#8250;</button>
+    </div>
+    <div class="sc-info" id="sc-info"></div>
+    <div class="sc-dots" id="sc-dots"></div>
+    <button class="btn btn-primary sc-select" id="sc-select">Select</button>
   `;
 
-  container.appendChild(selection);
+  container.appendChild(root);
 
-  // Generate starters
   const rng = createRng(`starter-${Date.now()}`);
   const names = createNameGenerator(rng);
   const starters = generateStarterSix(rng, names, 0);
 
-  // Ensure sprites are loaded
-  void loadSprites().then(() => {
-    renderStarters(selection, starters, onSelect);
-  });
+  let index = 0;
+  let phase = 0;
 
-  return () => {
-    selection.remove();
+  const canvasWrap = root.querySelector<HTMLDivElement>('#sc-canvas-wrap')!;
+  const infoEl = root.querySelector<HTMLDivElement>('#sc-info')!;
+  const counterEl = root.querySelector<HTMLSpanElement>('#sc-counter')!;
+  const dotsEl = root.querySelector<HTMLDivElement>('#sc-dots')!;
+  const prevBtn = root.querySelector<HTMLButtonElement>('#sc-prev')!;
+  const nextBtn = root.querySelector<HTMLButtonElement>('#sc-next')!;
+  const selectBtn = root.querySelector<HTMLButtonElement>('#sc-select')!;
+
+  const surface = createSurface(canvasWrap);
+  void loadSprites();
+
+  const goTo = (i: number): void => {
+    index = ((i % starters.length) + starters.length) % starters.length;
+    renderDots();
+    renderInfo();
   };
-}
 
-function renderStarters(container: HTMLElement, starters: Horse[], onSelect: (h: Horse) => void) {
-  const grid = container.querySelector<HTMLDivElement>('#starter-grid')!;
-  const detailsPanel = container.querySelector<HTMLDivElement>('#starter-details')!;
-
-  for (const horse of starters) {
-    const card = document.createElement('div');
-    card.className = 'starter-card';
-
-    // Canvas for sprite
-    const canvas = document.createElement('canvas');
-    canvas.width = 200;
-    canvas.height = 150;
-    const ctx = canvas.getContext('2d')!;
-
-    // Draw the sprite
-    drawSpriteHorse(ctx, 75, 100, {
-      coat: horse.coat,
-      silks: RIVAL_SILKS[0]!,
-      phase: 0.5,
-      scale: 0.6,
+  function renderDots(): void {
+    dotsEl.innerHTML = starters
+      .map(
+        (_, i) =>
+          `<button class="sc-dot ${i === index ? 'is-active' : ''}" data-i="${i}" aria-label="Horse ${i + 1}"></button>`,
+      )
+      .join('');
+    dotsEl.querySelectorAll<HTMLButtonElement>('.sc-dot').forEach((dot) => {
+      dot.addEventListener('click', () => goTo(Number(dot.dataset.i)));
     });
-
-    card.appendChild(canvas);
-
-    const showCard = (): void => {
-      showDetails(detailsPanel, horse, onSelect);
-    };
-
-    const hideCard = (): void => {
-      detailsPanel.style.display = 'none';
-    };
-
-    card.addEventListener('mouseenter', showCard);
-    card.addEventListener('mouseleave', hideCard);
-    card.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      showCard();
-    });
-    card.addEventListener('touchend', hideCard);
-
-    grid.appendChild(card);
   }
-}
 
-function showDetails(panel: HTMLDivElement, horse: Horse, onSelect: (h: Horse) => void) {
-  const styleLabel = (style: string): string => {
-    switch (style) {
-      case 'frontRunner':
-        return 'Front-runner';
-      case 'stalker':
-        return 'Stalker';
-      case 'midPack':
-        return 'Mid-pack';
-      default:
-        return 'Closer';
-    }
-  };
-
-  const momentLabel = (moment: string): string => {
-    switch (moment) {
-      case 'early':
-        return 'goes early';
-      case 'earlyMid':
-        return 'goes before halfway';
-      case 'midLate':
-        return 'goes off the turn';
-      default:
-        return 'goes late';
-    }
-  };
-
-  panel.innerHTML = `
-    <div class="starter-detail-card">
-      <div class="detail-header">
-        <h3>${horse.name}</h3>
-        <p class="detail-style">${styleLabel(horse.style)} · ${momentLabel(horse.moment)}</p>
+  function renderInfo(): void {
+    const horse = starters[index]!;
+    counterEl.textContent = `${index + 1} / ${starters.length}`;
+    infoEl.innerHTML = `
+      <h3>${horse.name}</h3>
+      <p class="sc-style">${styleLabel(horse.style)} &middot; ${momentLabel(horse.moment)}</p>
+      <div class="sc-distance">
+        <span class="sc-label">Preferred distance</span>
+        <span class="sc-value">${horse.preferredDistance.min}&ndash;${horse.preferredDistance.max} m</span>
       </div>
-      <div class="detail-distance">
-        <span class="detail-label">Preferred distance</span>
-        <span class="detail-value">${horse.preferredDistance.min}–${horse.preferredDistance.max} m</span>
-      </div>
-      <div class="detail-stats">
+      <div class="sc-stats">
         <div class="stat">
           <span class="stat-label">Speed</span>
           <span class="stat-value">${Math.round(horse.stats.speed)}</span>
@@ -137,16 +102,96 @@ function showDetails(panel: HTMLDivElement, horse: Horse, onSelect: (h: Horse) =
           <span class="stat-value">${Math.round(horse.stats.burst)}</span>
         </div>
       </div>
-      <div class="detail-traits">
-        <span class="detail-label">Traits</span>
+      <div class="sc-traits">
+        <span class="sc-label">Traits</span>
         <div class="traits-list">${horse.traits.map((t) => `<span class="trait-tag">${t}</span>`).join('')}</div>
       </div>
-      <button class="btn btn-primary btn-select">Select</button>
-    </div>
-  `;
+    `;
+  }
 
-  panel.style.display = 'block';
+  prevBtn.addEventListener('click', () => goTo(index - 1));
+  nextBtn.addEventListener('click', () => goTo(index + 1));
+  selectBtn.addEventListener('click', () => onSelect(starters[index]!));
 
-  const selectBtn = panel.querySelector<HTMLButtonElement>('.btn-select')!;
-  selectBtn.addEventListener('click', () => onSelect(horse));
+  // Swipe: a horizontal drag past the threshold steps the carousel; anything
+  // shorter (a tap, a vertical scroll attempt) is left alone.
+  let touchStartX = 0;
+  let touchStartY = 0;
+  const onTouchStart = (e: TouchEvent): void => {
+    touchStartX = e.touches[0]!.clientX;
+    touchStartY = e.touches[0]!.clientY;
+  };
+  const onTouchEnd = (e: TouchEvent): void => {
+    const dx = e.changedTouches[0]!.clientX - touchStartX;
+    const dy = e.changedTouches[0]!.clientY - touchStartY;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      goTo(dx > 0 ? index - 1 : index + 1);
+    }
+  };
+  canvasWrap.addEventListener('touchstart', onTouchStart, { passive: true });
+  canvasWrap.addEventListener('touchend', onTouchEnd, { passive: true });
+
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'ArrowLeft') goTo(index - 1);
+    if (e.key === 'ArrowRight') goTo(index + 1);
+  };
+  window.addEventListener('keydown', onKey);
+
+  const loop: Loop = startLoop(
+    30,
+    () => {
+      phase = (phase + (1 / 30) * 0.5) % 1;
+    },
+    () => {
+      const { ctx, width, height } = surface;
+      ctx.fillStyle = '#161c25';
+      ctx.fillRect(0, 0, width, height);
+      const horse = starters[index]!;
+      const scale = Math.min(2.6, width / 220, height / 160);
+      drawSpriteHorse(ctx, width / 2, height * 0.72, {
+        coat: horse.coat,
+        silks: RIVAL_SILKS[0]!,
+        phase,
+        scale,
+      });
+    },
+  );
+
+  renderDots();
+  renderInfo();
+
+  return () => {
+    loop.stop();
+    window.removeEventListener('keydown', onKey);
+    canvasWrap.removeEventListener('touchstart', onTouchStart);
+    canvasWrap.removeEventListener('touchend', onTouchEnd);
+    surface.destroy();
+    root.remove();
+  };
+}
+
+function styleLabel(style: string): string {
+  switch (style) {
+    case 'frontRunner':
+      return 'Front-runner';
+    case 'stalker':
+      return 'Stalker';
+    case 'midPack':
+      return 'Mid-pack';
+    default:
+      return 'Closer';
+  }
+}
+
+function momentLabel(moment: string): string {
+  switch (moment) {
+    case 'early':
+      return 'goes early';
+    case 'earlyMid':
+      return 'goes before halfway';
+    case 'midLate':
+      return 'goes off the turn';
+    default:
+      return 'goes late';
+  }
 }

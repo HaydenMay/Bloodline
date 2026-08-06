@@ -180,11 +180,15 @@ if (params.has('preview')) {
 } else if (params.has('test-race')) {
   // ?test-race opens the test race (development harness)
   startRace('bloodline-demo');
+} else if (params.has('roadmap')) {
+  // ?roadmap opens the build-progress panel — kept off every real game
+  // screen so it never collides with game chrome (the starter carousel's
+  // header sat directly under its fixed top-right pill).
+  mountRoadmap();
 } else {
   // Default: main menu → starter selection → career
   showMainMenu();
 }
-mountRoadmap();
 
 function showMainMenu(): void {
   teardown?.();
