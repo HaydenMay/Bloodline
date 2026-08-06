@@ -124,6 +124,9 @@ export function mountStarterSelection(
           <span class="stat-label">Temper</span>
           <span class="stat-value">${Math.round(horse.stats.temper)}</span>
         </div>
+        <div class="stat-shield">
+          <img src="/src/assets/shield-badge.png" alt="Shield" class="shield-img" />
+        </div>
       </div>
       <div class="sc-traits">
         <span class="sc-label">Traits &middot; tap to see what one does</span>
