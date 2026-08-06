@@ -390,9 +390,8 @@ export function drawHorse(
   ctx.fill();
   ctx.globalAlpha = 1;
 
-  // Mane along the crest.
-  ctx.fillStyle = coat.hair;
-  ctx.fill(path(MANE));
+  // Mane along the crest — shaded like other parts to avoid glowing flat fills
+  shade(ctx, path(MANE), [-1, -15, 21, -3], coat.hair, 0.5, 0.8);
 
   ctx.restore();
 
