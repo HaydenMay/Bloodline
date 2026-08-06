@@ -12,6 +12,7 @@ import { mountRoadmap } from './ui/roadmap.js';
 import { mountMainMenu } from './ui/mainMenu.js';
 import { mountStarterSelection } from './ui/starterSelection.js';
 import { mountResultsScreen } from './ui/resultsScreen.js';
+import { mountTrainingScreen } from './ui/trainingScreen.js';
 import type { Horse } from './sim/types.js';
 
 /**
@@ -206,20 +207,31 @@ function showStarterSelection(): void {
   teardown?.();
   app.innerHTML = '';
 
-  const teardownSelection = mountStarterSelection(app, (selectedHorse) => {
-    teardownSelection();
+  teardown = mountStarterSelection(app, (selectedHorse) => {
     startCareer(selectedHorse);
   });
 }
 
 function startCareer(starterHorse: Horse): void {
-  // TODO: Initialize career with selected horse
-  // For now, just jump into the first race with the selected horse
+  // Show training screen first
+  showTrainingScreen(starterHorse);
+}
+
+function showTrainingScreen(horse: Horse): void {
+  teardown?.();
+  app.innerHTML = '';
+
+  teardown = mountTrainingScreen(app, horse, (updatedHorse) => {
+    startRaceWithHorse(updatedHorse);
+  });
+}
+
+function startRaceWithHorse(player: Horse): void {
   const rng = createRng('career-seed-' + Date.now());
   const names = createNameGenerator(rng);
 
-  // Build a field around the starter
-  const field: Horse[] = [starterHorse];
+  // Build a field around the player
+  const field: Horse[] = [player];
   for (let i = 1; i < FIELD_SIZE; i++) {
     const rival = generateHorse(rng, names, {
       division: 'maiden',
@@ -228,8 +240,6 @@ function startCareer(starterHorse: Horse): void {
     });
     field.push(rival);
   }
-
-  const player = starterHorse;
 
   teardown?.();
   app.innerHTML = '';
