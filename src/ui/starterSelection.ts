@@ -27,8 +27,12 @@ export function mountStarterSelection(
   const badgeCache = new Map<string, string>();
 
   const renderItem = (horse: Horse): HTMLElement => {
+    const container = document.createElement('div');
+    container.className = 'sc-container';
+
     const wrapper = document.createElement('div');
     wrapper.className = 'sc-inner';
+    container.appendChild(wrapper);
 
     const badgeWrap = document.createElement('div');
     badgeWrap.className = 'sc-badge-wrap';
@@ -142,7 +146,7 @@ export function mountStarterSelection(
       });
     });
 
-    return wrapper;
+    return container;
   };
 
   const { teardown, state } = mountCarousel(container, {

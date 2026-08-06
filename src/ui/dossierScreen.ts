@@ -35,8 +35,12 @@ export function mountDossierScreen(
       ? `${entry.starts} starts · ${entry.wins}W ${entry.places}P ${entry.shows}S`
       : 'No prior races';
 
+    const container = document.createElement('div');
+    container.className = 'dc-container';
+
     const wrapper = document.createElement('div');
     wrapper.className = 'dc-inner';
+    container.appendChild(wrapper);
 
     const badgeCol = document.createElement('div');
     badgeCol.className = 'dc-badge-col';
@@ -69,9 +73,6 @@ export function mountDossierScreen(
     }
 
     badgeCol.appendChild(badgeWrap);
-    wrapper.appendChild(badgeCol);
-    wrapper.appendChild(infoCol);
-
     const infoEl = document.createElement('div');
     infoEl.className = 'dc-info-wrap';
     infoCol.appendChild(infoEl);
@@ -118,10 +119,10 @@ export function mountDossierScreen(
       </div>
     `;
 
-    wrapper.appendChild(badgeWrap);
-    wrapper.appendChild(infoEl);
+    wrapper.appendChild(badgeCol);
+    wrapper.appendChild(infoCol);
 
-    return wrapper;
+    return container;
   };
 
   const { teardown } = mountCarousel(host, {
