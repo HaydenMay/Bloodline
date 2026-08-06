@@ -227,12 +227,7 @@ function startCareer(starterHorse: Horse): void {
     field.push(rival);
   }
 
-  // Shuffle so player isn't always in the same position
-  const playerIndex = Math.floor(rng.next() * field.length);
-  const playerSplicedArray = field.splice(playerIndex, 1);
-  const player = playerSplicedArray[0];
-  if (!player) throw new Error('No player horse found');
-  field.unshift(player);
+  const player = starterHorse;
 
   teardown?.();
   app.innerHTML = '';
