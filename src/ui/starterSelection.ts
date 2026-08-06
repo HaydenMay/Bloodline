@@ -62,13 +62,21 @@ function renderStarters(container: HTMLElement, starters: Horse[], onSelect: (h:
 
     card.appendChild(canvas);
 
-    card.addEventListener('mouseenter', () => {
+    const showCard = (): void => {
       showDetails(detailsPanel, horse, onSelect);
-    });
+    };
 
-    card.addEventListener('mouseleave', () => {
+    const hideCard = (): void => {
       detailsPanel.style.display = 'none';
+    };
+
+    card.addEventListener('mouseenter', showCard);
+    card.addEventListener('mouseleave', hideCard);
+    card.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      showCard();
     });
+    card.addEventListener('touchend', hideCard);
 
     grid.appendChild(card);
   }
