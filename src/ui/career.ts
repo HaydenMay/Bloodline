@@ -1,4 +1,5 @@
 import type { Horse } from '../sim/types.js';
+import type { Silks } from '../render/palette.js';
 
 export interface CareerStats {
   wins: number;
@@ -9,6 +10,7 @@ export interface CareerStats {
 
 export interface Career {
   horse: Horse;
+  playerSilks: Silks;
   week: number;
   season: number;
   stats: CareerStats;
@@ -73,9 +75,10 @@ export function deleteCareer(): void {
   }
 }
 
-export function createNewCareer(horse: Horse): Career {
+export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
   return {
     horse,
+    playerSilks,
     week: 1,
     season: 1,
     stats: {

@@ -17,7 +17,7 @@ import { TRAITS } from '../data/traits.js';
  */
 export function mountStarterSelection(
   container: HTMLElement,
-  onSelect: (horse: Horse) => void,
+  onSelect: (horse: Horse, silks: Silks) => void,
 ): () => void {
   const root = document.createElement('div');
   root.className = 'starter-carousel';
@@ -172,7 +172,7 @@ export function mountStarterSelection(
 
   prevBtn.addEventListener('click', () => goTo(index - 1));
   nextBtn.addEventListener('click', () => goTo(index + 1));
-  selectBtn.addEventListener('click', () => onSelect(starters[index]!));
+  selectBtn.addEventListener('click', () => onSelect(starters[index]!, silksFor.get(starters[index]!.id)!));
 
   // Swipe: a horizontal drag past the threshold steps the carousel; anything
   // shorter (a tap, a vertical scroll attempt) is left alone.

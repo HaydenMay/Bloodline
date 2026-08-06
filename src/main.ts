@@ -16,6 +16,7 @@ import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { loadCareer, saveCareer, createNewCareer, type Career } from './ui/career.js';
 import type { Horse } from './sim/types.js';
+import type { Silks } from './render/palette.js';
 
 /**
  * Phase 2 harness screen.
@@ -221,14 +222,14 @@ function showStarterSelection(): void {
   teardown?.();
   app.innerHTML = '';
 
-  teardown = mountStarterSelection(app, (selectedHorse) => {
-    startCareer(selectedHorse);
+  teardown = mountStarterSelection(app, (selectedHorse, selectedSilks) => {
+    startCareer(selectedHorse, selectedSilks);
   });
 }
 
-function startCareer(starterHorse: Horse): void {
+function startCareer(starterHorse: Horse, playerSilks: Silks): void {
   // Create new career with selected starter
-  const career = createNewCareer(starterHorse);
+  const career = createNewCareer(starterHorse, playerSilks);
   saveCareer(career);
   showTrainingScreen(career);
 }
@@ -346,7 +347,7 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
     host: stage,
     field,
     playerHorseId: player.id,
-    playerSilks: { primary: '#1a1a2e', secondary: '#e94560' },
+    playerSilks: career.playerSilks,
     config: {
       seed: 'race-' + Date.now(),
       metres: raceDistance,
