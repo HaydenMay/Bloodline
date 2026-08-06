@@ -243,6 +243,12 @@ function showTrainingScreen(career: Career): void {
   teardown?.();
   app.innerHTML = '';
 
+  // If a race has already been selected for this week, go to race calendar instead
+  if (career.raceSelected) {
+    showRaceCalendar(career);
+    return;
+  }
+
   teardown = mountTrainingScreen(app, career.horse, (updatedHorse, _session) => {
     const updatedCareer = { ...career, horse: updatedHorse };
     saveCareer(updatedCareer);
@@ -255,7 +261,10 @@ function showRaceCalendar(career: Career): void {
   app.innerHTML = '';
 
   teardown = mountRaceCalendar(app, (race) => {
-    startRaceWithHorse(career, race);
+    // Mark that a race has been selected for this week
+    const careerWithRaceSelected = { ...career, raceSelected: true };
+    saveCareer(careerWithRaceSelected);
+    startRaceWithHorse(careerWithRaceSelected, race);
   });
 }
 
@@ -360,6 +369,7 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
     }
 
     updatedCareer.week += 1;
+    updatedCareer.raceSelected = false; // Clear race selection for next week
     saveCareer(updatedCareer);
 
     const teardownResults = mountResultsScreen(app, placings, player.id, () => {

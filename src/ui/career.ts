@@ -16,6 +16,8 @@ export interface Career {
   stats: CareerStats;
   createdAt: number;
   lastUpdated: number;
+  /** Whether a race has been selected for this week (prevents multiple trainings). */
+  raceSelected?: boolean;
 }
 
 const STORAGE_KEY = 'bloodline_career';
@@ -60,7 +62,14 @@ export function loadCareer(): Career | null {
       // TODO: Add migration logic here
     }
 
-    return stored.data;
+    const career = stored.data;
+
+    // Ensure playerSilks exists (for saves before playerSilks was added)
+    if (!career.playerSilks) {
+      career.playerSilks = { primary: '#1a1a2e', secondary: '#e94560' };
+    }
+
+    return career;
   } catch (error) {
     console.error('Failed to load career:', error);
     return null;
