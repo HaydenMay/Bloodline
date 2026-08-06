@@ -5,6 +5,7 @@ import type { Horse } from '../sim/types.js';
 import { createSurface, startLoop, type Loop } from '../render/canvas.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
 import { hashId, RIVAL_SILKS, type Silks } from '../render/palette.js';
+import { TRAITS } from '../data/traits.js';
 
 /**
  * Starter selection, as a full-screen carousel.
@@ -116,10 +117,34 @@ export function mountStarterSelection(
         </div>
       </div>
       <div class="sc-traits">
-        <span class="sc-label">Traits</span>
-        <div class="traits-list">${horse.traits.map((t) => `<span class="trait-tag">${t}</span>`).join('')}</div>
+        <span class="sc-label">Traits &middot; tap to see what one does</span>
+        <div class="traits-list">
+          ${horse.traits
+            .map(
+              (t) =>
+                `<button type="button" class="trait-tag" data-trait="${t}">${TRAITS[t].name}</button>`,
+            )
+            .join('')}
+        </div>
+        <p class="trait-desc" id="trait-desc" hidden></p>
       </div>
     `;
+
+    const traitDesc = infoEl.querySelector<HTMLParagraphElement>('#trait-desc')!;
+    const tags = infoEl.querySelectorAll<HTMLButtonElement>('.trait-tag');
+    tags.forEach((tag) => {
+      tag.addEventListener('click', () => {
+        const id = tag.dataset.trait as keyof typeof TRAITS;
+        const opening = !tag.classList.contains('is-open');
+        tags.forEach((other) => other.classList.remove('is-open'));
+        traitDesc.hidden = true;
+        if (opening) {
+          tag.classList.add('is-open');
+          traitDesc.textContent = TRAITS[id].description;
+          traitDesc.hidden = false;
+        }
+      });
+    });
   }
 
   prevBtn.addEventListener('click', () => goTo(index - 1));

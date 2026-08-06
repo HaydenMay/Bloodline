@@ -1343,6 +1343,31 @@ body {
   font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.trait-tag:hover {
+  background: rgba(242, 193, 78, 0.18);
+}
+
+.trait-tag:active,
+.trait-tag.is-open {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.trait-desc {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: clamp(11px, 2.8vw, 12.5px);
+  line-height: 1.4;
+  text-align: center;
 }
 
 .sc-dots {

@@ -133,6 +133,19 @@ Careers connect: Run 2 opens stronger than run 1. Permanent progression layer.
   - Both level up and persist across careers
   - Hire cheap and develop, or pay more for pre-levelled (time vs. money trade-off)
   - **Staff level capped by Reputation** (cash alone never buys a top jockey permanently)
+  - **Jockey portraits (hiring screen)**: Procedurally composited from layered assets — base
+    head (masked for skin tone) + hairstyle layer chosen from a small set (masked for hair
+    colour) + optional facial-hair layer (masked for hair colour), same runtime-tint pipeline
+    as coat genetics. New dedicated art, not cropped from `racer.png` — the gallop sheet draws
+    the jockey too small for portrait-level detail.
+  - **Known gap to close alongside portraits**: `spriteHorse.ts`'s `MATERIAL.fixed` (id 6)
+    currently lumps skin in with leather/hooves as "never tinted" — every jockey renders with
+    the same skin colour in an actual race today, regardless of anything chosen on a hiring
+    screen. Needs (1) skin split out into its own tintable material in the mask, and (2) the
+    hired jockey's appearance actually plumbed through to the race's per-runner scheme — a
+    horse currently only carries a `jockeySkill` number, not a jockey entity. Do this **before**
+    or alongside the portrait screen ships, not after — a hiring screen that shows diversity
+    the race then silently discards is worse than not having the feature yet.
 - **Consumables**: Feed, supplements, treats bought with cash, applied after training for larger gains or reduced injury risk
 - **Cosmetics** (purely visual, never mandatory):
   - Stable colours picked from palette; propagate to jockey silks, tack, grooming
