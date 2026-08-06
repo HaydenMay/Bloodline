@@ -1,5 +1,12 @@
 import { COAT_IDS, type CoatId } from '../data/index.js';
-import { shade, COATS as COAT_DATA, SILKS as SILK_DATA, SCENE as SCENE_DATA } from '../data/colors.js';
+import {
+  shade,
+  COATS as COAT_DATA,
+  SILKS as SILK_DATA,
+  SCENE as SCENE_DATA,
+  HORSE as HORSE_DATA,
+  UI as UI_DATA,
+} from '../data/colors.js';
 
 /**
  * Re-export shading functions and color system from centralized colors.ts.
@@ -11,8 +18,10 @@ export const INK = shade.INK;
 export const lite = shade.lite;
 export const dark = shade.dark;
 
-// Re-export scene colors
+// Re-export all color groups
+export const UI = UI_DATA;
 export const SCENE = SCENE_DATA;
+export const HORSE = HORSE_DATA;
 
 /**
  * A coat is three MATERIALS, each just a base colour. Light and dark tones are
@@ -69,7 +78,7 @@ export interface Silks {
 }
 
 /** Distinct, colourblind-safe hues for the AI runners. */
-export const RIVAL_SILKS: Silks[] = SILK_DATA;
+export const RIVAL_SILKS = SILK_DATA as unknown as Silks[];
 
 /**
  * A deterministic FNV-1a hash, so a horse's colour follows from its id rather

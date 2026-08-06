@@ -1,4 +1,4 @@
-import { SCENE } from './palette.js';
+import { SCENE, UI } from './palette.js';
 
 /**
  * The track and everything behind it.
@@ -201,12 +201,12 @@ export function drawDistanceMarkers(
     const remaining = Math.round((totalMetres - metres) / MARKER_SPACING);
     const isWire = remaining === 0;
 
-    ctx.fillStyle = isWire ? '#F2C14E' : SCENE.furlongPost;
+    ctx.fillStyle = isWire ? UI.accent : SCENE.furlongPost;
     ctx.fillRect(x - 1.5, markerY, 3, isWire ? 40 : 26);
 
     if (isWire) {
       // The wire itself.
-      ctx.strokeStyle = '#F2C14E';
+      ctx.strokeStyle = UI.accent;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(x, markerY - 40);
@@ -214,7 +214,7 @@ export function drawDistanceMarkers(
       ctx.stroke();
       ctx.fillRect(x - 14, markerY - 46, 28, 8);
     } else if (remaining <= 8) {
-      ctx.fillStyle = '#0E1218';
+      ctx.fillStyle = UI.bg;
       ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(`${remaining * MARKER_SPACING}`, x, markerY + 20);
@@ -242,14 +242,14 @@ export function drawMinimap(
   const cy = y + h / 2;
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
   ctx.lineWidth = 7;
   ctx.beginPath();
   ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
   ctx.stroke();
 
   // Winning post at the top of the oval.
-  ctx.strokeStyle = '#F2C14E';
+  ctx.strokeStyle = UI.accent;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(cx, cy - ry - 5);
@@ -268,7 +268,7 @@ export function drawMinimap(
     ctx.fill();
 
     if (r.isPlayer) {
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = '#f5f5f5';
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }

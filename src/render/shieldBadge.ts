@@ -1,6 +1,7 @@
 import badgeUrl from '../assets/shield-badge.png';
 import maskUrl from '../assets/shield-badge-mask.png';
 import { INK, coatFor, type Coat } from './palette.js';
+import { DEFAULTS } from '../data/colors.js';
 
 /**
  * Shield badge for horses.
@@ -154,7 +155,6 @@ export interface BadgeScheme {
 
 const tinted = new Map<string, HTMLCanvasElement>();
 const TINT_CACHE_MAX = 20;
-const DEFAULT_ACCENT = '#6B8FA3'; // Muted blue-grey (subtle accent)
 
 /**
  * Recolor a badge for the given coat and accent color.
@@ -162,7 +162,7 @@ const DEFAULT_ACCENT = '#6B8FA3'; // Muted blue-grey (subtle accent)
  */
 export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
   if (!loaded) return null;
-  const accentColor = scheme.silks?.primary ?? scheme.accentColor ?? DEFAULT_ACCENT;
+  const accentColor = scheme.silks?.primary ?? scheme.accentColor ?? DEFAULTS.badgeAccentColor;
   const maneColor = scheme.silks?.secondary ?? accentColor;
   const coat = typeof scheme.coat === 'string' ? coatFor(scheme.coat) : scheme.coat;
   const key = `${coat.body}|${coat.hair}|${accentColor}|${maneColor}`;

@@ -1,4 +1,4 @@
-import { coatFor, dark, lite, type Silks } from './palette.js';
+import { coatFor, dark, lite, HORSE, type Silks } from './palette.js';
 import { BODY, EAR, HOOF, LEG, MANE, NECK_HEAD, TAIL, path } from './horseArt.js';
 
 /**
@@ -397,7 +397,7 @@ export function drawHorse(
 
   // Eye, on top of everything. Small, and set high and well back on the face —
   // a large forward eye is the difference between a horse and a cartoon.
-  ctx.fillStyle = '#120C08';
+  ctx.fillStyle = HORSE.eye;
   ctx.beginPath();
   ctx.ellipse(26, -11, 1.3, 1.5, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -486,7 +486,7 @@ function drawJockey(
 
   // Boot, in the stirrup. Kept fine — a thick dark stroke here reads as a
   // smudge on the horse's back rather than a foot.
-  ctx.strokeStyle = '#2C2522';
+  ctx.strokeStyle = HORSE.boot;
   ctx.lineWidth = 2.2;
   ctx.beginPath();
   ctx.moveTo(-1, 5);
@@ -538,7 +538,7 @@ export function drawHorseShadow(
 ): void {
   ctx.save();
   ctx.globalAlpha = 0.24;
-  ctx.fillStyle = '#000';
+  ctx.fillStyle = HORSE.shadowBlack;
   ctx.beginPath();
   ctx.ellipse(x, y, 44 * scale, 6 * scale, 0, 0, Math.PI * 2);
   ctx.fill();

@@ -1,5 +1,6 @@
 import type { Horse } from '../sim/types.js';
 import type { Silks } from '../render/palette.js';
+import { DEFAULTS } from '../data/colors.js';
 
 export interface CareerStats {
   wins: number;
@@ -67,7 +68,7 @@ export function loadCareer(): Career | null {
 
     // Ensure playerSilks exists (for saves before playerSilks was added)
     if (!career.playerSilks) {
-      career.playerSilks = { primary: '#1a1a2e', secondary: '#e94560' };
+      career.playerSilks = DEFAULTS.playerSilksDefault;
     }
 
     // Ensure racesCompleted exists (for saves before racesCompleted was added)

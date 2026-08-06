@@ -4,7 +4,7 @@ import { generateStarterSix } from '../sim/horse.js';
 import type { Horse } from '../sim/types.js';
 import { createSurface, startLoop, type Loop } from '../render/canvas.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
-import { hashId, RIVAL_SILKS, type Silks } from '../render/palette.js';
+import { hashId, RIVAL_SILKS, UI, type Silks } from '../render/palette.js';
 import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { TRAITS } from '../data/traits.js';
 
@@ -212,7 +212,7 @@ export function mountStarterSelection(
     },
     () => {
       const { ctx, width, height } = surface;
-      ctx.fillStyle = '#161c25';
+      ctx.fillStyle = UI.panel;
       ctx.fillRect(0, 0, width, height);
       const horse = starters[index]!;
       const scale = Math.min(2.6, width / 220, height / 160);

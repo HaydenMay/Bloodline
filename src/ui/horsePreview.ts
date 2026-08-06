@@ -1,6 +1,6 @@
 import { createSurface, startLoop } from '../render/canvas.js';
 import { drawHorse, drawHorseShadow } from '../render/horse.js';
-import { COAT_IDS, coatFor, RIVAL_SILKS } from '../render/palette.js';
+import { COAT_IDS, coatFor, RIVAL_SILKS, UI } from '../render/palette.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
 
 /**
@@ -61,17 +61,17 @@ export function mountHorsePreview(host: HTMLElement): () => void {
       const { ctx, width, height } = surface;
       const phase = (time * (0.9 + intensity)) % 1;
 
-      ctx.fillStyle = '#171C24';
+      ctx.fillStyle = UI.panel;
       ctx.fillRect(0, 0, width, height);
 
       const label = (text: string, y: number): void => {
-        ctx.fillStyle = 'rgba(232,237,244,0.45)';
+        ctx.fillStyle = 'rgba(232,237,244,0.5)';
         ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(text, 12, y);
       };
       const rule = (y: number): void => {
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(0, y);
@@ -113,7 +113,7 @@ export function mountHorsePreview(host: HTMLElement): () => void {
         const x = cw * (i + 0.5);
         coatHits.push({ id, x0: cw * i, x1: cw * (i + 1), y0: coatY - 60, y1: coatY + 24 });
         if (id === selectedCoat) {
-          ctx.fillStyle = 'rgba(242,193,78,0.10)';
+          ctx.fillStyle = UI.accentFaint;
           ctx.fillRect(cw * i + 2, coatY - 60, cw - 4, 84);
         }
         drawHorseShadow(ctx, x, coatY, cs);
@@ -123,7 +123,7 @@ export function mountHorsePreview(host: HTMLElement): () => void {
           pose: { phase, intensity, drive: 0.4 },
           scale: cs,
         });
-        ctx.fillStyle = id === selectedCoat ? '#F2C14E' : 'rgba(232,237,244,0.5)';
+        ctx.fillStyle = id === selectedCoat ? UI.accent : 'rgba(232,237,244,0.5)';
         ctx.font = `${id === selectedCoat ? 700 : 500} 10px ui-sans-serif, system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillText(coatFor(id).name, x, coatY + 18);

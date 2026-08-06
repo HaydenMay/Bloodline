@@ -40,10 +40,20 @@ export const shade = {
  */
 export const UI = {
   bg: '#0e1218',
+  bgOverlay72: 'rgba(14, 18, 24, 0.72)',
+  bgOverlay82: 'rgba(14, 18, 24, 0.82)',
+  bgOverlay90: 'rgba(14, 18, 24, 0.9)',
   panel: '#161c25',
   line: '#26303d',
   text: '#e8edf4',
+  textMuted: '#c7d0dc',
+  textVariant: 'rgba(233, 238, 245, 0.92)',
   muted: '#8b98a9',
+  mutedDim: 'rgba(139, 152, 169, 0.25)',
+  mutedVeryDim: 'rgba(139, 152, 169, 0.22)',
+  mutedStrong: 'rgba(139, 152, 169, 0.9)',
+  mutedSubtle: 'rgba(139, 152, 169, 0.75)',
+  mutedFaint: 'rgba(139, 152, 169, 0.45)',
   accent: '#f2c14e',
   accentBright: '#ffd700',
   accentFaint: 'rgba(242, 193, 78, 0.1)',
@@ -51,13 +61,24 @@ export const UI = {
   accentLight: 'rgba(242, 193, 78, 0.15)',
   accentBorder: 'rgba(242, 193, 78, 0.25)',
   accentMedium: 'rgba(242, 193, 78, 0.4)',
+  accentMediumStrong: 'rgba(242, 193, 78, 0.45)',
   accentGlow: 'rgba(242, 193, 78, 0.6)',
+  accentGlowStrong: 'rgba(242, 193, 78, 0.9)',
+  accentGlowVeryStrong: 'rgba(242, 193, 78, 0.95)',
+  accentGlowShadow: 'rgba(242, 193, 78, 0.85)',
   accentBrightGlow: 'rgba(255, 215, 0, 0.5)',
+  accentDim: 'rgba(242, 193, 78, 0.28)',
   ok: '#4ec9a0',
   okLight: 'rgba(78, 201, 160, 0.15)',
   okLighter: 'rgba(78, 201, 160, 0.35)',
   warning: '#ff6b7a',
   warningLight: 'rgba(255, 107, 122, 0.15)',
+  draft: '#6fb3e0',
+  condition: {
+    good: '#6fe39b',
+    fair: '#f2c14e',
+    poor: '#d9534f',
+  },
 } as const;
 
 /**
@@ -113,4 +134,21 @@ export const SCENE = {
   dirt: '#8A6A47',
   dirtShade: '#6F5438',
   furlongPost: '#E8E4DA',
+} as const;
+
+/**
+ * Horse rendering details: eyes, boots, shadows.
+ */
+export const HORSE = {
+  eye: '#120C08',
+  boot: '#2C2522',
+  shadowBlack: '#000',
+} as const;
+
+/**
+ * Defaults and fallbacks used when rendering or in save compatibility.
+ */
+export const DEFAULTS = {
+  playerSilksDefault: { primary: '#1a1a2e', secondary: '#e94560' },
+  badgeAccentColor: '#6B8FA3',
 } as const;

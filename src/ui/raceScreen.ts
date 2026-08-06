@@ -1,7 +1,7 @@
 import { createSurface, startLoop, type Loop, type Surface } from '../render/canvas.js';
 import { drawHorse, drawHorseShadow } from '../render/horse.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
-import { hashId, RIVAL_SILKS, type Silks } from '../render/palette.js';
+import { hashId, RIVAL_SILKS, UI, type Silks } from '../render/palette.js';
 import {
   drawBackdrop,
   drawDistanceMarkers,
@@ -325,7 +325,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       if (isPlayer) {
         ctx.save();
         const glow = ctx.createRadialGradient(x, y - 8, 4, x, y - 8, 70 * (scale / baseScale) + 46);
-        glow.addColorStop(0, 'rgba(242,193,78,0.30)');
+        glow.addColorStop(0, UI.accentMedium);
         glow.addColorStop(1, 'rgba(242,193,78,0)');
         ctx.fillStyle = glow;
         ctx.beginPath();
@@ -370,7 +370,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         const markerY = y - 118 * scale;
         const bounce = Math.sin(performance.now() / 260) * 3;
 
-        ctx.fillStyle = '#F2C14E';
+        ctx.fillStyle = UI.accent;
         ctx.beginPath();
         ctx.moveTo(x, markerY + bounce);
         ctx.lineTo(x - 9, markerY - 13 + bounce);
@@ -378,7 +378,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = '#F2C14E';
+        ctx.fillStyle = UI.accent;
         ctx.font = '700 12px ui-sans-serif, system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('YOU', x, markerY - 19 + bounce);
@@ -402,20 +402,20 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
     // ---- Distance remaining ----------------------------------------------
     const remaining = Math.max(0, totalMetres - player.distance);
-    ctx.fillStyle = 'rgba(14,18,24,0.72)';
+    ctx.fillStyle = UI.bgOverlay72;
     roundRect(ctx, pad, pad, 168, 46, 10);
     ctx.fill();
 
-    ctx.fillStyle = '#8B98A9';
+    ctx.fillStyle = UI.muted;
     ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('TO GO', pad + 12, pad + 18);
 
-    ctx.fillStyle = '#E8EDF4';
+    ctx.fillStyle = UI.text;
     ctx.font = '700 20px ui-monospace, monospace';
     ctx.fillText(`${Math.round(remaining)} m`, pad + 12, pad + 38);
 
-    ctx.fillStyle = '#8B98A9';
+    ctx.fillStyle = UI.muted;
     ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(`${ordinal(player.rank)} of ${runners.length}`, pad + 156, pad + 38);
@@ -452,14 +452,14 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // is the cue to spend, and it has to be visible without being read.
     if (player.inWindow) {
       ctx.save();
-      ctx.shadowColor = 'rgba(242,193,78,0.85)';
+      ctx.shadowColor = UI.accentGlowShadow;
       ctx.shadowBlur = 18;
-      ctx.fillStyle = 'rgba(242,193,78,0.16)';
+      ctx.fillStyle = UI.accentLight;
       roundRect(ctx, barX, barY, barW, 26, 13);
       ctx.fill();
       ctx.restore();
 
-      ctx.strokeStyle = 'rgba(242,193,78,0.9)';
+      ctx.strokeStyle = UI.accentGlowStrong;
       ctx.lineWidth = 2;
       roundRect(ctx, barX, barY, barW, 26, 13);
       ctx.stroke();
@@ -469,15 +469,15 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       const bannerW = 122;
       const bannerX = (width - bannerW) / 2;
       const bannerY = barY - 26;
-      ctx.fillStyle = '#F2C14E';
+      ctx.fillStyle = UI.accent;
       roundRect(ctx, bannerX, bannerY, bannerW, 20, 10);
       ctx.fill();
-      ctx.fillStyle = '#12222B';
+      ctx.fillStyle = UI.bg;
       ctx.font = '800 11px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('YOUR MOMENT', width / 2, bannerY + 14);
     } else {
-      ctx.fillStyle = 'rgba(14,18,24,0.72)';
+      ctx.fillStyle = UI.bgOverlay72;
       roundRect(ctx, barX, barY, barW, 26, 13);
       ctx.fill();
     }
@@ -485,7 +485,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const LABEL_FONT = '700 11px ui-sans-serif, system-ui, sans-serif';
     ctx.font = LABEL_FONT;
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(233,238,245,0.92)';
+    ctx.fillStyle = UI.textVariant;
     ctx.fillText('CHARGES', barX + 12, barY + 17);
     const labelW = ctx.measureText('CHARGES').width;
 
@@ -503,13 +503,13 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const cond = player.condition;
     const condTier = cond > 0.66 ? 3 : cond > 0.33 ? 2 : 1;
     ctx.fillStyle =
-      condTier === 3 ? '#6FE39B' : condTier === 2 ? '#F2C14E' : '#D9534F';
+      condTier === 3 ? UI.condition.good : condTier === 2 ? UI.condition.fair : UI.condition.poor;
     ctx.fillText('='.repeat(condTier), barX + 20 + labelW, barY + 17);
 
     // ---- Drafting indicator ------------------------------------------------
     // Visual cue that the horse is sheltering behind a rival and getting regen bonus.
     if (player.drafting) {
-      ctx.fillStyle = '#6FB3E0';
+      ctx.fillStyle = UI.draft;
       ctx.font = '700 9px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText('◆', barX + 20 + labelW + arrowsMaxW + 6, barY + 17);
@@ -538,9 +538,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       ctx.arc(cx, dotsY, dotR, 0, Math.PI * 2);
       ctx.fillStyle = filled
         ? ready
-          ? '#F2C14E'
-          : 'rgba(242,193,78,0.28)'
-        : 'rgba(139,152,169,0.25)';
+          ? UI.accent
+          : UI.accentDim
+        : UI.mutedDim;
       ctx.fill();
 
       // The wedge on the first empty dot: how close the next one is.
@@ -549,7 +549,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         ctx.moveTo(cx, dotsY);
         ctx.arc(cx, dotsY, dotR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * player.chargeProgress);
         ctx.closePath();
-        ctx.fillStyle = 'rgba(242,193,78,0.45)';
+        ctx.fillStyle = UI.accentMediumStrong;
         ctx.fill();
       }
     }
@@ -559,9 +559,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     if (!ready) {
       const sweepW = (CHARGE_CAPACITY - 1) * dotGap + dotR * 2;
       const sweepX = dotsX0 - dotR;
-      ctx.fillStyle = 'rgba(139,152,169,0.22)';
+      ctx.fillStyle = UI.mutedVeryDim;
       ctx.fillRect(sweepX, dotsY + dotR + 4, sweepW, 2);
-      ctx.fillStyle = '#F2C14E';
+      ctx.fillStyle = UI.accent;
       ctx.fillRect(sweepX, dotsY + dotR + 4, sweepW * player.kickReady, 2);
     }
 
@@ -571,22 +571,22 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // the ones that used to be invisible: a player could tap into a cooldown or
     // into an exhausted horse and get no explanation for why nothing happened.
     if (input.takingBack) {
-      ctx.fillStyle = '#4EC9A0';
+      ctx.fillStyle = UI.ok;
       ctx.fillText('TAKING A PULL', barX + barW - 12, barY + 17);
     } else if (player.kicksRemaining === 0) {
-      ctx.fillStyle = '#D9534F';
+      ctx.fillStyle = UI.warning;
       ctx.fillText('NO CHARGES', barX + barW - 12, barY + 17);
     } else if (!ready) {
-      ctx.fillStyle = 'rgba(139,152,169,0.9)';
+      ctx.fillStyle = UI.mutedStrong;
       ctx.fillText('GETTING BACK', barX + barW - 12, barY + 17);
     } else if (player.inWindow) {
-      ctx.fillStyle = '#F2C14E';
+      ctx.fillStyle = UI.accent;
       ctx.fillText('GO NOW', barX + barW - 12, barY + 17);
     }
 
     // ---- Call-outs ---------------------------------------------------------
     if (performance.now() < calloutUntil && callout) {
-      ctx.fillStyle = 'rgba(242,193,78,0.95)';
+      ctx.fillStyle = UI.accentGlowVeryStrong;
       ctx.font = '700 22px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(callout, width / 2, height * 0.2);
@@ -600,18 +600,18 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   /** Pre-race card, so a race begins when you are ready rather than on load. */
   const drawStart = (ctx: CanvasRenderingContext2D, width: number, height: number): void => {
-    ctx.fillStyle = 'rgba(14,18,24,0.82)';
+    ctx.fillStyle = UI.bgOverlay82;
     ctx.fillRect(0, 0, width, height);
 
     const cx = width / 2;
     const cy = height / 2;
 
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#E8EDF4';
+    ctx.fillStyle = UI.text;
     ctx.font = '800 26px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText(playerHorse.name, cx, cy - 46);
 
-    ctx.fillStyle = '#8B98A9';
+    ctx.fillStyle = UI.muted;
     ctx.font = '600 13px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText(
       `${config.metres} m · ${config.going} going · field of ${field.length}`,
@@ -619,28 +619,28 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       cy - 24,
     );
 
-    ctx.fillStyle = '#F2C14E';
+    ctx.fillStyle = UI.accent;
     roundRect(ctx, cx - 82, cy + 2, 164, 44, 22);
     ctx.fill();
-    ctx.fillStyle = '#12222B';
+    ctx.fillStyle = UI.bg;
     ctx.font = '800 15px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText('START RACE', cx, cy + 30);
 
-    ctx.fillStyle = 'rgba(139,152,169,0.85)';
+    ctx.fillStyle = UI.mutedSubtle;
     ctx.font = '500 12px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText('Tap to KICK · hold to TAKE A PULL', cx, cy + 70);
   };
 
   /** 3, 2, 1 — covers the gate load so the race doesn't just snap into motion. */
   const drawCountdown = (ctx: CanvasRenderingContext2D, width: number, height: number): void => {
-    ctx.fillStyle = 'rgba(14,18,24,0.82)';
+    ctx.fillStyle = UI.bgOverlay82;
     ctx.fillRect(0, 0, width, height);
 
     const msLeft = Math.max(0, countdownEndsAt - performance.now());
     const beat = Math.min(3, Math.max(1, Math.ceil(msLeft / (COUNTDOWN_MS / 3))));
 
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#F2C14E';
+    ctx.fillStyle = UI.accent;
     ctx.font = '800 64px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText(String(beat), width / 2, height / 2 + 20);
   };
@@ -659,7 +659,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     height: number,
     player: RunnerSnapshot,
   ): void => {
-    ctx.fillStyle = 'rgba(14,18,24,0.9)';
+    ctx.fillStyle = UI.bgOverlay90;
     ctx.fillRect(0, 0, width, height);
 
     const recap = finalRecap ?? (finalRecap = buildRecap(race.outcome(), playerHorseId, playerHorse.style));
@@ -682,19 +682,19 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
     // ---- Headline ----------------------------------------------------------
     ctx.textAlign = 'center';
-    ctx.fillStyle = won ? '#F2C14E' : '#E8EDF4';
+    ctx.fillStyle = won ? UI.accent : UI.text;
     ctx.font = '800 30px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText(recap.headline, cx, y + 28);
     y += 40;
 
-    ctx.fillStyle = won ? 'rgba(242,193,78,0.8)' : '#8B98A9';
+    ctx.fillStyle = won ? UI.accentGlow : UI.muted;
     ctx.font = '600 14px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText(recap.margin, cx, y + 14);
     y += 22;
 
     // ---- What happened -----------------------------------------------------
     ctx.font = '500 13px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillStyle = '#C7D0DC';
+    ctx.fillStyle = UI.textMuted;
     for (const line of storyLines) {
       ctx.fillText(line, cx, y + 14);
       y += 19;
@@ -706,12 +706,12 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     for (let i = 0; i < visible; i++) {
       const r = rows[i]!;
       if (r.isPlayer) {
-        ctx.fillStyle = 'rgba(242,193,78,0.14)';
+        ctx.fillStyle = UI.accentFaint;
         roundRect(ctx, cx - panel / 2, y - 1, panel, rowH - 3, 7);
         ctx.fill();
       }
 
-      ctx.fillStyle = r.isPlayer ? '#F2C14E' : '#8B98A9';
+      ctx.fillStyle = r.isPlayer ? UI.accent : UI.muted;
       ctx.font = `${r.isPlayer ? 700 : 500} 13px ui-sans-serif, system-ui, sans-serif`;
       ctx.textAlign = 'left';
       ctx.fillText(String(r.position), cx - panel / 2 + 12, y + 14);
@@ -724,15 +724,15 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
       // The margin matters more than the clock — a race is won by lengths.
       ctx.textAlign = 'right';
-      ctx.fillStyle = r.isPlayer ? 'rgba(242,193,78,0.8)' : 'rgba(139,152,169,0.75)';
+      ctx.fillStyle = r.isPlayer ? UI.accentGlow : UI.mutedSubtle;
       ctx.fillText(r.margin, cx + panel / 2 - 74, y + 14);
-      ctx.fillStyle = r.isPlayer ? 'rgba(242,193,78,0.55)' : 'rgba(139,152,169,0.45)';
+      ctx.fillStyle = r.isPlayer ? UI.accentMedium : UI.mutedFaint;
       ctx.fillText(r.time, cx + panel / 2 - 12, y + 14);
       y += rowH;
     }
 
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(139,152,169,0.75)';
+    ctx.fillStyle = UI.mutedSubtle;
     ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText(`${paceLabel(recap.pace)} · New race to run again`, cx, y + 20);
   };
