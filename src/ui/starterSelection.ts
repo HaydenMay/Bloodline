@@ -2,52 +2,19 @@ import { createRng } from '../sim/rng.js';
 import { createNameGenerator } from '../data/names.js';
 import { generateStarterSix } from '../sim/horse.js';
 import type { Horse } from '../sim/types.js';
-import { createSurface, startLoop, type Loop } from '../render/canvas.js';
-import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
-import { hashId, RIVAL_SILKS, UI, type Silks } from '../render/palette.js';
+import { hashId, RIVAL_SILKS, type Silks } from '../render/palette.js';
 import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { TRAITS } from '../data/traits.js';
+import { mountCarousel } from './carousel.js';
 
-/**
- * Starter selection, as a full-screen carousel.
- *
- * One horse at a time rather than a scrolling grid: six cards side by side
- * either got too small to read on a phone or needed a hover/scroll gesture
- * that doesn't exist on touch. A stepper needs neither — swipe, tap an arrow,
- * or tap a dot, and the horse being looked at always fills the screen.
- */
 export function mountStarterSelection(
   container: HTMLElement,
   onSelect: (horse: Horse, silks: Silks) => void,
 ): () => void {
-  const root = document.createElement('div');
-  root.className = 'starter-carousel';
-
-  root.innerHTML = `
-    <div class="sc-header">
-      <h2>Choose Your Starter</h2>
-      <span class="sc-counter" id="sc-counter"></span>
-    </div>
-    <div class="sc-stage">
-      <button class="sc-arrow sc-arrow-prev" id="sc-prev" aria-label="Previous horse">&#8249;</button>
-      <div class="sc-canvas-wrap" id="sc-canvas-wrap"></div>
-      <button class="sc-arrow sc-arrow-next" id="sc-next" aria-label="Next horse">&#8250;</button>
-    </div>
-    <div class="sc-info" id="sc-info"></div>
-    <div class="sc-dots" id="sc-dots"></div>
-    <button class="btn btn-primary sc-select" id="sc-select">Select</button>
-  `;
-
-  container.appendChild(root);
-
   const rng = createRng(`starter-${Date.now()}`);
   const names = createNameGenerator(rng);
   const starters = generateStarterSix(rng, names, 0);
 
-  // Same silks-by-id rule as the race screen, but with collisions broken
-  // across just these six — with only eight rival colours, a plain hash
-  // draws a repeat about 60% of the time, and every option should look
-  // distinct in the one moment they are all being compared.
   const silksFor = new Map<string, Silks>();
   const taken = new Set<number>();
   for (const h of starters) {
@@ -57,46 +24,42 @@ export function mountStarterSelection(
     silksFor.set(h.id, RIVAL_SILKS[slot]!);
   }
 
-  let index = 0;
-  let phase = 0;
+  const badgeCache = new Map<string, string>();
 
-  const canvasWrap = root.querySelector<HTMLDivElement>('#sc-canvas-wrap')!;
-  const infoEl = root.querySelector<HTMLDivElement>('#sc-info')!;
-  const counterEl = root.querySelector<HTMLSpanElement>('#sc-counter')!;
-  const dotsEl = root.querySelector<HTMLDivElement>('#sc-dots')!;
-  const prevBtn = root.querySelector<HTMLButtonElement>('#sc-prev')!;
-  const nextBtn = root.querySelector<HTMLButtonElement>('#sc-next')!;
-  const selectBtn = root.querySelector<HTMLButtonElement>('#sc-select')!;
+  const renderItem = (horse: Horse): HTMLElement => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'sc-inner';
 
-  const surface = createSurface(canvasWrap);
-  void loadSprites();
+    const badgeWrap = document.createElement('div');
+    badgeWrap.className = 'sc-badge-wrap';
 
-  const goTo = (i: number): void => {
-    index = ((i % starters.length) + starters.length) % starters.length;
-    // Close any open trait description
-    const openTag = infoEl.querySelector<HTMLButtonElement>('.trait-tag.is-open');
-    if (openTag) openTag.classList.remove('is-open');
-    const traitDesc = infoEl.querySelector<HTMLDivElement>('#trait-desc');
-    if (traitDesc) traitDesc.hidden = true;
-    renderDots();
-    renderInfo();
-  };
+    const infoEl = document.createElement('div');
+    infoEl.className = 'sc-info';
 
-  function renderDots(): void {
-    dotsEl.innerHTML = starters
-      .map(
-        (_, i) =>
-          `<button class="sc-dot ${i === index ? 'is-active' : ''}" data-i="${i}" aria-label="Horse ${i + 1}"></button>`,
-      )
-      .join('');
-    dotsEl.querySelectorAll<HTMLButtonElement>('.sc-dot').forEach((dot) => {
-      dot.addEventListener('click', () => goTo(Number(dot.dataset.i)));
-    });
-  }
+    wrapper.appendChild(badgeWrap);
+    wrapper.appendChild(infoEl);
 
-  function renderInfo(): void {
-    const horse = starters[index]!;
-    counterEl.textContent = `${index + 1} / ${starters.length}`;
+    // Load or use cached badge
+    if (badgeCache.has(horse.id)) {
+      const img = document.createElement('img');
+      img.alt = 'Horse badge';
+      img.className = 'sc-badge';
+      img.src = badgeCache.get(horse.id)!;
+      badgeWrap.appendChild(img);
+    } else {
+      void getBadgeDataUri({ coat: horse.coat, silks: silksFor.get(horse.id)! }).then((uri) => {
+        if (uri) {
+          badgeCache.set(horse.id, uri);
+          const img = badgeWrap.querySelector('img') as HTMLImageElement;
+          if (img) img.src = uri;
+        }
+      });
+      const img = document.createElement('img');
+      img.alt = 'Horse badge';
+      img.className = 'sc-badge';
+      badgeWrap.appendChild(img);
+    }
+
     infoEl.innerHTML = `
       <h3>${horse.name}</h3>
       <p class="sc-style">${styleLabel(horse.style)} &middot; ${momentLabel(horse.moment)}</p>
@@ -114,19 +77,20 @@ export function mountStarterSelection(
           <span class="stat-value">${Math.round(horse.stats.stamina)}</span>
         </div>
         <div class="stat">
-          <span class="stat-label">Grit</span>
-          <span class="stat-value">${Math.round(horse.stats.grit)}</span>
-        </div>
-        <div class="stat">
           <span class="stat-label">Burst</span>
           <span class="stat-value">${Math.round(horse.stats.burst)}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Grit</span>
+          <span class="stat-value">${Math.round(horse.stats.grit)}</span>
         </div>
         <div class="stat">
           <span class="stat-label">Temper</span>
           <span class="stat-value">${Math.round(horse.stats.temper)}</span>
         </div>
-        <div class="stat-shield">
-          <img id="shield-badge" alt="Shield" class="shield-img" />
+        <div class="stat">
+          <span class="stat-label">Consistency</span>
+          <span class="stat-value">${Math.round(horse.stats.consistency)}</span>
         </div>
       </div>
       <div class="sc-traits">
@@ -139,17 +103,11 @@ export function mountStarterSelection(
             )
             .join('')}
         </div>
-        <div class="trait-desc" id="trait-desc" hidden></div>
+        <div class="trait-desc" id="trait-desc-${horse.id}" hidden></div>
       </div>
     `;
 
-    // Load the shield badge with the horse's coat and silks
-    const shieldImg = infoEl.querySelector<HTMLImageElement>('#shield-badge')!;
-    void getBadgeDataUri({ coat: horse.coat, silks: silksFor.get(horse.id)! }).then((uri) => {
-      if (uri) shieldImg.src = uri;
-    });
-
-    const traitDesc = infoEl.querySelector<HTMLDivElement>('#trait-desc')!;
+    const traitDesc = infoEl.querySelector<HTMLDivElement>(`#trait-desc-${horse.id}`)!;
     const traitTags = infoEl.querySelectorAll<HTMLButtonElement>('.trait-tag');
     traitTags.forEach((tag) => {
       tag.addEventListener('click', () => {
@@ -175,14 +133,24 @@ export function mountStarterSelection(
         }
       });
     });
-  }
 
-  prevBtn.addEventListener('click', () => goTo(index - 1));
-  nextBtn.addEventListener('click', () => goTo(index + 1));
-  selectBtn.addEventListener('click', () => onSelect(starters[index]!, silksFor.get(starters[index]!.id)!));
+    return wrapper;
+  };
 
-  // Swipe: a horizontal drag past the threshold steps the carousel; anything
-  // shorter (a tap, a vertical scroll attempt) is left alone.
+  const { teardown, state } = mountCarousel(container, {
+    items: starters,
+    renderItem,
+    onSelect: (horse) => onSelect(horse, silksFor.get(horse.id)!),
+    title: 'Choose Your Starter',
+    selectLabel: 'Select',
+    className: 'starter-carousel',
+    cssPrefix: 'sc',
+    showCounter: true,
+    showDots: true,
+    showArrows: true,
+  });
+
+  // Swipe support
   let touchStartX = 0;
   let touchStartY = 0;
   const onTouchStart = (e: TouchEvent): void => {
@@ -193,73 +161,33 @@ export function mountStarterSelection(
     const dx = e.changedTouches[0]!.clientX - touchStartX;
     const dy = e.changedTouches[0]!.clientY - touchStartY;
     if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
-      goTo(dx > 0 ? index - 1 : index + 1);
+      if (dx > 0) state.prev();
+      else state.next();
     }
   };
-  canvasWrap.addEventListener('touchstart', onTouchStart, { passive: true });
-  canvasWrap.addEventListener('touchend', onTouchEnd, { passive: true });
 
-  const onKey = (e: KeyboardEvent): void => {
-    if (e.key === 'ArrowLeft') goTo(index - 1);
-    if (e.key === 'ArrowRight') goTo(index + 1);
-  };
-  window.addEventListener('keydown', onKey);
+  container.addEventListener('touchstart', onTouchStart, { passive: true });
+  container.addEventListener('touchend', onTouchEnd, { passive: true });
 
-  const loop: Loop = startLoop(
-    30,
-    () => {
-      phase = (phase + (1 / 30) * 0.5) % 1;
-    },
-    () => {
-      const { ctx, width, height } = surface;
-      ctx.fillStyle = UI.panel;
-      ctx.fillRect(0, 0, width, height);
-      const horse = starters[index]!;
-      const scale = Math.min(2.6, width / 220, height / 160);
-      drawSpriteHorse(ctx, width / 2, height * 0.72, {
-        coat: horse.coat,
-        silks: silksFor.get(horse.id)!,
-        phase,
-        scale,
-      });
-    },
-  );
-
-  renderDots();
-  renderInfo();
-
-  return () => {
-    loop.stop();
-    window.removeEventListener('keydown', onKey);
-    canvasWrap.removeEventListener('touchstart', onTouchStart);
-    canvasWrap.removeEventListener('touchend', onTouchEnd);
-    surface.destroy();
-    root.remove();
-  };
+  return teardown;
 }
 
 function styleLabel(style: string): string {
-  switch (style) {
-    case 'frontRunner':
-      return 'Front-runner';
-    case 'stalker':
-      return 'Stalker';
-    case 'midPack':
-      return 'Mid-pack';
-    default:
-      return 'Closer';
-  }
+  const labels: Record<string, string> = {
+    frontRunner: 'Front-runner',
+    stalker: 'Stalker',
+    midPack: 'Mid-pack',
+    closer: 'Closer',
+  };
+  return labels[style] || style;
 }
 
 function momentLabel(moment: string): string {
-  switch (moment) {
-    case 'early':
-      return 'goes early';
-    case 'earlyMid':
-      return 'goes before halfway';
-    case 'midLate':
-      return 'goes off the turn';
-    default:
-      return 'goes late';
-  }
+  const labels: Record<string, string> = {
+    early: 'Early',
+    earlyMid: 'Early-mid',
+    midLate: 'Mid-late',
+    late: 'Late',
+  };
+  return labels[moment] || moment;
 }

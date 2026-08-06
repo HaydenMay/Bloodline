@@ -1,5 +1,7 @@
 import type { Horse } from '../sim/types.js';
 import type { RivalDossier } from './career.js';
+import { hashId, RIVAL_SILKS } from '../render/palette.js';
+import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { mountCarousel } from './carousel.js';
 
 export function mountDossierScreen(
@@ -11,6 +13,22 @@ export function mountDossierScreen(
 ): () => void {
   const rivals = field.filter((h) => h.id !== player.id);
 
+  // Map rival IDs to their silks (consistent across carousel)
+  const silksFor = new Map<string, typeof RIVAL_SILKS[0]>();
+  const taken = new Set<number>();
+
+  silksFor.set(player.id, RIVAL_SILKS[0]!); // Reserve player's slot
+  taken.add(0);
+
+  for (const rival of rivals) {
+    let slot = hashId(rival.id) % RIVAL_SILKS.length;
+    while (taken.has(slot)) slot = (slot + 1) % RIVAL_SILKS.length;
+    taken.add(slot);
+    silksFor.set(rival.id, RIVAL_SILKS[slot]!);
+  }
+
+  const badgeCache = new Map<string, string>();
+
   const renderItem = (rival: Horse): HTMLElement => {
     const entry = dossier[rival.id];
     const formText = entry
@@ -19,7 +37,34 @@ export function mountDossierScreen(
 
     const wrapper = document.createElement('div');
     wrapper.className = 'dc-inner';
-    wrapper.innerHTML = `
+
+    const badgeWrap = document.createElement('div');
+    badgeWrap.className = 'dc-badge-wrap';
+
+    // Load or use cached badge
+    if (badgeCache.has(rival.id)) {
+      const img = document.createElement('img');
+      img.alt = 'Rival badge';
+      img.className = 'dc-badge';
+      img.src = badgeCache.get(rival.id)!;
+      badgeWrap.appendChild(img);
+    } else {
+      void getBadgeDataUri({ coat: rival.coat, silks: silksFor.get(rival.id)! }).then((uri) => {
+        if (uri) {
+          badgeCache.set(rival.id, uri);
+          const img = badgeWrap.querySelector('img') as HTMLImageElement;
+          if (img) img.src = uri;
+        }
+      });
+      const img = document.createElement('img');
+      img.alt = 'Rival badge';
+      img.className = 'dc-badge';
+      badgeWrap.appendChild(img);
+    }
+
+    const infoEl = document.createElement('div');
+    infoEl.className = 'dc-info-wrap';
+    infoEl.innerHTML = `
       <h3>${rival.name}</h3>
       <p class="dc-form">${formText}</p>
       <div class="dc-style">
@@ -61,6 +106,10 @@ export function mountDossierScreen(
         </div>
       </div>
     `;
+
+    wrapper.appendChild(badgeWrap);
+    wrapper.appendChild(infoEl);
+
     return wrapper;
   };
 
