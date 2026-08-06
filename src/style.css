@@ -1378,6 +1378,18 @@ body {
   border: 1px solid rgba(242, 193, 78, 0.35);
 }
 
+.trait-affinity.raises {
+  background: rgba(78, 201, 160, 0.15);
+  color: var(--ok);
+  border: 1px solid rgba(78, 201, 160, 0.35);
+}
+
+.trait-affinity.lowers {
+  background: rgba(233, 69, 96, 0.15);
+  color: #ff6b7a;
+  border: 1px solid rgba(233, 69, 96, 0.35);
+}
+
 .trait-aff-speed,
 .trait-aff-stamina,
 .trait-aff-grit,

@@ -146,7 +146,7 @@ export function mountStarterSelection(
           tag.classList.add('is-open');
           const trait = TRAITS[id];
           const affinityHtml = trait.statAffinity
-            ? `<span class="trait-affinity trait-aff-${trait.statAffinity}">${trait.statAffinity}</span>`
+            ? `<span class="trait-affinity trait-aff-${trait.statAffinity} ${trait.statEffect === 1 ? 'raises' : trait.statEffect === -1 ? 'lowers' : ''}">${trait.statAffinity}</span>`
             : '';
           const tagsHtml = trait.tags && trait.tags.length > 0
             ? `<div class="trait-tags-list">${trait.tags.map((t) => `<span class="trait-tag-item">${t}</span>`).join('')}</div>`
