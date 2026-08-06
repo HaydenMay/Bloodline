@@ -8,6 +8,8 @@ import { mountRaceScreen } from './ui/raceScreen.js';
 import { mountHorsePreview } from './ui/horsePreview.js';
 import { mountSilksDemo } from './ui/silksDemo.js';
 import { mountRoadmap } from './ui/roadmap.js';
+import { mountMainMenu } from './ui/mainMenu.js';
+import { mountStarterSelection } from './ui/starterSelection.js';
 import type { Horse } from './sim/types.js';
 
 /**
@@ -164,18 +166,131 @@ function styleLabel(style: string): string {
   }
 }
 
-// ?preview opens the horse preview instead of a race — a development view for
-// judging the drawing at a size where problems are actually visible.
-// ?silks-demo opens the silks color picker for testing badge colors.
+// Development routes
 const params = new URLSearchParams(location.search);
 if (params.has('preview')) {
+  // ?preview opens the horse preview
   const stage = document.createElement('div');
   stage.className = 'stage stage-full';
   app.appendChild(stage);
   mountHorsePreview(stage);
 } else if (params.has('silks-demo')) {
+  // ?silks-demo opens the silks color picker
   mountSilksDemo(app);
-} else {
+} else if (params.has('test-race')) {
+  // ?test-race opens the test race (development harness)
   startRace('bloodline-demo');
+} else {
+  // Default: main menu → starter selection → career
+  showMainMenu();
 }
 mountRoadmap();
+
+function showMainMenu(): void {
+  teardown?.();
+  app.innerHTML = '';
+
+  const teardownMenu = mountMainMenu(app, () => {
+    teardownMenu();
+    showStarterSelection();
+  });
+}
+
+function showStarterSelection(): void {
+  teardown?.();
+  app.innerHTML = '';
+
+  const teardownSelection = mountStarterSelection(app, (selectedHorse) => {
+    teardownSelection();
+    startCareer(selectedHorse);
+  });
+}
+
+function startCareer(starterHorse: Horse): void {
+  // TODO: Initialize career with selected horse
+  // For now, just jump into the first race with the selected horse
+  const rng = createRng('career-seed-' + Date.now());
+  const names = createNameGenerator(rng);
+
+  // Build a field around the starter
+  const field: Horse[] = [starterHorse];
+  for (let i = 1; i < FIELD_SIZE; i++) {
+    const rival = generateHorse(rng, names, {
+      division: 'maiden',
+      style: RUNNING_STYLES[i % RUNNING_STYLES.length]!,
+      age: 2,
+    });
+    field.push(rival);
+  }
+
+  // Shuffle so player isn't always in the same position
+  const playerIndex = Math.floor(rng.next() * field.length);
+  const playerSplicedArray = field.splice(playerIndex, 1);
+  const player = playerSplicedArray[0];
+  if (!player) throw new Error('No player horse found');
+  field.unshift(player);
+
+  teardown?.();
+  app.innerHTML = '';
+
+  const stage = document.createElement('div');
+  stage.className = 'stage';
+  app.appendChild(stage);
+
+  const bar = document.createElement('div');
+  bar.className = 'racebar';
+
+  bar.innerHTML = `
+    <div class="rb-horse">
+      <span class="rb-name">${player.name}</span>
+      <span class="rb-style">${styleLabel(player.style)} · ${momentLabel(player.moment)}</span>
+    </div>
+    <div class="rb-moment">
+      <span class="rb-moment-label">Preferred length</span>
+      <span class="rb-pref">${player.preferredDistance.min}–${player.preferredDistance.max} m</span>
+    </div>
+    <div class="rb-controls">
+      <label class="rb-autopilot">
+        <input type="checkbox" id="autopilot-toggle">
+        Autopilot
+      </label>
+    </div>
+    <div class="rb-callout" id="callout"></div>
+  `;
+  app.appendChild(bar);
+
+  const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
+  const hintText = bar.querySelector<HTMLDivElement>('.rb-callout')!;
+
+  hintText.innerHTML = 'Tap or hold spacebar to kick · hold tap to take a pull';
+
+  autopilotToggle.addEventListener('change', (e) => {
+    hintText.innerHTML = (e.target as HTMLInputElement).checked
+      ? 'Watch the race · autopilot is on'
+      : 'Tap or hold spacebar to kick · hold tap to take a pull';
+  });
+
+  const onFinish = (): void => {
+    setTimeout(() => {
+      showMainMenu();
+    }, 3000);
+  };
+
+  teardown = mountRaceScreen({
+    host: stage,
+    field,
+    playerHorseId: player.id,
+    playerSilks: { primary: '#1a1a2e', secondary: '#e94560' },
+    config: {
+      seed: 'race-' + Date.now(),
+      metres: 1400,
+      going: 'good',
+      hype: 0.5,
+    },
+    autopilotToggle,
+    onRaceStart: () => {
+      autopilotToggle.disabled = true;
+    },
+    onFinish,
+  });
+}
