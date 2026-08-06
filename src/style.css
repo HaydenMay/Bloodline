@@ -1440,6 +1440,10 @@ body {
   text-align: center;
 }
 
+.trait-desc[hidden] {
+  display: none;
+}
+
 .sc-dots {
   flex: none;
   display: flex;

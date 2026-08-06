@@ -144,10 +144,10 @@ export function mountStarterSelection(
     traitTags.forEach((tag) => {
       tag.addEventListener('click', () => {
         const id = tag.dataset.trait as keyof typeof TRAITS;
-        const opening = !tag.classList.contains('is-open');
+        const isCurrentlyOpen = tag.classList.contains('is-open');
         traitTags.forEach((other) => other.classList.remove('is-open'));
         traitDesc.hidden = true;
-        if (opening) {
+        if (!isCurrentlyOpen) {
           tag.classList.add('is-open');
           const trait = TRAITS[id];
           const affinityHtml = trait.statAffinity
