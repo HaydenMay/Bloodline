@@ -121,8 +121,8 @@ export function rollMoment(rng: Rng, style: RunningStyle): Moment {
 export function rollTraits(rng: Rng, legacy = 0, pool: TraitId[] = RACING_TRAIT_IDS): TraitId[] {
   let count = 2;
   if (legacy === 0) {
-    // Starters: 5% chance of a rare 3rd trait.
-    if (rng.chance(0.05)) count = 3;
+    // Starters: 0.5% chance of a very rare 3rd trait.
+    if (rng.chance(0.005)) count = 3;
   } else {
     // Bred horses: scale up from 22% base, up to 45% bonus at high legacy.
     const bonus = Math.min(0.45, legacy / 200);
