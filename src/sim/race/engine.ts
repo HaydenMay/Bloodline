@@ -534,10 +534,9 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
       const planned = playerTapped ? nextUnfiredKick(state) : nextPendingKick(state, r.plan);
       if (planned >= 0) r.fired[planned] = true;
       record('kick', r.horse.id);
+      // Clear the kick input only after successfully firing a kick.
+      if (input) input.kickPending = false;
     }
-    // A tap during the gate break is HELD, not discarded — the rider fires it
-    // the moment the horse is up to speed.
-    if (input && atSpeed) input.kickPending = false;
 
     r.holding = decision.gear === 'HOLD';
 
