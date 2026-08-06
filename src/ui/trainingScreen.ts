@@ -64,7 +64,7 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
     name: 'Cross Training',
     description: 'Varied conditioning routines.',
     statEffects: { speed: 1, stamina: 1, burst: 1 },
-    traitPool: ['versatile', 'professional'],
+    traitPool: ['professional', 'tractable'],
   },
   recovery: {
     id: 'recovery',
@@ -78,7 +78,7 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
     name: 'Jumping Drills',
     description: 'Agility and coordination work.',
     statEffects: { burst: 2, temper: 1, speed: -1 },
-    traitPool: ['alert', 'acrobat'],
+    traitPool: ['alert', 'coiled'],
   },
   gallopsWork: {
     id: 'gallopsWork',
