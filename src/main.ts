@@ -3,6 +3,7 @@ import { createRng } from './sim/index.js';
 import { createNameGenerator } from './data/names.js';
 import { generateHorse } from './sim/horse.js';
 import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
+import type { RunnerSnapshot } from './sim/race/engine.js';
 import { attachInfoBox } from './ui/infoBox.js';
 import { mountRaceScreen } from './ui/raceScreen.js';
 import { mountHorsePreview } from './ui/horsePreview.js';
@@ -270,7 +271,7 @@ function startCareer(starterHorse: Horse): void {
       : 'Tap or hold spacebar to kick · hold tap to take a pull';
   });
 
-  const onFinish = (placings): void => {
+  const onFinish = (placings: RunnerSnapshot[]): void => {
     teardown?.();
     app.innerHTML = '';
 

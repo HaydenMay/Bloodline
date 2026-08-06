@@ -1,6 +1,4 @@
 import type { RunnerSnapshot } from '../sim/race/engine.js';
-import { RIVAL_SILKS, type Silks } from '../render/palette.js';
-import { attachInfoBox } from './infoBox.js';
 
 export function mountResultsScreen(
   container: HTMLElement,
@@ -52,9 +50,7 @@ export function mountResultsScreen(
     `;
 
     row.addEventListener('click', () => {
-      // Show info box for this horse
-      const silks = RIVAL_SILKS[i % RIVAL_SILKS.length]!;
-      showHorseInfo(placing, silks);
+      showHorseInfo(placing);
     });
 
     resultsList.appendChild(row);
@@ -62,7 +58,7 @@ export function mountResultsScreen(
 
   returnBtn.addEventListener('click', onReturn);
 
-  function showHorseInfo(horse: RunnerSnapshot, silks: Silks): void {
+  function showHorseInfo(horse: RunnerSnapshot): void {
     const modal = document.createElement('div');
     modal.className = 'info-modal';
 
