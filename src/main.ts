@@ -425,6 +425,14 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
 
   silksMap.set(player.id, career.playerSilks);
 
+  // Reserve player's silks slot so rivals can't use it
+  const playerSilksSlot = RIVAL_SILKS.findIndex(
+    (s) => s.primary === career.playerSilks.primary && s.secondary === career.playerSilks.secondary,
+  );
+  if (playerSilksSlot !== -1) {
+    taken.add(playerSilksSlot);
+  }
+
   for (const horse of field) {
     if (horse.id === player.id) continue;
     let slot = hashId(horse.id) % RIVAL_SILKS.length;
