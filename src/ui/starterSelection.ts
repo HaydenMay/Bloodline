@@ -33,11 +33,19 @@ export function mountStarterSelection(
     const badgeWrap = document.createElement('div');
     badgeWrap.className = 'sc-badge-wrap';
 
+    const badgeCol = document.createElement('div');
+    badgeCol.className = 'sc-badge-col';
+
+    const infoCol = document.createElement('div');
+    infoCol.className = 'sc-info-col';
+
     const infoEl = document.createElement('div');
     infoEl.className = 'sc-info';
 
-    wrapper.appendChild(badgeWrap);
-    wrapper.appendChild(infoEl);
+    badgeCol.appendChild(badgeWrap);
+    infoCol.appendChild(infoEl);
+    wrapper.appendChild(badgeCol);
+    wrapper.appendChild(infoCol);
 
     // Load or use cached badge
     if (badgeCache.has(horse.id)) {

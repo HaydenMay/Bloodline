@@ -38,8 +38,14 @@ export function mountDossierScreen(
     const wrapper = document.createElement('div');
     wrapper.className = 'dc-inner';
 
+    const badgeCol = document.createElement('div');
+    badgeCol.className = 'dc-badge-col';
+
     const badgeWrap = document.createElement('div');
     badgeWrap.className = 'dc-badge-wrap';
+
+    const infoCol = document.createElement('div');
+    infoCol.className = 'dc-info-col';
 
     // Load or use cached badge
     if (badgeCache.has(rival.id)) {
@@ -62,8 +68,13 @@ export function mountDossierScreen(
       badgeWrap.appendChild(img);
     }
 
+    badgeCol.appendChild(badgeWrap);
+    wrapper.appendChild(badgeCol);
+    wrapper.appendChild(infoCol);
+
     const infoEl = document.createElement('div');
     infoEl.className = 'dc-info-wrap';
+    infoCol.appendChild(infoEl);
     infoEl.innerHTML = `
       <h3>${rival.name}</h3>
       <p class="dc-form">${formText}</p>

@@ -1249,12 +1249,19 @@ body {
   min-height: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 16px;
+}
+
+/* Container columns for badge and info */
+.sc-badge-col {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
   justify-content: center;
 }
 
 .sc-badge-wrap {
-  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1270,6 +1277,14 @@ body {
   height: 100%;
   object-fit: contain;
   image-rendering: crisp-edges;
+}
+
+.sc-info-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-width: 400px;
 }
 
 .sc-info {
@@ -1318,11 +1333,11 @@ body {
 
 .sc-inner {
   flex: 1;
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: auto 1fr;
   gap: 20px;
   padding: 0;
-  align-items: flex-start;
+  align-items: start;
   min-height: 0;
 }
 
@@ -2512,16 +2527,23 @@ body {
 
 .dc-inner {
   flex: 1;
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: auto 1fr;
   gap: 20px;
   padding: 0;
-  align-items: flex-start;
+  align-items: start;
   min-height: 0;
 }
 
-.dc-badge-wrap {
+/* Container columns for dossier */
+.dc-badge-col {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dc-badge-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2537,6 +2559,14 @@ body {
   height: 100%;
   object-fit: contain;
   image-rendering: crisp-edges;
+}
+
+.dc-info-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-width: 400px;
 }
 
 .dc-info-wrap {
