@@ -1,4 +1,6 @@
 import { createRng } from '../sim/rng.js';
+import type { Division } from '../data/index.js';
+import { DIVISION_DISTANCES } from '../data/index.js';
 
 export interface RaceOption {
   id: string;
@@ -8,7 +10,7 @@ export interface RaceOption {
   hype: number;
 }
 
-export function generateRaceCalendar(seed: string): RaceOption[] {
+export function generateRaceCalendar(seed: string, division?: Division): RaceOption[] {
   const rng = createRng(seed);
 
   const names = [
@@ -22,7 +24,14 @@ export function generateRaceCalendar(seed: string): RaceOption[] {
     'Dawn Breaker Handicap',
   ];
 
-  const distances = [800, 1000, 1200, 1400, 1600, 1800, 2000];
+  // Generate distance range based on division, or use default if not provided
+  const distanceRange = division ? DIVISION_DISTANCES[division] : { min: 800, max: 2000 };
+  const distanceStep = 100;
+  const distances: number[] = [];
+  for (let d = distanceRange.min; d <= distanceRange.max; d += distanceStep) {
+    distances.push(d);
+  }
+
   const goingTypes: Array<'firm' | 'good' | 'soft' | 'heavy'> = ['firm', 'good', 'soft', 'heavy'];
 
   const races: RaceOption[] = [];
@@ -42,11 +51,12 @@ export function generateRaceCalendar(seed: string): RaceOption[] {
 export function mountRaceCalendar(
   container: HTMLElement,
   onSelectRace: (race: RaceOption) => void,
+  division?: Division,
 ): () => void {
   const root = document.createElement('div');
   root.className = 'race-calendar';
 
-  const races = generateRaceCalendar(`calendar-${Date.now()}`);
+  const races = generateRaceCalendar(`calendar-${Date.now()}`, division);
 
   root.innerHTML = `
     <div class="calendar-container">

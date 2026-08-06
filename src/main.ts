@@ -327,7 +327,7 @@ function showRaceCalendar(career: Career): void {
     const careerWithRaceSelected = { ...career, raceSelected: true };
     saveCareer(careerWithRaceSelected);
     startRaceWithHorse(careerWithRaceSelected, race);
-  });
+  }, career.horse.division);
 }
 
 function startRaceWithHorse(career: Career, race?: RaceOption): void {

@@ -73,3 +73,12 @@ export const WORLD_POPULATION: Record<Division, number> = {
   stakes: 10,
   championship: 8,
 };
+
+/** Race distance ranges (metres) by division. */
+export const DIVISION_DISTANCES: Record<Division, { min: number; max: number }> = {
+  maiden: { min: 600, max: 900 },
+  novice: { min: 800, max: 1200 },
+  open: { min: 1000, max: 1600 },
+  stakes: { min: 1200, max: 1800 },
+  championship: { min: 1400, max: 2000 },
+};
