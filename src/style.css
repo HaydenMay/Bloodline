@@ -1824,3 +1824,128 @@ body {
   font-weight: 700;
   color: var(--accent);
 }
+
+/* Training animation overlay */
+.training-animation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.training-animation-overlay.show {
+  opacity: 1;
+}
+
+.training-animation-overlay.fade-out {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.training-animation {
+  text-align: center;
+  max-width: 400px;
+}
+
+.training-animation h2 {
+  font-size: clamp(28px, 8vw, 40px);
+  margin: 0 0 12px;
+  color: var(--accent);
+}
+
+.training-anim-desc {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 24px;
+}
+
+.stat-animations {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.stat-anim {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  animation: slideIn 0.5s ease-out forwards;
+  opacity: 0;
+}
+
+.stat-anim:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.stat-anim:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.stat-anim:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.stat-anim:nth-child(4) {
+  animation-delay: 0.4s;
+}
+.stat-anim:nth-child(5) {
+  animation-delay: 0.5s;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-anim-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 600;
+  flex: 1;
+  text-align: left;
+}
+
+.stat-anim-change {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--mono);
+  min-width: 50px;
+  text-align: right;
+}
+
+.stat-anim-change.positive {
+  color: var(--ok);
+}
+
+.stat-anim-change.negative {
+  color: #ff6b7a;
+}
+
+.trait-learned {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 16px;
+  background: rgba(78, 201, 160, 0.15);
+  border: 1px solid rgba(78, 201, 160, 0.35);
+  border-radius: 6px;
+  color: var(--ok);
+  animation: slideIn 0.5s ease-out 0.6s forwards;
+  opacity: 0;
+}

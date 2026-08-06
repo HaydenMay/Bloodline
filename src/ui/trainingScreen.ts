@@ -151,19 +151,90 @@ export function mountTrainingScreen(
       };
 
       // Rare trait instillment (5% chance)
+      let newTrait: TraitId | null = null;
       if (Math.random() < 0.05 && session.traitPool.length > 0) {
-        const newTrait = session.traitPool[Math.floor(Math.random() * session.traitPool.length)]!;
-        if (!updatedHorse.traits.includes(newTrait)) {
-          updatedHorse.traits = [...updatedHorse.traits, newTrait];
-          console.log(`🎓 ${updatedHorse.name} learned ${TRAITS[newTrait].name}!`);
+        const trait = session.traitPool[Math.floor(Math.random() * session.traitPool.length)]!;
+        if (!updatedHorse.traits.includes(trait)) {
+          newTrait = trait;
+          updatedHorse.traits = [...updatedHorse.traits, trait];
+          console.log(`🎓 ${updatedHorse.name} learned ${TRAITS[trait].name}!`);
         }
       }
 
-      onTrainingSelect(updatedHorse, session);
+      showTrainingAnimation(root, session, horse.stats, updatedHorse.stats, newTrait, () => {
+        onTrainingSelect(updatedHorse, session);
+      });
     });
   });
 
   return () => {
     root.remove();
   };
+}
+
+function showTrainingAnimation(
+  container: HTMLElement,
+  session: TrainingSession,
+  oldStats: Horse['stats'],
+  newStats: Horse['stats'],
+  newTrait: TraitId | null,
+  onComplete: () => void,
+): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'training-animation-overlay';
+
+  const statChanges = {
+    speed: newStats.speed - oldStats.speed,
+    stamina: newStats.stamina - oldStats.stamina,
+    grit: newStats.grit - oldStats.grit,
+    burst: newStats.burst - oldStats.burst,
+    temper: newStats.temper - oldStats.temper,
+  };
+
+  overlay.innerHTML = `
+    <div class="training-animation">
+      <h2>${session.name}</h2>
+      <p class="training-anim-desc">${session.description}</p>
+
+      <div class="stat-animations">
+        ${Object.entries(statChanges)
+          .filter(([_, change]) => change !== 0)
+          .map(
+            ([stat, change]) => `
+          <div class="stat-anim">
+            <span class="stat-anim-label">${stat}</span>
+            <span class="stat-anim-change ${change > 0 ? 'positive' : 'negative'}">
+              ${change > 0 ? '+' : ''}${change}
+            </span>
+          </div>
+        `,
+          )
+          .join('')}
+      </div>
+
+      ${
+        newTrait
+          ? `<div class="trait-learned">
+        🎓 Learned: ${TRAITS[newTrait].name}
+      </div>`
+          : ''
+      }
+    </div>
+  `;
+
+  container.appendChild(overlay);
+
+  // Animate the stats appearing
+  setTimeout(() => {
+    overlay.classList.add('show');
+  }, 50);
+
+  // Wait for animation to complete and transition
+  setTimeout(() => {
+    overlay.classList.add('fade-out');
+    setTimeout(() => {
+      overlay.remove();
+      onComplete();
+    }, 400);
+  }, 1500);
 }
