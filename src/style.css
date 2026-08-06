@@ -31,6 +31,31 @@ body {
   overscroll-behavior: none;
 }
 
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(242, 193, 78, 0.4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(242, 193, 78, 0.6);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-color: rgba(242, 193, 78, 0.4) rgba(255, 255, 255, 0.05);
+  scrollbar-width: thin;
+}
+
 #app {
   min-height: 100svh;
   display: flex;
