@@ -1,14 +1,32 @@
 # Bloodline — Next Steps
 
-**Current Status:** Phase 2 ✅ Complete. Playable race delivered and tested. Queued work items and Phase 3 planning below.
+**Current Status:** Phase 3 🚀 In Progress. Main menu + starter selection + race flow working. Career systems (training, divisions, AI rivals) queued.
 
 See [DESIGN.md](DESIGN.md) for complete system design and [ROADMAP.md](ROADMAP.md) for build order and known issues.
 
 ---
 
-## Queued Work: Phase 2 Optimization (3.5 / 3.6 / 3.7)
+## Phase 3 Progress — Full Career (In Progress)
 
-Three optimization rounds before moving to Phase 3, in order. **None started without play-testing.**
+### ✅ Completed: Main Menu & Starter Selection
+- Main menu with title and "New Game" button
+- Full-screen carousel (6 starters, all guaranteed 2 traits with 0.5% rare bonus)
+- Canvas-rendered horse preview with silks per starter
+- Tap-to-reveal trait descriptions
+- Selected starter correctly passed to first race
+
+### 🚀 Next: Career Loop (Training, Races, Divisions)
+- Training system: sprint/long/hill/gate/swim/rest with stat gains
+- Race calendar: after each race, choose 2–3 upcoming races
+- Divisions: maiden, novice, open, stakes, championship
+- AI rivals: ~70 horses, train/age/promote/demote independently
+- Condition and form systems
+
+---
+
+## Deferred: Phase 4.5 Polish (3.5 / 3.6 / 3.7)
+
+Three optimization rounds moved to Phase 4.5 (after Phase 4) for focused polish.
 
 ### 3.5 — AI Kick Strategy per Archetype (~2–3 sessions)
 
@@ -273,12 +291,9 @@ In order of what goes first:
 | 0 · Foundation | ~1 | ✅ Complete | |
 | 1 · Race sim + harness | ~2–3 | ✅ Complete | 🚦 Is the model sound? |
 | 2 · Playable race | ~3–4 | ✅ Complete | 🚦 Is it fun? |
-| **3.5 · AI Kick Strategy** | **~2–3** | ⏳ Queued | Play-test verified |
-| **3.6 · UI Refinements** | **~1** | ⏳ Queued | Phone/tablet tested |
-| **3.7 · Player vs. AI Parity** | **~2–3** | ⏳ Queued | Owner decision needed |
-| 3 · Full career | ~3–4 | ⏳ Next | |
+| **3 · Full career** | **~3–4** | 🚀 In Progress | Career loop complete |
 | 4 · The stable | ~2–3 | ⏳ After Phase 3 | |
-| 4.5 · Re-balance & physics | ~2–3 | ⏳ After Phase 4 | |
+| 4.5 · Re-balance & polish | ~3–4 | ⏳ After Phase 4 | Includes 3.5/3.6/3.7 |
 | 5 · Breeding | ~3–4 | ⏳ After Phase 4 | |
 | 6 · Polish | ~3+ | ⏳ After Phase 5 | |
 | **Total estimate** | **~20–25** | | |
@@ -356,5 +371,5 @@ In order of what goes first:
 
 ---
 
-**Last updated:** 2026-08-04  
-**Current branch:** `main` (ready for Phase 3 work)
+**Last updated:** 2026-08-06  
+**Current branch:** `main` (Phase 3 in progress)
