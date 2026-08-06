@@ -1157,13 +1157,14 @@ body {
 
 .starter-selection {
   width: 100%;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   padding: 40px 20px;
   background: var(--bg);
-  min-height: 100vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .starter-header {
