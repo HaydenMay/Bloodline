@@ -134,6 +134,8 @@ export const SCENE = {
   dirt: '#8A6A47',
   dirtShade: '#6F5438',
   furlongPost: '#E8E4DA',
+  minimapOval: 'rgba(255, 255, 255, 0.2)',
+  minimapPlayerMarker: '#f5f5f5',
 } as const;
 
 /**

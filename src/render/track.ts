@@ -242,7 +242,7 @@ export function drawMinimap(
   const cy = y + h / 2;
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.strokeStyle = SCENE.minimapOval;
   ctx.lineWidth = 7;
   ctx.beginPath();
   ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
@@ -268,7 +268,7 @@ export function drawMinimap(
     ctx.fill();
 
     if (r.isPlayer) {
-      ctx.strokeStyle = '#f5f5f5';
+      ctx.strokeStyle = SCENE.minimapPlayerMarker;
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
