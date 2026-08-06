@@ -131,76 +131,16 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   const playerHorse = field.find((h) => h.id === playerHorseId)!;
 
-  // AI input for autopilot mode - updated each tick
-  const aiInput: PlayerInput = { takingBack: false, kickPending: false };
-
-  // AI jockey makes tactical decisions during autopilot races
-  const makeAIDecision = (player: RunnerSnapshot, snapshot: RaceSnapshot): void => {
-    const raceProgress = snapshot.progress;
-
-    // Find nearest rival distance
-    const rivals = snapshot.runners.filter((r) => r.id !== playerHorseId && !r.finished);
-    let distToRival = 0;
-    if (rivals.length > 0) {
-      const nearestRival = rivals.reduce((prev, curr) => {
-        const currDist = Math.abs(curr.distance - player.distance);
-        const prevDist = Math.abs(prev.distance - player.distance);
-        return currDist < prevDist ? curr : prev;
-      });
-      distToRival = nearestRival.distance - player.distance;
-    }
-
-    aiInput.kickPending = false;
-    aiInput.takingBack = false;
-
-    // Early race: settle and conserve
-    if (raceProgress < 0.3) {
-      if (player.condition < 0.4 && player.regenMult < 0) aiInput.takingBack = true;
-    }
-    // Middle race: maintain position, respond to threats
-    else if (raceProgress < 0.7) {
-      // If falling back and have kicks, kick to stay in contention
-      if (player.rank > 2 && player.kicksRemaining > 1 && distToRival > 10 && player.kickReady === 0) {
-        aiInput.kickPending = true;
-      }
-      // Recover if very tired
-      if (player.condition < 0.25) aiInput.takingBack = true;
-    }
-    // Stretch and final: aggressive
-    else {
-      // In final stretch, kick to improve position
-      if (player.rank > 1 && player.kicksRemaining > 0 && player.kickReady === 0) {
-        aiInput.kickPending = true;
-      }
-      // Take pull if completely gassed
-      if (player.condition < 0.15) aiInput.takingBack = true;
-    }
-  };
-
-  // When autopilot is ON, use AI decisions. When OFF, player controls.
-  const effectiveInput: PlayerInput = {
-    get takingBack() {
-      return getAutopilot() ? aiInput.takingBack : input.takingBack;
-    },
-    get kickPending() {
-      return getAutopilot() ? aiInput.kickPending : input.kickPending;
-    },
-    set takingBack(v: boolean) {
-      input.takingBack = v;
-    },
-    set kickPending(v: boolean) {
-      input.kickPending = v;
-    },
-  };
-
   const entrants: RaceEntrant[] = field.map((horse) => ({ horse }));
   const race: LiveRace = createRace(entrants, config);
   const totalMetres = race.totalMetres;
 
   // The player's horse runs the SAME base ride as every opponent; this input
-  // only modulates it (REBUILD.md §11.4). Registering it here is what makes a
-  // hands-off player competitive rather than a passenger.
-  race.setPlayer(playerHorseId, effectiveInput);
+  // only modulates it (REBUILD.md §11.4). When autopilot is OFF, this input
+  // makes a hands-off player competitive rather than a passenger. When ON,
+  // we don't register any input and let the race use its own baseRide decision.
+  // Register player input only when race starts (not on autopilot).
+  let playerInputRegistered = false;
 
   // Silks belong to the HORSE, not to its position in the field.
   //
@@ -271,6 +211,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       if (countdownEndsAt !== 0 && performance.now() >= countdownEndsAt) {
         started = true;
         countdownEndsAt = 0;
+        // Register player input only if NOT on autopilot
+        if (!getAutopilot() && !playerInputRegistered) {
+          playerInputRegistered = true;
+          race.setPlayer(playerHorseId, input);
+        }
         setCallout("And they're off!");
         onRaceStart?.();
       }
@@ -281,12 +226,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     prev = curr;
     running = race.step();
     curr = race.snapshot();
-
-    // Generate AI decisions for autopilot mode
-    if (getAutopilot()) {
-      const player = curr.runners.find((r) => r.id === playerHorseId);
-      if (player) makeAIDecision(player, curr);
-    }
 
     for (const e of curr.fresh) {
       if (e.kind === 'phase' && e.detail) setCallout(e.detail);
