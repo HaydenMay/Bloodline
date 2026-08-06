@@ -15,6 +15,7 @@ import { mountResultsScreen } from './ui/resultsScreen.js';
 import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
+import { mountDossierScreen } from './ui/dossierScreen.js';
 import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
@@ -347,23 +348,33 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
 
   let field: Horse[];
   try {
-    const rng = createRng('career-seed-' + Date.now());
-    const names = createNameGenerator(rng);
+    // Build field from stable world, filtered by player's current division
+    const rivalCandidates = career.stable.world.filter((h) => h.division === player.division);
 
-    // Build a field around the player
-    field = [player];
-    for (let i = 1; i < FIELD_SIZE; i++) {
-      const rival = generateHorse(rng, names, {
-        division: 'maiden',
-        style: RUNNING_STYLES[i % RUNNING_STYLES.length]!,
-        age: 2,
-      });
-      if (!rival) {
-        console.error(`Failed to generate rival horse ${i}`);
-        continue;
-      }
-      field.push(rival);
+    // Select rivals for this race (next FIELD_SIZE-1 from candidates)
+    // Shuffle to avoid always seeing the same rivals first
+    const rng = createRng('field-select-' + Date.now());
+    const shuffled = rng.shuffle([...rivalCandidates]);
+    const selected = shuffled.slice(0, Math.min(FIELD_SIZE - 1, shuffled.length));
+
+    // If not enough rivals in this division, top up with adjacent division
+    if (selected.length < FIELD_SIZE - 1) {
+      const adjacent = career.stable.world.filter(
+        (h) =>
+          (h.division === 'maiden' && player.division === 'novice') ||
+          (h.division === 'novice' && player.division === 'open') ||
+          (h.division === 'novice' && player.division === 'maiden') ||
+          (h.division === 'open' && player.division === 'novice') ||
+          (h.division === 'open' && player.division === 'stakes') ||
+          (h.division === 'stakes' && player.division === 'open') ||
+          (h.division === 'stakes' && player.division === 'championship') ||
+          (h.division === 'championship' && player.division === 'stakes'),
+      );
+      const shuffledAdj = rng.shuffle([...adjacent]);
+      selected.push(...shuffledAdj.slice(0, FIELD_SIZE - 1 - selected.length));
     }
+
+    field = [player, ...selected];
 
     if (field.length < 2) {
       console.error('Field generation failed, not enough horses:', field.length);
@@ -379,117 +390,174 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
   teardown?.();
   app.innerHTML = '';
 
-  const stage = document.createElement('div');
-  stage.className = 'stage';
-  app.appendChild(stage);
+  // Show dossier screen first
+  const dossierContainer = document.createElement('div');
+  dossierContainer.className = 'stage';
+  app.appendChild(dossierContainer);
 
-  const bar = document.createElement('div');
-  bar.className = 'racebar';
+  let dossierTeardown: (() => void) | null = null;
+  let raceScreenTeardown: (() => void) | null = null;
 
-  bar.innerHTML = `
-    <div class="rb-horse">
-      <span class="rb-name">${player.name}</span>
-      <span class="rb-style">${styleLabel(player.style)} · ${momentLabel(player.moment)}</span>
-    </div>
-    <div class="rb-moment">
-      <span class="rb-moment-label">Preferred length</span>
-      <span class="rb-pref">${player.preferredDistance.min}–${player.preferredDistance.max} m</span>
-    </div>
-    <div class="rb-controls">
-      <label class="rb-autopilot">
-        <input type="checkbox" id="autopilot-toggle">
-        Autopilot
-      </label>
-    </div>
-    <div class="rb-callout" id="callout"></div>
-  `;
-  app.appendChild(bar);
-
-  // Attach infobox to player horse name
-  const playerHorseNameEl = bar.querySelector<HTMLElement>('.rb-horse')!;
-  const infoBoxCleanup = attachInfoBox(playerHorseNameEl, player, career.playerSilks);
-
-  const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
-  const hintText = bar.querySelector<HTMLDivElement>('.rb-callout')!;
-
-  hintText.innerHTML = 'Tap or hold spacebar to kick · hold tap to take a pull';
-
-  autopilotToggle.addEventListener('change', (e) => {
-    hintText.innerHTML = (e.target as HTMLInputElement).checked
-      ? 'Watch the race · autopilot is on'
-      : 'Tap or hold spacebar to kick · hold tap to take a pull';
-  });
-
-  // Generate silks for all horses in the field
-  const silksMap = new Map<string, Silks>();
-  const taken = new Set<number>();
-
-  silksMap.set(player.id, career.playerSilks);
-
-  // Reserve player's silks slot so rivals can't use it
-  const playerSilksSlot = RIVAL_SILKS.findIndex(
-    (s) => s.primary === career.playerSilks.primary && s.secondary === career.playerSilks.secondary,
-  );
-  if (playerSilksSlot !== -1) {
-    taken.add(playerSilksSlot);
-  }
-
-  for (const horse of field) {
-    if (horse.id === player.id) continue;
-    let slot = hashId(horse.id) % RIVAL_SILKS.length;
-    while (taken.has(slot)) slot = (slot + 1) % RIVAL_SILKS.length;
-    taken.add(slot);
-    silksMap.set(horse.id, RIVAL_SILKS[slot]!);
-  }
-
-  const onFinish = (placings: RunnerSnapshot[]): void => {
-    teardown?.();
+  const startRaceScreen = () => {
+    dossierTeardown?.();
     app.innerHTML = '';
 
-    // Update career stats based on race result
-    const playerIndex = placings.findIndex((p) => p.id === player.id);
-    const updatedCareer = { ...career };
+    const stage = document.createElement('div');
+    stage.className = 'stage';
+    app.appendChild(stage);
 
-    if (playerIndex === 0) {
-      updatedCareer.stats.wins += 1;
-      updatedCareer.stats.totalEarnings += 1000; // TODO: Dynamic earnings
-    } else {
-      updatedCareer.stats.losses += 1;
+    const bar = document.createElement('div');
+    bar.className = 'racebar';
+
+    bar.innerHTML = `
+      <div class="rb-horse">
+        <span class="rb-name">${player.name}</span>
+        <span class="rb-style">${styleLabel(player.style)} · ${momentLabel(player.moment)}</span>
+      </div>
+      <div class="rb-moment">
+        <span class="rb-moment-label">Preferred length</span>
+        <span class="rb-pref">${player.preferredDistance.min}–${player.preferredDistance.max} m</span>
+      </div>
+      <div class="rb-controls">
+        <label class="rb-autopilot">
+          <input type="checkbox" id="autopilot-toggle">
+          Autopilot
+        </label>
+      </div>
+      <div class="rb-callout" id="callout"></div>
+    `;
+    app.appendChild(bar);
+
+    // Attach infobox to player horse name
+    const playerHorseNameEl = bar.querySelector<HTMLElement>('.rb-horse')!;
+    const infoBoxCleanup = attachInfoBox(playerHorseNameEl, player, career.playerSilks);
+
+    const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
+    const hintText = bar.querySelector<HTMLDivElement>('.rb-callout')!;
+
+    hintText.innerHTML = 'Tap or hold spacebar to kick · hold tap to take a pull';
+
+    autopilotToggle.addEventListener('change', (e) => {
+      hintText.innerHTML = (e.target as HTMLInputElement).checked
+        ? 'Watch the race · autopilot is on'
+        : 'Tap or hold spacebar to kick · hold tap to take a pull';
+    });
+
+    // Generate silks for all horses in the field
+    const silksMap = new Map<string, Silks>();
+    const taken = new Set<number>();
+
+    silksMap.set(player.id, career.playerSilks);
+
+    // Reserve player's silks slot so rivals can't use it
+    const playerSilksSlot = RIVAL_SILKS.findIndex(
+      (s) => s.primary === career.playerSilks.primary && s.secondary === career.playerSilks.secondary,
+    );
+    if (playerSilksSlot !== -1) {
+      taken.add(playerSilksSlot);
     }
 
-    updatedCareer.stats.racesCompleted += 1;
-    updatedCareer.week += 1;
-    updatedCareer.raceSelected = false; // Clear race selection for next week
-    saveCareer(updatedCareer);
+    for (const horse of field) {
+      if (horse.id === player.id) continue;
+      let slot = hashId(horse.id) % RIVAL_SILKS.length;
+      while (taken.has(slot)) slot = (slot + 1) % RIVAL_SILKS.length;
+      taken.add(slot);
+      silksMap.set(horse.id, RIVAL_SILKS[slot]!);
+    }
 
-    const teardownResults = mountResultsScreen(app, placings, player.id, () => {
-      infoBoxCleanup();
-      teardownResults();
-      // Check if career should end (5 races completed)
-      if (updatedCareer.stats.racesCompleted >= 5) {
-        showCareerRecap(updatedCareer);
-      } else {
-        // Loop back to training instead of main menu
-        showTrainingScreen(updatedCareer);
+    const onFinish = (placings: RunnerSnapshot[]): void => {
+      raceScreenTeardown?.();
+      app.innerHTML = '';
+
+      // Update career stats based on race result
+      const playerIndex = placings.findIndex((p) => p.id === player.id);
+      const updatedCareer = { ...career };
+
+      // Update rival records in stable
+      for (let i = 0; i < placings.length; i++) {
+        const placing = placings[i];
+        if (!placing || placing.id === player.id) continue;
+
+        const rival = updatedCareer.stable.world.find((h) => h.id === placing.id);
+        if (rival) {
+          rival.starts += 1;
+          if (i === 0) rival.wins += 1;
+          if (i === 1 || i === 2) rival.places += 1;
+          if (i === 3) rival.shows += 1;
+        }
+
+        // Also track in dossier
+        if (!updatedCareer.stable.dossier[placing.id]) {
+          updatedCareer.stable.dossier[placing.id] = {
+            wins: 0,
+            places: 0,
+            shows: 0,
+            starts: 0,
+            division: rival?.division || 'maiden',
+            lastSeen: updatedCareer.week,
+          };
+        }
+        const entry = updatedCareer.stable.dossier[placing.id];
+        if (entry) {
+          entry.starts += 1;
+          if (i === 0) entry.wins += 1;
+          if (i === 1 || i === 2) entry.places += 1;
+          if (i === 3) entry.shows += 1;
+          entry.lastSeen = updatedCareer.week;
+        }
       }
-    }, field, silksMap);
+
+      // Update player horse records
+      if (playerIndex === 0) {
+        updatedCareer.stats.wins += 1;
+        updatedCareer.stats.totalEarnings += 1000; // TODO: Dynamic earnings
+        updatedCareer.horse.wins += 1;
+      } else {
+        updatedCareer.stats.losses += 1;
+      }
+      updatedCareer.horse.starts += 1;
+
+      updatedCareer.stats.racesCompleted += 1;
+      updatedCareer.week += 1;
+      updatedCareer.raceSelected = false; // Clear race selection for next week
+      saveCareer(updatedCareer);
+
+      const teardownResults = mountResultsScreen(app, placings, player.id, () => {
+        infoBoxCleanup();
+        teardownResults();
+        // Check if career should end (5 races completed)
+        if (updatedCareer.stats.racesCompleted >= 5) {
+          showCareerRecap(updatedCareer);
+        } else {
+          // Loop back to training instead of main menu
+          showTrainingScreen(updatedCareer);
+        }
+      }, field, silksMap);
+    };
+
+    raceScreenTeardown = mountRaceScreen({
+      host: stage,
+      field,
+      playerHorseId: player.id,
+      playerSilks: career.playerSilks,
+      config: {
+        seed: 'race-' + Date.now(),
+        metres: raceDistance,
+        going: raceGoing,
+        hype: raceHype,
+      },
+      autopilotToggle,
+      onRaceStart: () => {
+        autopilotToggle.disabled = true;
+      },
+      onFinish,
+    });
   };
 
-  teardown = mountRaceScreen({
-    host: stage,
-    field,
-    playerHorseId: player.id,
-    playerSilks: career.playerSilks,
-    config: {
-      seed: 'race-' + Date.now(),
-      metres: raceDistance,
-      going: raceGoing,
-      hype: raceHype,
-    },
-    autopilotToggle,
-    onRaceStart: () => {
-      autopilotToggle.disabled = true;
-    },
-    onFinish,
-  });
+  // Show dossier first, then race screen
+  dossierTeardown = mountDossierScreen(dossierContainer, field, player, career.stable.dossier, startRaceScreen);
+  teardown = () => {
+    dossierTeardown?.();
+    raceScreenTeardown?.();
+  };
 }

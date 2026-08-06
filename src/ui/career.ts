@@ -1,6 +1,11 @@
 import type { Horse } from '../sim/types.js';
+import type { Division } from '../data/index.js';
 import type { Silks } from '../render/palette.js';
 import { DEFAULTS } from '../data/colors.js';
+import { WORLD_POPULATION } from '../data/index.js';
+import { createRng } from '../sim/index.js';
+import { createNameGenerator } from '../data/names.js';
+import { generateWorld } from '../sim/horse.js';
 
 export interface CareerStats {
   wins: number;
@@ -10,12 +15,29 @@ export interface CareerStats {
   racesCompleted: number;
 }
 
+export interface RivalDossier {
+  [rivalId: string]: {
+    wins: number;
+    places: number;
+    shows: number;
+    starts: number;
+    division: Division;
+    lastSeen: number;
+  };
+}
+
+export interface Stable {
+  world: Horse[];
+  dossier: RivalDossier;
+}
+
 export interface Career {
   horse: Horse;
   playerSilks: Silks;
   week: number;
   season: number;
   stats: CareerStats;
+  stable: Stable;
   createdAt: number;
   lastUpdated: number;
   /** Whether a race has been selected for this week (prevents multiple trainings). */
@@ -92,6 +114,11 @@ export function deleteCareer(): void {
 }
 
 export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
+  // Generate the living world of ~70 AI rivals
+  const rng = createRng(`career-${Date.now()}`);
+  const names = createNameGenerator(rng);
+  const world = generateWorld(rng, names, WORLD_POPULATION);
+
   return {
     horse,
     playerSilks,
@@ -103,6 +130,10 @@ export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
       totalEarnings: 0,
       topWins: [],
       racesCompleted: 0,
+    },
+    stable: {
+      world,
+      dossier: {},
     },
     createdAt: Date.now(),
     lastUpdated: Date.now(),
