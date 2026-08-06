@@ -6,6 +6,7 @@ export interface CareerStats {
   losses: number;
   totalEarnings: number;
   topWins: Array<{ raceName: string; margin: string }>;
+  racesCompleted: number;
 }
 
 export interface Career {
@@ -69,6 +70,11 @@ export function loadCareer(): Career | null {
       career.playerSilks = { primary: '#1a1a2e', secondary: '#e94560' };
     }
 
+    // Ensure racesCompleted exists (for saves before racesCompleted was added)
+    if (career.stats.racesCompleted === undefined) {
+      career.stats.racesCompleted = (career.stats.wins || 0) + (career.stats.losses || 0);
+    }
+
     return career;
   } catch (error) {
     console.error('Failed to load career:', error);
@@ -95,6 +101,7 @@ export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
       losses: 0,
       totalEarnings: 0,
       topWins: [],
+      racesCompleted: 0,
     },
     createdAt: Date.now(),
     lastUpdated: Date.now(),

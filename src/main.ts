@@ -14,7 +14,7 @@ import { mountStarterSelection } from './ui/starterSelection.js';
 import { mountResultsScreen } from './ui/resultsScreen.js';
 import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
-import { loadCareer, saveCareer, createNewCareer, type Career } from './ui/career.js';
+import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 
@@ -196,6 +196,67 @@ if (params.has('preview')) {
   showMainMenu();
 }
 
+function showCareerRecap(career: Career): void {
+  teardown?.();
+  app.innerHTML = '';
+
+  const winRate = career.stats.racesCompleted > 0
+    ? Math.round((career.stats.wins / career.stats.racesCompleted) * 100)
+    : 0;
+
+  const recap = document.createElement('div');
+  recap.className = 'career-recap';
+  recap.innerHTML = `
+    <div class="recap-container">
+      <h1>Career Summary</h1>
+      <div class="horse-info">
+        <h2>${career.horse.name}</h2>
+        <p>${styleLabel(career.horse.style)} • ${momentLabel(career.horse.moment)}</p>
+      </div>
+
+      <div class="career-stats">
+        <div class="stat-block">
+          <span class="stat-label">Races Completed</span>
+          <span class="stat-number">${career.stats.racesCompleted}</span>
+        </div>
+        <div class="stat-block">
+          <span class="stat-label">Wins</span>
+          <span class="stat-number">${career.stats.wins}</span>
+        </div>
+        <div class="stat-block">
+          <span class="stat-label">Losses</span>
+          <span class="stat-number">${career.stats.losses}</span>
+        </div>
+        <div class="stat-block">
+          <span class="stat-label">Win Rate</span>
+          <span class="stat-number">${winRate}%</span>
+        </div>
+        <div class="stat-block">
+          <span class="stat-label">Total Earnings</span>
+          <span class="stat-number">\$${career.stats.totalEarnings.toLocaleString()}</span>
+        </div>
+      </div>
+
+      <div class="career-data">
+        <h3>Saved Career Data</h3>
+        <pre>${JSON.stringify(career, null, 2)}</pre>
+      </div>
+
+      <div class="recap-actions">
+        <button class="btn btn-primary" id="new-game-btn">Start New Game</button>
+      </div>
+    </div>
+  `;
+
+  app.appendChild(recap);
+
+  const newGameBtn = recap.querySelector<HTMLButtonElement>('#new-game-btn')!;
+  newGameBtn.addEventListener('click', () => {
+    deleteCareer();
+    showMainMenu();
+  });
+}
+
 function showMainMenu(): void {
   teardown?.();
   app.innerHTML = '';
@@ -368,14 +429,20 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
       updatedCareer.stats.losses += 1;
     }
 
+    updatedCareer.stats.racesCompleted += 1;
     updatedCareer.week += 1;
     updatedCareer.raceSelected = false; // Clear race selection for next week
     saveCareer(updatedCareer);
 
     const teardownResults = mountResultsScreen(app, placings, player.id, () => {
       teardownResults();
-      // Loop back to training instead of main menu
-      showTrainingScreen(updatedCareer);
+      // Check if career should end (5 races completed)
+      if (updatedCareer.stats.racesCompleted >= 5) {
+        showCareerRecap(updatedCareer);
+      } else {
+        // Loop back to training instead of main menu
+        showTrainingScreen(updatedCareer);
+      }
     });
   };
 
