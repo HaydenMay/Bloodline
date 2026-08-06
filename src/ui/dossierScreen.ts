@@ -1,5 +1,6 @@
 import type { Horse } from '../sim/types.js';
 import type { RivalDossier } from './career.js';
+import { mountCarousel } from './carousel.js';
 
 export function mountDossierScreen(
   host: HTMLElement,
@@ -8,65 +9,17 @@ export function mountDossierScreen(
   dossier: RivalDossier,
   onContinue: () => void,
 ): () => void {
-  const root = document.createElement('div');
-  root.className = 'dossier-carousel';
-
-  root.innerHTML = `
-    <div class="dc-header">
-      <h2>Field Dossier</h2>
-      <span class="dc-counter" id="dc-counter"></span>
-    </div>
-    <div class="dc-stage">
-      <button class="dc-arrow dc-arrow-prev" id="dc-prev" aria-label="Previous opponent">&#8249;</button>
-      <div class="dc-info" id="dc-info"></div>
-      <button class="dc-arrow dc-arrow-next" id="dc-next" aria-label="Next opponent">&#8250;</button>
-    </div>
-    <div class="dc-dots" id="dc-dots"></div>
-    <button class="btn btn-primary dc-start" id="dc-start">Start Race</button>
-  `;
-
-  host.appendChild(root);
-
-  // Rivals only (skip player)
   const rivals = field.filter((h) => h.id !== player.id);
-  let index = 0;
 
-  const infoEl = root.querySelector<HTMLDivElement>('#dc-info')!;
-  const counterEl = root.querySelector<HTMLSpanElement>('#dc-counter')!;
-  const dotsEl = root.querySelector<HTMLDivElement>('#dc-dots')!;
-  const prevBtn = root.querySelector<HTMLButtonElement>('#dc-prev')!;
-  const nextBtn = root.querySelector<HTMLButtonElement>('#dc-next')!;
-  const startBtn = root.querySelector<HTMLButtonElement>('#dc-start')!;
-
-  const goTo = (i: number): void => {
-    index = ((i % rivals.length) + rivals.length) % rivals.length;
-    renderDots();
-    renderInfo();
-  };
-
-  function renderDots(): void {
-    dotsEl.innerHTML = rivals
-      .map(
-        (_, i) =>
-          `<button class="dc-dot ${i === index ? 'is-active' : ''}" data-i="${i}" aria-label="Opponent ${i + 1}"></button>`,
-      )
-      .join('');
-    dotsEl.querySelectorAll<HTMLButtonElement>('.dc-dot').forEach((dot) => {
-      dot.addEventListener('click', () => goTo(Number(dot.dataset.i)));
-    });
-  }
-
-  function renderInfo(): void {
-    const rival = rivals[index]!;
+  const renderItem = (rival: Horse): HTMLElement => {
     const entry = dossier[rival.id];
-
-    counterEl.textContent = `${index + 1} / ${rivals.length}`;
-
     const formText = entry
       ? `${entry.starts} starts · ${entry.wins}W ${entry.places}P ${entry.shows}S`
       : 'No prior races';
 
-    infoEl.innerHTML = `
+    const wrapper = document.createElement('div');
+    wrapper.className = 'dc-inner';
+    wrapper.innerHTML = `
       <h3>${rival.name}</h3>
       <p class="dc-form">${formText}</p>
       <div class="dc-style">
@@ -108,18 +61,23 @@ export function mountDossierScreen(
         </div>
       </div>
     `;
-  }
-
-  prevBtn.addEventListener('click', () => goTo(index - 1));
-  nextBtn.addEventListener('click', () => goTo(index + 1));
-  startBtn.addEventListener('click', onContinue);
-
-  renderDots();
-  renderInfo();
-
-  return () => {
-    root.remove();
+    return wrapper;
   };
+
+  const { teardown } = mountCarousel(host, {
+    items: rivals,
+    renderItem,
+    onSelect: onContinue,
+    title: 'Field Dossier',
+    selectLabel: 'Start Race',
+    className: 'dossier-carousel',
+    cssPrefix: 'dc',
+    showCounter: true,
+    showDots: true,
+    showArrows: true,
+  });
+
+  return teardown;
 }
 
 function styleLabel(style: string): string {
