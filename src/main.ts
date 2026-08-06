@@ -17,6 +17,7 @@ import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
+import { RIVAL_SILKS, hashId } from './render/palette.js';
 
 /**
  * Phase 2 harness screen.
@@ -403,6 +404,10 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
   `;
   app.appendChild(bar);
 
+  // Attach infobox to player horse name
+  const playerHorseNameEl = bar.querySelector<HTMLElement>('.rb-horse')!;
+  const infoBoxCleanup = attachInfoBox(playerHorseNameEl, player, career.playerSilks);
+
   const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
   const hintText = bar.querySelector<HTMLDivElement>('.rb-callout')!;
 
@@ -413,6 +418,20 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
       ? 'Watch the race · autopilot is on'
       : 'Tap or hold spacebar to kick · hold tap to take a pull';
   });
+
+  // Generate silks for all horses in the field
+  const silksMap = new Map<string, Silks>();
+  const taken = new Set<number>();
+
+  silksMap.set(player.id, career.playerSilks);
+
+  for (const horse of field) {
+    if (horse.id === player.id) continue;
+    let slot = hashId(horse.id) % RIVAL_SILKS.length;
+    while (taken.has(slot)) slot = (slot + 1) % RIVAL_SILKS.length;
+    taken.add(slot);
+    silksMap.set(horse.id, RIVAL_SILKS[slot]!);
+  }
 
   const onFinish = (placings: RunnerSnapshot[]): void => {
     teardown?.();
@@ -435,6 +454,7 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
     saveCareer(updatedCareer);
 
     const teardownResults = mountResultsScreen(app, placings, player.id, () => {
+      infoBoxCleanup();
       teardownResults();
       // Check if career should end (5 races completed)
       if (updatedCareer.stats.racesCompleted >= 5) {
@@ -443,7 +463,7 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         // Loop back to training instead of main menu
         showTrainingScreen(updatedCareer);
       }
-    });
+    }, field, silksMap);
   };
 
   teardown = mountRaceScreen({

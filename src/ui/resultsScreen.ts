@@ -1,10 +1,15 @@
 import type { RunnerSnapshot } from '../sim/race/engine.js';
+import type { Horse } from '../sim/types.js';
+import type { Silks } from '../render/palette.js';
+import { attachInfoBox } from './infoBox.js';
 
 export function mountResultsScreen(
   container: HTMLElement,
   placings: RunnerSnapshot[],
   playerHorseId: string,
   onReturn: () => void,
+  field?: Horse[],
+  silksMap?: Map<string, Silks>,
 ): () => void {
   const root = document.createElement('div');
   root.className = 'results-screen';
@@ -33,6 +38,8 @@ export function mountResultsScreen(
   const resultsList = root.querySelector<HTMLDivElement>('#results-list')!;
   const returnBtn = root.querySelector<HTMLButtonElement>('#return-btn')!;
 
+  const teardownFns: Array<() => void> = [];
+
   // Build results table
   const winnerTime = placings[0]!.finishTime ?? 0;
   placings.forEach((placing, i) => {
@@ -49,46 +56,25 @@ export function mountResultsScreen(
       <span class="results-margin">${position === 1 ? 'WIN' : `+${marginLengths}L`}</span>
     `;
 
-    row.addEventListener('click', () => {
-      showHorseInfo(placing);
-    });
+    // Attach infobox if we have field data
+    if (field && silksMap) {
+      const horse = field.find((h) => h.id === placing.id);
+      if (horse) {
+        const nameSpan = row.querySelector<HTMLSpanElement>('.results-name')!;
+        const silks = silksMap.get(horse.id);
+        const cleanup = attachInfoBox(nameSpan, horse, silks);
+        teardownFns.push(cleanup);
+        nameSpan.style.cursor = 'pointer';
+      }
+    }
 
     resultsList.appendChild(row);
   });
 
   returnBtn.addEventListener('click', onReturn);
 
-  function showHorseInfo(horse: RunnerSnapshot): void {
-    const modal = document.createElement('div');
-    modal.className = 'info-modal';
-
-    const infoBox = document.createElement('div');
-    infoBox.className = 'info-modal-content';
-
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'info-modal-close';
-    closeBtn.textContent = '✕';
-
-    const infoContent = document.createElement('div');
-    infoContent.className = 'info-modal-horse';
-    infoContent.innerHTML = `
-      <h3>${horse.name}</h3>
-      <p class="info-modal-rank">Finished: ${placings.findIndex((p) => p.id === horse.id) + 1}${['st', 'nd', 'rd'][Math.min(2, (placings.findIndex((p) => p.id === horse.id) + 1) % 10 - 1)] || 'th'}</p>
-    `;
-
-    infoBox.appendChild(closeBtn);
-    infoBox.appendChild(infoContent);
-    modal.appendChild(infoBox);
-
-    closeBtn.addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.remove();
-    });
-
-    container.appendChild(modal);
-  }
-
   return () => {
+    teardownFns.forEach((fn) => fn());
     root.remove();
   };
 }
