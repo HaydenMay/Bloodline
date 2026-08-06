@@ -1665,11 +1665,31 @@ body {
 .training-screen {
   width: 100%;
   height: 100dvh;
-  background: var(--bg);
+  background: var(--bg) url('/src/assets/backgrounds/stable-yard.png') no-repeat fixed;
+  background-size: cover;
+  background-position: center;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: max(20px, env(safe-area-inset-top)) 20px
     max(20px, env(safe-area-inset-bottom));
+  position: relative;
+}
+
+.training-screen::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.training-screen > * {
+  position: relative;
+  z-index: 1;
 }
 
 .training-container {
@@ -1678,6 +1698,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  position: relative;
+  z-index: 1;
 }
 
 .training-header {
