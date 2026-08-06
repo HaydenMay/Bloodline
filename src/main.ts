@@ -13,6 +13,7 @@ import { mountMainMenu } from './ui/mainMenu.js';
 import { mountStarterSelection } from './ui/starterSelection.js';
 import { mountResultsScreen } from './ui/resultsScreen.js';
 import { mountTrainingScreen } from './ui/trainingScreen.js';
+import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import type { Horse } from './sim/types.js';
 
 /**
@@ -222,11 +223,23 @@ function showTrainingScreen(horse: Horse): void {
   app.innerHTML = '';
 
   teardown = mountTrainingScreen(app, horse, (updatedHorse) => {
-    startRaceWithHorse(updatedHorse);
+    showRaceCalendar(updatedHorse);
   });
 }
 
-function startRaceWithHorse(player: Horse): void {
+function showRaceCalendar(horse: Horse): void {
+  teardown?.();
+  app.innerHTML = '';
+
+  teardown = mountRaceCalendar(app, (race) => {
+    startRaceWithHorse(horse, race);
+  });
+}
+
+function startRaceWithHorse(player: Horse, race?: RaceOption): void {
+  const raceDistance = race?.distance || 1400;
+  const raceGoing = race?.going || 'good';
+  const raceHype = race?.hype || 0.5;
   const rng = createRng('career-seed-' + Date.now());
   const names = createNameGenerator(rng);
 
@@ -298,9 +311,9 @@ function startRaceWithHorse(player: Horse): void {
     playerSilks: { primary: '#1a1a2e', secondary: '#e94560' },
     config: {
       seed: 'race-' + Date.now(),
-      metres: 1400,
-      going: 'good',
-      hype: 0.5,
+      metres: raceDistance,
+      going: raceGoing,
+      hype: raceHype,
     },
     autopilotToggle,
     onRaceStart: () => {

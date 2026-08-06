@@ -157,7 +157,6 @@ export function mountTrainingScreen(
         if (!updatedHorse.traits.includes(trait)) {
           newTrait = trait;
           updatedHorse.traits = [...updatedHorse.traits, trait];
-          console.log(`🎓 ${updatedHorse.name} learned ${TRAITS[trait].name}!`);
         }
       }
 
