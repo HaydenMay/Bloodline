@@ -234,7 +234,7 @@ function showCareerRecap(career: Career): void {
         </div>
         <div class="stat-block">
           <span class="stat-label">Total Earnings</span>
-          <span class="stat-number">\$${career.stats.totalEarnings.toLocaleString()}</span>
+          <span class="stat-number">$${career.stats.totalEarnings.toLocaleString()}</span>
         </div>
       </div>
 
