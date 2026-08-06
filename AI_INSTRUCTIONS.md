@@ -39,7 +39,11 @@ npm run check         # lint + build + test (pre-commit check)
 
 ## Session Log
 
-*(One or two paragraphs summarizing what was done this session and what's planned next. This gets erased and rewritten each time a new chat begins.)*
+**Session Summary (Updated 2026-08-06):**
+
+Completed comprehensive documentation cleanup and centralized color system consolidation. Extracted 475 lines of design history from ROADMAP.md into new HISTORY.md file (preserves valuable debugging context without cluttering active roadmap). Trimmed ROADMAP.md from 980 to 200 lines, pointing instead to NEXT_PLAN.md for active work. Created CONTRIBUTING_SCOPE.md as onboarding guide covering architecture constraints (sim/ isolation), code style, git workflow, and quick reference to key files. Extended color centralization work: added 40+ UI color variants to src/data/colors.ts (opacity levels, condition states, overlay colors), updated all canvas rendering code (raceScreen.ts, track.ts, horse.ts) to use UI color exports instead of hardcoded hex values. Fixed remaining default silks and stable colors. Deleted two outdated docs (SHIELD_BADGE_IMPLEMENTATION.md, CODEBASE_MAP.md). Created AI_INSTRUCTIONS.md to standardize agent onboarding and session handoffs.
+
+**Next Steps:** Race intro screen with fade-in animation (1-2 hrs, low complexity). Idle horse animation on training screen (1-2 hrs, depends on animation design choice). Visual hierarchy polish and mobile testing (2-3 hrs). All work should follow established patterns: commit directly to main, use centralized color system, run `npm run check` pre-commit. New agents read AI_INSTRUCTIONS.md → CONTRIBUTING_SCOPE.md → NEXT_PLAN.md to get up to speed.
 
 ---
 
