@@ -72,6 +72,11 @@ export function mountStarterSelection(
 
   const goTo = (i: number): void => {
     index = ((i % starters.length) + starters.length) % starters.length;
+    // Close any open trait description
+    const openTag = infoEl.querySelector<HTMLButtonElement>('.trait-tag.is-open');
+    if (openTag) openTag.classList.remove('is-open');
+    const traitDesc = infoEl.querySelector<HTMLDivElement>('#trait-desc');
+    if (traitDesc) traitDesc.hidden = true;
     renderDots();
     renderInfo();
   };
