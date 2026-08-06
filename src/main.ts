@@ -261,21 +261,47 @@ function showRaceCalendar(career: Career): void {
 
 function startRaceWithHorse(career: Career, race?: RaceOption): void {
   const player = career.horse;
+
+  // Validate player horse exists and has required properties
+  if (!player || !player.id) {
+    console.error('Invalid player horse in career:', player);
+    showMainMenu();
+    return;
+  }
+
   const raceDistance = race?.distance || 1400;
   const raceGoing = race?.going || 'good';
   const raceHype = race?.hype || 0.5;
-  const rng = createRng('career-seed-' + Date.now());
-  const names = createNameGenerator(rng);
 
-  // Build a field around the player
-  const field: Horse[] = [player];
-  for (let i = 1; i < FIELD_SIZE; i++) {
-    const rival = generateHorse(rng, names, {
-      division: 'maiden',
-      style: RUNNING_STYLES[i % RUNNING_STYLES.length]!,
-      age: 2,
-    });
-    field.push(rival);
+  let field: Horse[];
+  try {
+    const rng = createRng('career-seed-' + Date.now());
+    const names = createNameGenerator(rng);
+
+    // Build a field around the player
+    field = [player];
+    for (let i = 1; i < FIELD_SIZE; i++) {
+      const rival = generateHorse(rng, names, {
+        division: 'maiden',
+        style: RUNNING_STYLES[i % RUNNING_STYLES.length]!,
+        age: 2,
+      });
+      if (!rival) {
+        console.error(`Failed to generate rival horse ${i}`);
+        continue;
+      }
+      field.push(rival);
+    }
+
+    if (field.length < 2) {
+      console.error('Field generation failed, not enough horses:', field.length);
+      showMainMenu();
+      return;
+    }
+  } catch (error) {
+    console.error('Error during field generation:', error);
+    showMainMenu();
+    return;
   }
 
   teardown?.();
