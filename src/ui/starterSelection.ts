@@ -4,7 +4,7 @@ import { generateStarterSix } from '../sim/horse.js';
 import type { Horse } from '../sim/types.js';
 import { createSurface, startLoop, type Loop } from '../render/canvas.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
-import { RIVAL_SILKS } from '../render/palette.js';
+import { hashId, RIVAL_SILKS, type Silks } from '../render/palette.js';
 
 /**
  * Starter selection, as a full-screen carousel.
@@ -41,6 +41,19 @@ export function mountStarterSelection(
   const rng = createRng(`starter-${Date.now()}`);
   const names = createNameGenerator(rng);
   const starters = generateStarterSix(rng, names, 0);
+
+  // Same silks-by-id rule as the race screen, but with collisions broken
+  // across just these six — with only eight rival colours, a plain hash
+  // draws a repeat about 60% of the time, and every option should look
+  // distinct in the one moment they are all being compared.
+  const silksFor = new Map<string, Silks>();
+  const taken = new Set<number>();
+  for (const h of starters) {
+    let slot = hashId(h.id) % RIVAL_SILKS.length;
+    while (taken.has(slot)) slot = (slot + 1) % RIVAL_SILKS.length;
+    taken.add(slot);
+    silksFor.set(h.id, RIVAL_SILKS[slot]!);
+  }
 
   let index = 0;
   let phase = 0;
@@ -150,7 +163,7 @@ export function mountStarterSelection(
       const scale = Math.min(2.6, width / 220, height / 160);
       drawSpriteHorse(ctx, width / 2, height * 0.72, {
         coat: horse.coat,
-        silks: RIVAL_SILKS[0]!,
+        silks: silksFor.get(horse.id)!,
         phase,
         scale,
       });

@@ -103,6 +103,19 @@ export const RIVAL_SILKS: Silks[] = [
   { primary: '#2AA8B8', secondary: '#12222B' },
 ];
 
+/**
+ * A deterministic FNV-1a hash, so a horse's colour follows from its id rather
+ * than from wherever it happens to be drawn.
+ */
+export function hashId(id: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
 /** Track and environment. */
 export const SCENE = {
   skyTop: '#1A2536',

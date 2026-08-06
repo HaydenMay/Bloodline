@@ -1,7 +1,7 @@
 import { createSurface, startLoop, type Loop, type Surface } from '../render/canvas.js';
 import { drawHorse, drawHorseShadow } from '../render/horse.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
-import { RIVAL_SILKS, type Silks } from '../render/palette.js';
+import { hashId, RIVAL_SILKS, type Silks } from '../render/palette.js';
 import {
   drawBackdrop,
   drawDistanceMarkers,
@@ -877,16 +877,6 @@ function wrapText(
     }
   }
   if (line) out.push(line);
-}
-
-/** FNV-1a, so a horse's id maps to the same silks in every race it runs. */
-function hashId(id: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
 }
 
 function ordinal(n: number): string {
