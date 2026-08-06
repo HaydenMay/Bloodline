@@ -10,6 +10,7 @@ import { mountSilksDemo } from './ui/silksDemo.js';
 import { mountRoadmap } from './ui/roadmap.js';
 import { mountMainMenu } from './ui/mainMenu.js';
 import { mountStarterSelection } from './ui/starterSelection.js';
+import { mountResultsScreen } from './ui/resultsScreen.js';
 import type { Horse } from './sim/types.js';
 
 /**
@@ -269,10 +270,14 @@ function startCareer(starterHorse: Horse): void {
       : 'Tap or hold spacebar to kick · hold tap to take a pull';
   });
 
-  const onFinish = (): void => {
-    setTimeout(() => {
+  const onFinish = (placings): void => {
+    teardown?.();
+    app.innerHTML = '';
+
+    const teardownResults = mountResultsScreen(app, placings, player.id, () => {
+      teardownResults();
       showMainMenu();
-    }, 3000);
+    });
   };
 
   teardown = mountRaceScreen({
