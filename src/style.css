@@ -1395,22 +1395,51 @@ body {
   gap: 6px;
 }
 
+/* Unified badge/value display system */
+.badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.badge-label {
+  font-size: 8px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.badge-value {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+/* Stat boxes use the badge base */
 .stat {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .stat-label {
-  font-size: 9.5px;
+  font-size: 8px;
   color: var(--muted);
   text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
 }
 
 .stat-value {
   font-weight: 700;
-  font-size: clamp(14px, 3.5vw, 16px);
+  font-size: 14px;
   color: var(--accent);
 }
 
@@ -1434,19 +1463,31 @@ body {
   justify-content: center;
 }
 
+/* Unified trait tag system */
 .trait-tag {
   display: inline-block;
-  background: rgba(242, 193, 78, 0.1);
-  border: 1px solid rgba(242, 193, 78, 0.3);
+  background: rgba(242, 193, 78, 0.15);
+  border: 1px solid rgba(242, 193, 78, 0.35);
   color: var(--accent);
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 10.5px;
+  font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
   font-family: inherit;
   cursor: pointer;
   touch-action: manipulation;
+  letter-spacing: 0.3px;
+}
+
+.trait-tag:hover {
+  background: rgba(242, 193, 78, 0.18);
+}
+
+.trait-tag:active,
+.trait-tag.is-open {
+  background: var(--accent);
+  color: var(--bg);
 }
 
 .trait-desc-text {
@@ -1455,17 +1496,19 @@ body {
   font-size: 10px;
 }
 
+/* Unified affinity badge system */
 .trait-affinity {
   display: inline-block;
-  padding: 3px 8px;
-  border-radius: 3px;
-  font-size: 9px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 8px;
   font-weight: 600;
   text-transform: uppercase;
   align-self: center;
   background: rgba(242, 193, 78, 0.15);
   color: var(--accent);
   border: 1px solid rgba(242, 193, 78, 0.35);
+  letter-spacing: 0.3px;
 }
 
 .trait-affinity.raises {
@@ -1489,10 +1532,11 @@ body {
   border: 1px solid rgba(242, 193, 78, 0.35);
 }
 
+/* Unified tags list */
 .trait-tags-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: 4px;
   justify-content: center;
 }
 
@@ -1501,10 +1545,10 @@ body {
   background: rgba(242, 193, 78, 0.15);
   border: 1px solid rgba(242, 193, 78, 0.35);
   color: var(--accent);
-  padding: 2px 6px;
-  border-radius: 2px;
+  padding: 3px 6px;
+  border-radius: 3px;
   font-size: 8px;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
