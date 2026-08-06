@@ -327,16 +327,18 @@ body {
 }
 
 .racebar {
-  height: 62px;
+  height: clamp(62px, 12vh, 80px);
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 0 max(14px, env(safe-area-inset-left)) 0
-    max(14px, env(safe-area-inset-right));
+  gap: clamp(12px, 2vw, 18px);
+  padding: 0 max(12px, env(safe-area-inset-left)) 0
+    max(12px, env(safe-area-inset-right));
   background: var(--panel);
   border-top: 1px solid var(--line);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
 }
 
 .rb-horse {
@@ -347,14 +349,14 @@ body {
 }
 
 .rb-name {
-  font-size: 14px;
+  font-size: clamp(12px, 3vw, 14px);
   font-weight: 650;
   color: var(--text);
   white-space: nowrap;
 }
 
 .rb-style {
-  font-size: 11px;
+  font-size: clamp(10px, 2.5vw, 11px);
   color: var(--muted);
 }
 
@@ -519,7 +521,7 @@ body {
 .info-box {
   position: fixed;
   z-index: 950;
-  width: 290px;
+  width: min(290px, calc(100vw - 32px));
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 13px;
@@ -527,6 +529,8 @@ body {
   box-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
   font-family: var(--font);
   pointer-events: none;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .ib-head {
@@ -559,14 +563,14 @@ body {
 
 .ib-name {
   margin: 0;
-  font-size: 15px;
+  font-size: clamp(13px, 3vw, 15px);
   font-weight: 700;
   color: var(--text);
 }
 
 .ib-sub {
   margin: 1px 0 0;
-  font-size: 11px;
+  font-size: clamp(10px, 2.5vw, 11px);
   color: var(--muted);
   text-transform: capitalize;
 }
@@ -1121,14 +1125,15 @@ body {
 }
 
 .btn {
-  padding: 12px 32px;
-  font-size: 16px;
+  padding: clamp(12px, 3vh, 16px) clamp(24px, 5vw, 32px);
+  font-size: clamp(14px, 3vw, 16px);
   font-weight: 600;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
   font-family: var(--font);
+  touch-action: manipulation;
 }
 
 .btn-primary {
@@ -1164,23 +1169,37 @@ body {
 }
 
 .starter-header h2 {
-  font-size: 32px;
+  font-size: clamp(24px, 6vw, 32px);
   margin: 0 0 8px 0;
 }
 
 .starter-header p {
   color: var(--muted);
   margin: 0;
-  font-size: 14px;
+  font-size: clamp(12px, 3vw, 14px);
 }
 
 .starter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 24px;
+  grid-template-columns: 1fr;
+  gap: 20px;
   max-width: 1200px;
   margin: 0 auto 40px;
   flex: 1;
+  width: 100%;
+}
+
+@media (min-width: 600px) {
+  .starter-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+}
+
+@media (min-width: 1000px) {
+  .starter-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .starter-card {
@@ -1201,6 +1220,12 @@ body {
   background: #1a202c;
 }
 
+.starter-card:active {
+  border-color: var(--accent);
+  background: #1a202c;
+  transform: scale(0.98);
+}
+
 .starter-card canvas {
   width: 100%;
   height: auto;
@@ -1209,27 +1234,35 @@ body {
 
 .starter-details {
   position: fixed;
-  right: 20px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 320px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border-top: 1px solid var(--line);
+  border-radius: 12px 12px 0 0;
   padding: 20px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
   z-index: 1000;
-  max-height: 80vh;
+  max-height: 70vh;
   overflow-y: auto;
+  box-shadow: 0 -2px 16px rgb(0 0 0 / 0.3);
 }
 
-@media (max-width: 768px) {
+@media (min-width: 768px) {
   .starter-details {
-    width: calc(100% - 40px);
-    position: absolute;
-    top: auto;
-    bottom: 20px;
+    position: fixed;
     right: 20px;
-    transform: none;
+    top: 50%;
+    left: auto;
+    bottom: auto;
+    width: 320px;
+    border-radius: 8px;
+    border-top: 1px solid var(--line);
+    padding: 20px;
+    transform: translateY(-50%);
+    max-height: 80vh;
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.3);
   }
 }
 
@@ -1241,13 +1274,13 @@ body {
 
 .detail-header h3 {
   margin: 0 0 4px 0;
-  font-size: 20px;
+  font-size: clamp(16px, 4vw, 20px);
 }
 
 .detail-style {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: clamp(10px, 2.5vw, 12px);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
