@@ -119,10 +119,13 @@ export function rollMoment(rng: Rng, style: RunningStyle): Moment {
  * generations of breeding work pay off visibly at the moment a foal is born.
  */
 export function rollTraits(rng: Rng, legacy = 0, pool: TraitId[] = RACING_TRAIT_IDS): TraitId[] {
-  const bonus = Math.min(0.45, legacy / 200);
   let count = 2;
-  if (rng.chance(0.22 + bonus)) count = 3;
-  if (count === 3 && rng.chance(0.06 + bonus * 0.4)) count = 4;
+  // Starters (legacy=0) always have exactly 2 traits. Bred horses can get 3 or 4.
+  if (legacy > 0) {
+    const bonus = Math.min(0.45, legacy / 200);
+    if (rng.chance(0.22 + bonus)) count = 3;
+    if (count === 3 && rng.chance(0.06 + bonus * 0.4)) count = 4;
+  }
 
   const chosen: TraitId[] = [];
   const available = rng.shuffle(pool);
