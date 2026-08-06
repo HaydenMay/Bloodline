@@ -5,6 +5,7 @@ import type { Horse } from '../sim/types.js';
 import { createSurface, startLoop, type Loop } from '../render/canvas.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
 import { hashId, RIVAL_SILKS, type Silks } from '../render/palette.js';
+import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { TRAITS } from '../data/traits.js';
 
 /**
@@ -125,7 +126,7 @@ export function mountStarterSelection(
           <span class="stat-value">${Math.round(horse.stats.temper)}</span>
         </div>
         <div class="stat-shield">
-          <img src="/src/assets/shield-badge.png" alt="Shield" class="shield-img" />
+          <img id="shield-badge" alt="Shield" class="shield-img" />
         </div>
       </div>
       <div class="sc-traits">
@@ -141,6 +142,12 @@ export function mountStarterSelection(
         <div class="trait-desc" id="trait-desc" hidden></div>
       </div>
     `;
+
+    // Load the shield badge with the horse's coat and silks
+    const shieldImg = infoEl.querySelector<HTMLImageElement>('#shield-badge')!;
+    void getBadgeDataUri({ coat: horse.coat, silks: silksFor.get(horse.id)! }).then((uri) => {
+      if (uri) shieldImg.src = uri;
+    });
 
     const traitDesc = infoEl.querySelector<HTMLDivElement>('#trait-desc')!;
     const traitTags = infoEl.querySelectorAll<HTMLButtonElement>('.trait-tag');
