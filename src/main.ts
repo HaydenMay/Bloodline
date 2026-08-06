@@ -18,6 +18,7 @@ import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } fr
 import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
+import { DEFAULTS } from './data/colors.js';
 
 /**
  * Phase 2 harness screen.
@@ -97,7 +98,7 @@ function startRace(seed: string): void {
   app.appendChild(bar);
 
   // Check for color overrides from demo mode
-  let playerSilks = { primary: '#A8DADC', secondary: '#12222B' };
+  let playerSilks = DEFAULTS.demoSilksDefault;
 
   const colorOverride = sessionStorage.getItem('color-override');
   if (colorOverride) {
@@ -107,8 +108,8 @@ function startRace(seed: string): void {
       // is the breeches and collar. Mane and points travel with the coat, not
       // with the silks, so they are not carried here.
       playerSilks = {
-        primary: colors.silksColor || '#A8DADC',
-        secondary: colors.trimColor || colors.maneColor || '#12222B',
+        primary: colors.silksColor || DEFAULTS.demoSilksDefault.primary,
+        secondary: colors.trimColor || colors.maneColor || DEFAULTS.demoSilksDefault.secondary,
       };
       sessionStorage.removeItem('color-override');
     } catch {

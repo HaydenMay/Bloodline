@@ -150,5 +150,7 @@ export const HORSE = {
  */
 export const DEFAULTS = {
   playerSilksDefault: { primary: '#1a1a2e', secondary: '#e94560' },
+  demoSilksDefault: { primary: '#A8DADC', secondary: '#12222B' },
+  stableColorsDefault: { primary: '#1F6FB2', secondary: '#F2C14E' },
   badgeAccentColor: '#6B8FA3',
 } as const;

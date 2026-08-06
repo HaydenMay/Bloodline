@@ -12,6 +12,8 @@
  *  - Migrations run forwards only, one step at a time, and must be pure.
  */
 
+import { DEFAULTS } from '../data/colors.js';
+
 /** Bump this whenever the shape of StableSave changes. */
 export const CURRENT_VERSION = 1;
 
@@ -78,7 +80,7 @@ export const defaultSettings = (): SaveSettings => ({
 export const createStable = (stableName: string, seed: string): StableSave => ({
   seed,
   stableName,
-  stableColours: { primary: '#1F6FB2', secondary: '#F2C14E' },
+  stableColours: DEFAULTS.stableColorsDefault,
   createdAt: new Date().toISOString(),
   cash: 0,
   reputation: 0,
