@@ -23,10 +23,10 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
 
 /**
  * Load a frame sequence (e.g., "east-run" with 8 frames: frame_000.png ... frame_007.png)
+ * Sequence name maps to src/assets/horse-positions/{name}/ directory.
  */
 export async function loadFrameSequence(
   name: string,
-  basePath: string,
   frameCount: number,
 ): Promise<FrameSequence> {
   const cached = sequences.get(name);
@@ -39,7 +39,10 @@ export async function loadFrameSequence(
     const frames: HTMLImageElement[] = [];
     for (let i = 0; i < frameCount; i++) {
       const padded = String(i).padStart(3, '0');
-      const src = `${basePath}frame_${padded}.png`;
+      const src = new URL(
+        `../assets/horse-positions/${name}/frame_${padded}.png`,
+        import.meta.url,
+      ).href;
       frames.push(await loadImage(src));
     }
     const sequence: FrameSequence = { name, frames };

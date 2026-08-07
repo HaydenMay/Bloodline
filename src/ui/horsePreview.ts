@@ -2,6 +2,7 @@ import { createSurface, startLoop } from '../render/canvas.js';
 import { drawHorse, drawHorseShadow } from '../render/horse.js';
 import { COAT_IDS, coatFor, RIVAL_SILKS, UI } from '../render/palette.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
+import { loadFrameSequence, drawFrame } from '../render/frameAnimation.js';
 
 /**
  * Horse preview.
@@ -18,6 +19,13 @@ export function mountHorsePreview(host: HTMLElement): () => void {
   // Fire and forget: frames draw as soon as the sheet is decoded, and the drawn
   // rig carries the view until then.
   void loadSprites();
+
+  // Load frame sequences
+  let eastRunSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null = null;
+  let southwestIdleSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null = null;
+  void loadFrameSequence('east-run', 8).then((seq) => { eastRunSequence = seq; });
+  void loadFrameSequence('southwest-idle', 9).then((seq) => { southwestIdleSequence = seq; });
+
   let time = 0;
   let animate = true;
 
@@ -100,6 +108,38 @@ export function mountHorsePreview(host: HTMLElement): () => void {
         ctx.textAlign = 'center';
         ctx.fillText(coatFor(id).name, x, spriteY + 16);
       });
+
+      // ---- Frame animations: East Run ----------------------------------------
+      if (eastRunSequence) {
+        const frameY = spriteY + 80;
+        label('FRAMES — east-run (gallop)', frameY - 58);
+        rule(frameY);
+
+        const fw = width / 8;
+        for (let i = 0; i < 8; i++) {
+          const x = fw * (i + 0.5);
+          drawFrame(ctx, x, frameY, eastRunSequence, {
+            phase: i / 8,
+            scale: Math.min(3.0, fw / 50),
+          });
+        }
+      }
+
+      // ---- Frame animations: Southwest Idle ----------------------------------
+      if (southwestIdleSequence) {
+        const frameY = spriteY + 160;
+        label('FRAMES — southwest-idle (standing)', frameY - 58);
+        rule(frameY);
+
+        const fw = width / 9;
+        for (let i = 0; i < 9; i++) {
+          const x = fw * (i + 0.5);
+          drawFrame(ctx, x, frameY, southwestIdleSequence, {
+            phase: i / 9,
+            scale: Math.min(3.0, fw / 50),
+          });
+        }
+      }
 
       // ---- Coats, at the top and clickable ---------------------------------
       const coatY = spriteY + 130;
