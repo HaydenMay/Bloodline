@@ -6,6 +6,7 @@ import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
 import type { RunnerSnapshot } from './sim/race/engine.js';
 import { attachInfoBox } from './ui/infoBox.js';
 import { mountRaceScreen } from './ui/raceScreen.js';
+import { mountRaceIntro, type RaceIntroConfig } from './ui/raceIntro.js';
 import { mountHorsePreview } from './ui/horsePreview.js';
 import { mountSilksDemo } from './ui/silksDemo.js';
 import { mountRoadmap } from './ui/roadmap.js';
@@ -72,81 +73,107 @@ function startRace(seed: string): void {
   stage.className = 'stage';
   app.appendChild(stage);
 
-  const bar = document.createElement('div');
-  bar.className = 'racebar';
+  // Show race intro first
+  let introTeardown: (() => void) | null = null;
+  let raceScreenTeardown: (() => void) | null = null;
 
-  // No moment WINDOW is drawn any more: Moment selects a pace-curve shape, not
-  // a window (REBUILD.md §6), so there is nothing to mark on a timeline. What
-  // the player needs instead is what trip the horse wants.
-  bar.innerHTML = `
-    <div class="rb-horse">
-      <span class="rb-name">${player.name}</span>
-      <span class="rb-style">${styleLabel(player.style)} · ${momentLabel(player.moment)}</span>
-    </div>
-    <div class="rb-moment">
-      <span class="rb-moment-label">Preferred length</span>
-      <span class="rb-pref">${player.preferredDistance.min}–${player.preferredDistance.max} m</span>
-    </div>
-    <div class="rb-controls">
-      <label class="rb-autopilot">
-        <input type="checkbox" id="autopilot-toggle" ${autopilot ? 'checked' : ''}>
-        <span>Autopilot</span>
-      </label>
-    </div>
-    <div class="rb-hint" id="rb-hint-text">Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b></div>
-    <button class="rb-again">New race</button>
-  `;
-  app.appendChild(bar);
+  const showRaceScreen = (): void => {
+    introTeardown?.();
+    app.innerHTML = '';
 
-  // Check for color overrides from demo mode
-  let playerSilks = DEFAULTS.demoSilksDefault;
+    const newStage = document.createElement('div');
+    newStage.className = 'stage';
+    app.appendChild(newStage);
 
-  const colorOverride = sessionStorage.getItem('color-override');
-  if (colorOverride) {
-    try {
-      const colors = JSON.parse(colorOverride);
-      // The demo's silks pair: primary is the jockey and the shield, secondary
-      // is the breeches and collar. Mane and points travel with the coat, not
-      // with the silks, so they are not carried here.
-      playerSilks = {
-        primary: colors.silksColor || DEFAULTS.demoSilksDefault.primary,
-        secondary: colors.trimColor || colors.maneColor || DEFAULTS.demoSilksDefault.secondary,
-      };
-      sessionStorage.removeItem('color-override');
-    } catch {
-      // Ignore invalid JSON
+    const bar = document.createElement('div');
+    bar.className = 'racebar';
+
+    // No moment WINDOW is drawn any more: Moment selects a pace-curve shape, not
+    // a window (REBUILD.md §6), so there is nothing to mark on a timeline. What
+    // the player needs instead is what trip the horse wants.
+    bar.innerHTML = `
+      <div class="rb-horse">
+        <span class="rb-name">${player.name}</span>
+        <span class="rb-style">${styleLabel(player.style)} · ${momentLabel(player.moment)}</span>
+      </div>
+      <div class="rb-moment">
+        <span class="rb-moment-label">Preferred length</span>
+        <span class="rb-pref">${player.preferredDistance.min}–${player.preferredDistance.max} m</span>
+      </div>
+      <div class="rb-controls">
+        <label class="rb-autopilot">
+          <input type="checkbox" id="autopilot-toggle" ${autopilot ? 'checked' : ''}>
+          <span>Autopilot</span>
+        </label>
+      </div>
+      <div class="rb-hint" id="rb-hint-text">Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b></div>
+      <button class="rb-again">New race</button>
+    `;
+    app.appendChild(bar);
+
+    // Check for color overrides from demo mode
+    let playerSilks = DEFAULTS.demoSilksDefault;
+
+    const colorOverride = sessionStorage.getItem('color-override');
+    if (colorOverride) {
+      try {
+        const colors = JSON.parse(colorOverride);
+        // The demo's silks pair: primary is the jockey and the shield, secondary
+        // is the breeches and collar. Mane and points travel with the coat, not
+        // with the silks, so they are not carried here.
+        playerSilks = {
+          primary: colors.silksColor || DEFAULTS.demoSilksDefault.primary,
+          secondary: colors.trimColor || colors.maneColor || DEFAULTS.demoSilksDefault.secondary,
+        };
+        sessionStorage.removeItem('color-override');
+      } catch {
+        // Ignore invalid JSON
+      }
     }
-  }
 
-  attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks);
+    attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks);
 
-  const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
-  const hintText = bar.querySelector<HTMLElement>('#rb-hint-text')!;
+    const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
+    const hintText = bar.querySelector<HTMLElement>('#rb-hint-text')!;
 
-  autopilotToggle.addEventListener('change', (e) => {
-    autopilot = (e.target as HTMLInputElement).checked;
-    hintText.innerHTML = autopilot
-      ? 'Watch the race · autopilot is on'
-      : 'Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b>';
-  });
+    autopilotToggle.addEventListener('change', (e) => {
+      autopilot = (e.target as HTMLInputElement).checked;
+      hintText.innerHTML = autopilot
+        ? 'Watch the race · autopilot is on'
+        : 'Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b>';
+    });
 
-  bar.querySelector('.rb-again')!.addEventListener('click', (e) => {
-    e.stopPropagation();
-    startRace(`race-${Math.floor(Math.random() * 1e9)}`);
-  });
+    bar.querySelector('.rb-again')!.addEventListener('click', (e) => {
+      e.stopPropagation();
+      startRace(`race-${Math.floor(Math.random() * 1e9)}`);
+    });
 
-  teardown = mountRaceScreen({
-    host: stage,
-    field,
-    playerHorseId: playerId,
-    playerSilks,
-    config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
-    autopilotToggle,
-    onRaceStart: () => {
-      // Lock autopilot once race starts — can't change during race
-      autopilotToggle.disabled = true;
-    },
-  });
+    raceScreenTeardown = mountRaceScreen({
+      host: newStage,
+      field,
+      playerHorseId: playerId,
+      playerSilks,
+      config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
+      autopilotToggle,
+      onRaceStart: () => {
+        // Lock autopilot once race starts — can't change during race
+        autopilotToggle.disabled = true;
+      },
+    });
+  };
+
+  const introConfig: RaceIntroConfig = {
+    distance: RACE_METRES,
+    going: 'good',
+    fieldSize: field.length,
+    prize: 1000,
+  };
+
+  introTeardown = mountRaceIntro(stage, introConfig, showRaceScreen);
+  teardown = () => {
+    introTeardown?.();
+    raceScreenTeardown?.();
+  };
 }
 
 function momentLabel(moment: string): string {
@@ -396,168 +423,189 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
   app.appendChild(dossierContainer);
 
   let dossierTeardown: (() => void) | null = null;
+  let introTeardown: (() => void) | null = null;
   let raceScreenTeardown: (() => void) | null = null;
 
   const startRaceScreen = () => {
     dossierTeardown?.();
     app.innerHTML = '';
 
-    const stage = document.createElement('div');
-    stage.className = 'stage';
-    app.appendChild(stage);
+    // Show race intro first
+    const introStage = document.createElement('div');
+    introStage.className = 'stage';
+    app.appendChild(introStage);
 
-    const bar = document.createElement('div');
-    bar.className = 'racebar';
-
-    bar.innerHTML = `
-      <div class="rb-horse">
-        <span class="rb-name">${player.name}</span>
-        <span class="rb-style">${styleLabel(player.style)} · ${momentLabel(player.moment)}</span>
-      </div>
-      <div class="rb-moment">
-        <span class="rb-moment-label">Preferred length</span>
-        <span class="rb-pref">${player.preferredDistance.min}–${player.preferredDistance.max} m</span>
-      </div>
-      <div class="rb-controls">
-        <label class="rb-autopilot">
-          <input type="checkbox" id="autopilot-toggle">
-          Autopilot
-        </label>
-      </div>
-      <div class="rb-callout" id="callout"></div>
-    `;
-    app.appendChild(bar);
-
-    // Attach infobox to player horse name
-    const playerHorseNameEl = bar.querySelector<HTMLElement>('.rb-horse')!;
-    const infoBoxCleanup = attachInfoBox(playerHorseNameEl, player, career.playerSilks);
-
-    const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
-    const hintText = bar.querySelector<HTMLDivElement>('.rb-callout')!;
-
-    hintText.innerHTML = 'Tap or hold spacebar to kick · hold tap to take a pull';
-
-    autopilotToggle.addEventListener('change', (e) => {
-      hintText.innerHTML = (e.target as HTMLInputElement).checked
-        ? 'Watch the race · autopilot is on'
-        : 'Tap or hold spacebar to kick · hold tap to take a pull';
-    });
-
-    // Generate silks for all horses in the field
-    const silksMap = new Map<string, Silks>();
-    const taken = new Set<number>();
-
-    silksMap.set(player.id, career.playerSilks);
-
-    // Reserve player's silks slot so rivals can't use it
-    const playerSilksSlot = RIVAL_SILKS.findIndex(
-      (s) => s.primary === career.playerSilks.primary && s.secondary === career.playerSilks.secondary,
-    );
-    if (playerSilksSlot !== -1) {
-      taken.add(playerSilksSlot);
-    }
-
-    for (const horse of field) {
-      if (horse.id === player.id) continue;
-      let slot = hashId(horse.id) % RIVAL_SILKS.length;
-      while (taken.has(slot)) slot = (slot + 1) % RIVAL_SILKS.length;
-      taken.add(slot);
-      silksMap.set(horse.id, RIVAL_SILKS[slot]!);
-    }
-
-    const onFinish = (placings: RunnerSnapshot[]): void => {
-      raceScreenTeardown?.();
+    const showActualRaceScreen = () => {
+      introTeardown?.();
       app.innerHTML = '';
 
-      // Update career stats based on race result
-      const playerIndex = placings.findIndex((p) => p.id === player.id);
-      const updatedCareer = { ...career };
+      const stage = document.createElement('div');
+      stage.className = 'stage';
+      app.appendChild(stage);
 
-      // Update rival records in stable
-      for (let i = 0; i < placings.length; i++) {
-        const placing = placings[i];
-        if (!placing || placing.id === player.id) continue;
+      const bar = document.createElement('div');
+      bar.className = 'racebar';
 
-        const rival = updatedCareer.stable.world.find((h) => h.id === placing.id);
-        if (rival) {
-          rival.starts += 1;
-          if (i === 0) rival.wins += 1;
-          if (i === 1 || i === 2) rival.places += 1;
-          if (i === 3) rival.shows += 1;
-        }
+      bar.innerHTML = `
+        <div class="rb-horse">
+          <span class="rb-name">${player.name}</span>
+          <span class="rb-style">${styleLabel(player.style)} · ${momentLabel(player.moment)}</span>
+        </div>
+        <div class="rb-moment">
+          <span class="rb-moment-label">Preferred length</span>
+          <span class="rb-pref">${player.preferredDistance.min}–${player.preferredDistance.max} m</span>
+        </div>
+        <div class="rb-controls">
+          <label class="rb-autopilot">
+            <input type="checkbox" id="autopilot-toggle">
+            Autopilot
+          </label>
+        </div>
+        <div class="rb-callout" id="callout"></div>
+      `;
+      app.appendChild(bar);
 
-        // Also track in dossier
-        if (!updatedCareer.stable.dossier[placing.id]) {
-          updatedCareer.stable.dossier[placing.id] = {
-            wins: 0,
-            places: 0,
-            shows: 0,
-            starts: 0,
-            division: rival?.division || 'maiden',
-            lastSeen: updatedCareer.week,
-          };
-        }
-        const entry = updatedCareer.stable.dossier[placing.id];
-        if (entry) {
-          entry.starts += 1;
-          if (i === 0) entry.wins += 1;
-          if (i === 1 || i === 2) entry.places += 1;
-          if (i === 3) entry.shows += 1;
-          entry.lastSeen = updatedCareer.week;
-        }
+      // Attach infobox to player horse name
+      const playerHorseNameEl = bar.querySelector<HTMLElement>('.rb-horse')!;
+      const infoBoxCleanup = attachInfoBox(playerHorseNameEl, player, career.playerSilks);
+
+      const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
+      const hintText = bar.querySelector<HTMLDivElement>('.rb-callout')!;
+
+      hintText.innerHTML = 'Tap or hold spacebar to kick · hold tap to take a pull';
+
+      autopilotToggle.addEventListener('change', (e) => {
+        hintText.innerHTML = (e.target as HTMLInputElement).checked
+          ? 'Watch the race · autopilot is on'
+          : 'Tap or hold spacebar to kick · hold tap to take a pull';
+      });
+
+      // Generate silks for all horses in the field
+      const silksMap = new Map<string, Silks>();
+      const taken = new Set<number>();
+
+      silksMap.set(player.id, career.playerSilks);
+
+      // Reserve player's silks slot so rivals can't use it
+      const playerSilksSlot = RIVAL_SILKS.findIndex(
+        (s) => s.primary === career.playerSilks.primary && s.secondary === career.playerSilks.secondary,
+      );
+      if (playerSilksSlot !== -1) {
+        taken.add(playerSilksSlot);
       }
 
-      // Update player horse records
-      if (playerIndex === 0) {
-        updatedCareer.stats.wins += 1;
-        updatedCareer.stats.totalEarnings += 1000; // TODO: Dynamic earnings
-        updatedCareer.horse.wins += 1;
-      } else {
-        updatedCareer.stats.losses += 1;
+      for (const horse of field) {
+        if (horse.id === player.id) continue;
+        let slot = hashId(horse.id) % RIVAL_SILKS.length;
+        while (taken.has(slot)) slot = (slot + 1) % RIVAL_SILKS.length;
+        taken.add(slot);
+        silksMap.set(horse.id, RIVAL_SILKS[slot]!);
       }
-      updatedCareer.horse.starts += 1;
 
-      updatedCareer.stats.racesCompleted += 1;
-      updatedCareer.week += 1;
-      updatedCareer.raceSelected = false; // Clear race selection for next week
-      saveCareer(updatedCareer);
+      const onFinish = (placings: RunnerSnapshot[]): void => {
+        raceScreenTeardown?.();
+        app.innerHTML = '';
 
-      const teardownResults = mountResultsScreen(app, placings, player.id, () => {
-        infoBoxCleanup();
-        teardownResults();
-        // Check if career should end (5 races completed)
-        if (updatedCareer.stats.racesCompleted >= 5) {
-          showCareerRecap(updatedCareer);
+        // Update career stats based on race result
+        const playerIndex = placings.findIndex((p) => p.id === player.id);
+        const updatedCareer = { ...career };
+
+        // Update rival records in stable
+        for (let i = 0; i < placings.length; i++) {
+          const placing = placings[i];
+          if (!placing || placing.id === player.id) continue;
+
+          const rival = updatedCareer.stable.world.find((h) => h.id === placing.id);
+          if (rival) {
+            rival.starts += 1;
+            if (i === 0) rival.wins += 1;
+            if (i === 1 || i === 2) rival.places += 1;
+            if (i === 3) rival.shows += 1;
+          }
+
+          // Also track in dossier
+          if (!updatedCareer.stable.dossier[placing.id]) {
+            updatedCareer.stable.dossier[placing.id] = {
+              wins: 0,
+              places: 0,
+              shows: 0,
+              starts: 0,
+              division: rival?.division || 'maiden',
+              lastSeen: updatedCareer.week,
+            };
+          }
+          const entry = updatedCareer.stable.dossier[placing.id];
+          if (entry) {
+            entry.starts += 1;
+            if (i === 0) entry.wins += 1;
+            if (i === 1 || i === 2) entry.places += 1;
+            if (i === 3) entry.shows += 1;
+            entry.lastSeen = updatedCareer.week;
+          }
+        }
+
+        // Update player horse records
+        if (playerIndex === 0) {
+          updatedCareer.stats.wins += 1;
+          updatedCareer.stats.totalEarnings += 1000; // TODO: Dynamic earnings
+          updatedCareer.horse.wins += 1;
         } else {
-          // Loop back to training instead of main menu
-          showTrainingScreen(updatedCareer);
+          updatedCareer.stats.losses += 1;
         }
-      }, field, silksMap);
+        updatedCareer.horse.starts += 1;
+
+        updatedCareer.stats.racesCompleted += 1;
+        updatedCareer.week += 1;
+        updatedCareer.raceSelected = false; // Clear race selection for next week
+        saveCareer(updatedCareer);
+
+        const teardownResults = mountResultsScreen(app, placings, player.id, () => {
+          infoBoxCleanup();
+          teardownResults();
+          // Check if career should end (5 races completed)
+          if (updatedCareer.stats.racesCompleted >= 5) {
+            showCareerRecap(updatedCareer);
+          } else {
+            // Loop back to training instead of main menu
+            showTrainingScreen(updatedCareer);
+          }
+        }, field, silksMap);
+      };
+
+      raceScreenTeardown = mountRaceScreen({
+        host: stage,
+        field,
+        playerHorseId: player.id,
+        playerSilks: career.playerSilks,
+        config: {
+          seed: 'race-' + Date.now(),
+          metres: raceDistance,
+          going: raceGoing,
+          hype: raceHype,
+        },
+        autopilotToggle,
+        onRaceStart: () => {
+          autopilotToggle.disabled = true;
+        },
+        onFinish,
+      });
     };
 
-    raceScreenTeardown = mountRaceScreen({
-      host: stage,
-      field,
-      playerHorseId: player.id,
-      playerSilks: career.playerSilks,
-      config: {
-        seed: 'race-' + Date.now(),
-        metres: raceDistance,
-        going: raceGoing,
-        hype: raceHype,
-      },
-      autopilotToggle,
-      onRaceStart: () => {
-        autopilotToggle.disabled = true;
-      },
-      onFinish,
-    });
+    // Mount intro before race screen
+    const introConfig: RaceIntroConfig = {
+      distance: raceDistance,
+      going: raceGoing,
+      fieldSize: field.length,
+      prize: 1000,
+    };
+    introTeardown = mountRaceIntro(introStage, introConfig, showActualRaceScreen);
   };
 
   // Show dossier first, then race screen
   dossierTeardown = mountDossierScreen(dossierContainer, field, player, career.stable.dossier, startRaceScreen);
   teardown = () => {
     dossierTeardown?.();
+    introTeardown?.();
     raceScreenTeardown?.();
   };
 }
