@@ -29,6 +29,7 @@ export function mountRaceIntro(
 
   // Canvas for blurred track background
   const surface = createSurface(container);
+  surface.canvas.className = 'race-intro-canvas';
   surface.canvas.style.filter = 'blur(8px)';
   surface.canvas.style.position = 'absolute';
   surface.canvas.style.top = '0';
@@ -93,6 +94,9 @@ export function mountRaceIntro(
   const onClick = (): void => {
     if (clicked) return;
     clicked = true;
+
+    // Unfade the background (reduce blur)
+    surface.canvas.classList.add('unfade');
 
     // Fade out intro details
     content.classList.add('fade-out');
