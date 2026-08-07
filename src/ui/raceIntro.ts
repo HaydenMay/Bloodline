@@ -1,15 +1,9 @@
-import type { Horse } from '../sim/types.js';
-import type { Silks } from '../render/palette.js';
-import { drawHorse, type HorsePose } from '../render/horse.js';
-
 export interface RaceIntroConfig {
   name: string;
   distance: number;
   going: string;
   fieldSize: number;
   prize: number;
-  playerHorse?: Horse;
-  playerSilks?: Silks;
 }
 
 /**
@@ -19,6 +13,10 @@ export interface RaceIntroConfig {
  * animation. Auto-advances after 2.5 seconds or on tap/click.
  *
  * Returns a teardown function.
+ *
+ * NOTE: drawHorse() is deprecated for now — the vectorized rig doesn't render
+ * well at small scales or as watermarks. Consider sprite-based horse visuals
+ * or alternative background treatments for Phase 6 visual polish.
  */
 export function mountRaceIntro(
   host: HTMLElement,
@@ -27,33 +25,6 @@ export function mountRaceIntro(
 ): () => void {
   const container = document.createElement('div');
   container.className = 'race-intro';
-
-  // Add horse canvas if we have a player horse
-  if (config.playerHorse && config.playerSilks) {
-    const canvas = document.createElement('canvas');
-    canvas.className = 'race-intro-horse-canvas';
-    canvas.width = 300;
-    canvas.height = 300;
-    container.appendChild(canvas);
-
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      // Draw horse in relaxed standing pose
-      const pose: HorsePose = {
-        phase: 0.25, // Standing position
-        intensity: 0,
-        drive: 0,
-      };
-
-      drawHorse(ctx, 150, 180, {
-        coat: config.playerHorse.coat,
-        silks: config.playerSilks,
-        pose,
-        scale: 1.2,
-        faded: true,
-      });
-    }
-  }
 
   const content = document.createElement('div');
   content.className = 'race-intro-content';

@@ -568,14 +568,6 @@ body {
   letter-spacing: 0.3px;
 }
 
-.race-intro-horse-canvas {
-  position: absolute;
-  bottom: -40px;
-  right: -60px;
-  opacity: 0.12;
-  pointer-events: none;
-}
-
 @keyframes fadeIn {
   from {
     opacity: 0;

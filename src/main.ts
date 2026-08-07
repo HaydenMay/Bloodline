@@ -164,8 +164,6 @@ function startRace(seed: string): void {
     going: 'good',
     fieldSize: field.length,
     prize: 1000,
-    playerHorse: player,
-    playerSilks,
   };
 
   introTeardown = mountRaceIntro(stage, introConfig, showRaceScreen);
@@ -598,8 +596,6 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
       going: raceGoing,
       fieldSize: field.length,
       prize: 1000,
-      playerHorse: player,
-      playerSilks: career.playerSilks,
     };
     introTeardown = mountRaceIntro(introStage, introConfig, showActualRaceScreen);
   };
