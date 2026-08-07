@@ -17,6 +17,7 @@ import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
+import { mountPreRaceScreen } from './ui/preRaceScreen.js';
 import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
@@ -414,11 +415,7 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
   teardown?.();
   app.innerHTML = '';
 
-  // Show dossier screen first
-  const dossierContainer = document.createElement('div');
-  dossierContainer.className = 'stage';
-  app.appendChild(dossierContainer);
-
+  let preRaceTeardown: (() => void) | null = null;
   let dossierTeardown: (() => void) | null = null;
   let introTeardown: (() => void) | null = null;
   let raceScreenTeardown: (() => void) | null = null;
@@ -600,9 +597,28 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
     introTeardown = mountRaceIntro(introStage, introConfig, showActualRaceScreen);
   };
 
-  // Show dossier first, then race screen
-  dossierTeardown = mountDossierScreen(dossierContainer, field, player, career.stable.dossier, startRaceScreen);
+  // Pre-race screen with two options
+  preRaceTeardown = mountPreRaceScreen(app,
+    () => {
+      // Show Opponents: display dossier first
+      preRaceTeardown?.();
+      app.innerHTML = '';
+
+      const dossierContainer = document.createElement('div');
+      dossierContainer.className = 'stage';
+      app.appendChild(dossierContainer);
+
+      dossierTeardown = mountDossierScreen(dossierContainer, field, player, career.stable.dossier, startRaceScreen);
+    },
+    () => {
+      // Go to Race: skip dossier, go straight to intro
+      preRaceTeardown?.();
+      startRaceScreen();
+    }
+  );
+
   teardown = () => {
+    preRaceTeardown?.();
     dossierTeardown?.();
     introTeardown?.();
     raceScreenTeardown?.();
