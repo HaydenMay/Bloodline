@@ -565,19 +565,37 @@ body {
 
 /* --- Info box ----------------------------------------------------------- */
 
-.info-box {
+.info-box-popover {
   position: fixed;
   z-index: 950;
-  width: min(290px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.info-box-content {
+  width: min(260px, calc(100vw - 32px));
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 13px;
-  padding: 14px 16px;
-  box-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
   font-family: var(--font);
-  pointer-events: none;
   max-height: 80vh;
   overflow-y: auto;
+  position: relative;
+}
+
+.info-box-content::after {
+  content: '';
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid var(--panel);
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  filter: drop-shadow(-1px 0 0 var(--line));
 }
 
 .ib-head {
@@ -784,20 +802,24 @@ body {
 }
 
 /* Pinned info box — click the name to keep it open */
-.info-box.is-pinned {
+.info-box-popover.is-pinned {
+  pointer-events: auto;
+}
+
+.info-box-popover.is-pinned .info-box-content {
   border-color: var(--accent);
   box-shadow:
-    0 16px 40px rgb(0 0 0 / 0.55),
+    0 12px 32px rgb(0 0 0 / 0.55),
     0 0 0 1px rgba(242, 193, 78, 0.25);
 }
 
-.info-box.is-pinned::after {
+.info-box-popover.is-pinned .info-box-content::before {
   content: "pinned — click the name to close";
   display: block;
-  margin-top: 11px;
+  margin: 11px 0 0;
   padding-top: 9px;
   border-top: 1px solid var(--line);
-  font-size: 9.5px;
+  font-size: 9px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--accent);
@@ -843,7 +865,7 @@ body {
   }
 }
 
-.info-box.is-pinned .ib-trait:hover .ib-tip {
+.info-box-popover.is-pinned .ib-trait:hover .ib-tip {
   opacity: 1;
   visibility: visible;
 }

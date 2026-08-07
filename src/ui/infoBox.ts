@@ -134,9 +134,12 @@ export function attachInfoBox(
   silks?: Silks,
 ): () => void {
   const card = document.createElement("div");
-  card.className = "info-box";
+  card.className = "info-box-popover";
   card.hidden = true;
-  card.innerHTML = renderInfoBox(horse);
+  const content = document.createElement("div");
+  content.className = "info-box-content";
+  content.innerHTML = renderInfoBox(horse);
+  card.appendChild(content);
   document.body.appendChild(card);
 
   // Load badge asynchronously if silks provided
@@ -163,9 +166,11 @@ export function attachInfoBox(
     const r = trigger.getBoundingClientRect();
     card.hidden = false;
     const cardRect = card.getBoundingClientRect();
-    const left = Math.max(8, r.left - cardRect.width - 40);
+    const triggerCenterY = r.top + r.height / 2;
+    const left = Math.max(8, r.left - cardRect.width - 12);
+    const top = Math.max(8, triggerCenterY - cardRect.height / 2);
     card.style.left = `${left}px`;
-    card.style.top = `${Math.max(8, r.top - cardRect.height - 40)}px`;
+    card.style.top = `${top}px`;
   };
 
   // Hovering peeks; clicking PINS it open so you can read it properly without
@@ -182,7 +187,6 @@ export function attachInfoBox(
   const setPinned = (value: boolean): void => {
     pinned = value;
     card.classList.toggle("is-pinned", value);
-    card.style.pointerEvents = value ? "auto" : "none";
     if (value) place();
     else card.hidden = true;
   };
