@@ -1,4 +1,5 @@
 export interface RaceIntroConfig {
+  name: string;
   distance: number;
   going: string;
   fieldSize: number;
@@ -25,7 +26,7 @@ export function mountRaceIntro(
   content.className = 'race-intro-content';
 
   content.innerHTML = `
-    <div class="race-intro-title">Starting Race</div>
+    <div class="race-intro-title">${config.name}</div>
     <div class="race-intro-details">
       <div class="rid-row">
         <span class="rid-label">Distance</span>

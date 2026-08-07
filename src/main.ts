@@ -163,6 +163,7 @@ function startRace(seed: string): void {
   };
 
   const introConfig: RaceIntroConfig = {
+    name: 'Test Race',
     distance: RACE_METRES,
     going: 'good',
     fieldSize: field.length,
@@ -592,7 +593,9 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
     };
 
     // Mount intro before race screen
+    const raceName = race?.name || 'Unnamed Race';
     const introConfig: RaceIntroConfig = {
+      name: raceName,
       distance: raceDistance,
       going: raceGoing,
       fieldSize: field.length,
