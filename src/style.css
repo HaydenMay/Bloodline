@@ -812,8 +812,8 @@ body {
 .ib-tip {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 7px);
-  transform: translateX(-25%);
+  top: calc(100% + 7px);
+  transform: translateX(-50%);
   width: 160px;
   max-width: calc(100vw - 16px);
   max-height: 120px;
