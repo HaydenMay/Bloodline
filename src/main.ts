@@ -73,6 +73,22 @@ function startRace(seed: string): void {
   stage.className = 'stage';
   app.appendChild(stage);
 
+  // Determine player silks before showing intro
+  let playerSilks = DEFAULTS.demoSilksDefault;
+  const colorOverride = sessionStorage.getItem('color-override');
+  if (colorOverride) {
+    try {
+      const colors = JSON.parse(colorOverride);
+      playerSilks = {
+        primary: colors.silksColor || DEFAULTS.demoSilksDefault.primary,
+        secondary: colors.trimColor || colors.maneColor || DEFAULTS.demoSilksDefault.secondary,
+      };
+      sessionStorage.removeItem('color-override');
+    } catch {
+      // Ignore invalid JSON
+    }
+  }
+
   // Show race intro first
   let introTeardown: (() => void) | null = null;
   let raceScreenTeardown: (() => void) | null = null;
@@ -111,26 +127,6 @@ function startRace(seed: string): void {
     `;
     app.appendChild(bar);
 
-    // Check for color overrides from demo mode
-    let playerSilks = DEFAULTS.demoSilksDefault;
-
-    const colorOverride = sessionStorage.getItem('color-override');
-    if (colorOverride) {
-      try {
-        const colors = JSON.parse(colorOverride);
-        // The demo's silks pair: primary is the jockey and the shield, secondary
-        // is the breeches and collar. Mane and points travel with the coat, not
-        // with the silks, so they are not carried here.
-        playerSilks = {
-          primary: colors.silksColor || DEFAULTS.demoSilksDefault.primary,
-          secondary: colors.trimColor || colors.maneColor || DEFAULTS.demoSilksDefault.secondary,
-        };
-        sessionStorage.removeItem('color-override');
-      } catch {
-        // Ignore invalid JSON
-      }
-    }
-
     attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks);
 
     const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
@@ -168,6 +164,8 @@ function startRace(seed: string): void {
     going: 'good',
     fieldSize: field.length,
     prize: 1000,
+    playerHorse: player,
+    playerSilks,
   };
 
   introTeardown = mountRaceIntro(stage, introConfig, showRaceScreen);
@@ -600,6 +598,8 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
       going: raceGoing,
       fieldSize: field.length,
       prize: 1000,
+      playerHorse: player,
+      playerSilks: career.playerSilks,
     };
     introTeardown = mountRaceIntro(introStage, introConfig, showActualRaceScreen);
   };
