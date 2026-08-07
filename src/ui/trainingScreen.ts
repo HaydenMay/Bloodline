@@ -1,6 +1,8 @@
 import type { Horse } from '../sim/types.js';
 import { TRAITS } from '../data/traits.js';
 import type { TraitId } from '../data/traits.js';
+import { createSurface, startLoop } from '../render/canvas.js';
+import { loadFrameSequence, drawFrame, type DrawFrameOptions } from '../render/frameAnimation.js';
 
 export interface TrainingSession {
   id: string;
@@ -115,6 +117,9 @@ export function mountTrainingScreen(
     <div class="training-container">
       <div class="training-header">
         <h2>Training Plan — Week 1</h2>
+        <div class="horse-preview-wrapper">
+          <canvas class="horse-preview-canvas"></canvas>
+        </div>
         <div class="horse-card">
           <h3>${horse.name}</h3>
           <p class="horse-meta">Age 2 • Trainer Career</p>
@@ -172,6 +177,38 @@ export function mountTrainingScreen(
   `;
 
   container.appendChild(root);
+
+  // Set up horse preview canvas
+  const canvasWrapper = root.querySelector('.horse-preview-wrapper') as HTMLElement;
+  const surface = createSurface(canvasWrapper);
+  void loadFrameSequence('southwest-idle', 'src/assets/horse-positions/southwest-idle/', 9).then(
+    (sequence) => {
+      let time = 0;
+      const loop = startLoop(
+        30,
+        () => {
+          time += 1 / 30;
+        },
+        () => {
+          const { ctx, width, height } = surface;
+          ctx.fillStyle = '#1a1a2e';
+          ctx.fillRect(0, 0, width, height);
+
+          const phase = (time * 0.5) % 1;
+          const opts: DrawFrameOptions = {
+            phase,
+            scale: 4,
+          };
+
+          drawFrame(ctx, width / 2, height * 0.65, sequence, opts);
+        },
+      );
+
+      // Cleanup on unmount
+      const cleanup = () => loop.stop();
+      return cleanup;
+    },
+  );
 
   const trainingCards = root.querySelectorAll<HTMLButtonElement>('.training-card');
   trainingCards.forEach((card) => {

@@ -2,6 +2,7 @@ import { createSurface, startLoop, type Loop, type Surface } from '../render/can
 import { drawHorse, drawHorseShadow } from '../render/horse.js';
 import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
 import { hashId, RIVAL_SILKS, UI, type Silks } from '../render/palette.js';
+import { loadFrameSequence, drawFrame } from '../render/frameAnimation.js';
 import {
   drawBackdrop,
   drawDistanceMarkers,
@@ -121,9 +122,12 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const getAutopilot = (): boolean => autopilotToggle?.checked ?? false;
 
   const surface = createSurface(host);
-  // Decoding and tinting happen off the critical path; the rig covers the
-  // opening frames, so a race never waits on the art.
+  // Decoding happens off the critical path; the rig covers the opening frames.
   void loadSprites();
+  let frameSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null = null;
+  void loadFrameSequence('east-run', 'src/assets/horse-positions/east-run/', 8).then((seq) => {
+    frameSequence = seq;
+  });
   const input: PlayerInput = {
     takingBack: false,
     kickPending: false,
@@ -336,34 +340,34 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
       drawHorseShadow(ctx, x, y + 2, scale);
 
-      // The sprite sheet is the shipping art. The drawn rig stays behind it as
-      // the fallback for the frames before the sheet has decoded, and for the
-      // poses the sheet does not contain — standing at the gate.
-      //
-      // Crossing the wire is NOT one of those poses. Dropping the sheet at the
-      // line swapped the horse for the rig mid-stride, in the one moment the
-      // player is looking straight at it, and it read as the model resetting.
-      // A horse pulling up is still galloping, decaying to a canter — which is
-      // exactly what the sheet run at a decaying stride rate already shows.
-      const drewSprite = drawSpriteHorse(ctx, x, y, {
-        coat: r.coat,
-        silks: silksFor.get(r.id)!,
-        phase,
-        scale: scale * SPRITE_PER_RIG_UNIT,
-      });
-
-      if (!drewSprite) {
-        drawHorse(ctx, x, y, {
+      // Draw frame-based animation if loaded, otherwise fall back to sprite sheet,
+      // then procedural rig as final fallback.
+      if (frameSequence) {
+        drawFrame(ctx, x, y, frameSequence, {
+          phase,
+          scale: scale * 3.5,
+        });
+      } else {
+        const drewSprite = drawSpriteHorse(ctx, x, y, {
           coat: r.coat,
           silks: silksFor.get(r.id)!,
-          pose: {
-            phase,
-            intensity: Math.min(1, Math.max(0, (drawSpeed - 18) / 14)),
-            drive: r.finished ? 0 : r.effort,
-          },
-          scale,
-          faded: false,
+          phase,
+          scale: scale * SPRITE_PER_RIG_UNIT,
         });
+
+        if (!drewSprite) {
+          drawHorse(ctx, x, y, {
+            coat: r.coat,
+            silks: silksFor.get(r.id)!,
+            pose: {
+              phase,
+              intensity: Math.min(1, Math.max(0, (drawSpeed - 18) / 14)),
+              drive: r.finished ? 0 : r.effort,
+            },
+            scale,
+            faded: false,
+          });
+        }
       }
 
       if (isPlayer) {
