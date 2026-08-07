@@ -54,9 +54,15 @@ export function mountCarousel<T>(
   } = config;
 
   if (items.length === 0) {
-    console.error('Carousel: no items provided');
+    const msg = `Carousel: no items provided (className: ${className})`;
+    console.error(msg);
+    const errorDiv = document.createElement('div');
+    errorDiv.style.padding = '20px';
+    errorDiv.style.color = '#ff6b6b';
+    errorDiv.textContent = 'Error: No items to display in carousel';
+    host.appendChild(errorDiv);
     return {
-      teardown: () => {},
+      teardown: () => { errorDiv.remove(); },
       state: {
         currentIndex: 0,
         items: [],

@@ -13,6 +13,10 @@ export function mountDossierScreen(
 ): () => void {
   const rivals = field.filter((h) => h.id !== player.id);
 
+  if (rivals.length === 0) {
+    console.error('Dossier: no rivals in field', { fieldLength: field.length, playerID: player.id });
+  }
+
   // Map rival IDs to their silks (consistent across carousel)
   const silksFor = new Map<string, typeof RIVAL_SILKS[0]>();
   const taken = new Set<number>();
@@ -58,6 +62,8 @@ export function mountDossierScreen(
           const img = badgeWrap.querySelector('img') as HTMLImageElement;
           if (img) img.src = uri;
         }
+      }).catch((err) => {
+        console.error(`Failed to load badge for ${rival.name}:`, err);
       });
       const img = document.createElement('img');
       img.alt = 'Rival badge';
