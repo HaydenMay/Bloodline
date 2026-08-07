@@ -653,6 +653,33 @@ body {
   letter-spacing: 0.3px;
 }
 
+.race-intro-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.race-intro-btn {
+  background: rgba(242, 193, 78, 0.1);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  padding: 10px 18px;
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: none;
+}
+
+.race-intro-btn:hover {
+  background: rgba(242, 193, 78, 0.15);
+  border-color: var(--accent);
+  color: var(--accent-bright);
+}
+
 .race-intro-canvas.unfade {
   animation: unfadeCanvas 2s ease-in-out forwards;
 }

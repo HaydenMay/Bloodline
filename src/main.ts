@@ -17,7 +17,6 @@ import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
-import { mountPreRaceScreen } from './ui/preRaceScreen.js';
 import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
@@ -415,7 +414,6 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
   teardown?.();
   app.innerHTML = '';
 
-  let preRaceTeardown: (() => void) | null = null;
   let dossierTeardown: (() => void) | null = null;
   let introTeardown: (() => void) | null = null;
   let raceScreenTeardown: (() => void) | null = null;
@@ -594,31 +592,53 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
       fieldSize: field.length,
       prize: 1000,
     };
-    introTeardown = mountRaceIntro(introStage, introConfig, showActualRaceScreen);
+
+    introTeardown = mountRaceIntro(
+      introStage,
+      introConfig,
+      showActualRaceScreen,
+      {
+        field,
+        playerHorse: player,
+        dossier: career.stable.dossier,
+        onShowOpponents: (returnCallback) => {
+          // Hide intro content
+          const introContent = introStage.querySelector('.race-intro-content') as HTMLElement;
+          if (introContent) {
+            introContent.style.opacity = '0';
+            introContent.style.pointerEvents = 'none';
+          }
+
+          // Show dossier
+          const dossierContainer = document.createElement('div');
+          dossierContainer.className = 'stage';
+          app.appendChild(dossierContainer);
+
+          dossierTeardown = mountDossierScreen(
+            dossierContainer,
+            field,
+            player,
+            career.stable.dossier,
+            () => {
+              // Return to intro
+              dossierTeardown?.();
+              dossierContainer.remove();
+              if (introContent) {
+                introContent.style.opacity = '1';
+                introContent.style.pointerEvents = 'auto';
+              }
+              returnCallback();
+            }
+          );
+        },
+      }
+    );
   };
 
-  // Pre-race screen with two options
-  preRaceTeardown = mountPreRaceScreen(app,
-    () => {
-      // Show Opponents: display dossier first
-      preRaceTeardown?.();
-      app.innerHTML = '';
-
-      const dossierContainer = document.createElement('div');
-      dossierContainer.className = 'stage';
-      app.appendChild(dossierContainer);
-
-      dossierTeardown = mountDossierScreen(dossierContainer, field, player, career.stable.dossier, startRaceScreen);
-    },
-    () => {
-      // Go to Race: skip dossier, go straight to intro
-      preRaceTeardown?.();
-      startRaceScreen();
-    }
-  );
+  // Start with race intro
+  startRaceScreen();
 
   teardown = () => {
-    preRaceTeardown?.();
     dossierTeardown?.();
     introTeardown?.();
     raceScreenTeardown?.();

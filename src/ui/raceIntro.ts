@@ -1,6 +1,8 @@
 import { createSurface, startLoop, type Loop } from '../render/canvas.js';
 import { drawBackdrop } from '../render/track.js';
 import type { Camera } from '../render/track.js';
+import type { Horse } from '../sim/types.js';
+import type { RivalDossier } from './career.js';
 
 export interface RaceIntroConfig {
   name: string;
@@ -10,12 +12,19 @@ export interface RaceIntroConfig {
   prize: number;
 }
 
+export interface RaceIntroOptions {
+  field?: Horse[];
+  playerHorse?: Horse;
+  dossier?: RivalDossier;
+  onShowOpponents?: (callback: () => void) => void;
+}
+
 /**
  * Race intro screen.
  *
  * Displays race details over a blurred, panning track background with cinematic
- * atmosphere. On click: fades out details, shows "Riders....take your marks",
- * then transitions to race screen.
+ * atmosphere. Includes button to view opponents. On click: fades out details,
+ * shows "Riders....take your marks", then transitions to race screen.
  *
  * Returns a teardown function.
  */
@@ -23,6 +32,7 @@ export function mountRaceIntro(
   host: HTMLElement,
   config: RaceIntroConfig,
   onContinue: () => void,
+  options?: RaceIntroOptions,
 ): () => void {
   const container = document.createElement('div');
   container.className = 'race-intro';
@@ -62,11 +72,29 @@ export function mountRaceIntro(
         <span class="rid-value">$${config.prize.toLocaleString()}</span>
       </div>
     </div>
+    <div class="race-intro-actions">
+      ${options?.field && options?.playerHorse ? `<button class="race-intro-btn opponents-btn">View Opponents</button>` : ''}
+    </div>
     <div class="race-intro-cue">Tap to continue</div>
   `;
 
   container.appendChild(content);
   host.appendChild(container);
+
+  // Handle view opponents button
+  const opponentsBtn = content.querySelector('.opponents-btn') as HTMLButtonElement | null;
+  const onShowOpponents = options?.onShowOpponents;
+  if (opponentsBtn && onShowOpponents) {
+    opponentsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const returnToIntro = (): void => {
+        // Cleanup dossier and return focus to intro
+        content.classList.remove('fade-out');
+        content.style.opacity = '1';
+      };
+      onShowOpponents(returnToIntro);
+    });
+  }
 
   // Track background animation
   let time = 0;
@@ -91,7 +119,11 @@ export function mountRaceIntro(
   let clicked = false;
 
   // Click/tap to advance
-  const onClick = (): void => {
+  const onClick = (e: MouseEvent): void => {
+    // Don't advance if clicking on the button
+    if ((e.target as HTMLElement)?.closest('.opponents-btn')) {
+      return;
+    }
     if (clicked) return;
     clicked = true;
 
