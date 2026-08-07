@@ -14,7 +14,7 @@ export interface RaceIntroConfig {
  * Race intro screen.
  *
  * Displays race details over a blurred, panning track background with cinematic
- * atmosphere. On click: fades out details, shows "Riders...Take your marks",
+ * atmosphere. On click: fades out details, shows "Riders....take your marks",
  * then transitions to race screen.
  *
  * Returns a teardown function.
@@ -101,18 +101,18 @@ export function mountRaceIntro(
     // Fade out intro details
     content.classList.add('fade-out');
 
-    // Show "Riders....." first
+    // Show "Riders...." first
     setTimeout(() => {
       const ridersText = document.createElement('div');
       ridersText.className = 'race-intro-marker riders';
-      ridersText.textContent = 'Riders.....';
+      ridersText.textContent = 'Riders....';
       container.appendChild(ridersText);
 
-      // Then "Take your marks" slides in
+      // Then "take your marks" slides in
       setTimeout(() => {
         const marksText = document.createElement('div');
         marksText.className = 'race-intro-marker marks';
-        marksText.textContent = 'Take your marks';
+        marksText.textContent = 'take your marks';
         container.appendChild(marksText);
 
         // After all animations, continue to race
