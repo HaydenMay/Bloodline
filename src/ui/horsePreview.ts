@@ -83,15 +83,6 @@ export function mountHorsePreview(host: HTMLElement): () => void {
           });
         }
         y += 80;
-
-        // Animated version
-        label("ANIMATED:", y - 25);
-        const animX = width - 80;
-        drawFrame(ctx, animX, y - 25, eastRunSequence, {
-          phase,
-          scale: 4.5,
-        });
-        y += 20;
       }
 
       rule(y);
@@ -114,13 +105,46 @@ export function mountHorsePreview(host: HTMLElement): () => void {
           });
         }
         y += 80;
+      }
 
-        // Animated version
-        label("ANIMATED:", y - 25);
-        const animX = width - 80;
-        drawFrame(ctx, animX, y - 25, southwestIdleSequence, {
+      rule(y);
+      y += 40;
+
+      // ---- Animated sequences in boxes at the bottom ---------------------------
+      const boxHeight = 140;
+      const boxPadding = 20;
+      const boxY = y;
+      const boxW = (width - boxPadding * 3) / 2;
+
+      if (eastRunSequence) {
+        // East Run box
+        const boxX = boxPadding;
+        ctx.strokeStyle = "rgba(255,255,255,0.1)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(boxX, boxY, boxW, boxHeight);
+
+        label("EAST-RUN (animated)", boxX + 10);
+        const animX = boxX + boxW / 2;
+        const animY = boxY + boxHeight / 2;
+        drawFrame(ctx, animX, animY, eastRunSequence, {
           phase,
-          scale: 4.5,
+          scale: 5,
+        });
+      }
+
+      if (southwestIdleSequence) {
+        // Southwest Idle box
+        const boxX = boxPadding * 2 + boxW;
+        ctx.strokeStyle = "rgba(255,255,255,0.1)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(boxX, boxY, boxW, boxHeight);
+
+        label("SOUTHWEST-IDLE (animated)", boxX + 10);
+        const animX = boxX + boxW / 2;
+        const animY = boxY + boxHeight / 2;
+        drawFrame(ctx, animX, animY, southwestIdleSequence, {
+          phase,
+          scale: 5,
         });
       }
     },
