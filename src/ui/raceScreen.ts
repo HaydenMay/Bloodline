@@ -125,7 +125,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   // Decoding happens off the critical path; the rig covers the opening frames.
   void loadSprites();
   let frameSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null = null;
-  void loadFrameSequence('east-run', 'src/assets/horse-positions/east-run/', 8).then((seq) => {
+  void loadFrameSequence('east-run', 8).then((seq) => {
     frameSequence = seq;
   });
   const input: PlayerInput = {
