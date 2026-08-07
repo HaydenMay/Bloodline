@@ -506,14 +506,25 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(22, 28, 37, 0.6) 0%,
-    var(--bg) 70%
-  );
   z-index: 100;
   opacity: 0;
   animation: fadeIn 0.6s ease-out forwards;
+}
+
+.race-intro::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(22, 28, 37, 0.85) 0%,
+    rgba(14, 18, 24, 0.95) 70%
+  );
+  z-index: 2;
+  pointer-events: none;
 }
 
 .race-intro-content {
@@ -566,6 +577,64 @@ body {
   font-size: 14px;
   color: var(--muted);
   letter-spacing: 0.3px;
+}
+
+.race-intro-content.fade-out {
+  animation: fadeOut 0.4s ease-in forwards;
+}
+
+.race-intro-marker {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 56px;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: center;
+  letter-spacing: 2px;
+  z-index: 3;
+  line-height: 1.2;
+}
+
+.race-intro-marker.riders {
+  top: 35%;
+  opacity: 0;
+  animation: ridersIn 0.6s ease-out forwards;
+}
+
+.race-intro-marker.marks {
+  top: 55%;
+  opacity: 0;
+  animation: marksIn 0.7s ease-out forwards;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes ridersIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes marksIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 @keyframes fadeIn {

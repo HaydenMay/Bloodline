@@ -1,3 +1,7 @@
+import { createSurface, startLoop, type Loop } from '../render/canvas.js';
+import { drawBackdrop } from '../render/track.js';
+import type { Camera } from '../render/track.js';
+
 export interface RaceIntroConfig {
   name: string;
   distance: number;
@@ -9,14 +13,11 @@ export interface RaceIntroConfig {
 /**
  * Race intro screen.
  *
- * Displays race details (distance, going, field size, prize) with a fade-in
- * animation. Advances on tap/click so the player can appreciate the screen.
+ * Displays race details over a blurred, panning track background with cinematic
+ * atmosphere. On click: fades out details, shows "Riders...Take your marks",
+ * then transitions to race screen.
  *
  * Returns a teardown function.
- *
- * NOTE: drawHorse() is deprecated for now — the vectorized rig doesn't render
- * well at small scales or as watermarks. Consider sprite-based horse visuals
- * or alternative background treatments for Phase 6 visual polish.
  */
 export function mountRaceIntro(
   host: HTMLElement,
@@ -26,8 +27,19 @@ export function mountRaceIntro(
   const container = document.createElement('div');
   container.className = 'race-intro';
 
+  // Canvas for blurred track background
+  const surface = createSurface(container);
+  surface.canvas.style.filter = 'blur(8px)';
+  surface.canvas.style.position = 'absolute';
+  surface.canvas.style.top = '0';
+  surface.canvas.style.left = '0';
+  surface.canvas.style.zIndex = '1';
+
+  // Content overlay
   const content = document.createElement('div');
   content.className = 'race-intro-content';
+  content.style.position = 'relative';
+  content.style.zIndex = '2';
 
   content.innerHTML = `
     <div class="race-intro-title">${config.name}</div>
@@ -55,11 +67,59 @@ export function mountRaceIntro(
   container.appendChild(content);
   host.appendChild(container);
 
+  // Track background animation
+  let time = 0;
+  const camera: Camera = {
+    scrollMetres: 0,
+    pixelsPerMetre: 2,
+  };
+
+  const loop: Loop | null = startLoop(
+    30,
+    () => {
+      time += 1 / 30;
+      // Pan camera slowly across track (subtle motion)
+      camera.scrollMetres = (time * 50) % 1400;
+    },
+    () => {
+      const ctx = surface.ctx;
+      drawBackdrop(ctx, surface.canvas.width, surface.canvas.height, camera, 0.5);
+    },
+  );
+
+  let clicked = false;
+
   // Click/tap to advance
   const onClick = (): void => {
-    cleanup();
-    onContinue();
+    if (clicked) return;
+    clicked = true;
+
+    // Fade out intro details
+    content.classList.add('fade-out');
+
+    // Show "Riders....." first
+    setTimeout(() => {
+      const ridersText = document.createElement('div');
+      ridersText.className = 'race-intro-marker riders';
+      ridersText.textContent = 'Riders.....';
+      container.appendChild(ridersText);
+
+      // Then "Take your marks" slides in
+      setTimeout(() => {
+        const marksText = document.createElement('div');
+        marksText.className = 'race-intro-marker marks';
+        marksText.textContent = 'Take your marks';
+        container.appendChild(marksText);
+
+        // After all animations, continue to race
+        setTimeout(() => {
+          cleanup();
+          onContinue();
+        }, 1200);
+      }, 600);
+    }, 300);
   };
+
   container.addEventListener('click', onClick);
 
   // Trigger animation
@@ -69,6 +129,7 @@ export function mountRaceIntro(
 
   const cleanup = (): void => {
     container.removeEventListener('click', onClick);
+    loop?.stop();
     container.remove();
   };
 
