@@ -167,9 +167,22 @@ export function attachInfoBox(
     card.hidden = false;
     const cardRect = card.getBoundingClientRect();
     const triggerCenterY = r.top + r.height / 2;
-    const left = Math.max(8, r.left - cardRect.width - 12);
-    const top = Math.max(8, triggerCenterY - cardRect.height / 2);
-    card.style.left = `${left}px`;
+
+    // Try positioning to the right first (most common), then fall back to left
+    const rightPos = r.right + 12;
+    const leftPos = r.left - cardRect.width - 12;
+    const top = Math.max(8, Math.min(triggerCenterY - cardRect.height / 2, window.innerHeight - cardRect.height - 8));
+
+    if (rightPos + cardRect.width + 8 <= window.innerWidth) {
+      // Position to the right
+      card.style.left = `${rightPos}px`;
+      card.classList.remove("is-left");
+    } else {
+      // Position to the left as fallback
+      card.style.left = `${Math.max(8, leftPos)}px`;
+      card.classList.add("is-left");
+    }
+
     card.style.top = `${top}px`;
   };
 

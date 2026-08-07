@@ -587,15 +587,21 @@ body {
 .info-box-content::after {
   content: '';
   position: absolute;
-  right: -8px;
+  right: -10px;
   top: 50%;
   transform: translateY(-50%);
   width: 0;
   height: 0;
-  border-left: 8px solid var(--panel);
-  border-top: 6px solid transparent;
-  border-bottom: 6px solid transparent;
-  filter: drop-shadow(-1px 0 0 var(--line));
+  border-left: 10px solid var(--panel);
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+}
+
+.info-box-popover.is-left .info-box-content::after {
+  right: auto;
+  left: -10px;
+  border-left: none;
+  border-right: 10px solid var(--panel);
 }
 
 .ib-head {
