@@ -105,10 +105,14 @@ export function mountStarterSelection(
           )
           .join('')}
       </div>
-      <div class="trait-desc" id="trait-desc-${horse.id}" hidden></div>
     `;
 
-    const traitDesc = infoEl.querySelector<HTMLDivElement>(`#trait-desc-${horse.id}`)!;
+    // Create portal element for trait description (outside container)
+    const traitDesc = document.createElement('div');
+    traitDesc.className = 'trait-desc';
+    traitDesc.hidden = true;
+    document.body.appendChild(traitDesc);
+
     const traitTags = infoEl.querySelectorAll<HTMLButtonElement>('.trait-tag');
     traitTags.forEach((tag) => {
       tag.addEventListener('click', () => {
@@ -131,6 +135,14 @@ export function mountStarterSelection(
             ${tagsHtml}
           `;
           traitDesc.hidden = false;
+
+          // Position near the clicked tag
+          const tagRect = tag.getBoundingClientRect();
+          const descRect = traitDesc.getBoundingClientRect();
+          const top = Math.max(8, tagRect.bottom + 8);
+          const left = Math.max(8, Math.min(tagRect.left + tagRect.width / 2 - descRect.width / 2, window.innerWidth - descRect.width - 8));
+          traitDesc.style.left = `${left}px`;
+          traitDesc.style.top = `${top}px`;
         }
       });
     });
