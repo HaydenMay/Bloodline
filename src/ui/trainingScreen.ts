@@ -181,7 +181,8 @@ export function mountTrainingScreen(
   // Set up horse preview canvas
   const canvasWrapper = root.querySelector('.horse-preview-wrapper') as HTMLElement;
   const surface = createSurface(canvasWrapper);
-  void loadFrameSequence('southwest-idle', 9).then((sequence) => {
+  void loadFrameSequence('southwest-idle', 9).then(
+    (sequence) => {
       let time = 0;
       const loop = startLoop(
         30,

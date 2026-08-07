@@ -1,8 +1,8 @@
 /**
- * Frame-based animation rendering.
+ * Frame-based animation rendering using spritesheets.
  *
- * Loads individual frame images from a sequence directory and renders them
- * based on animation phase (0-1).
+ * Loads a spritesheet image and extracts frames in a 3x3 grid layout
+ * (92x92 pixels per frame, 276x276 total).
  */
 
 interface FrameSequence {
@@ -21,8 +21,57 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
     img.src = src;
   });
 
+const spritesheetNames: Record<string, string> = {
+  'east-run': 'east-run.png',
+  'southwest-idle': 'idle-horse.png',
+};
+
+const extractFramesFromSpritesheet = async (
+  spritesheet: HTMLImageElement,
+  frameCount: number,
+): Promise<HTMLImageElement[]> => {
+  const FRAME_WIDTH = 92;
+  const FRAME_HEIGHT = 92;
+  const GRID_COLS = 3;
+
+  const frames: HTMLImageElement[] = [];
+
+  for (let i = 0; i < frameCount; i++) {
+    const col = i % GRID_COLS;
+    const row = Math.floor(i / GRID_COLS);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = FRAME_WIDTH;
+    canvas.height = FRAME_HEIGHT;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.drawImage(
+      spritesheet,
+      col * FRAME_WIDTH,
+      row * FRAME_HEIGHT,
+      FRAME_WIDTH,
+      FRAME_HEIGHT,
+      0,
+      0,
+      FRAME_WIDTH,
+      FRAME_HEIGHT,
+    );
+
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const image = new Image();
+      image.onload = () => res(image);
+      image.onerror = () => rej(new Error(`Failed to create frame ${i}`));
+      image.src = canvas.toDataURL();
+    });
+
+    frames.push(img);
+  }
+
+  return frames;
+};
+
 /**
- * Load a frame sequence (e.g., "east-run" with 8 frames: frame_000.png ... frame_007.png)
+ * Load a frame sequence from a spritesheet.
  * Sequence name maps to src/assets/horse-positions/{name}/ directory.
  */
 export async function loadFrameSequence(
@@ -36,15 +85,19 @@ export async function loadFrameSequence(
   if (pending) return pending;
 
   const promise = (async () => {
-    const frames: HTMLImageElement[] = [];
-    for (let i = 0; i < frameCount; i++) {
-      const padded = String(i).padStart(3, '0');
-      const src = new URL(
-        `../assets/horse-positions/${name}/frame_${padded}.png`,
-        import.meta.url,
-      ).href;
-      frames.push(await loadImage(src));
+    const spritesheetName = spritesheetNames[name];
+    if (!spritesheetName) {
+      throw new Error(`Unknown sequence: ${name}`);
     }
+
+    const spritesheetSrc = new URL(
+      `../assets/horse-positions/${name}/${spritesheetName}`,
+      import.meta.url,
+    ).href;
+
+    const spritesheet = await loadImage(spritesheetSrc);
+    const frames = await extractFramesFromSpritesheet(spritesheet, frameCount);
+
     const sequence: FrameSequence = { name, frames };
     sequences.set(name, sequence);
     loadingPromises.delete(name);
