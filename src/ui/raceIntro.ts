@@ -10,7 +10,7 @@ export interface RaceIntroConfig {
  * Race intro screen.
  *
  * Displays race details (distance, going, field size, prize) with a fade-in
- * animation. Auto-advances after 2.5 seconds or on tap/click.
+ * animation. Advances on tap/click so the player can appreciate the screen.
  *
  * Returns a teardown function.
  *
@@ -49,17 +49,11 @@ export function mountRaceIntro(
         <span class="rid-value">$${config.prize.toLocaleString()}</span>
       </div>
     </div>
-    <div class="race-intro-cue">Tap to continue · Auto-start in 2s</div>
+    <div class="race-intro-cue">Tap to continue</div>
   `;
 
   container.appendChild(content);
   host.appendChild(container);
-
-  // Auto-advance after 2.5s
-  const timer = setTimeout(() => {
-    cleanup();
-    onContinue();
-  }, 2500);
 
   // Click/tap to advance
   const onClick = (): void => {
@@ -74,7 +68,6 @@ export function mountRaceIntro(
   });
 
   const cleanup = (): void => {
-    clearTimeout(timer);
     container.removeEventListener('click', onClick);
     container.remove();
   };
