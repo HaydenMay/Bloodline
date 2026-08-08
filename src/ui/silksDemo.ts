@@ -34,6 +34,7 @@ const TEST_SCHEME = {
   points: '#FF8000',
   silks: '#2060FF',
   trim: '#FFE81A',
+  fixed: '#00D9FF',
 };
 
 const mix = (a: string, b: string, t: number): string => {
@@ -83,11 +84,11 @@ const SILKS_COLORS = RIVAL_SILKS.map((silks, i) => ({
 }));
 
 export function mountSilksDemo(host: HTMLElement): void {
-  // FIVE INDEPENDENT COLOURS, one per tinted material in the mask. In the game
+  // SIX INDEPENDENT COLOURS, one per tinted material in the mask. In the game
   // three of them arrive together from the coat gene — a horse does not choose
   // its mane. This screen is the exception on purpose: it exists to exercise
   // the colour system, and it cannot show what the mask can do if three of its
-  // five regions are welded to one control. Picking a coat still sets all
+  // six regions are welded to one control. Picking a coat still sets all
   // three, so it behaves as a preset; then each can be moved off it.
   let selectedCoat = 'palomino';
   /** Set only by Test Colours; a coat button clears it. */
