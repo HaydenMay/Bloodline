@@ -144,14 +144,26 @@ export function mountSilksDemo(host: HTMLElement): void {
     const ctx = canvas?.getContext('2d');
     // Stops when the demo leaves the page, so the loop cannot outlive it.
     if (!canvas?.isConnected || !ctx) return;
+
+    // Set canvas resolution to match display size for crisp rendering
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+    }
+
     phase = (phase + ((now - last) / 1000) * STRIDES_PER_SECOND) % 1;
     last = now;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
 
     // Draw single horse scaled to fill the box
-    const scale = Math.min(canvas.width / 85, canvas.height / 50);
-    const x = canvas.width / 2;
-    const y = canvas.height * 0.60;
+    const displayWidth = canvas.width / dpr;
+    const displayHeight = canvas.height / dpr;
+    const scale = Math.min(displayWidth / 85, displayHeight / 50);
+    const x = displayWidth / 2;
+    const y = displayHeight * 0.60;
 
     // Southwest-idle animation, scaled up
     if (southwestIdleSequence) {
@@ -248,7 +260,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       <div class="sd-preview-container">
         <div class="sd-preview">
           <p>Horse Preview</p>
-          <canvas class="sd-horse-canvas" width="880" height="800"></canvas>
+          <canvas class="sd-horse-canvas"></canvas>
         </div>
         <div class="sd-preview">
           <p>Badge Preview</p>
