@@ -1,6 +1,7 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { drawHorseShadow } from '../render/horse.js';
 import { drawSpriteHorse, loadSprites, type Scheme } from '../render/spriteHorse.js';
+import { loadFrameSequence, drawFrame } from '../render/frameAnimation.js';
 import { COATS, INK, RIVAL_SILKS, coatFor } from '../render/palette.js';
 
 const COAT_COLORS = Object.values(COATS).map((coat) => ({
@@ -104,6 +105,16 @@ export function mountSilksDemo(host: HTMLElement): void {
     silks: { primary: selectedSilksColor, secondary: selectedTrimColor },
   };
 
+  // Load frame animations for display
+  let eastRunSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null = null;
+  let southwestIdleSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null = null;
+  void loadFrameSequence('east-run', 8).then((seq) => {
+    eastRunSequence = seq;
+  });
+  void loadFrameSequence('southwest-idle', 9).then((seq) => {
+    southwestIdleSequence = seq;
+  });
+
   const updatePreview = async () => {
     scheme = {
       coat: {
@@ -141,11 +152,31 @@ export function mountSilksDemo(host: HTMLElement): void {
     phase = (phase + ((now - last) / 1000) * STRIDES_PER_SECOND) % 1;
     last = now;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const scale = Math.min(canvas.width / 210, canvas.height / 165);
-    const x = canvas.width / 2;
+
+    // Draw three animation types side by side
+    const thirdWidth = canvas.width / 3;
+    const scale = Math.min(canvas.width / 630, canvas.height / 165);
     const y = canvas.height * 0.95;
-    drawHorseShadow(ctx, x, y + 2, scale * 1.1);
-    drawSpriteHorse(ctx, x, y, { ...scheme, phase, scale });
+
+    // Sprite horse (race sprite)
+    const spriteX = thirdWidth * 0.5;
+    drawHorseShadow(ctx, spriteX, y + 2, scale * 1.1);
+    drawSpriteHorse(ctx, spriteX, y, { ...scheme, phase, scale });
+
+    // East-run animation
+    if (eastRunSequence) {
+      const eastX = thirdWidth * 1.5;
+      drawHorseShadow(ctx, eastX, y + 2, scale * 1.1);
+      drawFrame(ctx, eastX, y, eastRunSequence, { phase, scale, scheme });
+    }
+
+    // Southwest-idle animation
+    if (southwestIdleSequence) {
+      const idleX = thirdWidth * 2.5;
+      drawHorseShadow(ctx, idleX, y + 2, scale * 1.1);
+      drawFrame(ctx, idleX, y, southwestIdleSequence, { phase, scale, scheme });
+    }
+
     requestAnimationFrame(frame);
   };
 
@@ -235,7 +266,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       <div class="sd-preview-container">
         <div class="sd-preview">
           <p>Horse Preview</p>
-          <canvas class="sd-horse-canvas" width="440" height="320"></canvas>
+          <canvas class="sd-horse-canvas" width="1320" height="320"></canvas>
         </div>
         <div class="sd-preview">
           <p>Badge Preview</p>
