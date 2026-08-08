@@ -149,9 +149,9 @@ export function mountSilksDemo(host: HTMLElement): void {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw single horse scaled to fill the box
-    const scale = Math.min(canvas.width / 120, canvas.height / 65);
+    const scale = Math.min(canvas.width / 100, canvas.height / 55);
     const x = canvas.width / 2;
-    const y = canvas.height * 0.62;
+    const y = canvas.height * 0.58;
 
     // Southwest-idle animation, scaled up
     if (southwestIdleSequence) {
@@ -248,7 +248,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       <div class="sd-preview-container">
         <div class="sd-preview">
           <p>Horse Preview</p>
-          <canvas class="sd-horse-canvas" width="880" height="320"></canvas>
+          <canvas class="sd-horse-canvas" width="880" height="600"></canvas>
         </div>
         <div class="sd-preview">
           <p>Badge Preview</p>
