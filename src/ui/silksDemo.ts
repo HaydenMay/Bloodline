@@ -1,5 +1,4 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
-import { drawHorseShadow } from '../render/horse.js';
 import { loadFrameSequence, drawFrame, type Scheme } from '../render/frameAnimation.js';
 import { COATS, INK, RIVAL_SILKS, coatFor } from '../render/palette.js';
 
