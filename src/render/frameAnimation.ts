@@ -10,7 +10,7 @@
 import type { Silks, Coat } from './palette.js';
 import { coatFor } from './palette.js';
 
-const MATERIAL = { body: 1, hair: 2, points: 3, silks: 4, trim: 5, fixed: 6 } as const;
+const MATERIAL = { body: 1, hair: 2, points: 3, silks: 4, trim: 5, fixed: 6, shine: 7 } as const;
 
 interface FrameSequence {
   name: string;
@@ -259,7 +259,7 @@ function tintFrame(
   if (!maskData || !maskData.mask) return frame;
 
   const coat = typeof scheme.coat === 'string' ? coatFor(scheme.coat) : scheme.coat;
-  const key = `frame-${frameIndex}|${coat.body}|${coat.hair}|${coat.points}|${coat.fixed}|${scheme.silks.primary}|${scheme.silks.secondary}`;
+  const key = `frame-${frameIndex}|${coat.body}|${coat.hair}|${coat.points}|${coat.fixed}|${coat.shine}|${scheme.silks.primary}|${scheme.silks.secondary}`;
 
   const cached = tintedFrameCache.get(key);
   if (cached) {
@@ -275,6 +275,7 @@ function tintFrame(
     [MATERIAL.silks]: hexToHsl(scheme.silks.primary),
     [MATERIAL.trim]: hexToHsl(scheme.silks.secondary),
     [MATERIAL.fixed]: hexToHsl(coat.fixed),
+    [MATERIAL.shine]: hexToHsl(coat.shine),
   };
 
   const ctx = scratch(92, 92);

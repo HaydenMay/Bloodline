@@ -40,6 +40,8 @@ export interface Coat {
   points: string;
   /** Borders, eyes, and other fixed features. */
   fixed: string;
+  /** Highlights and shine (e.g., eye reflections). */
+  shine: string;
 }
 
 export const COATS: Record<CoatId, Coat> = {

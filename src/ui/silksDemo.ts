@@ -35,6 +35,7 @@ const TEST_SCHEME = {
   silks: '#2060FF',
   trim: '#FFE81A',
   fixed: '#000000',
+  shine: '#FFFFFF',
 };
 
 const mix = (a: string, b: string, t: number): string => {
