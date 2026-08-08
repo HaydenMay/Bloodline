@@ -43,23 +43,46 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
     img.src = src;
   });
 
-const loadMaskData = async (maskSrc: string, width: number, height: number): Promise<MaskData> => {
+const loadMaskData = async (
+  maskSrc: string,
+  spritesheet: HTMLImageElement,
+  width: number,
+  height: number,
+): Promise<MaskData> => {
   try {
     const maskImg = await loadImage(maskSrc);
     const mctx = scratch(width, height);
     mctx.drawImage(maskImg, 0, 0);
     const maskImageData = mctx.getImageData(0, 0, width, height);
-    const maskData = maskImageData.data;
+    const maskPixels = maskImageData.data;
 
     const mask = new Uint8Array(width * height);
     for (let p = 0; p < width * height; p++) {
-      const m = Math.round(maskData[p * 4]! / 40);
+      const m = Math.round(maskPixels[p * 4]! / 40);
       mask[p] = m;
+    }
+
+    // Calculate mean luminance per material from the spritesheet
+    const bctx = scratch(width, height);
+    bctx.drawImage(spritesheet, 0, 0);
+    const baseImageData = bctx.getImageData(0, 0, width, height);
+    const basePixels = baseImageData.data;
+
+    const sum = new Float64Array(8);
+    const count = new Float64Array(8);
+    for (let p = 0; p < width * height; p++) {
+      const m = mask[p]!;
+      if (!m || m > 7 || basePixels[p * 4 + 3]! === 0) continue;
+      const r = basePixels[p * 4]!;
+      const g = basePixels[p * 4 + 1]!;
+      const b = basePixels[p * 4 + 2]!;
+      sum[m] = sum[m]! + (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
+      count[m] = count[m]! + 1;
     }
 
     const meanL = new Float64Array(8);
     for (let m = 1; m < 8; m++) {
-      meanL[m] = 0.5;
+      meanL[m] = count[m] ? sum[m]! / count[m]! : 0.5;
     }
 
     return { mask, meanL, width, height };
@@ -202,7 +225,7 @@ export async function loadFrameSequence(
 
     let maskData: MaskData | undefined;
     if (maskSrc) {
-      maskData = await loadMaskData(maskSrc, 92, 92);
+      maskData = await loadMaskData(maskSrc, spritesheet, 276, 276);
     }
 
     const sequence: FrameSequence = { name, frames, maskData };
@@ -225,11 +248,16 @@ export interface DrawFrameOptions {
   scheme?: Scheme;
 }
 
-function tintFrame(frame: HTMLImageElement, scheme: Scheme, maskData: MaskData): HTMLCanvasElement | null {
+function tintFrame(
+  frame: HTMLImageElement,
+  frameIndex: number,
+  scheme: Scheme,
+  maskData: MaskData,
+): HTMLCanvasElement | null {
   if (!maskData || !maskData.mask) return null;
 
   const coat = typeof scheme.coat === 'string' ? coatFor(scheme.coat) : scheme.coat;
-  const key = `${frame.src}|${coat.body}|${coat.hair}|${coat.points}|${scheme.silks.primary}|${scheme.silks.secondary}`;
+  const key = `frame-${frameIndex}|${coat.body}|${coat.hair}|${coat.points}|${scheme.silks.primary}|${scheme.silks.secondary}`;
 
   const cached = tintedFrameCache.get(key);
   if (cached) {
@@ -253,31 +281,42 @@ function tintFrame(frame: HTMLImageElement, scheme: Scheme, maskData: MaskData):
   const { data } = imageData;
   const { mask, meanL } = maskData;
 
-  for (let p = 0; p < 92 * 92; p++) {
-    const i = p * 4;
-    const a = data[i + 3]!;
-    out.data[i + 3] = a;
-    if (a === 0) continue;
+  // Calculate the offset of this frame in the 276x276 spritesheet (3x3 grid)
+  const col = frameIndex % 3;
+  const row = Math.floor(frameIndex / 3);
+  const offsetX = col * 92;
+  const offsetY = row * 92;
+  const maskStride = 276;
 
-    const m = mask[p]!;
-    const r = data[i]!;
-    const g = data[i + 1]!;
-    const b = data[i + 2]!;
-    const tint = target[m];
+  for (let y = 0; y < 92; y++) {
+    for (let x = 0; x < 92; x++) {
+      const p = y * 92 + x;
+      const i = p * 4;
+      const a = data[i + 3]!;
+      out.data[i + 3] = a;
+      if (a === 0) continue;
 
-    if (!tint) {
-      out.data[i] = r;
-      out.data[i + 1] = g;
-      out.data[i + 2] = b;
-      continue;
+      const maskPixel = (offsetY + y) * maskStride + (offsetX + x);
+      const m = mask[maskPixel]!;
+      const r = data[i]!;
+      const g = data[i + 1]!;
+      const b = data[i + 2]!;
+      const tint = target[m];
+
+      if (!tint) {
+        out.data[i] = r;
+        out.data[i + 1] = g;
+        out.data[i + 2] = b;
+        continue;
+      }
+
+      const l = (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
+      const lit = Math.max(0.02, Math.min(0.98, tint[2] + (l - meanL[m]!) * 0.9));
+      const [nr, ng, nb] = hslToRgb(tint[0], tint[1], lit);
+      out.data[i] = nr;
+      out.data[i + 1] = ng;
+      out.data[i + 2] = nb;
     }
-
-    const l = (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
-    const lit = Math.max(0.02, Math.min(0.98, tint[2] + (l - meanL[m]!) * 0.9));
-    const [nr, ng, nb] = hslToRgb(tint[0], tint[1], lit);
-    out.data[i] = nr;
-    out.data[i + 1] = ng;
-    out.data[i + 2] = nb;
   }
 
   ctx.putImageData(out, 0, 0);
@@ -317,7 +356,7 @@ export function drawFrame(
 
   let imageToDrawn = frame;
   if (opts.scheme && sequence.maskData) {
-    const tinted = tintFrame(frame, opts.scheme, sequence.maskData);
+    const tinted = tintFrame(frame, frameIndex, opts.scheme, sequence.maskData);
     if (tinted) {
       imageToDrawn = new Image();
       imageToDrawn.src = tinted.toDataURL();
