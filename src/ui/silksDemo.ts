@@ -161,7 +161,7 @@ export function mountSilksDemo(host: HTMLElement): void {
     // Draw single horse scaled to fill the box
     const displayWidth = canvas.width / dpr;
     const displayHeight = canvas.height / dpr;
-    const scale = Math.min(displayWidth / 85, displayHeight / 50);
+    const scale = Math.min(displayWidth / 60, displayHeight / 35);
     const x = displayWidth / 2;
     const y = displayHeight;
 
