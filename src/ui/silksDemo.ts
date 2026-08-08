@@ -34,7 +34,7 @@ const TEST_SCHEME = {
   points: '#FF8000',
   silks: '#2060FF',
   trim: '#FFE81A',
-  fixed: '#00D9FF',
+  fixed: '#000000',
 };
 
 const mix = (a: string, b: string, t: number): string => {
