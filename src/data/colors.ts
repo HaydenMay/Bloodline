@@ -91,14 +91,14 @@ export const UI = {
  * layered shapes.
  */
 export const COATS = {
-  bay: { body: '#8C5A32', hair: '#221509', points: '#2A1A0E' },
-  chestnut: { body: '#A85C2E', hair: '#C88A4E', points: '#8B4A24' },
-  black: { body: '#37312F', hair: '#191617', points: '#1F1B1B' },
-  grey: { body: '#B9B7B8', hair: '#EDECEC', points: '#6E6B6D' },
-  palomino: { body: '#C99A56', hair: '#F2E7D2', points: '#B2843F' },
-  buckskin: { body: '#C29B63', hair: '#241A11', points: '#2B2016' },
-  roan: { body: '#A97F72', hair: '#6E4A40', points: '#7A5449' },
-  darkBay: { body: '#5C3A22', hair: '#1B1210', points: '#211611' },
+  bay: { body: '#8C5A32', hair: '#221509', points: '#2A1A0E', fixed: '#000000' },
+  chestnut: { body: '#A85C2E', hair: '#C88A4E', points: '#8B4A24', fixed: '#000000' },
+  black: { body: '#37312F', hair: '#191617', points: '#1F1B1B', fixed: '#000000' },
+  grey: { body: '#B9B7B8', hair: '#EDECEC', points: '#6E6B6D', fixed: '#000000' },
+  palomino: { body: '#C99A56', hair: '#F2E7D2', points: '#B2843F', fixed: '#000000' },
+  buckskin: { body: '#C29B63', hair: '#241A11', points: '#2B2016', fixed: '#000000' },
+  roan: { body: '#A97F72', hair: '#6E4A40', points: '#7A5449', fixed: '#000000' },
+  darkBay: { body: '#5C3A22', hair: '#1B1210', points: '#211611', fixed: '#000000' },
 } as const;
 
 /**

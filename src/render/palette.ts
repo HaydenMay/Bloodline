@@ -38,6 +38,8 @@ export interface Coat {
   hair: string;
   /** Lower legs, muzzle and ear tips — the "points". */
   points: string;
+  /** Borders, eyes, and other fixed features. */
+  fixed: string;
 }
 
 export const COATS: Record<CoatId, Coat> = {

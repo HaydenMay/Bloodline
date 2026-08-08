@@ -259,7 +259,7 @@ function tintFrame(
   if (!maskData || !maskData.mask) return frame;
 
   const coat = typeof scheme.coat === 'string' ? coatFor(scheme.coat) : scheme.coat;
-  const key = `frame-${frameIndex}|${coat.body}|${coat.hair}|${coat.points}|${scheme.silks.primary}|${scheme.silks.secondary}`;
+  const key = `frame-${frameIndex}|${coat.body}|${coat.hair}|${coat.points}|${coat.fixed}|${scheme.silks.primary}|${scheme.silks.secondary}`;
 
   const cached = tintedFrameCache.get(key);
   if (cached) {
@@ -274,6 +274,7 @@ function tintFrame(
     [MATERIAL.points]: hexToHsl(coat.points),
     [MATERIAL.silks]: hexToHsl(scheme.silks.primary),
     [MATERIAL.trim]: hexToHsl(scheme.silks.secondary),
+    [MATERIAL.fixed]: hexToHsl(coat.fixed),
   };
 
   const ctx = scratch(92, 92);
