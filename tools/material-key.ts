@@ -58,7 +58,16 @@ export const MATERIAL = {
 
 export type Material = (typeof MATERIAL)[keyof typeof MATERIAL];
 
-export const MATERIAL_NAMES = ['none', 'body', 'hair', 'points', 'silks', 'trim', 'fixed', 'shine'] as const;
+export const MATERIAL_NAMES = [
+  "none",
+  "body",
+  "hair",
+  "points",
+  "silks",
+  "trim",
+  "fixed",
+  "shine",
+] as const;
 
 export const materialByName = (name: string): Material | null => {
   const i = MATERIAL_NAMES.indexOf(name as (typeof MATERIAL_NAMES)[number]);
@@ -91,12 +100,18 @@ export const HUE_HAIR: [number, number] = [260, 325];
  * would otherwise be dark leather and collide with `points`.
  */
 export const KEY: Record<string, { hex: string; note: string }> = {
-  body: { hex: '#8C8C8F', note: 'neutral grey, mid lightness' },
-  hair: { hex: '#A032D0', note: 'violet — clear of the silks window and of skin' },
-  points: { hex: '#201818', note: 'very dark reddish-brown' },
-  silks: { hex: '#1E6FD9', note: 'blue' },
-  trim: { hex: '#F0F0F2', note: 'near-white' },
-  fixed: { hex: '#12B36A', note: 'tack only; skin and leather keep natural tones' },
+  body: { hex: "#8C8C8F", note: "neutral grey, mid lightness" },
+  hair: {
+    hex: "#A032D0",
+    note: "violet — clear of the silks window and of skin",
+  },
+  points: { hex: "#3D2B2B", note: "very dark reddish-maroon, legs and hooves" },
+  silks: { hex: "#1E6FD9", note: "blue" },
+  trim: { hex: "#F0F0F2", note: "near-white" },
+  fixed: {
+    hex: "#12B36A",
+    note: "tack only; skin and leather keep natural tones",
+  },
 };
 
 /**
@@ -120,12 +135,12 @@ export const KEY: Record<string, { hex: string; note: string }> = {
  * `fixed` by virtue of being nothing else.
  */
 export const RAMPS: Record<string, string[]> = {
-  body: ['#55555A', '#70707A', '#8C8C8F', '#A0A0A4'],
-  hair: ['#5A1C75', '#7B26A2', '#A032D0', '#C070E8'],
-  points: ['#0F0D0D', '#161414', '#201818', '#2A2626'],
-  silks: ['#12447F', '#1857AB', '#1E6FD9', '#6BA6F0'],
-  trim: ['#C8C8CC', '#DCDCE0', '#F0F0F2', '#FAFAFC'],
-  fixed: ['#0B6B40', '#12B36A', '#3FD693', '#8A5A3C', '#C98A5E'],
+  body: ["#55555A", "#70707A", "#8C8C8F", "#A0A0A4"],
+  hair: ["#5A1C75", "#7B26A2", "#A032D0", "#C070E8"],
+  points: ['#1A1212', '#2B1F1F', '#3D2B2B', '#4F3939'],
+  silks: ["#12447F", "#1857AB", "#1E6FD9", "#6BA6F0"],
+  trim: ["#C8C8CC", "#DCDCE0", "#F0F0F2", "#FAFAFC"],
+  fixed: ["#0B6B40", "#12B36A", "#3FD693", "#8A5A3C", "#C98A5E"],
 };
 
 // ---- Colour maths -----------------------------------------------------------
@@ -142,7 +157,11 @@ export const RAMPS: Record<string, string[]> = {
 export const chromaOf = (r: number, g: number, b: number): number =>
   Math.max(r, g, b) - Math.min(r, g, b);
 
-export function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+export function rgbToHsl(
+  r: number,
+  g: number,
+  b: number,
+): [number, number, number] {
   r /= 255;
   g /= 255;
   b /= 255;
@@ -167,12 +186,12 @@ export const hueIn = (h: number, [lo, hi]: [number, number]): boolean => {
 
 /** Parse `#rrggbb`. */
 export const hexToRgb = (hex: string): [number, number, number] => {
-  const n = parseInt(hex.replace('#', ''), 16);
+  const n = parseInt(hex.replace("#", ""), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 };
 
 export const rgbToHex = (r: number, g: number, b: number): string =>
-  `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+  `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 
 /**
  * Which material is this colour, by the key alone.
@@ -202,14 +221,21 @@ export function classifyByKey(r: number, g: number, b: number): Material {
  * §11 for the workflow.
  */
 export function paletteGpl(): string {
-  const lines = ['GIMP Palette', 'Name: Bloodline material key', 'Columns: 5', '#'];
-  const pad = (v: number): string => String(v).padStart(3, ' ');
+  const lines = [
+    "GIMP Palette",
+    "Name: Bloodline material key",
+    "Columns: 5",
+    "#",
+  ];
+  const pad = (v: number): string => String(v).padStart(3, " ");
   for (const [name, ramp] of Object.entries(RAMPS)) {
     lines.push(`# ${name} — ${KEY[name]!.note}`);
     ramp.forEach((hex, i) => {
       const [r, g, b] = hexToRgb(hex);
-      lines.push(`${pad(r)} ${pad(g)} ${pad(b)}\t${name} ${i + 1}${hex === KEY[name]!.hex ? ' (base)' : ''}`);
+      lines.push(
+        `${pad(r)} ${pad(g)} ${pad(b)}\t${name} ${i + 1}${hex === KEY[name]!.hex ? " (base)" : ""}`,
+      );
     });
   }
-  return `${lines.join('\n')}\n`;
+  return `${lines.join("\n")}\n`;
 }
