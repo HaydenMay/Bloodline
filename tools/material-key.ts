@@ -75,7 +75,6 @@ export const L_POINTS_MAX = 0.22;
 export const L_BODY_MIN = 0.28;
 export const L_BODY_MAX = 0.68;
 export const L_TRIM_MIN = 0.72;
-export const L_SHINE_MIN = 0.88;
 
 /** Hue windows for the saturated materials. A window may wrap zero. */
 export const HUE_SILKS: [number, number] = [185, 250];
@@ -98,7 +97,6 @@ export const KEY: Record<string, { hex: string; note: string }> = {
   silks: { hex: '#1E6FD9', note: 'blue' },
   trim: { hex: '#F0F0F2', note: 'near-white' },
   fixed: { hex: '#12B36A', note: 'tack only; skin and leather keep natural tones' },
-  shine: { hex: '#FFFFFF', note: 'white highlights and eye reflections' },
 };
 
 /**
@@ -128,7 +126,6 @@ export const RAMPS: Record<string, string[]> = {
   silks: ['#12447F', '#1857AB', '#1E6FD9', '#6BA6F0'],
   trim: ['#C8C8CC', '#DCDCE0', '#F0F0F2', '#FAFAFC'],
   fixed: ['#0B6B40', '#12B36A', '#3FD693', '#8A5A3C', '#C98A5E'],
-  shine: ['#E8E8EB', '#F2F2F5', '#FFFFFF'],
 };
 
 // ---- Colour maths -----------------------------------------------------------
@@ -192,7 +189,6 @@ export function classifyByKey(r: number, g: number, b: number): Material {
     return MATERIAL.fixed; // tack green, skin warm, anything else coloured
   }
   if (l < L_POINTS_MAX) return MATERIAL.points;
-  if (l >= L_SHINE_MIN) return MATERIAL.shine;
   if (l > L_TRIM_MIN) return MATERIAL.trim;
   if (l >= L_BODY_MIN && l <= L_BODY_MAX) return MATERIAL.body;
   return MATERIAL.fixed; // in a gap between two neutral bands
