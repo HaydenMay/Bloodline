@@ -101,7 +101,12 @@ export function mountSilksDemo(host: HTMLElement): void {
 
   /** What the preview is currently drawing. The loop below reads it. */
   let scheme: Scheme = {
-    coat: coatFor(selectedCoat),
+    coat: {
+      ...coatFor(selectedCoat),
+      body: coatFor(selectedCoat).body,
+      hair: selectedHairColor,
+      points: selectedPointColor,
+    },
     silks: { primary: selectedSilksColor, secondary: selectedTrimColor },
   };
 
