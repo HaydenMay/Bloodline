@@ -93,7 +93,7 @@ export const HUE_HAIR: [number, number] = [260, 325];
 export const KEY: Record<string, { hex: string; note: string }> = {
   body: { hex: '#8C8C8F', note: 'neutral grey, mid lightness' },
   hair: { hex: '#A032D0', note: 'violet — clear of the silks window and of skin' },
-  points: { hex: '#201818', note: 'very dark with red tone' },
+  points: { hex: '#201818', note: 'very dark reddish-brown' },
   silks: { hex: '#1E6FD9', note: 'blue' },
   trim: { hex: '#F0F0F2', note: 'near-white' },
   fixed: { hex: '#12B36A', note: 'tack only; skin and leather keep natural tones' },
