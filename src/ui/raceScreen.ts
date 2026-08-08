@@ -291,7 +291,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
     // Lane 0 is the rail (furthest from camera), so higher lanes draw nearer
     // and larger. Sorting by lane keeps the overlap correct.
-    const laneY = (lane: number): number => height * 0.58 + lane * (height * 0.055);
+    const laneY = (lane: number): number => height * 0.68 + lane * (height * 0.055);
     // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
     const baseScale = (HORSE_METRES * cam.pixelsPerMetre * HORSE_SCALE) / RIG_UNITS;
     const laneScale = (lane: number): number => baseScale * (0.88 + lane * 0.04);
@@ -339,7 +339,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         ctx.restore();
       }
 
-      drawHorseShadow(ctx, x, y - 22, scale);
+      drawHorseShadow(ctx, x, y + 8, scale);
 
       // Draw frame-based animation if loaded, otherwise fall back to procedural rig.
       if (frameSequence) {
