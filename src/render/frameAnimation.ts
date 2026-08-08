@@ -364,7 +364,7 @@ export function drawFrame(
   const w = source.width * opts.scale;
   const h = source.height * opts.scale;
   const dx = x - w / 2;
-  const dy = y - h;
+  const dy = y - h / 2;
 
   ctx.save();
   if (opts.faded) ctx.globalAlpha = 0.5;
