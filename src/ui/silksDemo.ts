@@ -163,7 +163,7 @@ export function mountSilksDemo(host: HTMLElement): void {
     const displayHeight = canvas.height / dpr;
     const scale = Math.min(displayWidth / 60, displayHeight / 35);
     const x = displayWidth / 2;
-    const y = displayHeight;
+    const y = displayHeight + 15;
 
     // Southwest-idle animation, scaled up
     if (southwestIdleSequence) {
