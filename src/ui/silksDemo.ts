@@ -167,7 +167,6 @@ export function mountSilksDemo(host: HTMLElement): void {
 
     // Southwest-idle animation, scaled up
     if (southwestIdleSequence) {
-      drawHorseShadow(ctx, x, y - 22, scale * 1.1);
       drawFrame(ctx, x, y, southwestIdleSequence, { phase, scale, scheme });
     }
 
