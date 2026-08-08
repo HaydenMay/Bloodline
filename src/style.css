@@ -1325,7 +1325,13 @@ body {
   text-align: center;
   display: flex;
   flex-direction: column;
-  min-height: 30vh;
+  min-height: 50vh;
+}
+
+@media (max-width: 768px) {
+  .sd-preview {
+    min-height: 60vh;
+  }
 }
 
 .sd-preview > p {
@@ -1350,6 +1356,8 @@ body {
   height: 100%;
   display: block;
   background: var(--panel);
+  max-width: 100%;
+  max-height: 100%;
   border-radius: 4px;
   margin-bottom: 0;
   image-rendering: crisp-edges;
