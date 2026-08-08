@@ -248,13 +248,15 @@ export interface DrawFrameOptions {
   scheme?: Scheme;
 }
 
+type TintedSource = HTMLCanvasElement | HTMLImageElement;
+
 function tintFrame(
   frame: HTMLImageElement,
   frameIndex: number,
   scheme: Scheme,
   maskData: MaskData,
-): HTMLCanvasElement | null {
-  if (!maskData || !maskData.mask) return null;
+): TintedSource {
+  if (!maskData || !maskData.mask) return frame;
 
   const coat = typeof scheme.coat === 'string' ? coatFor(scheme.coat) : scheme.coat;
   const key = `frame-${frameIndex}|${coat.body}|${coat.hair}|${coat.points}|${scheme.silks.primary}|${scheme.silks.secondary}`;
@@ -354,25 +356,20 @@ export function drawFrame(
 
   if (!frame.complete) return false;
 
-  let imageToDrawn = frame;
+  let source: TintedSource = frame;
   if (opts.scheme && sequence.maskData) {
-    const tinted = tintFrame(frame, frameIndex, opts.scheme, sequence.maskData);
-    if (tinted) {
-      imageToDrawn = new Image();
-      imageToDrawn.src = tinted.toDataURL();
-      if (!imageToDrawn.complete) return false;
-    }
+    source = tintFrame(frame, frameIndex, opts.scheme, sequence.maskData);
   }
 
-  const w = imageToDrawn.width * opts.scale;
-  const h = imageToDrawn.height * opts.scale;
+  const w = source.width * opts.scale;
+  const h = source.height * opts.scale;
   const dx = x - w / 2;
   const dy = y - h / 2;
 
   ctx.save();
   if (opts.faded) ctx.globalAlpha = 0.5;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(imageToDrawn, dx, dy, w, h);
+  ctx.drawImage(source, dx, dy, w, h);
   ctx.restore();
   return true;
 }
