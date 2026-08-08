@@ -1325,12 +1325,12 @@ body {
   text-align: center;
   display: flex;
   flex-direction: column;
-  min-height: 30vh;
+  min-height: 40vh;
 }
 
 @media (max-width: 768px) {
   .sd-preview {
-    min-height: 25vh;
+    min-height: 40vh;
   }
 }
 
