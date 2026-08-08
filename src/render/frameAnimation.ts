@@ -306,8 +306,10 @@ function tintFrame(
       const g = data[i + 1]!;
       const b = data[i + 2]!;
 
-      // Skip tinting pure black (#000000) and pure white (#FFFFFF)
-      if ((r === 0 && g === 0 && b === 0) || (r === 255 && g === 255 && b === 255)) {
+      // Skip tinting pure black and white only for fixed (borders) and shine (eyes)
+      const isPureBlack = r === 0 && g === 0 && b === 0;
+      const isPureWhite = r === 255 && g === 255 && b === 255;
+      if ((isPureBlack && m === MATERIAL.fixed) || (isPureWhite && m === MATERIAL.shine)) {
         out.data[i] = r;
         out.data[i + 1] = g;
         out.data[i + 2] = b;
