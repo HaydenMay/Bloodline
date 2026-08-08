@@ -137,7 +137,7 @@ export const KEY: Record<string, { hex: string; note: string }> = {
 export const RAMPS: Record<string, string[]> = {
   body: ["#55555A", "#70707A", "#8C8C8F", "#A0A0A4"],
   hair: ["#5A1C75", "#7B26A2", "#A032D0", "#C070E8"],
-  points: ['#1A1212', '#2B1F1F', '#3D2B2B', '#4F3939'],
+  points: ['#1A1212', '#2B1F1F', '#3D2B2B', '#3E2F2F'],
   silks: ["#12447F", "#1857AB", "#1E6FD9", "#6BA6F0"],
   trim: ["#C8C8CC", "#DCDCE0", "#F0F0F2", "#FAFAFC"],
   fixed: ["#0B6B40", "#12B36A", "#3FD693", "#8A5A3C", "#C98A5E"],
