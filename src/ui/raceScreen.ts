@@ -346,6 +346,10 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         drawFrame(ctx, x, y, frameSequence, {
           phase,
           scale: scale * 3.5,
+          scheme: {
+            coat: r.coat,
+            silks: silksFor.get(r.id)!,
+          },
         });
       } else {
         const drewSprite = drawSpriteHorse(ctx, x, y, {

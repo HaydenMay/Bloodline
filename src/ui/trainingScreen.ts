@@ -3,6 +3,7 @@ import { TRAITS } from '../data/traits.js';
 import type { TraitId } from '../data/traits.js';
 import { createSurface, startLoop } from '../render/canvas.js';
 import { loadFrameSequence, drawFrame, type DrawFrameOptions } from '../render/frameAnimation.js';
+import { RIVAL_SILKS } from '../render/palette.js';
 
 export interface TrainingSession {
   id: string;
@@ -198,6 +199,10 @@ export function mountTrainingScreen(
           const opts: DrawFrameOptions = {
             phase,
             scale: 4,
+            scheme: {
+              coat: horse.coat,
+              silks: RIVAL_SILKS[0]!,
+            },
           };
 
           drawFrame(ctx, width / 2, height * 0.65, sequence, opts);
