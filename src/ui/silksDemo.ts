@@ -1,7 +1,6 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { drawHorseShadow } from '../render/horse.js';
-import { drawSpriteHorse, loadSprites, type Scheme } from '../render/spriteHorse.js';
-import { loadFrameSequence, drawFrame } from '../render/frameAnimation.js';
+import { loadFrameSequence, drawFrame, type Scheme } from '../render/frameAnimation.js';
 import { COATS, INK, RIVAL_SILKS, coatFor } from '../render/palette.js';
 
 const COAT_COLORS = Object.values(COATS).map((coat) => ({
@@ -153,26 +152,21 @@ export function mountSilksDemo(host: HTMLElement): void {
     last = now;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw three animation types side by side
-    const thirdWidth = canvas.width / 3;
-    const scale = Math.min(canvas.width / 630, canvas.height / 165);
+    // Draw two frame animations side by side
+    const halfWidth = canvas.width / 2;
+    const scale = Math.min(canvas.width / 420, canvas.height / 165);
     const y = canvas.height * 0.95;
-
-    // Sprite horse (race sprite)
-    const spriteX = thirdWidth * 0.5;
-    drawHorseShadow(ctx, spriteX, y + 2, scale * 1.1);
-    drawSpriteHorse(ctx, spriteX, y, { ...scheme, phase, scale });
 
     // East-run animation
     if (eastRunSequence) {
-      const eastX = thirdWidth * 1.5;
+      const eastX = halfWidth * 0.5;
       drawHorseShadow(ctx, eastX, y + 2, scale * 1.1);
       drawFrame(ctx, eastX, y, eastRunSequence, { phase, scale, scheme });
     }
 
     // Southwest-idle animation
     if (southwestIdleSequence) {
-      const idleX = thirdWidth * 2.5;
+      const idleX = halfWidth * 1.5;
       drawHorseShadow(ctx, idleX, y + 2, scale * 1.1);
       drawFrame(ctx, idleX, y, southwestIdleSequence, { phase, scale, scheme });
     }
@@ -266,7 +260,7 @@ export function mountSilksDemo(host: HTMLElement): void {
       <div class="sd-preview-container">
         <div class="sd-preview">
           <p>Horse Preview</p>
-          <canvas class="sd-horse-canvas" width="1320" height="320"></canvas>
+          <canvas class="sd-horse-canvas" width="880" height="320"></canvas>
         </div>
         <div class="sd-preview">
           <p>Badge Preview</p>
@@ -417,20 +411,7 @@ export function mountSilksDemo(host: HTMLElement): void {
     window.location.href = '/';
   });
 
-  loadSprites()
-    .then(() => {
-      updatePreview();
-      last = performance.now();
-      requestAnimationFrame(frame);
-    })
-    .catch(() => {
-      // The sheet failed to load. Say so rather than leaving an empty box.
-      const canvas = host.querySelector<HTMLCanvasElement>('.sd-horse-canvas');
-      const ctx = canvas?.getContext('2d');
-      if (!ctx || !canvas) return;
-      ctx.fillStyle = 'rgba(232,237,244,0.4)';
-      ctx.font = '14px ui-sans-serif, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('sprite sheet failed to load', canvas.width / 2, canvas.height / 2);
-    });
+  updatePreview();
+  last = performance.now();
+  requestAnimationFrame(frame);
 }

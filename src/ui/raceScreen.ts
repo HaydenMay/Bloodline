@@ -1,6 +1,5 @@
 import { createSurface, startLoop, type Loop, type Surface } from '../render/canvas.js';
 import { drawHorse, drawHorseShadow } from '../render/horse.js';
-import { drawSpriteHorse, loadSprites } from '../render/spriteHorse.js';
 import { hashId, RIVAL_SILKS, UI, type Silks } from '../render/palette.js';
 import { loadFrameSequence, drawFrame } from '../render/frameAnimation.js';
 import {
@@ -81,7 +80,6 @@ const PULL_UP_WALK = 1.74;
  * about 181 pixels across the same animal. Scaling the sprite by the rig's
  * scale alone would draw it half again too big.
  */
-const SPRITE_PER_RIG_UNIT = 123 / 181;
 
 /**
  * How much bigger than life the horses are drawn.
@@ -122,8 +120,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const getAutopilot = (): boolean => autopilotToggle?.checked ?? false;
 
   const surface = createSurface(host);
-  // Decoding happens off the critical path; the rig covers the opening frames.
-  void loadSprites();
   let frameSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null = null;
   void loadFrameSequence('east-run', 8).then((seq) => {
     frameSequence = seq;
@@ -340,8 +336,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
       drawHorseShadow(ctx, x, y + 2, scale);
 
-      // Draw frame-based animation if loaded, otherwise fall back to sprite sheet,
-      // then procedural rig as final fallback.
+      // Draw frame-based animation if loaded, otherwise fall back to procedural rig.
       if (frameSequence) {
         drawFrame(ctx, x, y, frameSequence, {
           phase,
@@ -352,26 +347,17 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
           },
         });
       } else {
-        const drewSprite = drawSpriteHorse(ctx, x, y, {
+        drawHorse(ctx, x, y, {
           coat: r.coat,
           silks: silksFor.get(r.id)!,
-          phase,
-          scale: scale * SPRITE_PER_RIG_UNIT,
+          pose: {
+            phase,
+            intensity: Math.min(1, Math.max(0, (drawSpeed - 18) / 14)),
+            drive: r.finished ? 0 : r.effort,
+          },
+          scale,
+          faded: false,
         });
-
-        if (!drewSprite) {
-          drawHorse(ctx, x, y, {
-            coat: r.coat,
-            silks: silksFor.get(r.id)!,
-            pose: {
-              phase,
-              intensity: Math.min(1, Math.max(0, (drawSpeed - 18) / 14)),
-              drive: r.finished ? 0 : r.effort,
-            },
-            scale,
-            faded: false,
-          });
-        }
       }
 
       if (isPlayer) {

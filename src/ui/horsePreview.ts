@@ -1,7 +1,6 @@
 import { createSurface, startLoop } from "../render/canvas.js";
 import { loadFrameSequence, drawFrame } from "../render/frameAnimation.js";
 import { UI } from "../render/palette.js";
-import { loadSprites } from "../render/spriteHorse.js";
 
 /**
  * Horse preview.
@@ -15,8 +14,6 @@ import { loadSprites } from "../render/spriteHorse.js";
  */
 export function mountHorsePreview(host: HTMLElement): () => void {
   const surface = createSurface(host);
-  // Fire and forget: frames draw as soon as the sheet is decoded.
-  void loadSprites();
 
   // Load frame sequences
   let eastRunSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null =
