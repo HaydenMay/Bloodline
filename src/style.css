@@ -1337,7 +1337,7 @@ body {
 .sd-horse-canvas {
   width: 100%;
   height: auto;
-  max-height: 85vh;
+  max-height: 140vh;
   display: block;
   background: var(--panel);
   border-radius: 4px;
