@@ -286,8 +286,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
     // Lane 0 is the rail (furthest from camera), so higher lanes draw nearer
     // and larger. Sorting by lane keeps the overlap correct.
-    // Baseline positioned so frame hooves align with the track rail.
-    const laneY = (lane: number): number => height * 0.31 + lane * (height * 0.035);
+    // Baseline positioned so frame hooves sit properly on the track.
+    const laneY = (lane: number): number => height * 0.37 + lane * (height * 0.035);
     // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
     const baseScale = (HORSE_METRES * cam.pixelsPerMetre * HORSE_SCALE) / RIG_UNITS;
     const laneScale = (lane: number): number => baseScale * (0.88 + lane * 0.04);
