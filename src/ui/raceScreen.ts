@@ -340,7 +340,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       if (frameSequence) {
         drawFrame(ctx, x, y, frameSequence, {
           phase,
-          scale: scale * 3.5,
+          scale: scale * 2.2,
           scheme: {
             coat: r.coat,
             silks: silksFor.get(r.id)!,
