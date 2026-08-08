@@ -305,6 +305,15 @@ function tintFrame(
       const r = data[i]!;
       const g = data[i + 1]!;
       const b = data[i + 2]!;
+
+      // Skip tinting pure black (#000000) and pure white (#FFFFFF)
+      if ((r === 0 && g === 0 && b === 0) || (r === 255 && g === 255 && b === 255)) {
+        out.data[i] = r;
+        out.data[i + 1] = g;
+        out.data[i + 2] = b;
+        continue;
+      }
+
       const tint = target[m];
 
       if (!tint) {
