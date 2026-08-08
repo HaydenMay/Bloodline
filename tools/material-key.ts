@@ -93,7 +93,7 @@ export const HUE_HAIR: [number, number] = [260, 325];
 export const KEY: Record<string, { hex: string; note: string }> = {
   body: { hex: '#8C8C8F', note: 'neutral grey, mid lightness' },
   hair: { hex: '#A032D0', note: 'violet — clear of the silks window and of skin' },
-  points: { hex: '#1A1A1C', note: 'near-black' },
+  points: { hex: '#201818', note: 'very dark with red tone' },
   silks: { hex: '#1E6FD9', note: 'blue' },
   trim: { hex: '#F0F0F2', note: 'near-white' },
   fixed: { hex: '#12B36A', note: 'tack only; skin and leather keep natural tones' },
@@ -122,7 +122,7 @@ export const KEY: Record<string, { hex: string; note: string }> = {
 export const RAMPS: Record<string, string[]> = {
   body: ['#55555A', '#70707A', '#8C8C8F', '#A0A0A4'],
   hair: ['#5A1C75', '#7B26A2', '#A032D0', '#C070E8'],
-  points: ['#101012', '#1A1A1C', '#26262A', '#2E2E33'],
+  points: ['#0F0D0D', '#161414', '#201818', '#2A2626'],
   silks: ['#12447F', '#1857AB', '#1E6FD9', '#6BA6F0'],
   trim: ['#C8C8CC', '#DCDCE0', '#F0F0F2', '#FAFAFC'],
   fixed: ['#0B6B40', '#12B36A', '#3FD693', '#8A5A3C', '#C98A5E'],
