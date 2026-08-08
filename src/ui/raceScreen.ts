@@ -1,20 +1,46 @@
-import { createSurface, startLoop, type Loop, type Surface } from '../render/canvas.js';
-import { drawHorse, drawHorseShadow } from '../render/horse.js';
-import { hashId, RIVAL_SILKS, SKIN_TONES, UI, type Silks } from '../render/palette.js';
-import { loadFrameSequence, drawFrame } from '../render/frameAnimation.js';
+import {
+  createSurface,
+  startLoop,
+  type Loop,
+  type Surface,
+} from "../render/canvas.js";
+import { drawHorse, drawHorseShadow } from "../render/horse.js";
+import {
+  hashId,
+  RIVAL_SILKS,
+  SKIN_TONES,
+  UI,
+  type Silks,
+} from "../render/palette.js";
+import { loadFrameSequence, drawFrame } from "../render/frameAnimation.js";
 import {
   drawBackdrop,
   drawDistanceMarkers,
   drawMinimap,
   metreToScreen,
   type Camera,
-} from '../render/track.js';
-import { createRace, type LiveRace, type RaceSnapshot, type RunnerSnapshot } from '../sim/race/engine.js';
-import { buildRecap, recapRows, type Pace, type Recap, type RecapRow } from '../sim/race/recap.js';
-import type { PlayerInput, RaceConfig, RaceEntrant } from '../sim/race/types.js';
-import { CHARGE_CAPACITY, TICK_HZ } from '../sim/race/constants.js';
-import type { Horse } from '../sim/types.js';
-import { attachInfoBox } from './infoBox.js';
+} from "../render/track.js";
+import {
+  createRace,
+  type LiveRace,
+  type RaceSnapshot,
+  type RunnerSnapshot,
+} from "../sim/race/engine.js";
+import {
+  buildRecap,
+  recapRows,
+  type Pace,
+  type Recap,
+  type RecapRow,
+} from "../sim/race/recap.js";
+import type {
+  PlayerInput,
+  RaceConfig,
+  RaceEntrant,
+} from "../sim/race/types.js";
+import { CHARGE_CAPACITY, TICK_HZ } from "../sim/race/constants.js";
+import type { Horse } from "../sim/types.js";
+import { attachInfoBox } from "./infoBox.js";
 
 /**
  * The race screen.
@@ -97,9 +123,9 @@ const HORSE_SCALE = 1.55;
 
 /** Track sections, by the leader's progress. Each fires once. */
 const CALLOUTS = [
-  { at: 0.24, text: 'Down the backstretch' },
-  { at: 0.56, text: 'Round the turn' },
-  { at: 0.84, text: 'Down the stretch!' },
+  { at: 0.24, text: "Down the backstretch" },
+  { at: 0.56, text: "Round the turn" },
+  { at: 0.84, text: "Down the stretch!" },
 ] as const;
 
 function skinToneFor(id: string): string {
@@ -119,14 +145,23 @@ export interface RaceScreenOptions {
 }
 
 export function mountRaceScreen(opts: RaceScreenOptions): () => void {
-  const { host, field, playerHorseId, playerSilks, config, autopilotToggle, onRaceStart } = opts;
+  const {
+    host,
+    field,
+    playerHorseId,
+    playerSilks,
+    config,
+    autopilotToggle,
+    onRaceStart,
+  } = opts;
 
   // Read autopilot state from toggle element when race starts, not when button clicked
   const getAutopilot = (): boolean => autopilotToggle?.checked ?? false;
 
   const surface = createSurface(host);
-  let frameSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null = null;
-  void loadFrameSequence('east-run', 8).then((seq) => {
+  let frameSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null =
+    null;
+  void loadFrameSequence("east-run", 8).then((seq) => {
     frameSequence = seq;
   });
   const input: PlayerInput = {
@@ -181,7 +216,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let prev: RaceSnapshot = race.snapshot();
   let curr: RaceSnapshot = prev;
   let running = true;
-  let callout = '';
+  let callout = "";
   let calloutUntil = 0;
   let finishedAt = 0;
   // Built once at the wire. The finish screen redraws every frame and
@@ -190,12 +225,17 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let finalRows: RecapRow[] | null = null;
   // Track result row name positions, so a DOM hover target can be laid over
   // each one — the recap is drawn on canvas, which has no hover of its own.
-  const resultRowBounds: Map<string, { top: number; height: number; left: number; width: number }> =
-    new Map();
+  const resultRowBounds: Map<
+    string,
+    { top: number; height: number; left: number; width: number }
+  > = new Map();
   // One invisible trigger element per horse, positioned over its name each
   // frame. attachInfoBox already knows how to peek-on-hover and pin-on-click;
   // this just gives it something sized and placed correctly to listen on.
-  const resultHoverTargets: Map<string, { trigger: HTMLDivElement; detach: () => void }> = new Map();
+  const resultHoverTargets: Map<
+    string,
+    { trigger: HTMLDivElement; detach: () => void }
+  > = new Map();
   /** Races wait for you rather than starting the moment the page loads. */
   let started = false;
   // 3 beats of a second each, then the field breaks and "And they're off!"
@@ -233,7 +273,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     curr = race.snapshot();
 
     for (const e of curr.fresh) {
-      if (e.kind === 'phase' && e.detail) setCallout(e.detail);
+      if (e.kind === "phase" && e.detail) setCallout(e.detail);
     }
 
     // Each call-out fires ONCE, when the leader first passes that point.
@@ -250,7 +290,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     if (!running && finishedAt === 0) {
       finishedAt = performance.now();
       const placings = [...curr.runners].sort(
-        (a, b) => (a.finishTime ?? 1e9) - (b.finishTime ?? 1e9) || b.distance - a.distance,
+        (a, b) =>
+          (a.finishTime ?? 1e9) - (b.finishTime ?? 1e9) ||
+          b.distance - a.distance,
       );
       opts.onFinish?.(placings);
     }
@@ -291,10 +333,13 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
     // Lane 0 is the rail (furthest from camera), so higher lanes draw nearer
     // and larger. Sorting by lane keeps the overlap correct.
-    const laneY = (lane: number): number => height * 0.58 + lane * (height * 0.055);
+    const laneY = (lane: number): number =>
+      height * 0.58 + lane * (height * 0.055);
     // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
-    const baseScale = (HORSE_METRES * cam.pixelsPerMetre * HORSE_SCALE) / RIG_UNITS;
-    const laneScale = (lane: number): number => baseScale * (0.88 + lane * 0.04);
+    const baseScale =
+      (HORSE_METRES * cam.pixelsPerMetre * HORSE_SCALE) / RIG_UNITS;
+    const laneScale = (lane: number): number =>
+      baseScale * (0.88 + lane * 0.04);
 
     for (const r of [...runners].sort((a, b) => a.lane - b.lane)) {
       const pu0 = pullUp.get(r.id);
@@ -329,9 +374,16 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       // it was far too easy to lose in a pack of eight.
       if (isPlayer) {
         ctx.save();
-        const glow = ctx.createRadialGradient(x, y - 8, 4, x, y - 8, 70 * (scale / baseScale) + 46);
+        const glow = ctx.createRadialGradient(
+          x,
+          y - 8,
+          4,
+          x,
+          y - 8,
+          70 * (scale / baseScale) + 46,
+        );
         glow.addColorStop(0, UI.accentMedium);
-        glow.addColorStop(1, 'rgba(242,193,78,0)');
+        glow.addColorStop(1, "rgba(242,193,78,0)");
         ctx.fillStyle = glow;
         ctx.beginPath();
         ctx.arc(x, y - 8, 70 * (scale / baseScale) + 46, 0, Math.PI * 2);
@@ -379,9 +431,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         ctx.fill();
 
         ctx.fillStyle = UI.accent;
-        ctx.font = '700 12px ui-sans-serif, system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('YOU', x, markerY - 19 + bounce);
+        ctx.font = "700 12px ui-sans-serif, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("YOU", x, markerY - 19 + bounce);
       }
     }
 
@@ -407,18 +459,22 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.fill();
 
     ctx.fillStyle = UI.muted;
-    ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('TO GO', pad + 12, pad + 18);
+    ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("TO GO", pad + 12, pad + 18);
 
     ctx.fillStyle = UI.text;
-    ctx.font = '700 20px ui-monospace, monospace';
+    ctx.font = "700 20px ui-monospace, monospace";
     ctx.fillText(`${Math.round(remaining)} m`, pad + 12, pad + 38);
 
     ctx.fillStyle = UI.muted;
-    ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(`${ordinal(player.rank)} of ${runners.length}`, pad + 156, pad + 38);
+    ctx.font = "600 11px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(
+      `${ordinal(player.rank)} of ${runners.length}`,
+      pad + 156,
+      pad + 38,
+    );
 
     // There is deliberately no "your moment" window drawn here. Moment no
     // longer opens a window at all — it selects a pace-curve shape (REBUILD.md
@@ -473,46 +529,50 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       roundRect(ctx, bannerX, bannerY, bannerW, 20, 10);
       ctx.fill();
       ctx.fillStyle = UI.bg;
-      ctx.font = '800 11px ui-sans-serif, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('YOUR MOMENT', width / 2, bannerY + 14);
+      ctx.font = "800 11px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("YOUR MOMENT", width / 2, bannerY + 14);
     } else {
       ctx.fillStyle = UI.bgOverlay72;
       roundRect(ctx, barX, barY, barW, 26, 13);
       ctx.fill();
     }
 
-    const LABEL_FONT = '700 11px ui-sans-serif, system-ui, sans-serif';
+    const LABEL_FONT = "700 11px ui-sans-serif, system-ui, sans-serif";
     ctx.font = LABEL_FONT;
-    ctx.textAlign = 'left';
+    ctx.textAlign = "left";
     ctx.fillStyle = UI.textVariant;
-    ctx.fillText('CHARGES', barX + 12, barY + 17);
-    const labelW = ctx.measureText('CHARGES').width;
+    ctx.fillText("CHARGES", barX + 12, barY + 17);
+    const labelW = ctx.measureText("CHARGES").width;
 
     // ---- Regen indicator ---------------------------------------------------
     // The dots show the bank, but never whether it's currently filling well —
     // position, drafting, and holding all feed the same regen multiplier, and
     // none of that was visible before. 1-3 arrows for low/normal/strong regen,
     // using the dead space this bar already had to spare.
-    const ARROW_FONT = '700 9px ui-sans-serif, system-ui, sans-serif';
+    const ARROW_FONT = "700 9px ui-sans-serif, system-ui, sans-serif";
     ctx.font = ARROW_FONT;
     // How the horse is GOING. The tank itself stays hidden — no stamina bar —
     // but a horse can hold a full bank of charges and still be completely out of
     // petrol, and the player has to be able to see that coming.
-    const arrowsMaxW = ctx.measureText('===').width;
+    const arrowsMaxW = ctx.measureText("===").width;
     const cond = player.condition;
     const condTier = cond > 0.66 ? 3 : cond > 0.33 ? 2 : 1;
     ctx.fillStyle =
-      condTier === 3 ? UI.condition.good : condTier === 2 ? UI.condition.fair : UI.condition.poor;
-    ctx.fillText('='.repeat(condTier), barX + 20 + labelW, barY + 17);
+      condTier === 3
+        ? UI.condition.good
+        : condTier === 2
+          ? UI.condition.fair
+          : UI.condition.poor;
+    ctx.fillText("=".repeat(condTier), barX + 20 + labelW, barY + 17);
 
     // ---- Drafting indicator ------------------------------------------------
     // Visual cue that the horse is sheltering behind a rival and getting regen bonus.
     if (player.drafting) {
       ctx.fillStyle = UI.draft;
-      ctx.font = '700 9px ui-sans-serif, system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('◆', barX + 20 + labelW + arrowsMaxW + 6, barY + 17);
+      ctx.font = "700 9px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("◆", barX + 20 + labelW + arrowsMaxW + 6, barY + 17);
     }
 
     // ---- The charge dots ---------------------------------------------------
@@ -536,18 +596,20 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
       ctx.beginPath();
       ctx.arc(cx, dotsY, dotR, 0, Math.PI * 2);
-      ctx.fillStyle = filled
-        ? ready
-          ? UI.accent
-          : UI.accentDim
-        : UI.mutedDim;
+      ctx.fillStyle = filled ? (ready ? UI.accent : UI.accentDim) : UI.mutedDim;
       ctx.fill();
 
       // The wedge on the first empty dot: how close the next one is.
       if (!filled && i === player.kicksRemaining && player.chargeProgress > 0) {
         ctx.beginPath();
         ctx.moveTo(cx, dotsY);
-        ctx.arc(cx, dotsY, dotR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * player.chargeProgress);
+        ctx.arc(
+          cx,
+          dotsY,
+          dotR,
+          -Math.PI / 2,
+          -Math.PI / 2 + Math.PI * 2 * player.chargeProgress,
+        );
         ctx.closePath();
         ctx.fillStyle = UI.accentMediumStrong;
         ctx.fill();
@@ -566,29 +628,29 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     }
 
     ctx.font = LABEL_FONT;
-    ctx.textAlign = 'right';
+    ctx.textAlign = "right";
     // What the horse is doing right now, most urgent first. The middle two are
     // the ones that used to be invisible: a player could tap into a cooldown or
     // into an exhausted horse and get no explanation for why nothing happened.
     if (input.takingBack) {
       ctx.fillStyle = UI.ok;
-      ctx.fillText('TAKING A PULL', barX + barW - 12, barY + 17);
+      ctx.fillText("TAKING A PULL", barX + barW - 12, barY + 17);
     } else if (player.kicksRemaining === 0) {
       ctx.fillStyle = UI.warning;
-      ctx.fillText('NO CHARGES', barX + barW - 12, barY + 17);
+      ctx.fillText("NO CHARGES", barX + barW - 12, barY + 17);
     } else if (!ready) {
       ctx.fillStyle = UI.mutedStrong;
-      ctx.fillText('GETTING BACK', barX + barW - 12, barY + 17);
+      ctx.fillText("GETTING BACK", barX + barW - 12, barY + 17);
     } else if (player.inWindow) {
       ctx.fillStyle = UI.accent;
-      ctx.fillText('GO NOW', barX + barW - 12, barY + 17);
+      ctx.fillText("GO NOW", barX + barW - 12, barY + 17);
     }
 
     // ---- Call-outs ---------------------------------------------------------
     if (performance.now() < calloutUntil && callout) {
       ctx.fillStyle = UI.accentGlowVeryStrong;
-      ctx.font = '700 22px ui-sans-serif, system-ui, sans-serif';
-      ctx.textAlign = 'center';
+      ctx.font = "700 22px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
       ctx.fillText(callout, width / 2, height * 0.2);
     }
 
@@ -599,49 +661,60 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   };
 
   /** Pre-race card, so a race begins when you are ready rather than on load. */
-  const drawStart = (ctx: CanvasRenderingContext2D, width: number, height: number): void => {
+  const drawStart = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+  ): void => {
     ctx.fillStyle = UI.bgOverlay82;
     ctx.fillRect(0, 0, width, height);
 
     const cx = width / 2;
     const cy = height / 2;
 
-    ctx.textAlign = 'center';
+    ctx.textAlign = "center";
     ctx.fillStyle = UI.text;
-    ctx.font = '800 26px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = "800 26px ui-sans-serif, system-ui, sans-serif";
     ctx.fillText(playerHorse.name, cx, cy - 46);
 
     ctx.fillStyle = UI.muted;
-    ctx.font = '600 13px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = "600 13px ui-sans-serif, system-ui, sans-serif";
     ctx.fillText(
       `${config.metres} m · ${config.going} going · field of ${field.length}`,
       cx,
-      cy - 24,
+      cy - 60,
     );
 
     ctx.fillStyle = UI.accent;
     roundRect(ctx, cx - 82, cy + 2, 164, 44, 22);
     ctx.fill();
     ctx.fillStyle = UI.bg;
-    ctx.font = '800 15px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('START RACE', cx, cy + 30);
+    ctx.font = "800 15px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText("START RACE", cx, cy + 30);
 
     ctx.fillStyle = UI.mutedSubtle;
-    ctx.font = '500 12px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('Tap to KICK · hold to TAKE A PULL', cx, cy + 70);
+    ctx.font = "500 12px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText("Tap to KICK · hold to TAKE A PULL", cx, cy + 70);
   };
 
   /** 3, 2, 1 — covers the gate load so the race doesn't just snap into motion. */
-  const drawCountdown = (ctx: CanvasRenderingContext2D, width: number, height: number): void => {
+  const drawCountdown = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+  ): void => {
     ctx.fillStyle = UI.bgOverlay82;
     ctx.fillRect(0, 0, width, height);
 
     const msLeft = Math.max(0, countdownEndsAt - performance.now());
-    const beat = Math.min(3, Math.max(1, Math.ceil(msLeft / (COUNTDOWN_MS / 3))));
+    const beat = Math.min(
+      3,
+      Math.max(1, Math.ceil(msLeft / (COUNTDOWN_MS / 3))),
+    );
 
-    ctx.textAlign = 'center';
+    ctx.textAlign = "center";
     ctx.fillStyle = UI.accent;
-    ctx.font = '800 64px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = "800 64px ui-sans-serif, system-ui, sans-serif";
     ctx.fillText(String(beat), width / 2, height / 2 + 20);
   };
 
@@ -662,8 +735,15 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.fillStyle = UI.bgOverlay90;
     ctx.fillRect(0, 0, width, height);
 
-    const recap = finalRecap ?? (finalRecap = buildRecap(race.outcome(), playerHorseId, playerHorse.style));
-    const rows = finalRows ?? (finalRows = recapRows(race.outcome(), playerHorseId));
+    const recap =
+      finalRecap ??
+      (finalRecap = buildRecap(
+        race.outcome(),
+        playerHorseId,
+        playerHorse.style,
+      ));
+    const rows =
+      finalRows ?? (finalRows = recapRows(race.outcome(), playerHorseId));
 
     const won = player.rank === 1;
     const cx = width / 2;
@@ -673,7 +753,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
     // Lay the whole thing out first so it can be centred as one block, however
     // many reasons the race produced.
-    ctx.font = '500 13px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = "500 13px ui-sans-serif, system-ui, sans-serif";
     const storyLines: string[] = [];
     for (const line of recap.story) wrapText(ctx, line, panel - 24, storyLines);
 
@@ -681,19 +761,19 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     let y = Math.max(56, (height - blockH) / 2);
 
     // ---- Headline ----------------------------------------------------------
-    ctx.textAlign = 'center';
+    ctx.textAlign = "center";
     ctx.fillStyle = won ? UI.accent : UI.text;
-    ctx.font = '800 30px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = "800 30px ui-sans-serif, system-ui, sans-serif";
     ctx.fillText(recap.headline, cx, y + 28);
     y += 40;
 
     ctx.fillStyle = won ? UI.accentGlow : UI.muted;
-    ctx.font = '600 14px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = "600 14px ui-sans-serif, system-ui, sans-serif";
     ctx.fillText(recap.margin, cx, y + 14);
     y += 22;
 
     // ---- What happened -----------------------------------------------------
-    ctx.font = '500 13px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = "500 13px ui-sans-serif, system-ui, sans-serif";
     ctx.fillStyle = UI.textMuted;
     for (const line of storyLines) {
       ctx.fillText(line, cx, y + 14);
@@ -713,17 +793,22 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
       ctx.fillStyle = r.isPlayer ? UI.accent : UI.muted;
       ctx.font = `${r.isPlayer ? 700 : 500} 13px ui-sans-serif, system-ui, sans-serif`;
-      ctx.textAlign = 'left';
+      ctx.textAlign = "left";
       ctx.fillText(String(r.position), cx - panel / 2 + 12, y + 14);
 
       const nameX = cx - panel / 2 + 34;
       const nameWidth = ctx.measureText(r.name).width;
       ctx.fillText(r.name, nameX, y + 14);
 
-      resultRowBounds.set(r.horseId, { top: y - 1, height: rowH - 3, left: nameX, width: nameWidth });
+      resultRowBounds.set(r.horseId, {
+        top: y - 1,
+        height: rowH - 3,
+        left: nameX,
+        width: nameWidth,
+      });
 
       // The margin matters more than the clock — a race is won by lengths.
-      ctx.textAlign = 'right';
+      ctx.textAlign = "right";
       ctx.fillStyle = r.isPlayer ? UI.accentGlow : UI.mutedSubtle;
       ctx.fillText(r.margin, cx + panel / 2 - 74, y + 14);
       ctx.fillStyle = r.isPlayer ? UI.accentMedium : UI.mutedFaint;
@@ -731,10 +816,14 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       y += rowH;
     }
 
-    ctx.textAlign = 'center';
+    ctx.textAlign = "center";
     ctx.fillStyle = UI.mutedSubtle;
-    ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText(`${paceLabel(recap.pace)} · New race to run again`, cx, y + 20);
+    ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText(
+      `${paceLabel(recap.pace)} · New race to run again`,
+      cx,
+      y + 20,
+    );
   };
 
   // ---- Input --------------------------------------------------------------
@@ -774,25 +863,25 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     if (held < HOLD_MS) tap();
   };
 
-  host.addEventListener('pointerdown', down);
-  window.addEventListener('pointerup', up);
-  window.addEventListener('pointercancel', up);
+  host.addEventListener("pointerdown", down);
+  window.addEventListener("pointerup", up);
+  window.addEventListener("pointercancel", up);
 
   const key = (e: KeyboardEvent): void => {
     if (e.repeat) return;
-    if (e.code === 'Space' || e.code === 'ArrowUp') {
+    if (e.code === "Space" || e.code === "ArrowUp") {
       e.preventDefault();
-      if (e.type !== 'keydown') return;
+      if (e.type !== "keydown") return;
       if (!started) beginCountdown();
       else if (!getAutopilot()) tap();
     }
-    if (e.code === 'ArrowDown' || e.code === 'ShiftLeft') {
+    if (e.code === "ArrowDown" || e.code === "ShiftLeft") {
       e.preventDefault();
-      if (!getAutopilot()) input.takingBack = e.type === 'keydown';
+      if (!getAutopilot()) input.takingBack = e.type === "keydown";
     }
   };
-  window.addEventListener('keydown', key);
-  window.addEventListener('keyup', key);
+  window.addEventListener("keydown", key);
+  window.addEventListener("keyup", key);
 
   // Set up invisible hover triggers over result horse names so the info box
   // can peek and pin over them, even though the names are drawn on canvas.
@@ -802,11 +891,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     for (const [horseId, bounds] of resultRowBounds) {
       let target = resultHoverTargets.get(horseId);
       if (!target) {
-        const trigger = document.createElement('div');
-        trigger.style.position = 'fixed';
-        trigger.style.pointerEvents = 'auto';
-        trigger.style.cursor = 'pointer';
-        trigger.style.zIndex = '10';
+        const trigger = document.createElement("div");
+        trigger.style.position = "fixed";
+        trigger.style.pointerEvents = "auto";
+        trigger.style.cursor = "pointer";
+        trigger.style.zIndex = "10";
         host.appendChild(trigger);
 
         const horse = field.find((h) => h.id === horseId);
@@ -832,11 +921,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     loop.stop();
     surface.destroy();
     window.clearTimeout(holdTimer);
-    host.removeEventListener('pointerdown', down);
-    window.removeEventListener('pointerup', up);
-    window.removeEventListener('pointercancel', up);
-    window.removeEventListener('keydown', key);
-    window.removeEventListener('keyup', key);
+    host.removeEventListener("pointerdown", down);
+    window.removeEventListener("pointerup", up);
+    window.removeEventListener("pointercancel", up);
+    window.removeEventListener("keydown", key);
+    window.removeEventListener("keyup", key);
     for (const { trigger, detach } of resultHoverTargets.values()) {
       detach();
       trigger.remove();
@@ -847,9 +936,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
 /** How the race was run, in three words, under the placings. */
 function paceLabel(pace: Pace): string {
-  if (pace === 'collapsed') return 'Pace: went too fast';
-  if (pace === 'crawl') return 'Pace: run at a crawl';
-  return 'Pace: evenly run';
+  if (pace === "collapsed") return "Pace: went too fast";
+  if (pace === "crawl") return "Pace: run at a crawl";
+  return "Pace: evenly run";
 }
 
 /**
@@ -865,8 +954,8 @@ function wrapText(
   maxWidth: number,
   out: string[],
 ): void {
-  const words = text.split(' ');
-  let line = '';
+  const words = text.split(" ");
+  let line = "";
   for (const word of words) {
     const next = line ? `${line} ${word}` : word;
     if (line && ctx.measureText(next).width > maxWidth) {
@@ -880,7 +969,7 @@ function wrapText(
 }
 
 function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
+  const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
   return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]!);
 }
