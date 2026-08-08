@@ -31,7 +31,7 @@ const CREAM = '#F2E7D2';
 const TEST_SCHEME = {
   body: '#22CC55',
   hair: '#E028D0',
-  points: '#FF8000',
+  points: '#CC0000',
   silks: '#2060FF',
   trim: '#FFE81A',
   fixed: '#000000',
