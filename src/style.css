@@ -1336,14 +1336,12 @@ body {
 
 .sd-horse-canvas {
   width: 100%;
-  height: auto;
-  max-height: 140vh;
+  height: 400px;
   display: block;
   background: var(--panel);
   border-radius: 4px;
   margin-bottom: 0;
   image-rendering: crisp-edges;
-  aspect-ratio: 11 / 9;
 }
 
 .sd-badge {
