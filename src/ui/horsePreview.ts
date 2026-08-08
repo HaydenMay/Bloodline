@@ -32,9 +32,9 @@ export function mountHorsePreview(host: HTMLElement): () => void {
   });
 
   let time = 0;
-  let animate = true;
+  const animate = true;
 
-  let intensity = 0.7;
+  const intensity = 0.7;
 
   const loop = startLoop(
     30,

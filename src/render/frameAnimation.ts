@@ -3,15 +3,37 @@
  *
  * Loads a spritesheet image and extracts frames in a 3x3 grid layout
  * (92x92 pixels per frame, 276x276 total).
+ *
+ * Frames are recolored using a mask-based tinting system, same as the sprite horse.
  */
+
+import type { Silks, Coat } from './palette.js';
+import { coatFor } from './palette.js';
+
+const MATERIAL = { body: 1, hair: 2, points: 3, silks: 4, trim: 5, fixed: 6 } as const;
 
 interface FrameSequence {
   name: string;
   frames: HTMLImageElement[];
+  maskData: MaskData | undefined;
+}
+
+interface MaskData {
+  mask: Uint8Array;
+  meanL: Float64Array;
+  width: number;
+  height: number;
+}
+
+export interface Scheme {
+  coat: string | Coat;
+  silks: Silks;
 }
 
 const sequences = new Map<string, FrameSequence>();
 const loadingPromises = new Map<string, Promise<FrameSequence>>();
+const tintedFrameCache = new Map<string, HTMLCanvasElement>();
+const TINT_CACHE_MAX = 50;
 
 const loadImage = (src: string): Promise<HTMLImageElement> =>
   new Promise((res, rej) => {
@@ -21,10 +43,81 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
     img.src = src;
   });
 
+const loadMaskData = async (maskSrc: string, width: number, height: number): Promise<MaskData> => {
+  try {
+    const maskImg = await loadImage(maskSrc);
+    const mctx = scratch(width, height);
+    mctx.drawImage(maskImg, 0, 0);
+    const maskImageData = mctx.getImageData(0, 0, width, height);
+    const maskData = maskImageData.data;
+
+    const mask = new Uint8Array(width * height);
+    for (let p = 0; p < width * height; p++) {
+      const m = Math.round(maskData[p * 4]! / 40);
+      mask[p] = m;
+    }
+
+    const meanL = new Float64Array(8);
+    for (let m = 1; m < 8; m++) {
+      meanL[m] = 0.5;
+    }
+
+    return { mask, meanL, width, height };
+  } catch (e) {
+    console.warn('Failed to load mask:', maskSrc, e);
+    const mask = new Uint8Array(width * height);
+    const meanL = new Float64Array(8);
+    for (let m = 1; m < 8; m++) meanL[m] = 0.5;
+    return { mask, meanL, width, height };
+  }
+};
+
 const spritesheetNames: Record<string, string> = {
   'east-run': 'east-run.png',
   'southwest-idle': 'idle-horse.png',
 };
+
+const maskNames: Record<string, string> = {
+  'east-run': 'east-run-mask.png',
+  'southwest-idle': 'idle-horse-mask.png',
+};
+
+function scratch(w: number, h: number): CanvasRenderingContext2D {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  if (!ctx) throw new Error('no 2d context');
+  return ctx;
+}
+
+function hexToHsl(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  const l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn;
+  const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  let h: number;
+  if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
+  else if (mx === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  h = ((h % 360) + 360) % 360;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number): number => {
+    const k = (n + h / 30) % 12;
+    return l - a * Math.max(-1, Math.min(Math.min(k - 3, 9 - k), 1));
+  };
+  return [Math.round(255 * f(0)), Math.round(255 * f(8)), Math.round(255 * f(4))];
+}
 
 const extractFramesFromSpritesheet = async (
   spritesheet: HTMLImageElement,
@@ -73,6 +166,7 @@ const extractFramesFromSpritesheet = async (
 /**
  * Load a frame sequence from a spritesheet.
  * Sequence name maps to src/assets/horse-positions/{name}/ directory.
+ * Also loads the mask PNG for tinting support.
  */
 export async function loadFrameSequence(
   name: string,
@@ -95,10 +189,23 @@ export async function loadFrameSequence(
       import.meta.url,
     ).href;
 
+    const maskName = maskNames[name];
+    const maskSrc = maskName
+      ? new URL(
+          `../assets/horse-positions/${name}/${maskName}`,
+          import.meta.url,
+        ).href
+      : '';
+
     const spritesheet = await loadImage(spritesheetSrc);
     const frames = await extractFramesFromSpritesheet(spritesheet, frameCount);
 
-    const sequence: FrameSequence = { name, frames };
+    let maskData: MaskData | undefined;
+    if (maskSrc) {
+      maskData = await loadMaskData(maskSrc, 92, 92);
+    }
+
+    const sequence: FrameSequence = { name, frames, maskData };
     sequences.set(name, sequence);
     loadingPromises.delete(name);
     return sequence;
@@ -114,10 +221,85 @@ export interface DrawFrameOptions {
   /** Pixels per sprite pixel */
   scale: number;
   faded?: boolean;
+  /** Optional color scheme for tinting */
+  scheme?: Scheme;
+}
+
+function tintFrame(frame: HTMLImageElement, scheme: Scheme, maskData: MaskData): HTMLCanvasElement | null {
+  if (!maskData || !maskData.mask) return null;
+
+  const coat = typeof scheme.coat === 'string' ? coatFor(scheme.coat) : scheme.coat;
+  const key = `${frame.src}|${coat.body}|${coat.hair}|${coat.points}|${scheme.silks.primary}|${scheme.silks.secondary}`;
+
+  const cached = tintedFrameCache.get(key);
+  if (cached) {
+    tintedFrameCache.delete(key);
+    tintedFrameCache.set(key, cached);
+    return cached;
+  }
+
+  const target: Record<number, [number, number, number]> = {
+    [MATERIAL.body]: hexToHsl(coat.body),
+    [MATERIAL.hair]: hexToHsl(coat.hair),
+    [MATERIAL.points]: hexToHsl(coat.points),
+    [MATERIAL.silks]: hexToHsl(scheme.silks.primary),
+    [MATERIAL.trim]: hexToHsl(scheme.silks.secondary),
+  };
+
+  const ctx = scratch(92, 92);
+  ctx.drawImage(frame, 0, 0);
+  const imageData = ctx.getImageData(0, 0, 92, 92);
+  const out = ctx.createImageData(92, 92);
+  const { data } = imageData;
+  const { mask, meanL } = maskData;
+
+  for (let p = 0; p < 92 * 92; p++) {
+    const i = p * 4;
+    const a = data[i + 3]!;
+    out.data[i + 3] = a;
+    if (a === 0) continue;
+
+    const m = mask[p]!;
+    const r = data[i]!;
+    const g = data[i + 1]!;
+    const b = data[i + 2]!;
+    const tint = target[m];
+
+    if (!tint) {
+      out.data[i] = r;
+      out.data[i + 1] = g;
+      out.data[i + 2] = b;
+      continue;
+    }
+
+    const l = (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
+    const lit = Math.max(0.02, Math.min(0.98, tint[2] + (l - meanL[m]!) * 0.9));
+    const [nr, ng, nb] = hslToRgb(tint[0], tint[1], lit);
+    out.data[i] = nr;
+    out.data[i + 1] = ng;
+    out.data[i + 2] = nb;
+  }
+
+  ctx.putImageData(out, 0, 0);
+  tintedFrameCache.set(key, ctx.canvas);
+
+  while (tintedFrameCache.size > TINT_CACHE_MAX) {
+    const oldest = tintedFrameCache.keys().next().value;
+    if (oldest === undefined) break;
+    const stale = tintedFrameCache.get(oldest);
+    tintedFrameCache.delete(oldest);
+    if (stale) {
+      stale.width = 0;
+      stale.height = 0;
+    }
+  }
+
+  return ctx.canvas;
 }
 
 /**
  * Draw a frame from a loaded sequence, anchored at the center bottom (hooves).
+ * If a scheme is provided, applies tinting based on the mask.
  */
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
@@ -133,15 +315,25 @@ export function drawFrame(
 
   if (!frame.complete) return false;
 
-  const w = frame.width * opts.scale;
-  const h = frame.height * opts.scale;
+  let imageToDrawn = frame;
+  if (opts.scheme && sequence.maskData) {
+    const tinted = tintFrame(frame, opts.scheme, sequence.maskData);
+    if (tinted) {
+      imageToDrawn = new Image();
+      imageToDrawn.src = tinted.toDataURL();
+      if (!imageToDrawn.complete) return false;
+    }
+  }
+
+  const w = imageToDrawn.width * opts.scale;
+  const h = imageToDrawn.height * opts.scale;
   const dx = x - w / 2;
   const dy = y - h / 2;
 
   ctx.save();
   if (opts.faded) ctx.globalAlpha = 0.5;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(frame, dx, dy, w, h);
+  ctx.drawImage(imageToDrawn, dx, dy, w, h);
   ctx.restore();
   return true;
 }
