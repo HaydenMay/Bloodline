@@ -8,9 +8,16 @@
  */
 
 import type { Silks, Coat } from './palette.js';
-import { coatFor } from './palette.js';
+import { coatFor, COATS } from './palette.js';
 
 const MATERIAL = { body: 1, hair: 2, points: 3, silks: 4, trim: 5, fixed: 6, shine: 7 } as const;
+
+// Collect all fixed material colors that should never be tinted
+const fixedColors = new Set<string>();
+for (const coat of Object.values(COATS)) {
+  fixedColors.add(coat.fixed.toLowerCase());
+  fixedColors.add(coat.shine.toLowerCase());
+}
 
 interface FrameSequence {
   name: string;
@@ -306,10 +313,9 @@ function tintFrame(
       const g = data[i + 1]!;
       const b = data[i + 2]!;
 
-      // Skip tinting pure black and white only for fixed (borders) and shine (eyes)
-      const isPureBlack = r === 0 && g === 0 && b === 0;
-      const isPureWhite = r === 255 && g === 255 && b === 255;
-      if ((isPureBlack && m === MATERIAL.fixed) || (isPureWhite && m === MATERIAL.shine)) {
+      // Skip tinting if pixel exactly matches a fixed or shine color (never tint borders/eyes)
+      const pixelHex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toLowerCase();
+      if (fixedColors.has(pixelHex)) {
         out.data[i] = r;
         out.data[i + 1] = g;
         out.data[i + 2] = b;
