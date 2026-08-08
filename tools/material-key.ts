@@ -52,11 +52,13 @@ export const MATERIAL = {
   trim: 5,
   /** Skin, leather, hoof horn — never tinted. */
   fixed: 6,
+  /** Highlights and shine effects. */
+  shine: 7,
 } as const;
 
 export type Material = (typeof MATERIAL)[keyof typeof MATERIAL];
 
-export const MATERIAL_NAMES = ['none', 'body', 'hair', 'points', 'silks', 'trim', 'fixed'] as const;
+export const MATERIAL_NAMES = ['none', 'body', 'hair', 'points', 'silks', 'trim', 'fixed', 'shine'] as const;
 
 export const materialByName = (name: string): Material | null => {
   const i = MATERIAL_NAMES.indexOf(name as (typeof MATERIAL_NAMES)[number]);
