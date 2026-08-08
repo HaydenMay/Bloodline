@@ -104,12 +104,8 @@ export function mountSilksDemo(host: HTMLElement): void {
     silks: { primary: selectedSilksColor, secondary: selectedTrimColor },
   };
 
-  // Load frame animations for display
-  let eastRunSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null = null;
+  // Load frame animation for display
   let southwestIdleSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null = null;
-  void loadFrameSequence('east-run', 8).then((seq) => {
-    eastRunSequence = seq;
-  });
   void loadFrameSequence('southwest-idle', 9).then((seq) => {
     southwestIdleSequence = seq;
   });
