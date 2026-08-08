@@ -152,23 +152,15 @@ export function mountSilksDemo(host: HTMLElement): void {
     last = now;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw two frame animations side by side
-    const halfWidth = canvas.width / 2;
-    const scale = Math.min(canvas.width / 420, canvas.height / 165);
-    const y = canvas.height * 0.95;
+    // Draw single horse scaled to fill the box
+    const scale = Math.min(canvas.width / 210, canvas.height / 110);
+    const x = canvas.width / 2;
+    const y = canvas.height * 0.65;
 
-    // East-run animation
-    if (eastRunSequence) {
-      const eastX = halfWidth * 0.5;
-      drawHorseShadow(ctx, eastX, y + 2, scale * 1.1);
-      drawFrame(ctx, eastX, y, eastRunSequence, { phase, scale, scheme });
-    }
-
-    // Southwest-idle animation
+    // Southwest-idle animation, scaled up
     if (southwestIdleSequence) {
-      const idleX = halfWidth * 1.5;
-      drawHorseShadow(ctx, idleX, y + 2, scale * 1.1);
-      drawFrame(ctx, idleX, y, southwestIdleSequence, { phase, scale, scheme });
+      drawHorseShadow(ctx, x, y - 22, scale * 1.1);
+      drawFrame(ctx, x, y, southwestIdleSequence, { phase, scale, scheme });
     }
 
     requestAnimationFrame(frame);
