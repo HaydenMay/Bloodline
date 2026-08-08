@@ -334,7 +334,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         ctx.restore();
       }
 
-      drawHorseShadow(ctx, x, y - 20, scale);
+      drawHorseShadow(ctx, x, y - 50, scale);
 
       // Draw frame-based animation if loaded, otherwise fall back to procedural rig.
       if (frameSequence) {
@@ -361,7 +361,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       }
 
       if (isPlayer) {
-        const markerY = y - 160 * scale;
+        const markerY = y - 200 * scale;
         const bounce = Math.sin(performance.now() / 260) * 3;
 
         ctx.fillStyle = UI.accent;
