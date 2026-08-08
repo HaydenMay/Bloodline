@@ -1,6 +1,6 @@
 import { createSurface, startLoop, type Loop, type Surface } from '../render/canvas.js';
 import { drawHorse, drawHorseShadow } from '../render/horse.js';
-import { hashId, RIVAL_SILKS, UI, type Silks } from '../render/palette.js';
+import { hashId, RIVAL_SILKS, SKIN_TONES, UI, type Silks } from '../render/palette.js';
 import { loadFrameSequence, drawFrame } from '../render/frameAnimation.js';
 import {
   drawBackdrop,
@@ -101,6 +101,11 @@ const CALLOUTS = [
   { at: 0.56, text: 'Round the turn' },
   { at: 0.84, text: 'Down the stretch!' },
 ] as const;
+
+function skinToneFor(id: string): string {
+  const hash = hashId(id);
+  return SKIN_TONES[hash % SKIN_TONES.length]!.hex;
+}
 
 export interface RaceScreenOptions {
   host: HTMLElement;
@@ -344,6 +349,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
           scheme: {
             coat: r.coat,
             silks: silksFor.get(r.id)!,
+            jockeySkin: skinToneFor(r.id),
           },
         });
       } else {

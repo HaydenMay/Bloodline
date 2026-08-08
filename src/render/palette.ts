@@ -85,6 +85,23 @@ export interface Silks {
 export const RIVAL_SILKS = SILK_DATA as unknown as Silks[];
 
 /**
+ * Jockey skin tones — the base skin colour is #D4A574, which gets replaced
+ * with one of these selected tones when rendering.
+ */
+export interface SkinTone {
+  hex: string;
+  name: string;
+}
+
+export const SKIN_TONES: SkinTone[] = [
+  { hex: '#D4A574', name: 'Medium Tan' },
+  { hex: '#C9956B', name: 'Dark Tan' },
+  { hex: '#E8B896', name: 'Light Tan' },
+  { hex: '#9B7653', name: 'Deep Brown' },
+  { hex: '#B8956A', name: 'Warm Brown' },
+];
+
+/**
  * A deterministic FNV-1a hash, so a horse's colour follows from its id rather
  * than from wherever it happens to be drawn.
  */

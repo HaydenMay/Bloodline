@@ -35,6 +35,7 @@ interface MaskData {
 export interface Scheme {
   coat: string | Coat;
   silks: Silks;
+  jockeySkin?: string;
 }
 
 const sequences = new Map<string, FrameSequence>();
@@ -266,7 +267,7 @@ function tintFrame(
   if (!maskData || !maskData.mask) return frame;
 
   const coat = typeof scheme.coat === 'string' ? coatFor(scheme.coat) : scheme.coat;
-  const key = `frame-${frameIndex}|${coat.body}|${coat.hair}|${coat.points}|${coat.fixed}|${coat.shine}|${scheme.silks.primary}|${scheme.silks.secondary}`;
+  const key = `frame-${frameIndex}|${coat.body}|${coat.hair}|${coat.points}|${coat.fixed}|${coat.shine}|${scheme.silks.primary}|${scheme.silks.secondary}|${scheme.jockeySkin || ''}`;
 
   const cached = tintedFrameCache.get(key);
   if (cached) {
@@ -319,6 +320,15 @@ function tintFrame(
         out.data[i] = r;
         out.data[i + 1] = g;
         out.data[i + 2] = b;
+        continue;
+      }
+
+      // Replace base skin color with selected jockey skin tone
+      if (scheme.jockeySkin && pixelHex === '#d4a574') {
+        const [skinR, skinG, skinB] = hexToRgb(scheme.jockeySkin);
+        out.data[i] = skinR;
+        out.data[i + 1] = skinG;
+        out.data[i + 2] = skinB;
         continue;
       }
 
