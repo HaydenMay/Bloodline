@@ -7,6 +7,7 @@
  * Frames are recolored using a mask-based tinting system, same as the sprite horse.
  */
 
+import { hexToRgb } from '../../tools/material-key.js';
 import type { Silks, Coat } from './palette.js';
 import { coatFor, COATS } from './palette.js';
 
