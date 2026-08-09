@@ -209,9 +209,11 @@ export function mountCarousel<T>(
       alert('2. Checked onSelect');
       alert(`3. onSelect is: ${hasOnSelect}`);
       if (onSelect) {
-        alert('4. onSelect exists, calling it');
-        onSelect(items[currentIndex]!, currentIndex);
-        alert('5. onSelect call completed');
+        alert('4. About to call onSelect');
+        alert(`4b. onSelect type: ${typeof onSelect}`);
+        const result = onSelect(items[currentIndex]!, currentIndex);
+        alert(`5. onSelect returned: ${typeof result}`);
+        alert('6. onSelect call completed');
       } else {
         alert('ERROR: onSelect is undefined!');
       }
