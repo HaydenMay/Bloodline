@@ -337,7 +337,7 @@ function showTrainingScreen(career: Career): void {
     return;
   }
 
-  teardown = mountTrainingScreen(app, career.horse, (updatedHorse, _session) => {
+  teardown = mountTrainingScreen(app, career.horse, career.playerSilks, (updatedHorse, _session) => {
     const updatedCareer = { ...career, horse: updatedHorse, raceSelected: true };
     saveCareer(updatedCareer);
     showRaceCalendar(updatedCareer);
