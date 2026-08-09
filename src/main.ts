@@ -272,6 +272,9 @@ function generateRandomCareer(): Career {
     stable: {
       world: [],
       dossier: {},
+      settings: {
+        autopilotEnabled: false,
+      },
     },
     createdAt: Date.now() - Math.random() * 100000000,
     lastUpdated: Date.now(),

@@ -26,9 +26,14 @@ export interface RivalDossier {
   };
 }
 
+export interface SaveSettings {
+  autopilotEnabled: boolean;
+}
+
 export interface Stable {
   world: Horse[];
   dossier: RivalDossier;
+  settings: SaveSettings;
 }
 
 export interface Career {
@@ -134,6 +139,9 @@ export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
     stable: {
       world,
       dossier: {},
+      settings: {
+        autopilotEnabled: false,
+      },
     },
     createdAt: Date.now(),
     lastUpdated: Date.now(),
