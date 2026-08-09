@@ -336,7 +336,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // and larger. Sorting by lane keeps the overlap correct.
     const isSmallScreen = width < 600;
     const laneY = (lane: number): number => {
-      const baseY = isSmallScreen ? height * 0.58 : height * 0.68;
+      const baseY = isSmallScreen ? height * 0.58 : height * 0.60;
       const laneSpacing = isSmallScreen ? height * 0.0525 : height * 0.055;
       return baseY + lane * laneSpacing;
     };
