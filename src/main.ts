@@ -787,31 +787,19 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         playerHorse: player,
         dossier: career.stable.dossier,
         onShowOpponents: (returnCallback) => {
-          // Hide intro content
-          const introContent = introStage.querySelector('.race-intro-content') as HTMLElement;
-          if (introContent) {
-            introContent.style.opacity = '0';
-            introContent.style.pointerEvents = 'none';
-          }
-
-          // Show dossier
-          const dossierContainer = document.createElement('div');
-          dossierContainer.className = 'stage';
-          app.appendChild(dossierContainer);
+          // Clear intro and show dossier
+          introStage.innerHTML = '';
 
           dossierTeardown = mountDossierScreen(
-            dossierContainer,
+            introStage,
             field,
             player,
             career.stable.dossier,
             () => {
               // Return to intro
               dossierTeardown?.();
-              dossierContainer.remove();
-              if (introContent) {
-                introContent.style.opacity = '1';
-                introContent.style.pointerEvents = 'auto';
-              }
+              introStage.innerHTML = '';
+              introTeardown?.();
               returnCallback();
             }
           );
