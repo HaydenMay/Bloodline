@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Test helper functions for Bloodline E2E tests.
@@ -46,11 +46,6 @@ export async function completeTrainingWeek(page: Page): Promise<void> {
   // Scroll to see all options and find the advancement path
   await page.evaluate(() => window.scrollBy(0, 1000));
   await page.waitForTimeout(500);
-
-  // Look for week summary section or advancement button
-  // Usually at bottom after all training options
-  const allText = await page.locator('body').textContent();
-  const hasWeekSummary = allText?.includes('Summary') || allText?.includes('total');
 
   console.log('Training screen visible, looking for advancement...');
 
