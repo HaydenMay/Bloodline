@@ -86,10 +86,17 @@ export function mountDossierScreen(
     return container;
   };
 
+  const wrappedOnContinue = () => {
+    alert('DOSSIER: onSelect called - about to call onContinue');
+    console.log('[dossier] onSelect callback invoked');
+    onContinue();
+    alert('DOSSIER: onContinue completed');
+  };
+
   const { teardown, state } = mountCarousel(host, {
     items: rivals,
     renderItem,
-    onSelect: onContinue,
+    onSelect: wrappedOnContinue,
     title: 'Field Dossier',
     selectLabel: 'Start Race',
     className: 'dossier-carousel',
