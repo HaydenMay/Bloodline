@@ -322,7 +322,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // Show a fixed window of TRACK, not a fixed number of pixels — so the
     // relationship between a horse's size and the ground it covers stays
     // correct at any screen size. That relationship is what sells the speed.
-    const visibleMetres = 42;
+    // On mobile, reduce visible metres to show horses larger
+    const visibleMetres = width < 600 ? 28 : 42;
     cam.pixelsPerMetre = width / visibleMetres;
 
     const target = player.distance - (width * 0.36) / cam.pixelsPerMetre;
@@ -333,7 +334,12 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
     // Lane 0 is the rail (furthest from camera), so higher lanes draw nearer
     // and larger. Sorting by lane keeps the overlap correct.
-    const laneY = (lane: number): number => height * 0.68 + lane * (height * 0.055);
+    const isSmallScreen = width < 600;
+    const laneY = (lane: number): number => {
+      const baseY = isSmallScreen ? height * 0.58 : height * 0.68;
+      const laneSpacing = isSmallScreen ? height * 0.065 : height * 0.055;
+      return baseY + lane * laneSpacing;
+    };
     // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
     const baseScale =
       (HORSE_METRES * cam.pixelsPerMetre * HORSE_SCALE) / RIG_UNITS;
