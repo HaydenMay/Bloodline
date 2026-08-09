@@ -2774,7 +2774,7 @@ body {
   /* animation: statSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; */
   opacity: 1;
   animation: none;
-  overflow: hidden;
+  position: relative;
 }
 
 @keyframes statSlideIn {
@@ -2887,6 +2887,10 @@ body {
   justify-content: center;
   padding: 4px 0;
   min-height: 28px;
+  position: absolute;
+  right: -60px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .stat-anim-change {
