@@ -109,13 +109,14 @@ function startRace(seed: string): void {
   let raceScreenTeardown: (() => void) | null = null;
 
   const showRaceScreen = (opts?: { autoStartCountdown?: boolean }): void => {
-    console.log('[showRaceScreen] Starting race screen', { autoStartCountdown: opts?.autoStartCountdown });
-    introTeardown?.();
-    app.innerHTML = '';
+    try {
+      console.log('[showRaceScreen] Starting race screen', { autoStartCountdown: opts?.autoStartCountdown });
+      introTeardown?.();
+      app.innerHTML = '';
 
-    const newStage = document.createElement('div');
-    newStage.className = 'stage';
-    app.appendChild(newStage);
+      const newStage = document.createElement('div');
+      newStage.className = 'stage';
+      app.appendChild(newStage);
 
     const bar = document.createElement('div');
     bar.className = 'racebar';
@@ -182,6 +183,10 @@ function startRace(seed: string): void {
         autopilotToggle.disabled = true;
       },
     });
+    } catch (error) {
+      console.error('[showRaceScreen] Error:', error);
+      app.innerHTML = `<div style="color: red; padding: 20px; font-family: monospace;">Error starting race: ${error instanceof Error ? error.message : String(error)}</div>`;
+    }
   };
 
   const introConfig: RaceIntroConfig = {
@@ -198,9 +203,16 @@ function startRace(seed: string): void {
     if (raceIntro) raceIntro.style.display = 'none';
 
     const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
-      dossierTeardown();
-      if (raceIntro) raceIntro.style.display = '';
-      showRaceScreen();
+      try {
+        console.log('[dossier] Start Race clicked');
+        dossierTeardown();
+        if (raceIntro) raceIntro.style.display = '';
+        console.log('[dossier] About to call showRaceScreen');
+        showRaceScreen();
+        console.log('[dossier] showRaceScreen completed');
+      } catch (error) {
+        console.error('[dossier] Error in Start Race:', error);
+      }
     });
   };
 
