@@ -2775,6 +2775,13 @@ body {
   opacity: 1;
   animation: none;
   position: relative;
+}
+
+.stat-value-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+  height: 28px;
   overflow: hidden;
 }
 
@@ -2797,9 +2804,6 @@ body {
   position: relative;
 }
 
-.stat-anim-row:last-child {
-  /* visible by default */
-}
 
 .stat-anim-label {
   font-size: 11px;
@@ -2816,6 +2820,9 @@ body {
   font-weight: 700;
   font-family: var(--mono);
   color: var(--accent);
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .stat-before {
@@ -2898,15 +2905,19 @@ body {
 @keyframes slideInOut {
   0% {
     opacity: 0;
-    transform: translateX(-100px);
+    transform: translateX(-80px);
   }
-  50% {
+  25% {
     opacity: 1;
     transform: translateX(0);
   }
+  75% {
+    opacity: 1;
+    transform: translateX(50px);
+  }
   100% {
     opacity: 0;
-    transform: translateX(-100px);
+    transform: translateX(120px);
   }
 }
 
@@ -2916,9 +2927,9 @@ body {
   padding: 4px 0;
   min-height: 28px;
   position: absolute;
-  right: -60px;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 86px;
+  top: 16px;
+  z-index: 5;
 }
 
 .stat-anim-change {

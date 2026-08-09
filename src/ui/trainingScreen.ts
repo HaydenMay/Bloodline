@@ -337,16 +337,15 @@ function showTrainingAnimation(
           <div class="stat-anim" style="animation-delay: ${index * 0.1}s">
             <div class="stat-anim-row">
               <span class="stat-anim-label">${stat}</span>
-              <span class="stat-before">${Math.round(oldStats[stat as keyof typeof oldStats])}</span>
+              <div class="stat-value-container">
+                <span class="stat-before">${Math.round(oldStats[stat as keyof typeof oldStats])}</span>
+                <span class="stat-after">${Math.round(newStats[stat as keyof typeof newStats])}</span>
+              </div>
             </div>
             <div class="stat-anim-middle">
               <span class="stat-anim-change ${change > 0 ? 'positive' : 'negative'}">
                 ${change > 0 ? '↑' : '↓'} ${Math.abs(change)}
               </span>
-            </div>
-            <div class="stat-anim-row">
-              <span class="stat-anim-label">${stat}</span>
-              <span class="stat-after">${Math.round(newStats[stat as keyof typeof newStats])}</span>
             </div>
           </div>
         `,
