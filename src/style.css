@@ -3012,9 +3012,6 @@ body {
   flex-direction: column;
   gap: 32px;
   padding-bottom: 40px;
-  max-height: calc(100dvh - 40px);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .recap-container h1 {
@@ -3047,7 +3044,9 @@ body {
 }
 
 .career-stats {
-  display: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
 }
 
 .stat-block {
@@ -3077,7 +3076,10 @@ body {
 }
 
 .career-data {
-  display: none;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
 }
 
 .career-data h3 {
@@ -3129,8 +3131,14 @@ body {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .horse-stats {
@@ -3205,6 +3213,57 @@ body {
   font-size: 12px;
   font-weight: 600;
   border: 1px solid var(--accent-border);
+}
+
+.top-wins-box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.top-wins-box h3 {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.top-wins-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.top-win-item {
+  display: grid;
+  grid-template-columns: 40px 1fr 80px;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
+}
+
+.top-win-item .rank {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.top-win-item .race-name {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.top-win-item .margin {
+  text-align: right;
+  color: var(--ok);
+  font-weight: 700;
+  font-size: 12px;
 }
 
 /* Dossier Carousel (like starter selection) */

@@ -3,7 +3,7 @@ import { TRAITS } from '../data/traits.js';
 import type { TraitId } from '../data/traits.js';
 import { createSurface, startLoop } from '../render/canvas.js';
 import { loadFrameSequence, drawFrame, type DrawFrameOptions } from '../render/frameAnimation.js';
-import type { Silks } from '../render/palette.js';
+import { RIVAL_SILKS } from '../render/palette.js';
 
 export interface TrainingSession {
   id: string;
@@ -109,7 +109,6 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
 export function mountTrainingScreen(
   container: HTMLElement,
   horse: Horse,
-  playerSilks: Silks,
   onTrainingSelect: (horse: Horse, training: TrainingSession) => void,
 ): () => void {
   const root = document.createElement('div');
@@ -197,22 +196,16 @@ export function mountTrainingScreen(
           ctx.fillRect(0, 0, width, height);
 
           const phase = (time * 0.5) % 1;
-
-          // Responsive positioning: adjust x based on viewport width
-          const isSmallScreen = window.innerWidth < 600;
-          const horseX = isSmallScreen ? width * 0.35 : width / 2;
-          const horseY = height * 1.6;
-
           const opts: DrawFrameOptions = {
             phase,
             scale: 4,
             scheme: {
               coat: horse.coat,
-              silks: playerSilks,
+              silks: RIVAL_SILKS[0]!,
             },
           };
 
-          drawFrame(ctx, horseX, horseY, sequence, opts);
+          drawFrame(ctx, width / 2, height * 0.85, sequence, opts);
         },
       );
 

@@ -21,7 +21,6 @@ import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
 import { DEFAULTS } from './data/colors.js';
-import { TRAITS } from './data/traits.js';
 
 /**
  * Phase 2 harness screen.
@@ -200,6 +199,50 @@ function styleLabel(style: string): string {
   }
 }
 
+function generateRandomCareer(): Career {
+  const rng = createRng(Math.random());
+  const names = createNameGenerator(rng);
+  const horse = generateHorse(rng, names, {
+    division: 'open',
+    style: RUNNING_STYLES[Math.floor(Math.random() * RUNNING_STYLES.length)]!,
+    age: 2,
+  });
+  const racesCompleted = Math.floor(Math.random() * 20) + 5;
+  const wins = Math.floor(racesCompleted * Math.random() * 0.6);
+  const losses = racesCompleted - wins;
+  const totalEarnings = wins * 50000 + Math.floor(Math.random() * 100000);
+
+  const raceNames = [
+    'Derby Classic', 'Royal Ascot', 'The Oaks', 'King George VI',
+    'Breeders Cup', 'St Leger', '2000 Guineas', 'Gold Cup',
+  ];
+
+  const topWins = Array.from({ length: Math.min(3, wins) }, (_, i) => ({
+    raceName: raceNames[i % raceNames.length]!,
+    margin: `${Math.floor(Math.random() * 3) + 1}L`,
+  }));
+
+  return {
+    horse,
+    playerSilks: RIVAL_SILKS[Math.floor(Math.random() * RIVAL_SILKS.length)]!,
+    week: Math.floor(Math.random() * 52) + 1,
+    season: Math.floor(Math.random() * 5) + 1,
+    stats: {
+      wins,
+      losses,
+      racesCompleted,
+      totalEarnings,
+      topWins,
+    },
+    stable: {
+      world: [],
+      dossier: {},
+    },
+    createdAt: Date.now() - Math.random() * 100000000,
+    lastUpdated: Date.now(),
+  };
+}
+
 // Development routes
 const params = new URLSearchParams(location.search);
 if (params.has('preview')) {
@@ -219,6 +262,10 @@ if (params.has('preview')) {
   // screen so it never collides with game chrome (the starter carousel's
   // header sat directly under its fixed top-right pill).
   mountRoadmap();
+} else if (params.has('random-retire')) {
+  // ?random-retire shows a simulated retirement screen with random stats
+  const randomCareer = generateRandomCareer();
+  showCareerRecap(randomCareer);
 } else {
   // Default: main menu → starter selection → career
   showMainMenu();
@@ -235,7 +282,6 @@ function showCareerRecap(career: Career): void {
   const recap = document.createElement('div');
   recap.className = 'career-recap';
 
-  const topWin = career.stats.topWins?.[0];
   const rivalCount = Object.keys(career.stable.dossier).length;
 
   recap.innerHTML = `
@@ -273,10 +319,18 @@ function showCareerRecap(career: Career): void {
         </div>
       </div>
 
-      ${topWin ? `
-        <div class="stat-block stat-box" style="animation-delay: 1.4s">
-          <span class="stat-label">Greatest Victory</span>
-          <span class="stat-value">${topWin.raceName} • ${topWin.margin}</span>
+      ${career.stats.topWins.length > 0 ? `
+        <div class="top-wins-box stat-box" style="animation-delay: 1.4s">
+          <h3>Top Wins</h3>
+          <div class="top-wins-list">
+            ${career.stats.topWins.map((win, i) => `
+              <div class="top-win-item">
+                <span class="rank">#${i + 1}</span>
+                <span class="race-name">${win.raceName}</span>
+                <span class="margin">${win.margin}</span>
+              </div>
+            `).join('')}
+          </div>
         </div>
       ` : ''}
 
@@ -306,16 +360,7 @@ function showCareerRecap(career: Career): void {
         </div>
       </div>
 
-      ${career.horse.traits.length > 0 ? `
-        <div class="traits-box stat-box" style="animation-delay: 1.8s">
-          <h3>Traits Learned</h3>
-          <div class="traits-list">
-            ${career.horse.traits.map(t => `<span class="trait-tag">${TRAITS[t].name}</span>`).join('')}
-          </div>
-        </div>
-      ` : ''}
-
-      <div class="recap-actions stat-box" style="animation-delay: 2s">
+      <div class="recap-actions">
         <button class="btn btn-primary" id="new-game-btn">Start New Game</button>
       </div>
     </div>
@@ -383,7 +428,7 @@ function showTrainingScreen(career: Career): void {
     return;
   }
 
-  teardown = mountTrainingScreen(app, career.horse, career.playerSilks, (updatedHorse, _session) => {
+  teardown = mountTrainingScreen(app, career.horse, (updatedHorse, _session) => {
     const updatedCareer = { ...career, horse: updatedHorse, raceSelected: true };
     saveCareer(updatedCareer);
     showRaceCalendar(updatedCareer);
