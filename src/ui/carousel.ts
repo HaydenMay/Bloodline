@@ -201,6 +201,7 @@ export function mountCarousel<T>(
   if (nextBtn) nextBtn.addEventListener('click', next);
 
   selectBtn.addEventListener('click', () => {
+    alert('Select button clicked');
     if (onSelect) {
       onSelect(items[currentIndex]!, currentIndex);
     }
