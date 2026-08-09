@@ -2797,7 +2797,10 @@ body {
 }
 
 .stat-anim-row:last-child {
-  display: none;
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: visible;
 }
 
 .stat-anim-label {
