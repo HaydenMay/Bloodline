@@ -3012,9 +3012,16 @@ body {
   flex-direction: column;
   gap: 32px;
   padding-bottom: 40px;
+  padding-right: 12px;
   max-height: 90vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 600px) {
+  .recap-container {
+    padding-right: 16px;
+  }
 }
 
 .recap-container h1 {
