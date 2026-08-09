@@ -27,6 +27,14 @@ export function mountStarterSelection(
   const badgeCache = new Map<string, string>();
 
   const renderItem = (horse: Horse): HTMLElement => {
+    // Close any open trait tooltips from previous horse
+    document.querySelectorAll<HTMLButtonElement>('.trait-tag.is-open').forEach((tag) => {
+      tag.classList.remove('is-open');
+    });
+    document.querySelectorAll<HTMLDivElement>('.trait-desc').forEach((desc) => {
+      desc.hidden = true;
+    });
+
     const container = document.createElement('div');
     container.className = 'sc-carousel-box';
 
