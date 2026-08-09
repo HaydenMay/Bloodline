@@ -1,8 +1,8 @@
 import type { Horse } from '../sim/types.js';
 import type { RivalDossier } from './career.js';
 import { hashId, RIVAL_SILKS } from '../render/palette.js';
-import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { mountCarousel } from './carousel.js';
+import { createBadgeElement } from './badgeLoader.js';
 
 export function mountDossierScreen(
   host: HTMLElement,
@@ -42,34 +42,9 @@ export function mountDossierScreen(
     const container = document.createElement('div');
     container.className = 'dc-carousel-box';
 
-    const badgeWrap = document.createElement('div');
-    badgeWrap.className = 'dc-badge-wrap';
-
+    const badgeWrap = createBadgeElement(rival.coat, silksFor.get(rival.id)!, badgeCache, rival.id, 'dc-badge', 'Rival badge');
     const infoEl = document.createElement('div');
     infoEl.className = 'dc-carousel-info';
-
-    // Load or use cached badge
-    if (badgeCache.has(rival.id)) {
-      const img = document.createElement('img');
-      img.alt = 'Rival badge';
-      img.className = 'dc-badge';
-      img.src = badgeCache.get(rival.id)!;
-      badgeWrap.appendChild(img);
-    } else {
-      void getBadgeDataUri({ coat: rival.coat, silks: silksFor.get(rival.id)! }).then((uri) => {
-        if (uri) {
-          badgeCache.set(rival.id, uri);
-          const img = badgeWrap.querySelector('img') as HTMLImageElement;
-          if (img) img.src = uri;
-        }
-      }).catch((err) => {
-        console.error(`Failed to load badge for ${rival.name}:`, err);
-      });
-      const img = document.createElement('img');
-      img.alt = 'Rival badge';
-      img.className = 'dc-badge';
-      badgeWrap.appendChild(img);
-    }
 
     container.appendChild(badgeWrap);
     container.appendChild(infoEl);
@@ -120,7 +95,7 @@ export function mountDossierScreen(
     return container;
   };
 
-  const { teardown } = mountCarousel(host, {
+  const { teardown, state } = mountCarousel(host, {
     items: rivals,
     renderItem,
     onSelect: onContinue,
@@ -133,7 +108,31 @@ export function mountDossierScreen(
     showArrows: true,
   });
 
-  return teardown;
+  // Swipe support
+  let touchStartX = 0;
+  let touchStartY = 0;
+  const onTouchStart = (e: TouchEvent): void => {
+    touchStartX = e.touches[0]!.clientX;
+    touchStartY = e.touches[0]!.clientY;
+  };
+  const onTouchEnd = (e: TouchEvent): void => {
+    const dx = e.changedTouches[0]!.clientX - touchStartX;
+    const dy = e.changedTouches[0]!.clientY - touchStartY;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx > 0) state.prev();
+      else state.next();
+    }
+  };
+
+  host.addEventListener('touchstart', onTouchStart, { passive: true });
+  host.addEventListener('touchend', onTouchEnd, { passive: true });
+
+  const originalTeardown = teardown;
+  return (): void => {
+    host.removeEventListener('touchstart', onTouchStart);
+    host.removeEventListener('touchend', onTouchEnd);
+    originalTeardown();
+  };
 }
 
 function styleLabel(style: string): string {

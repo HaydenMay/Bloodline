@@ -3,9 +3,9 @@ import { createNameGenerator } from '../data/names.js';
 import { generateStarterSix } from '../sim/horse.js';
 import type { Horse } from '../sim/types.js';
 import { hashId, RIVAL_SILKS, type Silks } from '../render/palette.js';
-import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { TRAITS } from '../data/traits.js';
 import { mountCarousel } from './carousel.js';
+import { createBadgeElement } from './badgeLoader.js';
 
 export function mountStarterSelection(
   container: HTMLElement,
@@ -38,32 +38,9 @@ export function mountStarterSelection(
     const container = document.createElement('div');
     container.className = 'sc-carousel-box';
 
-    const badgeWrap = document.createElement('div');
-    badgeWrap.className = 'sc-badge-wrap';
-
+    const badgeWrap = createBadgeElement(horse.coat, silksFor.get(horse.id)!, badgeCache, horse.id, 'sc-badge', 'Horse badge');
     const infoEl = document.createElement('div');
     infoEl.className = 'sc-carousel-info';
-
-    // Load or use cached badge
-    if (badgeCache.has(horse.id)) {
-      const img = document.createElement('img');
-      img.alt = 'Horse badge';
-      img.className = 'sc-badge';
-      img.src = badgeCache.get(horse.id)!;
-      badgeWrap.appendChild(img);
-    } else {
-      void getBadgeDataUri({ coat: horse.coat, silks: silksFor.get(horse.id)! }).then((uri) => {
-        if (uri) {
-          badgeCache.set(horse.id, uri);
-          const img = badgeWrap.querySelector('img') as HTMLImageElement;
-          if (img) img.src = uri;
-        }
-      });
-      const img = document.createElement('img');
-      img.alt = 'Horse badge';
-      img.className = 'sc-badge';
-      badgeWrap.appendChild(img);
-    }
 
     container.appendChild(badgeWrap);
     container.appendChild(infoEl);
