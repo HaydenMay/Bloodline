@@ -396,7 +396,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         ctx.restore();
       }
 
-      drawHorseShadow(ctx, x, y + 8, scale);
+      // drawHorseShadow(ctx, x, y + 8, scale);
 
       // Draw frame-based animation if loaded, otherwise fall back to procedural rig.
       if (frameSequence) {
