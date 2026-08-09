@@ -45,6 +45,23 @@ npm run check         # lint + build + test (pre-commit check)
 
 ---
 
+## Next Steps — Phase 3 Completion
+
+**Remaining work to complete Phase 3 (A full career):**
+
+1. **Finish training weeks mechanics** — Complete the other half
+   - Condition states, form tracking, injury system, breakthrough mechanics
+   
+2. **Divisions & promotion/demotion** — Build division system
+   - Points-based division placement, promotion/demotion logic
+   
+3. **Auto-race and skip** — Implement race automation
+   - Auto-play race feature, skip race option
+
+Once Phase 3 is complete, Phase 4 (The Stable) becomes the next priority.
+
+---
+
 ## Navigation
 
 | Document | Purpose |
