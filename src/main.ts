@@ -166,7 +166,18 @@ function startRace(seed: string): void {
     prize: 1000,
   };
 
-  introTeardown = mountRaceIntro(stage, introConfig, showRaceScreen);
+  const showDossier = (returnToIntro: () => void): void => {
+    const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
+      dossierTeardown();
+      returnToIntro();
+    });
+  };
+
+  introTeardown = mountRaceIntro(stage, introConfig, showRaceScreen, {
+    field,
+    playerHorse: player,
+    onShowOpponents: showDossier,
+  });
   teardown = () => {
     introTeardown?.();
     raceScreenTeardown?.();
