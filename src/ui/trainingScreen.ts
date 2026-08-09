@@ -196,16 +196,21 @@ export function mountTrainingScreen(
           ctx.fillRect(0, 0, width, height);
 
           const phase = (time * 0.5) % 1;
+
+          const isSmallScreen = window.innerWidth < 600;
+          const horseX = isSmallScreen ? width * 0.35 : width / 2;
+          const horseY = height * 1.6;
+
           const opts: DrawFrameOptions = {
             phase,
             scale: 4,
             scheme: {
               coat: horse.coat,
-              silks: RIVAL_SILKS[0]!,
+              silks: playerSilks,
             },
           };
 
-          drawFrame(ctx, width / 2, height * 0.85, sequence, opts);
+          drawFrame(ctx, horseX, horseY, sequence, opts);
         },
       );
 
