@@ -190,7 +190,13 @@ export function mountStarterSelection(
   container.addEventListener('touchstart', onTouchStart, { passive: true });
   container.addEventListener('touchend', onTouchEnd, { passive: true });
 
-  return teardown;
+  return () => {
+    // Clean up all trait tooltips before tearing down
+    document.querySelectorAll<HTMLDivElement>('.trait-desc').forEach((desc) => {
+      desc.remove();
+    });
+    teardown();
+  };
 }
 
 function styleLabel(style: string): string {
