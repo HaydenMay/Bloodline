@@ -190,10 +190,10 @@ function startRace(seed: string): void {
     prize: 1000,
   };
 
-  const showDossier = (_returnToIntro: () => void): void => {
+  const showDossier = (returnToIntro: () => void): void => {
     const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
       dossierTeardown();
-      showRaceScreen();
+      returnToIntro();
     });
   };
 
