@@ -2816,7 +2816,7 @@ body {
 }
 
 .stat-after {
-  animation: fadeAfterIn 0.4s ease-out 1.6s forwards;
+  /* animation: fadeAfterIn 0.4s ease-out 1.6s forwards; */
   opacity: 0;
 }
 
