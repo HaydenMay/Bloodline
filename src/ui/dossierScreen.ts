@@ -8,7 +8,7 @@ export function mountDossierScreen(
   host: HTMLElement,
   field: Horse[],
   player: Horse,
-  dossier: RivalDossier,
+  _dossier: RivalDossier,
   onContinue: () => void,
 ): () => void {
   const rivals = field.filter((h) => h.id !== player.id);
@@ -34,11 +34,6 @@ export function mountDossierScreen(
   const badgeCache = new Map<string, string>();
 
   const renderItem = (rival: Horse): HTMLElement => {
-    const entry = dossier[rival.id];
-    const formText = entry
-      ? `${entry.starts} starts · ${entry.wins}W ${entry.places}P ${entry.shows}S`
-      : 'No prior races';
-
     const container = document.createElement('div');
     container.className = 'dc-carousel-box';
 
@@ -52,12 +47,7 @@ export function mountDossierScreen(
     infoEl.innerHTML = `
       <div class="dc-head">
         <h3>${rival.name}</h3>
-        <p class="dc-sub">${formText}</p>
-      </div>
-      <div class="dc-section">Details</div>
-      <div class="dc-row">
-        <div><span class="dc-k">Style</span><span class="dc-v">${styleLabel(rival.style)}</span></div>
-        <div><span class="dc-k">Timing</span><span class="dc-v">${momentLabel(rival.moment)}</span></div>
+        <p class="dc-sub">${styleLabel(rival.style)} &middot; ${momentLabel(rival.moment)}</p>
       </div>
       <div class="dc-section">Distance</div>
       <div class="dc-apt">
