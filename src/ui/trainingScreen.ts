@@ -371,14 +371,6 @@ function showTrainingAnimation(
     overlay.classList.add('show');
   }, 50);
 
-  // Trigger stat-after animation at 2 second mark
-  setTimeout(() => {
-    const statAfters = overlay.querySelectorAll('.stat-after');
-    statAfters.forEach(el => {
-      el.classList.add('animate');
-    });
-  }, 2000);
-
   // Longer duration for breakthroughs (matches 4s animation)
   const duration = isBreakthrough ? 4500 : 4000;
 
