@@ -1603,6 +1603,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 16px;
+  overflow: visible;
 }
 
 /* Container columns for badge and info */
@@ -1701,10 +1702,12 @@ body {
   flex-direction: row;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: visible;
   -webkit-overflow-scrolling: touch;
   gap: 20px;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .sc-inner {
@@ -3600,6 +3603,7 @@ body {
   padding: 20px;
   position: relative;
   min-height: 0;
+  overflow: visible;
 }
 
 .dc-content {
@@ -3608,10 +3612,12 @@ body {
   flex-direction: row;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: visible;
   -webkit-overflow-scrolling: touch;
   gap: 20px;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .dc-inner {
