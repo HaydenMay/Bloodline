@@ -2351,6 +2351,35 @@ body {
   width: 100%;
 }
 
+.dc-dots {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: var(--line);
+  cursor: pointer;
+  padding: 0;
+  touch-action: manipulation;
+}
+
+.dc-dot.is-active {
+  background: var(--accent);
+  width: 20px;
+  border-radius: 4px;
+}
+
+.dc-select {
+  flex: none;
+  width: 100%;
+}
+
 /* Results screen */
 .results-screen {
   width: 100%;
