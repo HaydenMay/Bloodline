@@ -2782,7 +2782,7 @@ body {
   align-items: center;
   position: relative;
   height: 28px;
-  overflow: hidden;
+  min-width: 50px;
 }
 
 @keyframes statSlideIn {
