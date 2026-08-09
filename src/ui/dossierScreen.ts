@@ -87,10 +87,15 @@ export function mountDossierScreen(
   };
 
   const wrappedOnContinue = () => {
-    alert('DOSSIER: onSelect called - about to call onContinue');
-    console.log('[dossier] onSelect callback invoked');
-    onContinue();
-    alert('DOSSIER: onContinue completed');
+    try {
+      alert('DOSSIER: onSelect called - about to call onContinue');
+      onContinue();
+      alert('DOSSIER: onContinue completed');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      alert(`DOSSIER ERROR: ${errorMsg}`);
+      alert(`Stack: ${error instanceof Error ? error.stack : 'no stack'}`);
+    }
   };
 
   const { teardown, state } = mountCarousel(host, {
