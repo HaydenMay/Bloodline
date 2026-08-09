@@ -2815,7 +2815,8 @@ body {
 }
 
 .stat-after {
-  animation: fadeAfterIn 0.4s ease-out forwards;
+  animation: bounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s forwards;
+  opacity: 0;
 }
 
 @keyframes fadeBeforeToChange {
@@ -2833,13 +2834,25 @@ body {
   }
 }
 
-@keyframes fadeAfterIn {
+@keyframes bounceIn {
   0% {
     opacity: 0;
-    transform: translateY(0);
+    transform: scale(0.5);
   }
-  50% {
+  60% {
     opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes floatUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
   }
   100% {
     opacity: 0;
@@ -2861,8 +2874,8 @@ body {
   padding: 4px 8px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.08);
-  /* animation: changeAppearDisappear 2s ease-out forwards; */
-  opacity: 1;
+  animation: floatUp 0.4s ease-out forwards;
+  opacity: 0;
 }
 
 @keyframes changeAppearDisappear {
