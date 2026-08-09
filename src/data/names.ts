@@ -12,6 +12,9 @@ const FIRST = [
   'Crimson', 'Silver', 'Distant', 'Bold', 'Restless', 'Autumn', 'Hidden', 'Grand',
   'Copper', 'Velvet', 'Rapid', 'Solemn', 'Amber', 'Winter', 'Bright', 'Fearless',
   'Shadow', 'Marble', 'Gentle', 'Roman', 'Coastal', 'Highland', 'Lucky', 'Sable',
+  'Fierce', 'Keen', 'Swift', 'Proud', 'True', 'Noble', 'Wise', 'Dark',
+  'Regal', 'Vital', 'Sacred', 'Royal', 'Loyal', 'Brash', 'Sleek', 'Mystic',
+  'Vivid', 'Sharp', 'Daring', 'Graceful', 'Majestic', 'Savage', 'Serene', 'Zesty',
 ] as const;
 
 const SECOND = [
@@ -19,12 +22,17 @@ const SECOND = [
   'Whisper', 'Thunder', 'Ledger', 'Beacon', 'Arrow', 'Chapter', 'Meridian', 'Falcon',
   'Promise', 'Rhythm', 'Sonnet', 'Trooper', 'Wager', 'Cavalier', 'Legacy', 'Sovereign',
   'Marauder', 'Lullaby', 'Comet', 'Bandit', 'Nomad', 'Chancer', 'Reckoning', 'Tempest',
+  'Vessel', 'Oracle', 'Prophet', 'Timber', 'Forge', 'Tide', 'Spark', 'Prism',
+  'Rebel', 'Victor', 'Horizon', 'Phantom', 'Summit', 'Torch', 'Warden', 'Sentinel',
+  'Crown', 'Mantle', 'Scepter', 'Throne', 'Justice', 'Valor', 'Glory', 'Honor',
 ] as const;
 
 /** Single-word names, used occasionally so the field isn't uniformly two-word. */
 const SOLO = [
   'Kingmaker', 'Understudy', 'Firebrand', 'Nightjar', 'Hearsay', 'Landslide',
   'Overture', 'Backdraft', 'Riptide', 'Freehand', 'Nobleman', 'Windfall',
+  'Maverick', 'Phantom', 'Tempest', 'Wildfire', 'Starlight', 'Thunder',
+  'Blaze', 'Eclipse', 'Mirage', 'Vortex', 'Zenith', 'Dynamo',
 ] as const;
 
 /** Combinations that read badly or unfortunately. Checked case-insensitively. */

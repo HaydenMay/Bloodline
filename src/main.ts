@@ -47,18 +47,24 @@ function buildField(seed: string): { field: Horse[]; playerId: string } {
   const rng = createRng(seed);
   const names = createNameGenerator(rng);
 
+  // Draw player index first so we know which horse to generate as player
+  const playerIndex = Math.floor(rng.next() * FIELD_SIZE);
+
   const field: Horse[] = Array.from({ length: FIELD_SIZE }, (_, i) => {
     const horse = generateHorse(rng, names, {
       division: 'open',
       style: RUNNING_STYLES[i % RUNNING_STYLES.length]!,
       age: 4,
     });
+
+    // Reserve player's name so no rival gets it
+    if (i === playerIndex) {
+      names.reserve(horse.name);
+    }
+
     return horse;
   });
 
-  // Draw the player at random, otherwise field[0] always lands on the first
-  // style in the list and you are a front-runner in every single race.
-  const playerIndex = Math.floor(rng.next() * field.length);
   return { field, playerId: field[playerIndex]!.id };
 }
 
