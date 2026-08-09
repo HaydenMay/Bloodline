@@ -3843,8 +3843,8 @@ body {
     font-size: 22px;
   }
 
-  .dc-stats {
-    grid-template-columns: repeat(2, 1fr);
+  .sc-info h3 {
+    font-size: 22px;
   }
 
   .dc-dots {
@@ -3853,14 +3853,6 @@ body {
 
   .dc-start {
     margin: 0 12px 12px 12px;
-  }
-
-  .sc-info h3 {
-    font-size: 22px;
-  }
-
-  .sc-stats {
-    grid-template-columns: repeat(3, 1fr);
   }
 }
 
