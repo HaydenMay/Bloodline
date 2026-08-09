@@ -203,12 +203,20 @@ export function mountCarousel<T>(
   if (nextBtn) nextBtn.addEventListener('click', next);
 
   selectBtn.addEventListener('click', () => {
-    alert('Select button clicked');
-    alert(`onSelect exists: ${!!onSelect}`);
-    if (onSelect) {
-      alert('About to call onSelect');
-      onSelect(items[currentIndex]!, currentIndex);
-      alert('onSelect completed');
+    try {
+      alert('1. Button clicked');
+      const hasOnSelect = !!onSelect;
+      alert('2. Checked onSelect');
+      alert(`3. onSelect is: ${hasOnSelect}`);
+      if (onSelect) {
+        alert('4. onSelect exists, calling it');
+        onSelect(items[currentIndex]!, currentIndex);
+        alert('5. onSelect call completed');
+      } else {
+        alert('ERROR: onSelect is undefined!');
+      }
+    } catch (e) {
+      alert(`CATCH: ${e}`);
     }
   });
 
