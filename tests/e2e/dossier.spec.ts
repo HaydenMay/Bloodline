@@ -45,18 +45,18 @@ test('Dossier View Opponents flow: race intro → dossier → start race', async
   await startRaceButton.click();
   console.log('Clicked Start Race from dossier');
 
-  // 4. VERIFY RETURN TO RACE INTRO
-  console.log('=== VERIFY RETURN TO RACE INTRO ===');
+  // 4. VERIFY PRE-RACE CARD LOADED
+  console.log('=== VERIFY PRE-RACE CARD ===');
   await page.waitForTimeout(500);
   await page.screenshot({ path: '/tmp/after-start-race-final.png' });
 
-  // Verify we're back at race intro (look for race details again)
+  // Verify we're at the pre-race card (Riders, take your marks screen)
   const returnedBodyText = await page.locator('body').textContent();
-  const hasDistance = returnedBodyText?.includes('Distance');
-  const hasGoing = returnedBodyText?.includes('Going');
+  const hasKickText = returnedBodyText?.includes('KICK');
+  const hasPullText = returnedBodyText?.includes('PULL');
 
-  if (!hasDistance || !hasGoing) {
-    throw new Error('Failed to return to race intro. Current text: ' + returnedBodyText?.substring(0, 200));
+  if (!hasKickText || !hasPullText) {
+    throw new Error('Failed to reach pre-race card. Current text: ' + returnedBodyText?.substring(0, 200));
   }
 
   // Verify dossier is gone
@@ -69,5 +69,5 @@ test('Dossier View Opponents flow: race intro → dossier → start race', async
     throw new Error('Dossier carousel still visible after Start Race click');
   }
 
-  console.log('✓ Successfully tested full flow: Race Intro → Dossier → Start Race → Back to Race Intro');
+  console.log('✓ Successfully tested full flow: Race Intro → Dossier → Start Race → Pre-race Card');
 });

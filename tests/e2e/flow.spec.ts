@@ -32,13 +32,15 @@ test.describe('Dossier / View Opponents', () => {
     await page.screenshot({ path: 'tests/e2e/screenshots/dossier-open.png' });
     console.log('✓ Dossier opened successfully');
 
-    // Click Start Race to return to race intro
+    // Click Start Race to proceed to pre-race card
     await clickStartRaceOnDossier(page);
 
-    // Verify returned to race intro
-    await verifyReturnedToRaceIntro(page);
-    await page.screenshot({ path: 'tests/e2e/screenshots/back-at-race-intro.png' });
-    console.log('✓ Successfully returned to race intro');
+    // Verify we're at the pre-race card (Riders, take your marks screen)
+    const bodyText = await page.locator('body').textContent();
+    expect(bodyText).toContain('KICK');
+    expect(bodyText).toContain('PULL');
+    await page.screenshot({ path: 'tests/e2e/screenshots/pre-race-card.png' });
+    console.log('✓ Successfully navigated to pre-race card');
   });
 
   test('dossier carousel can navigate between opponents', async ({ page }) => {
