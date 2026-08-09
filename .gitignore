@@ -27,3 +27,4 @@ tools/output/
 playwright-report/
 test-results/
 screenshot-*.png
+tests/e2e/screenshots/
