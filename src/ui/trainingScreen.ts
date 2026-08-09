@@ -20,6 +20,41 @@ export interface TrainingSession {
 }
 
 export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
+  gatePractice: {
+    id: 'gatePractice',
+    name: 'Gate Practice',
+    description: 'Refine your break technique.',
+    statEffects: { speed: 2, grit: 1 },
+    traitPool: ['alert', 'professional'],
+  },
+  gallopsWork: {
+    id: 'gallopsWork',
+    name: 'Gallops Work',
+    description: 'Extended aerobic conditioning.',
+    statEffects: { stamina: 2, grit: 1 },
+    traitPool: ['cruiser', 'relentless'],
+  },
+  recovery: {
+    id: 'recovery',
+    name: 'Recovery Day',
+    description: 'Focused restoration and balance.',
+    statEffects: { stamina: 1, grit: 1, temper: 1 },
+    traitPool: ['tractable', 'goodDoer'],
+  },
+  restDay: {
+    id: 'restDay',
+    name: 'Rest Day',
+    description: 'Complete recovery and adaptation.',
+    statEffects: { stamina: 1, temper: 1 },
+    traitPool: ['tractable', 'goodDoer'],
+  },
+  crossTraining: {
+    id: 'crossTraining',
+    name: 'Cross Training',
+    description: 'Varied conditioning routines.',
+    statEffects: { speed: 1, stamina: 1, burst: 1 },
+    traitPool: ['professional', 'tractable'],
+  },
   swimming: {
     id: 'swimming',
     name: 'Swimming',
@@ -41,13 +76,6 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
     statEffects: { grit: 3, stamina: 2, speed: -1 },
     traitPool: ['grinder', 'bulldozer'],
   },
-  gatePractice: {
-    id: 'gatePractice',
-    name: 'Gate Practice',
-    description: 'Refine your break technique.',
-    statEffects: { speed: 2, grit: 1 },
-    traitPool: ['alert', 'professional'],
-  },
   breezing: {
     id: 'breezing',
     name: 'Breezing',
@@ -62,20 +90,6 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
     statEffects: { stamina: 2, burst: 1, grit: -1 },
     traitPool: ['cruiser', 'ironLungs'],
   },
-  crossTraining: {
-    id: 'crossTraining',
-    name: 'Cross Training',
-    description: 'Varied conditioning routines.',
-    statEffects: { speed: 1, stamina: 1, burst: 1 },
-    traitPool: ['professional', 'tractable'],
-  },
-  recovery: {
-    id: 'recovery',
-    name: 'Recovery Day',
-    description: 'Focused restoration and balance.',
-    statEffects: { stamina: 1, grit: 1, temper: 1 },
-    traitPool: ['tractable', 'goodDoer'],
-  },
   jumpingDrills: {
     id: 'jumpingDrills',
     name: 'Jumping Drills',
@@ -83,26 +97,12 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
     statEffects: { burst: 2, temper: 1, speed: -1 },
     traitPool: ['alert', 'coiled'],
   },
-  gallopsWork: {
-    id: 'gallopsWork',
-    name: 'Gallops Work',
-    description: 'Extended aerobic conditioning.',
-    statEffects: { stamina: 2, grit: 1 },
-    traitPool: ['cruiser', 'relentless'],
-  },
   intervalTraining: {
     id: 'intervalTraining',
     name: 'Interval Training',
     description: 'High-intensity alternating pace.',
     statEffects: { speed: 3, stamina: 2, temper: -2 },
     traitPool: ['turnOfFoot', 'professional'],
-  },
-  restDay: {
-    id: 'restDay',
-    name: 'Rest Day',
-    description: 'Complete recovery and adaptation.',
-    statEffects: { stamina: 1, temper: 1 },
-    traitPool: ['tractable', 'goodDoer'],
   },
 };
 
