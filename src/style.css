@@ -449,23 +449,38 @@ body {
 .rb-autopilot {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   cursor: pointer;
   user-select: none;
   font-size: 12px;
+  font-weight: 600;
   color: var(--muted);
   flex: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.rb-autopilot:hover {
+  color: var(--text);
+  background: rgba(242, 193, 78, 0.08);
 }
 
 .rb-autopilot input[type="checkbox"] {
   width: 16px;
   height: 16px;
+  min-width: 16px;
   cursor: pointer;
   accent-color: var(--accent);
+  transition: transform 0.2s ease;
 }
 
-.rb-autopilot:hover {
-  color: var(--text);
+.rb-autopilot input[type="checkbox"]:checked {
+  transform: scale(1.1);
+}
+
+.rb-autopilot input[type="checkbox"]:hover {
+  transform: scale(1.15);
 }
 
 .rb-skip,

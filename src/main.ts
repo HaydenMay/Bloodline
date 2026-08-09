@@ -43,6 +43,15 @@ const app: HTMLDivElement = appEl;
 let teardown: (() => void) | null = null;
 let autopilot = false;
 
+// Track skip race unlock status
+function isSkipRaceUnlocked(): boolean {
+  return localStorage.getItem('skipRaceUnlocked') === 'true';
+}
+
+function unlockSkipRace(): void {
+  localStorage.setItem('skipRaceUnlocked', 'true');
+}
+
 function buildField(seed: string): { field: Horse[]; playerId: string } {
   const rng = createRng(seed);
   const names = createNameGenerator(rng);
@@ -412,6 +421,8 @@ function showCareerRecap(career: Career): void {
 }
 
 function showSkipRaceUnlock(): void {
+  unlockSkipRace();
+
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
   modal.innerHTML = `
@@ -715,6 +726,13 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
       const skipBtn = bar.querySelector<HTMLButtonElement>('#skip-race-btn')!;
       const autoBtn = bar.querySelector<HTMLButtonElement>('#auto-race-btn')!;
 
+      // Hide skip/auto-race if not yet unlocked
+      const skipUnlocked = isSkipRaceUnlocked();
+      if (!skipUnlocked) {
+        skipBtn.style.display = 'none';
+        autoBtn.style.display = 'none';
+      }
+
       raceScreenTeardown = mountRaceScreen({
         host: stage,
         field,
@@ -727,12 +745,14 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
           hype: raceHype,
         },
         autopilotToggle,
-        skipToggle: skipBtn,
-        autoRaceToggle: autoBtn,
+        ...(skipUnlocked && { skipToggle: skipBtn }),
+        ...(skipUnlocked && { autoRaceToggle: autoBtn }),
         onRaceStart: () => {
           autopilotToggle.disabled = true;
-          skipBtn.disabled = false;
-          autoBtn.disabled = false;
+          if (skipUnlocked) {
+            skipBtn.disabled = false;
+            autoBtn.disabled = false;
+          }
         },
         onFinish,
       });
