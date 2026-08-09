@@ -45,7 +45,7 @@ export function mountResultsScreen(
   placings.forEach((placing, i) => {
     const position = i + 1;
     const marginSecs = (placing.finishTime ?? winnerTime) - winnerTime;
-    const marginLengths = Math.round(marginSecs * 20 * 10) / 10; // Rough conversion: 20 m/s ≈ horse length per 0.05s
+    const marginLengths = Math.round(marginSecs * 2 * 10) / 10; // Rough conversion: 6 m/s ≈ horse length per 0.4s
     const isPlayer = placing.id === playerHorseId;
 
     const row = document.createElement('div');
