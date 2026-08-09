@@ -310,6 +310,7 @@ function showTrainingAnimation(
     grit: newStats.grit - oldStats.grit,
     burst: newStats.burst - oldStats.burst,
     temper: newStats.temper - oldStats.temper,
+    consistency: newStats.consistency - oldStats.consistency,
   };
 
   overlay.innerHTML = `
@@ -332,12 +333,21 @@ function showTrainingAnimation(
         ${Object.entries(statChanges)
           .filter(([_, change]) => change !== 0)
           .map(
-            ([stat, change]) => `
-          <div class="stat-anim">
-            <span class="stat-anim-label">${stat}</span>
-            <span class="stat-anim-change ${change > 0 ? 'positive' : 'negative'}">
-              ${change > 0 ? '+' : ''}${change}
-            </span>
+            ([stat, change], index) => `
+          <div class="stat-anim" style="animation-delay: ${index * 0.1}s">
+            <div class="stat-anim-row">
+              <span class="stat-anim-label">${stat}</span>
+              <span class="stat-before">${Math.round(oldStats[stat as keyof typeof oldStats])}</span>
+            </div>
+            <div class="stat-anim-middle">
+              <span class="stat-anim-change ${change > 0 ? 'positive' : 'negative'}">
+                ${change > 0 ? '↑' : '↓'} ${Math.abs(change)}
+              </span>
+            </div>
+            <div class="stat-anim-row">
+              <span class="stat-anim-label">${stat}</span>
+              <span class="stat-after">${Math.round(newStats[stat as keyof typeof newStats])}</span>
+            </div>
           </div>
         `,
           )
