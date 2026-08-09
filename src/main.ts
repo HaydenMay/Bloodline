@@ -625,10 +625,20 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
 
       hintText.innerHTML = 'Tap or hold spacebar to kick · hold tap to take a pull';
 
+      // Load saved autopilot preference
+      autopilotToggle.checked = career.stable.settings.autopilotEnabled;
+      if (autopilotToggle.checked) {
+        hintText.innerHTML = 'Watch the race · autopilot is on';
+      }
+
       autopilotToggle.addEventListener('change', (e) => {
-        hintText.innerHTML = (e.target as HTMLInputElement).checked
+        const isChecked = (e.target as HTMLInputElement).checked;
+        hintText.innerHTML = isChecked
           ? 'Watch the race · autopilot is on'
           : 'Tap or hold spacebar to kick · hold tap to take a pull';
+        // Save autopilot preference
+        career.stable.settings.autopilotEnabled = isChecked;
+        saveCareer(career);
       });
 
       // Generate silks for all horses in the field

@@ -15,7 +15,7 @@
 import { DEFAULTS } from '../data/colors.js';
 
 /** Bump this whenever the shape of StableSave changes. */
-export const CURRENT_VERSION = 1;
+export const CURRENT_VERSION = 2;
 
 export const SLOT_COUNT = 3;
 
@@ -64,6 +64,7 @@ export interface SaveSettings {
   musicVolume: number;
   sfxVolume: number;
   textScale: number;
+  autopilotEnabled: boolean;
 }
 
 export const defaultSettings = (): SaveSettings => ({
@@ -75,6 +76,7 @@ export const defaultSettings = (): SaveSettings => ({
   musicVolume: 0.7,
   sfxVolume: 0.9,
   textScale: 1,
+  autopilotEnabled: false,
 });
 
 export const createStable = (stableName: string, seed: string): StableSave => ({

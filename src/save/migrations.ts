@@ -13,9 +13,13 @@ import { CURRENT_VERSION } from './schema.js';
 type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
 
 const migrations: Record<number, Migration> = {
-  // Example of the shape, for when the first real one is needed:
-  //
-  // 1: (data) => ({ ...data, facilities: {} }),   // v1 -> v2
+  1: (data) => ({
+    ...data,
+    settings: {
+      ...(data.settings as Record<string, unknown>),
+      autopilotEnabled: false,
+    },
+  }),
 };
 
 export class SaveTooNewError extends Error {
