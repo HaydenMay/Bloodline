@@ -11,6 +11,7 @@ export function mountDossierScreen(
   _dossier: RivalDossier,
   onContinue: () => void,
 ): () => void {
+  alert('Dossier mounted');
   const rivals = field.filter((h) => h.id !== player.id);
 
   if (rivals.length === 0) {
