@@ -866,6 +866,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const held = performance.now() - pressedAt;
     input.takingBack = false;
     if (held < HOLD_MS) tap();
+    pressedAt = 0; // Reset state for next press
   };
 
   host.addEventListener("pointerdown", down);
