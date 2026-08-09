@@ -199,6 +199,50 @@ function styleLabel(style: string): string {
   }
 }
 
+function generateRandomCareer(): Career {
+  const rng = createRng(Math.random());
+  const names = createNameGenerator(rng);
+  const horse = generateHorse(rng, names, {
+    division: 'open',
+    style: RUNNING_STYLES[Math.floor(Math.random() * RUNNING_STYLES.length)]!,
+    age: 2,
+  });
+  const racesCompleted = Math.floor(Math.random() * 20) + 5;
+  const wins = Math.floor(racesCompleted * Math.random() * 0.6);
+  const losses = racesCompleted - wins;
+  const totalEarnings = wins * 50000 + Math.floor(Math.random() * 100000);
+
+  const raceNames = [
+    'Derby Classic', 'Royal Ascot', 'The Oaks', 'King George VI',
+    'Breeders Cup', 'St Leger', '2000 Guineas', 'Gold Cup',
+  ];
+
+  const topWins = Array.from({ length: Math.min(3, wins) }, (_, i) => ({
+    raceName: raceNames[i % raceNames.length]!,
+    margin: `${Math.floor(Math.random() * 3) + 1}L`,
+  }));
+
+  return {
+    horse,
+    playerSilks: RIVAL_SILKS[Math.floor(Math.random() * RIVAL_SILKS.length)]!,
+    week: Math.floor(Math.random() * 52) + 1,
+    season: Math.floor(Math.random() * 5) + 1,
+    stats: {
+      wins,
+      losses,
+      racesCompleted,
+      totalEarnings,
+      topWins,
+    },
+    stable: {
+      world: [],
+      dossier: {},
+    },
+    createdAt: Date.now() - Math.random() * 100000000,
+    lastUpdated: Date.now(),
+  };
+}
+
 // Development routes
 const params = new URLSearchParams(location.search);
 if (params.has('preview')) {
@@ -218,6 +262,10 @@ if (params.has('preview')) {
   // screen so it never collides with game chrome (the starter carousel's
   // header sat directly under its fixed top-right pill).
   mountRoadmap();
+} else if (params.has('random-retire')) {
+  // ?random-retire shows a simulated retirement screen with random stats
+  const randomCareer = generateRandomCareer();
+  showCareerRecap(randomCareer);
 } else {
   // Default: main menu → starter selection → career
   showMainMenu();
@@ -233,40 +281,83 @@ function showCareerRecap(career: Career): void {
 
   const recap = document.createElement('div');
   recap.className = 'career-recap';
+
+  const rivalCount = Object.keys(career.stable.dossier).length;
+
   recap.innerHTML = `
     <div class="recap-container">
       <h1>Career Summary</h1>
-      <div class="horse-info">
+      <div class="horse-info stat-box" style="animation-delay: 0s">
         <h2>${career.horse.name}</h2>
         <p>${styleLabel(career.horse.style)} • ${momentLabel(career.horse.moment)}</p>
       </div>
 
-      <div class="career-stats">
-        <div class="stat-block">
+      <div class="stats-grid">
+        <div class="stat-block stat-box" style="animation-delay: 0.2s">
           <span class="stat-label">Races Completed</span>
           <span class="stat-number">${career.stats.racesCompleted}</span>
         </div>
-        <div class="stat-block">
+        <div class="stat-block stat-box" style="animation-delay: 0.4s">
           <span class="stat-label">Wins</span>
           <span class="stat-number">${career.stats.wins}</span>
         </div>
-        <div class="stat-block">
+        <div class="stat-block stat-box" style="animation-delay: 0.6s">
           <span class="stat-label">Losses</span>
           <span class="stat-number">${career.stats.losses}</span>
         </div>
-        <div class="stat-block">
+        <div class="stat-block stat-box" style="animation-delay: 0.8s">
           <span class="stat-label">Win Rate</span>
           <span class="stat-number">${winRate}%</span>
         </div>
-        <div class="stat-block">
+        <div class="stat-block stat-box" style="animation-delay: 1s">
           <span class="stat-label">Total Earnings</span>
           <span class="stat-number">$${career.stats.totalEarnings.toLocaleString()}</span>
         </div>
+        <div class="stat-block stat-box" style="animation-delay: 1.2s">
+          <span class="stat-label">Rivals Encountered</span>
+          <span class="stat-number">${rivalCount}</span>
+        </div>
       </div>
 
-      <div class="career-data">
-        <h3>Saved Career Data</h3>
-        <pre>${JSON.stringify(career, null, 2)}</pre>
+      ${career.stats.topWins.length > 0 ? `
+        <div class="top-wins-box stat-box" style="animation-delay: 1.4s">
+          <h3>Top Wins</h3>
+          <div class="top-wins-list">
+            ${career.stats.topWins.map((win, i) => `
+              <div class="top-win-item">
+                <span class="rank">#${i + 1}</span>
+                <span class="race-name">${win.raceName}</span>
+                <span class="margin">${win.margin}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="horse-stats stat-box" style="animation-delay: 1.6s">
+        <h3>Final Stats</h3>
+        <div class="stats-row">
+          <div class="stat-item">
+            <span class="label">Speed</span>
+            <span class="value">${Math.round(career.horse.stats.speed)}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Stamina</span>
+            <span class="value">${Math.round(career.horse.stats.stamina)}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Grit</span>
+            <span class="value">${Math.round(career.horse.stats.grit)}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Burst</span>
+            <span class="value">${Math.round(career.horse.stats.burst)}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Temper</span>
+            <span class="value">${Math.round(career.horse.stats.temper)}</span>
+          </div>
+        </div>
       </div>
 
       <div class="recap-actions">
