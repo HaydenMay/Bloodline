@@ -196,6 +196,12 @@ export function mountTrainingScreen(
           ctx.fillRect(0, 0, width, height);
 
           const phase = (time * 0.5) % 1;
+
+          // Responsive positioning: adjust x and y based on viewport width
+          const isSmallScreen = window.innerWidth < 600;
+          const horseX = isSmallScreen ? width * 0.65 : width / 2;
+          const horseY = isSmallScreen ? height * 1.2 : height * 1.6;
+
           const opts: DrawFrameOptions = {
             phase,
             scale: 4,
@@ -205,7 +211,7 @@ export function mountTrainingScreen(
             },
           };
 
-          drawFrame(ctx, width / 2, height * 1.6, sequence, opts);
+          drawFrame(ctx, horseX, horseY, sequence, opts);
         },
       );
 
