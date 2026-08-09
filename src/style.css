@@ -2145,6 +2145,8 @@ body {
   font-size: 14px;
   font-weight: 700;
   color: var(--accent);
+  position: relative;
+  z-index: 1;
 }
 
 .sc-traits {
@@ -2320,6 +2322,8 @@ body {
   font-size: 14px;
   font-weight: 700;
   color: var(--accent);
+  position: relative;
+  z-index: 1;
 }
 
 .sc-dots {
