@@ -337,9 +337,10 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     calloutUntil = performance.now() + 2200;
   };
 
-  const drawFlash = (ctx: CanvasRenderingContext2D, x: number, y: number, alpha: number): void => {
+  const drawFlash = (ctx: CanvasRenderingContext2D, x: number, y: number, alpha: number, screenWidth: number): void => {
     // Draw a concave diamond (camera flash symbol) with pinched sides
-    const size = 6;
+    // Scale size based on screen width: smaller on mobile, larger on desktop
+    const size = screenWidth < 600 ? 8 : 6;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = 'white';
@@ -388,7 +389,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     drawDistanceMarkers(ctx, height, cam, totalMetres);
 
     // Spawn camera flashes from the crowd
-    if (Math.random() < 0.4) {
+    // Slightly higher spawn rate on mobile for better visibility
+    const spawnRate = width < 600 ? 0.45 : 0.4;
+    if (Math.random() < spawnRate) {
       spawnFlash();
     }
 
@@ -402,7 +405,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         // Fade in quickly, then fade out
         const progress = flash.age / flash.duration;
         const alpha = progress < 0.3 ? progress / 0.3 : 1 - (progress - 0.3) / 0.7;
-        drawFlash(ctx, flash.x, flash.y, alpha);
+        drawFlash(ctx, flash.x, flash.y, alpha, width);
       }
     }
 
