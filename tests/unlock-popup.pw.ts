@@ -68,9 +68,15 @@ test('Skip race unlock popup appears after 20 races', async ({ page }) => {
   // Wait for unlock popup to appear
   await page.waitForSelector('.modal-overlay', { timeout: 5000 });
 
+  // Screenshot 1: Before the popup (career recap screen)
+  await page.screenshot({ path: 'screenshot-1-before-popup.png' });
+
   // Verify the popup content
   const popup = page.locator('.unlock-popup');
   await expect(popup).toBeVisible();
+
+  // Screenshot 2: During the popup
+  await page.screenshot({ path: 'screenshot-2-during-popup.png' });
 
   const heading = popup.locator('h2');
   await expect(heading).toContainText('Feature Unlocked');
@@ -84,6 +90,12 @@ test('Skip race unlock popup appears after 20 races', async ({ page }) => {
 
   // Click OK to close popup
   await okBtn.click();
+
+  // Wait for popup to disappear
+  await page.waitForTimeout(500);
+
+  // Screenshot 3: After the popup closes
+  await page.screenshot({ path: 'screenshot-3-after-popup.png' });
 
   // Verify popup disappears
   await expect(popup).not.toBeVisible({ timeout: 2000 });
