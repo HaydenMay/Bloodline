@@ -205,7 +205,7 @@ export function mountTrainingScreen(
             },
           };
 
-          drawFrame(ctx, width / 2, height * 0.95, sequence, opts);
+          drawFrame(ctx, width / 2, height * 0.3, sequence, opts);
         },
       );
 
