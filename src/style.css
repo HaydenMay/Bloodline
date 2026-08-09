@@ -2907,6 +2907,9 @@ body {
     opacity: 0;
     transform: translateX(60px);
   }
+  50% {
+    opacity: 1;
+  }
   100% {
     opacity: 0;
     transform: translateX(-60px);
