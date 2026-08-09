@@ -4,7 +4,7 @@ import {
   type Loop,
   type Surface,
 } from "../render/canvas.js";
-import { drawHorse, drawHorseShadow } from "../render/horse.js";
+import { drawHorse } from "../render/horse.js";
 import {
   hashId,
   RIVAL_SILKS,
