@@ -200,7 +200,7 @@ export function mountTrainingScreen(
           // Responsive positioning: adjust x and y based on viewport width
           const isSmallScreen = window.innerWidth < 600;
           const horseX = isSmallScreen ? width * 0.35 : width / 2;
-          const horseY = isSmallScreen ? height * 1.8 : height * 1.6;
+          const horseY = isSmallScreen ? height * 1.7 : height * 1.6;
 
           const opts: DrawFrameOptions = {
             phase,
