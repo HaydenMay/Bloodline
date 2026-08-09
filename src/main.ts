@@ -401,6 +401,31 @@ function showCareerRecap(career: Career): void {
   const newGameBtn = recap.querySelector<HTMLButtonElement>('#new-game-btn')!;
   newGameBtn.addEventListener('click', () => {
     deleteCareer();
+
+    // Show unlock popup if this was a full 20-race career
+    if (career.stats.racesCompleted >= 20) {
+      showSkipRaceUnlock();
+    } else {
+      showMainMenu();
+    }
+  });
+}
+
+function showSkipRaceUnlock(): void {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-content unlock-popup">
+      <h2>🏁 Feature Unlocked!</h2>
+      <p>You've completed a full career! You've unlocked <strong>Skip Race</strong> for future careers.</p>
+      <p>Use it to quickly jump through races you don't want to watch, and focus on training and strategy.</p>
+      <button class="btn btn-primary" id="unlock-ok">Got it</button>
+    </div>
+  `;
+  app.appendChild(modal);
+
+  modal.querySelector('#unlock-ok')!.addEventListener('click', () => {
+    modal.remove();
     showMainMenu();
   });
 }
