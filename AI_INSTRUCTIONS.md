@@ -39,11 +39,9 @@ npm run check         # lint + build + test (pre-commit check)
 
 ## Session Log
 
-**Session Summary (Updated 2026-08-09):**
+**Session Summary (Updated [DATE]):**
 
-Integrated frame-based sprite animations for racing and idle poses. Fixed horse positioning on race screen (laneY baseline 0.58→0.68) so hooves sit on ground instead of floating. Implemented randomized jockey skin tones system with 5 realistic palette options (#D4A574 base color, deterministically selected per horse ID). Extended Scheme interface to support `jockeySkin` property and updated tintFrame() to detect/replace base skin color. Updated material-key points color from #0F0D0D to more saturated maroon (#3D2B2B) with full ramp for better classification. Fixed silks preview height (50vh→40vh) for responsive layout. Added hexToRgb utility imported from material-key. All masks regenerated. Artwork cleaned up. All work committed directly to main.
-
-**Next Steps:** Either continue with bug fixes (pants flashing issues, mask classification edge cases) or proceed to next feature from NEXT_PLAN.md. Recommend checking NEXT_PLAN.md first to see what's prioritized.
+[Session notes here — will be cleared when new chat starts]
 
 ---
 
