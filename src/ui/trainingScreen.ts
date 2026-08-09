@@ -3,7 +3,7 @@ import { TRAITS } from '../data/traits.js';
 import type { TraitId } from '../data/traits.js';
 import { createSurface, startLoop } from '../render/canvas.js';
 import { loadFrameSequence, drawFrame, type DrawFrameOptions } from '../render/frameAnimation.js';
-import { RIVAL_SILKS } from '../render/palette.js';
+import type { Silks } from '../render/palette.js';
 
 export interface TrainingSession {
   id: string;
@@ -109,6 +109,7 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
 export function mountTrainingScreen(
   container: HTMLElement,
   horse: Horse,
+  playerSilks: Silks,
   onTrainingSelect: (horse: Horse, training: TrainingSession) => void,
 ): () => void {
   const root = document.createElement('div');
