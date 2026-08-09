@@ -2812,7 +2812,7 @@ body {
 }
 
 .stat-before {
-  animation: fadeBeforeToChange 2s ease-out forwards;
+  /* animation: fadeBeforeToChange 2s ease-out forwards; */
 }
 
 .stat-after {
@@ -2864,8 +2864,8 @@ body {
   padding: 4px 8px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.08);
-  animation: changeAppearDisappear 2s ease-out forwards;
-  opacity: 0;
+  /* animation: changeAppearDisappear 2s ease-out forwards; */
+  opacity: 1;
 }
 
 @keyframes changeAppearDisappear {
