@@ -184,8 +184,10 @@ function startRace(seed: string): void {
       },
     });
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('[showRaceScreen] Error:', error);
-      app.innerHTML = `<div style="color: red; padding: 20px; font-family: monospace;">Error starting race: ${error instanceof Error ? error.message : String(error)}</div>`;
+      alert(`Error starting race: ${errorMsg}`);
+      app.innerHTML = `<div style="color: red; padding: 20px; font-family: monospace;">Error starting race: ${errorMsg}</div>`;
     }
   };
 
@@ -211,7 +213,9 @@ function startRace(seed: string): void {
         showRaceScreen();
         console.log('[dossier] showRaceScreen completed');
       } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
         console.error('[dossier] Error in Start Race:', error);
+        alert(`Error in Start Race: ${errorMsg}`);
       }
     });
   };
