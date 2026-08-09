@@ -3708,66 +3708,6 @@ body {
   font-weight: 600;
 }
 
-.dc-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-top: 8px;
-}
-
-.dc-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 12px 8px;
-}
-
-.dc-stat-label {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.dc-stat-value {
-  font-size: 20px;
-  color: var(--accent);
-  font-weight: 700;
-}
-
-.dc-dots {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--line);
-}
-
-.dc-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  transition: all 0.2s ease;
-}
-
-.dc-dot:hover {
-  border-color: var(--accent);
-  background: var(--accent-faint);
-}
-
-.dc-dot.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-}
 
 .dc-start {
   margin: 0 20px 16px 20px;
