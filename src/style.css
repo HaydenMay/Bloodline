@@ -1767,19 +1767,6 @@ body {
   font-size: clamp(12px, 3vw, 14px);
 }
 
-.sc-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding: 10px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  justify-items: center;
-  max-width: fit-content;
-  margin: 0 auto;
-}
-
 .sc-traits {
   display: flex;
   flex-direction: column;
