@@ -21,6 +21,7 @@ import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
 import { DEFAULTS } from './data/colors.js';
+import { TRAITS } from './data/traits.js';
 
 /**
  * Phase 2 harness screen.
@@ -233,43 +234,88 @@ function showCareerRecap(career: Career): void {
 
   const recap = document.createElement('div');
   recap.className = 'career-recap';
+
+  const topWin = career.stats.topWins?.[0];
+  const rivalCount = Object.keys(career.stable.dossier).length;
+
   recap.innerHTML = `
     <div class="recap-container">
       <h1>Career Summary</h1>
-      <div class="horse-info">
+      <div class="horse-info stat-box" style="animation-delay: 0s">
         <h2>${career.horse.name}</h2>
         <p>${styleLabel(career.horse.style)} • ${momentLabel(career.horse.moment)}</p>
       </div>
 
-      <div class="career-stats">
-        <div class="stat-block">
+      <div class="stats-grid">
+        <div class="stat-block stat-box" style="animation-delay: 0.2s">
           <span class="stat-label">Races Completed</span>
           <span class="stat-number">${career.stats.racesCompleted}</span>
         </div>
-        <div class="stat-block">
+        <div class="stat-block stat-box" style="animation-delay: 0.4s">
           <span class="stat-label">Wins</span>
           <span class="stat-number">${career.stats.wins}</span>
         </div>
-        <div class="stat-block">
+        <div class="stat-block stat-box" style="animation-delay: 0.6s">
           <span class="stat-label">Losses</span>
           <span class="stat-number">${career.stats.losses}</span>
         </div>
-        <div class="stat-block">
+        <div class="stat-block stat-box" style="animation-delay: 0.8s">
           <span class="stat-label">Win Rate</span>
           <span class="stat-number">${winRate}%</span>
         </div>
-        <div class="stat-block">
+        <div class="stat-block stat-box" style="animation-delay: 1s">
           <span class="stat-label">Total Earnings</span>
           <span class="stat-number">$${career.stats.totalEarnings.toLocaleString()}</span>
         </div>
+        <div class="stat-block stat-box" style="animation-delay: 1.2s">
+          <span class="stat-label">Rivals Encountered</span>
+          <span class="stat-number">${rivalCount}</span>
+        </div>
       </div>
 
-      <div class="career-data">
-        <h3>Saved Career Data</h3>
-        <pre>${JSON.stringify(career, null, 2)}</pre>
+      ${topWin ? `
+        <div class="stat-block stat-box" style="animation-delay: 1.4s">
+          <span class="stat-label">Greatest Victory</span>
+          <span class="stat-value">${topWin.raceName} • ${topWin.margin}</span>
+        </div>
+      ` : ''}
+
+      <div class="horse-stats stat-box" style="animation-delay: 1.6s">
+        <h3>Final Stats</h3>
+        <div class="stats-row">
+          <div class="stat-item">
+            <span class="label">Speed</span>
+            <span class="value">${Math.round(career.horse.stats.speed)}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Stamina</span>
+            <span class="value">${Math.round(career.horse.stats.stamina)}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Grit</span>
+            <span class="value">${Math.round(career.horse.stats.grit)}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Burst</span>
+            <span class="value">${Math.round(career.horse.stats.burst)}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Temper</span>
+            <span class="value">${Math.round(career.horse.stats.temper)}</span>
+          </div>
+        </div>
       </div>
 
-      <div class="recap-actions">
+      ${career.horse.traits.length > 0 ? `
+        <div class="traits-box stat-box" style="animation-delay: 1.8s">
+          <h3>Traits Learned</h3>
+          <div class="traits-list">
+            ${career.horse.traits.map(t => `<span class="trait-tag">${TRAITS[t].name}</span>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="recap-actions stat-box" style="animation-delay: 2s">
         <button class="btn btn-primary" id="new-game-btn">Start New Game</button>
       </div>
     </div>
