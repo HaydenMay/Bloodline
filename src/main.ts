@@ -200,7 +200,7 @@ function startRace(seed: string): void {
     const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
       dossierTeardown();
       if (raceIntro) raceIntro.style.display = '';
-      showRaceScreen({ autoStartCountdown: true });
+      showRaceScreen();
     });
   };
 
