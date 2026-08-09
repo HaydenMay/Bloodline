@@ -3115,17 +3115,24 @@ body {
 
 /* Animated stat boxes */
 @keyframes slideUpFade {
-  from {
+  0% {
     opacity: 0;
+    visibility: hidden;
     transform: translateY(40px);
   }
-  to {
+  1% {
+    visibility: visible;
+  }
+  100% {
     opacity: 1;
+    visibility: visible;
     transform: translateY(0);
   }
 }
 
 .stat-box {
+  opacity: 0;
+  visibility: hidden;
   animation: slideUpFade 0.6s ease-out forwards;
 }
 
