@@ -201,6 +201,7 @@ function startRace(seed: string): void {
   };
 
   const showDossier = (_returnToIntro: () => void): void => {
+    alert('>>> showDossier() WAS CALLED <<<');
     // Hide the race intro while showing dossier
     const raceIntro = stage.querySelector<HTMLElement>('.race-intro');
     if (raceIntro) raceIntro.style.display = 'none';
