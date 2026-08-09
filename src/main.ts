@@ -109,6 +109,7 @@ function startRace(seed: string): void {
   let raceScreenTeardown: (() => void) | null = null;
 
   const showRaceScreen = (opts?: { autoStartCountdown?: boolean }): void => {
+    console.log('[showRaceScreen] Starting race screen', { autoStartCountdown: opts?.autoStartCountdown });
     introTeardown?.();
     app.innerHTML = '';
 

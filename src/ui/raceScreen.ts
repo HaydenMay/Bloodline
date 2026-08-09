@@ -1011,8 +1011,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   // Auto-start countdown if requested (e.g., when starting from View Opponents)
   if (autoStartCountdown) {
+    console.log('[raceScreen] Auto-starting countdown');
     beginCountdown();
   }
+
+  console.log('[raceScreen] Race screen initialized', { autoStartCountdown, loopRunning: !!loop });
 
   return (): void => {
     loop.stop();
