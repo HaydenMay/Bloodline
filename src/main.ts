@@ -191,8 +191,13 @@ function startRace(seed: string): void {
   };
 
   const showDossier = (returnToIntro: () => void): void => {
+    // Hide the race intro while showing dossier
+    const raceIntro = stage.querySelector<HTMLElement>('.race-intro');
+    if (raceIntro) raceIntro.style.display = 'none';
+
     const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
       dossierTeardown();
+      if (raceIntro) raceIntro.style.display = '';
       returnToIntro();
     });
   };
