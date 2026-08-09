@@ -371,8 +371,8 @@ function showTrainingAnimation(
     overlay.classList.add('show');
   }, 50);
 
-  // Longer duration for breakthroughs
-  const duration = isBreakthrough ? 2000 : 1500;
+  // Longer duration for breakthroughs (matches 4s animation)
+  const duration = isBreakthrough ? 4500 : 4000;
 
   // Wait for animation to complete and transition
   setTimeout(() => {

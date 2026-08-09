@@ -24,3 +24,6 @@ logs/
 # Test / harness output
 coverage/
 tools/output/
+playwright-report/
+test-results/
+screenshot-*.png

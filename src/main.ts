@@ -43,6 +43,15 @@ const app: HTMLDivElement = appEl;
 let teardown: (() => void) | null = null;
 let autopilot = false;
 
+// Track skip race unlock status
+function isSkipRaceUnlocked(): boolean {
+  return localStorage.getItem('skipRaceUnlocked') === 'true';
+}
+
+function unlockSkipRace(): void {
+  localStorage.setItem('skipRaceUnlocked', 'true');
+}
+
 function buildField(seed: string): { field: Horse[]; playerId: string } {
   const rng = createRng(seed);
   const names = createNameGenerator(rng);
@@ -155,6 +164,10 @@ function startRace(seed: string): void {
     const skipBtn = bar.querySelector<HTMLButtonElement>('#skip-race-btn')!;
     const autoBtn = bar.querySelector<HTMLButtonElement>('#auto-race-btn')!;
 
+    // Demo mode: hide skip and auto-race, only autopilot for testing
+    skipBtn.style.display = 'none';
+    autoBtn.style.display = 'none';
+
     raceScreenTeardown = mountRaceScreen({
       host: newStage,
       field,
@@ -162,13 +175,9 @@ function startRace(seed: string): void {
       playerSilks,
       config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
       autopilotToggle,
-      skipToggle: skipBtn,
-      autoRaceToggle: autoBtn,
       onRaceStart: () => {
         // Lock autopilot once race starts — can't change during race
         autopilotToggle.disabled = true;
-        skipBtn.disabled = false;
-        autoBtn.disabled = false;
       },
     });
   };
@@ -401,6 +410,33 @@ function showCareerRecap(career: Career): void {
   const newGameBtn = recap.querySelector<HTMLButtonElement>('#new-game-btn')!;
   newGameBtn.addEventListener('click', () => {
     deleteCareer();
+
+    // Show unlock popup if this was a full 20-race career
+    if (career.stats.racesCompleted >= 20) {
+      showSkipRaceUnlock();
+    } else {
+      showMainMenu();
+    }
+  });
+}
+
+function showSkipRaceUnlock(): void {
+  unlockSkipRace();
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-content unlock-popup">
+      <h2>🏁 Feature Unlocked!</h2>
+      <p>You've completed a full career! You've unlocked <strong>Skip Race</strong> for future careers.</p>
+      <p>Use it to quickly jump through races you don't want to watch, and focus on training and strategy.</p>
+      <button class="btn btn-primary" id="unlock-ok">Got it</button>
+    </div>
+  `;
+  app.appendChild(modal);
+
+  modal.querySelector('#unlock-ok')!.addEventListener('click', () => {
+    modal.remove();
     showMainMenu();
   });
 }
@@ -690,6 +726,13 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
       const skipBtn = bar.querySelector<HTMLButtonElement>('#skip-race-btn')!;
       const autoBtn = bar.querySelector<HTMLButtonElement>('#auto-race-btn')!;
 
+      // Hide skip/auto-race if not yet unlocked
+      const skipUnlocked = isSkipRaceUnlocked();
+      if (!skipUnlocked) {
+        skipBtn.style.display = 'none';
+        autoBtn.style.display = 'none';
+      }
+
       raceScreenTeardown = mountRaceScreen({
         host: stage,
         field,
@@ -702,12 +745,14 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
           hype: raceHype,
         },
         autopilotToggle,
-        skipToggle: skipBtn,
-        autoRaceToggle: autoBtn,
+        ...(skipUnlocked && { skipToggle: skipBtn }),
+        ...(skipUnlocked && { autoRaceToggle: autoBtn }),
         onRaceStart: () => {
           autopilotToggle.disabled = true;
-          skipBtn.disabled = false;
-          autoBtn.disabled = false;
+          if (skipUnlocked) {
+            skipBtn.disabled = false;
+            autoBtn.disabled = false;
+          }
         },
         onFinish,
       });
