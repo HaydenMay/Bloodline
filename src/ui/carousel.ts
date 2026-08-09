@@ -204,8 +204,11 @@ export function mountCarousel<T>(
 
   selectBtn.addEventListener('click', () => {
     alert('Select button clicked');
+    alert(`onSelect exists: ${!!onSelect}`);
     if (onSelect) {
+      alert('About to call onSelect');
       onSelect(items[currentIndex]!, currentIndex);
+      alert('onSelect completed');
     }
   });
 
