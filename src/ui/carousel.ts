@@ -132,6 +132,7 @@ export function mountCarousel<T>(
   selectBtn.id = `${cssPrefix}-select`;
   selectBtn.textContent = selectLabel;
   root.appendChild(selectBtn);
+  alert(`Select button created: ${selectLabel}`);
 
   host.appendChild(root);
 
