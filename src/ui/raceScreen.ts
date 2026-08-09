@@ -337,7 +337,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const isSmallScreen = width < 600;
     const laneY = (lane: number): number => {
       const baseY = isSmallScreen ? height * 0.58 : height * 0.68;
-      const laneSpacing = isSmallScreen ? height * 0.065 : height * 0.055;
+      const laneSpacing = isSmallScreen ? height * 0.04 : height * 0.055;
       return baseY + lane * laneSpacing;
     };
     // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
