@@ -71,27 +71,27 @@ export function mountStarterSelection(
       </div>
       <div class="sc-section">Attributes</div>
       <div class="sc-stats">
-        <div class="sc-stat">
+        <div class="sc-stat" title="Acceleration and top speed during races">
           <span class="sc-stat-label">Speed</span>
           <span class="sc-stat-value">${Math.round(horse.stats.speed)}</span>
         </div>
-        <div class="sc-stat">
+        <div class="sc-stat" title="Endurance to maintain effort over distance">
           <span class="sc-stat-label">Stamina</span>
           <span class="sc-stat-value">${Math.round(horse.stats.stamina)}</span>
         </div>
-        <div class="sc-stat">
+        <div class="sc-stat" title="Ability to accelerate rapidly in short bursts">
           <span class="sc-stat-label">Burst</span>
           <span class="sc-stat-value">${Math.round(horse.stats.burst)}</span>
         </div>
-        <div class="sc-stat">
+        <div class="sc-stat" title="Resilience and ability to recover when fatigued">
           <span class="sc-stat-label">Grit</span>
           <span class="sc-stat-value">${Math.round(horse.stats.grit)}</span>
         </div>
-        <div class="sc-stat">
+        <div class="sc-stat" title="Composure and ability to handle pressure in close races">
           <span class="sc-stat-label">Temper</span>
           <span class="sc-stat-value">${Math.round(horse.stats.temper)}</span>
         </div>
-        <div class="sc-stat">
+        <div class="sc-stat" title="Reliable performance across different race conditions">
           <span class="sc-stat-label">Consistency</span>
           <span class="sc-stat-value">${Math.round(horse.stats.consistency)}</span>
         </div>
