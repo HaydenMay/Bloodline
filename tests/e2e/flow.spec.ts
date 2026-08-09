@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { verifyAtRaceIntro, openViewOpponents, waitForDossier, clickStartRaceOnDossier, verifyReturnedToRaceIntro } from './helpers';
+import { verifyAtRaceIntro, openViewOpponents, waitForDossier, clickStartRaceOnDossier } from './helpers';
 
 /**
  * Dossier / View Opponents Flow Tests
