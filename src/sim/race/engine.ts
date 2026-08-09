@@ -407,8 +407,12 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
   // must sit to clear the cooldown.
   const raceSeconds = totalMetres / BASE_SPEED;
 
+  // Shuffle lanes so player doesn't always start in lane 0
+  const lanes = Array.from({ length: entrants.length }, (_, i) => i % LANE_COUNT);
+  rng.shuffle(lanes);
+
   const runners: Runner[] = entrants.map((e, i) =>
-    makeRunner(e.horse, i % LANE_COUNT, config, rng, raceSeconds),
+    makeRunner(e.horse, lanes[i]!, config, rng, raceSeconds),
   );
 
   let elapsed = 0;

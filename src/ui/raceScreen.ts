@@ -388,27 +388,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
       const isPlayer = r.id === playerHorseId;
 
-      // Spotlight the player's horse on the track itself — a small arrow above
-      // it was far too easy to lose in a pack of eight.
-      if (isPlayer) {
-        ctx.save();
-        const glow = ctx.createRadialGradient(
-          x,
-          y - 8,
-          4,
-          x,
-          y - 8,
-          70 * (scale / baseScale) + 46,
-        );
-        glow.addColorStop(0, UI.accentMedium);
-        glow.addColorStop(1, "rgba(242,193,78,0)");
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(x, y - 8, 70 * (scale / baseScale) + 46, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-
       // drawHorseShadow(ctx, x, y + 8, scale);
 
       // Draw frame-based animation if loaded, otherwise fall back to procedural rig.
