@@ -155,6 +155,10 @@ function startRace(seed: string): void {
     const skipBtn = bar.querySelector<HTMLButtonElement>('#skip-race-btn')!;
     const autoBtn = bar.querySelector<HTMLButtonElement>('#auto-race-btn')!;
 
+    // Demo mode: hide skip and auto-race, only autopilot for testing
+    skipBtn.style.display = 'none';
+    autoBtn.style.display = 'none';
+
     raceScreenTeardown = mountRaceScreen({
       host: newStage,
       field,
@@ -162,13 +166,9 @@ function startRace(seed: string): void {
       playerSilks,
       config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
       autopilotToggle,
-      skipToggle: skipBtn,
-      autoRaceToggle: autoBtn,
       onRaceStart: () => {
         // Lock autopilot once race starts — can't change during race
         autopilotToggle.disabled = true;
-        skipBtn.disabled = false;
-        autoBtn.disabled = false;
       },
     });
   };
