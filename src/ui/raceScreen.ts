@@ -144,6 +144,7 @@ export interface RaceScreenOptions {
   autoRaceToggle?: HTMLButtonElement;
   onRaceStart?: () => void;
   onFinish?: (placings: RunnerSnapshot[]) => void;
+  autoStartCountdown?: boolean;
 }
 
 export function mountRaceScreen(opts: RaceScreenOptions): () => void {
@@ -157,6 +158,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     skipToggle,
     autoRaceToggle,
     onRaceStart,
+    autoStartCountdown,
   } = opts;
 
   // Read autopilot state from toggle element when race starts, not when button clicked
@@ -1006,6 +1008,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   };
 
   const loop: Loop = startLoop(TICK_HZ, tick, draw);
+
+  // Auto-start countdown if requested (e.g., when starting from View Opponents)
+  if (autoStartCountdown) {
+    beginCountdown();
+  }
 
   return (): void => {
     loop.stop();

@@ -108,7 +108,7 @@ function startRace(seed: string): void {
   let introTeardown: (() => void) | null = null;
   let raceScreenTeardown: (() => void) | null = null;
 
-  const showRaceScreen = (): void => {
+  const showRaceScreen = (opts?: { autoStartCountdown?: boolean }): void => {
     introTeardown?.();
     app.innerHTML = '';
 
@@ -175,6 +175,7 @@ function startRace(seed: string): void {
       playerSilks,
       config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
       autopilotToggle,
+      autoStartCountdown: opts?.autoStartCountdown ?? false,
       onRaceStart: () => {
         // Lock autopilot once race starts — can't change during race
         autopilotToggle.disabled = true;
@@ -198,7 +199,7 @@ function startRace(seed: string): void {
     const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
       dossierTeardown();
       if (raceIntro) raceIntro.style.display = '';
-      showRaceScreen();
+      showRaceScreen({ autoStartCountdown: true });
     });
   };
 
