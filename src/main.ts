@@ -206,6 +206,7 @@ function startRace(seed: string): void {
     if (raceIntro) raceIntro.style.display = 'none';
 
     const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
+      alert('>>> DOSSIER CALLBACK FIRED <<<');
       try {
         alert('Start Race clicked');
         console.log('[dossier] Start Race clicked');
