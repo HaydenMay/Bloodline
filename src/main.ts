@@ -110,6 +110,7 @@ function startRace(seed: string): void {
 
   const showRaceScreen = (opts?: { autoStartCountdown?: boolean }): void => {
     try {
+      alert('showRaceScreen started');
       console.log('[showRaceScreen] Starting race screen', { autoStartCountdown: opts?.autoStartCountdown });
       introTeardown?.();
       app.innerHTML = '';
@@ -206,11 +207,14 @@ function startRace(seed: string): void {
 
     const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
       try {
+        alert('Start Race clicked');
         console.log('[dossier] Start Race clicked');
         dossierTeardown();
         if (raceIntro) raceIntro.style.display = '';
+        alert('Calling showRaceScreen');
         console.log('[dossier] About to call showRaceScreen');
         showRaceScreen();
+        alert('showRaceScreen completed');
         console.log('[dossier] showRaceScreen completed');
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
