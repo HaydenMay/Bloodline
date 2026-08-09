@@ -357,6 +357,10 @@ function showCareerRecap(career: Career): void {
             <span class="label">Temper</span>
             <span class="value">${Math.round(career.horse.stats.temper)}</span>
           </div>
+          <div class="stat-item">
+            <span class="label">Consistency</span>
+            <span class="value">${Math.round(career.horse.stats.consistency)}</span>
+          </div>
         </div>
       </div>
 
