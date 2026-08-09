@@ -40,6 +40,7 @@ export function mountCarousel<T>(
   host: HTMLElement,
   config: CarouselConfig<T>,
 ): { teardown: () => void; state: CarouselState<T> } {
+  alert(`mountCarousel called with selectLabel: ${config.selectLabel || 'undefined'}`);
   const {
     items,
     renderItem,
