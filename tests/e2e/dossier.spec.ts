@@ -1,64 +1,73 @@
 import { test, expect } from '@playwright/test';
 
-test('View Opponents Start Race button navigates back to race intro', async ({ page }) => {
-  // Load the app with the test-race parameter to get straight to a race
+test('Dossier View Opponents flow: race intro → dossier → start race', async ({ page }) => {
+  // Use the test-race parameter to jump straight to race intro
+  // This simulates having gone through: starter → training → race calendar → selected a race
   await page.goto('/?test-race');
 
-  // Wait for the race intro screen to load
+  console.log('=== RACE INTRO ===');
   await expect(page).toHaveTitle('Bloodline');
 
-  // Wait for "Field Dossier" or "View Opponents" button to appear in the race intro
+  // Wait for race intro to load
   await page.waitForTimeout(2000);
+  await page.screenshot({ path: '/tmp/race-intro-test.png' });
 
-  // Take a screenshot to see the race intro screen
-  await page.screenshot({ path: '/tmp/race-intro.png' });
-
-  // Look for the button that shows opponents - it might be labeled differently
-  // Check what's actually on the page
+  // Verify we're at the race intro by looking for race details
   const bodyText = await page.locator('body').textContent();
-  console.log('Race intro screen content:', bodyText?.substring(0, 300));
+  console.log('At race intro, body contains:', bodyText?.substring(0, 150));
 
-  // Try to find any button that might show opponents
-  const allButtons = await page.locator('button').allTextContents();
-  console.log('Available buttons:', allButtons);
-
-  // If there's a View Opponents or similar button, click it
-  const viewOpponentsButton = page.locator('button:has-text("View Opponents")');
-  const count = await viewOpponentsButton.count();
-
-  if (count > 0) {
-    console.log('Found View Opponents button');
-    await viewOpponentsButton.click();
-
-    // Wait for the dossier carousel to appear
-    await page.locator('.dossier-carousel').waitFor({ state: 'visible', timeout: 10000 });
-
-    // Take a screenshot of the dossier screen
-    await page.screenshot({ path: '/tmp/dossier-screen-2.png' });
-
-    // Verify the title is "Field Dossier"
-    await expect(page.locator('text=Field Dossier')).toBeVisible();
-
-    // Click the Start Race button
-    const startRaceButton = page.locator('button:has-text("Start Race")');
-    await startRaceButton.click();
-
-    // Wait a moment for navigation
-    await page.waitForTimeout(500);
-
-    // Take a screenshot after clicking Start Race
-    await page.screenshot({ path: '/tmp/after-start-race-2.png' });
-
-    // Verify that we're back at the race intro screen
-    // Look for elements that indicate we're back at the intro
-    const postRaceBody = await page.locator('body').textContent();
-    console.log('After Start Race click:', postRaceBody?.substring(0, 300));
-
-    // The race intro should be visible again
-    const testRaceText = page.locator('text=Test Race');
-    await expect(testRaceText).toBeVisible({ timeout: 5000 });
-  } else {
-    console.log('View Opponents button not found');
-    throw new Error('View Opponents button not found on race intro screen');
+  if (!bodyText?.includes('Distance') || !bodyText?.includes('Going')) {
+    throw new Error('Race intro not found');
   }
+
+  // 1. CLICK VIEW OPPONENTS
+  console.log('=== VIEW OPPONENTS ===');
+  const viewOpponentsButton = page.locator('button:has-text("View Opponents")');
+  await expect(viewOpponentsButton).toBeVisible({ timeout: 5000 });
+  await viewOpponentsButton.click();
+  console.log('Clicked View Opponents');
+
+  // 2. DOSSIER CAROUSEL LOADS
+  console.log('=== DOSSIER SCREEN ===');
+  const dossierCarousel = page.locator('.dossier-carousel');
+  await dossierCarousel.waitFor({ state: 'visible', timeout: 10000 });
+
+  const fieldDossierTitle = page.locator('text=Field Dossier');
+  await expect(fieldDossierTitle).toBeVisible();
+  console.log('Dossier screen loaded');
+
+  await page.screenshot({ path: '/tmp/dossier-screen-loaded.png' });
+
+  // 3. CLICK START RACE BUTTON
+  console.log('=== CLICK START RACE ===');
+  const startRaceButton = page.locator('button:has-text("Start Race")');
+  await expect(startRaceButton).toBeVisible();
+  await startRaceButton.click();
+  console.log('Clicked Start Race from dossier');
+
+  // 4. VERIFY RETURN TO RACE INTRO
+  console.log('=== VERIFY RETURN TO RACE INTRO ===');
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: '/tmp/after-start-race-final.png' });
+
+  // Verify we're back at race intro (look for race details again)
+  const returnedBodyText = await page.locator('body').textContent();
+  const hasDistance = returnedBodyText?.includes('Distance');
+  const hasGoing = returnedBodyText?.includes('Going');
+
+  if (!hasDistance || !hasGoing) {
+    throw new Error('Failed to return to race intro. Current text: ' + returnedBodyText?.substring(0, 200));
+  }
+
+  // Verify dossier is gone
+  const dossierVisible = await dossierCarousel.count() > 0 && await page.evaluate(() => {
+    const elem = document.querySelector('.dossier-carousel');
+    return elem && window.getComputedStyle(elem).display !== 'none';
+  });
+
+  if (dossierVisible) {
+    throw new Error('Dossier carousel still visible after Start Race click');
+  }
+
+  console.log('✓ Successfully tested full flow: Race Intro → Dossier → Start Race → Back to Race Intro');
 });
