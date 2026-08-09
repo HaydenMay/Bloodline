@@ -127,6 +127,8 @@ function startRace(seed: string): void {
           <input type="checkbox" id="autopilot-toggle" ${autopilot ? 'checked' : ''}>
           <span>Autopilot</span>
         </label>
+        <button class="rb-skip" id="skip-race-btn" disabled>Skip Race</button>
+        <button class="rb-auto" id="auto-race-btn" disabled>Auto-race</button>
       </div>
       <div class="rb-hint" id="rb-hint-text">Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b></div>
       <button class="rb-again">New race</button>
@@ -150,6 +152,9 @@ function startRace(seed: string): void {
       startRace(`race-${Math.floor(Math.random() * 1e9)}`);
     });
 
+    const skipBtn = bar.querySelector<HTMLButtonElement>('#skip-race-btn')!;
+    const autoBtn = bar.querySelector<HTMLButtonElement>('#auto-race-btn')!;
+
     raceScreenTeardown = mountRaceScreen({
       host: newStage,
       field,
@@ -157,9 +162,13 @@ function startRace(seed: string): void {
       playerSilks,
       config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
       autopilotToggle,
+      skipToggle: skipBtn,
+      autoRaceToggle: autoBtn,
       onRaceStart: () => {
         // Lock autopilot once race starts — can't change during race
         autopilotToggle.disabled = true;
+        skipBtn.disabled = false;
+        autoBtn.disabled = false;
       },
     });
   };
@@ -564,6 +573,8 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
             <input type="checkbox" id="autopilot-toggle">
             Autopilot
           </label>
+          <button class="rb-skip" id="skip-race-btn" disabled>Skip Race</button>
+          <button class="rb-auto" id="auto-race-btn" disabled>Auto-race</button>
         </div>
         <div class="rb-callout" id="callout"></div>
       `;
@@ -676,6 +687,9 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         }, field, silksMap);
       };
 
+      const skipBtn = bar.querySelector<HTMLButtonElement>('#skip-race-btn')!;
+      const autoBtn = bar.querySelector<HTMLButtonElement>('#auto-race-btn')!;
+
       raceScreenTeardown = mountRaceScreen({
         host: stage,
         field,
@@ -688,8 +702,12 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
           hype: raceHype,
         },
         autopilotToggle,
+        skipToggle: skipBtn,
+        autoRaceToggle: autoBtn,
         onRaceStart: () => {
           autopilotToggle.disabled = true;
+          skipBtn.disabled = false;
+          autoBtn.disabled = false;
         },
         onFinish,
       });

@@ -140,6 +140,8 @@ export interface RaceScreenOptions {
   playerSilks: Silks;
   config: RaceConfig;
   autopilotToggle?: HTMLInputElement;
+  skipToggle?: HTMLButtonElement;
+  autoRaceToggle?: HTMLButtonElement;
   onRaceStart?: () => void;
   onFinish?: (placings: RunnerSnapshot[]) => void;
 }
@@ -152,6 +154,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     playerSilks,
     config,
     autopilotToggle,
+    skipToggle,
+    autoRaceToggle,
     onRaceStart,
   } = opts;
 
@@ -219,6 +223,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   let callout = "";
   let calloutUntil = 0;
   let finishedAt = 0;
+  let skipRace = false;
+  let autoRaceActive = false;
   // Built once at the wire. The finish screen redraws every frame and
   // race.outcome() re-sorts and re-measures the whole field each call.
   let finalRecap: Recap | null = null;
@@ -256,8 +262,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       if (countdownEndsAt !== 0 && performance.now() >= countdownEndsAt) {
         started = true;
         countdownEndsAt = 0;
-        // Register player input only if NOT on autopilot
-        if (!getAutopilot() && !playerInputRegistered) {
+        // Register player input only if NOT on autopilot and not auto-racing
+        if (!getAutopilot() && !playerInputRegistered && !autoRaceActive) {
           playerInputRegistered = true;
           race.setPlayer(playerHorseId, input);
         }
@@ -268,9 +274,13 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     }
     if (!running) return;
 
-    prev = curr;
-    running = race.step();
-    curr = race.snapshot();
+    // Fast-forward when skipping: run many steps per frame
+    const stepsPerFrame = skipRace ? 100 : 1;
+    for (let i = 0; i < stepsPerFrame && running; i++) {
+      prev = curr;
+      running = race.step();
+      curr = race.snapshot();
+    }
 
     for (const e of curr.fresh) {
       if (e.kind === "phase" && e.detail) setCallout(e.detail);
@@ -294,6 +304,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
           (a.finishTime ?? 1e9) - (b.finishTime ?? 1e9) ||
           b.distance - a.distance,
       );
+      // Disable skip and auto-race buttons when race finishes
+      if (skipToggle) skipToggle.disabled = true;
+      if (autoRaceToggle) autoRaceToggle.disabled = true;
       opts.onFinish?.(placings);
     }
   };
@@ -888,6 +901,32 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   };
   window.addEventListener("keydown", key);
   window.addEventListener("keyup", key);
+
+  // Skip race button
+  if (skipToggle) {
+    skipToggle.addEventListener("click", () => {
+      if (running && started) {
+        skipRace = true;
+      }
+    });
+  }
+
+  // Auto-race button
+  if (autoRaceToggle) {
+    autoRaceToggle.addEventListener("click", () => {
+      if (running && started && !getAutopilot()) {
+        autoRaceActive = true;
+        // Register player input (or rather, stop accepting it and switch to AI)
+        if (!playerInputRegistered) {
+          playerInputRegistered = true;
+          race.setPlayer(playerHorseId, input);
+        }
+        // Clear any pending player input
+        input.kickPending = false;
+        input.takingBack = false;
+      }
+    });
+  }
 
   // Set up invisible hover triggers over result horse names so the info box
   // can peek and pin over them, even though the names are drawn on canvas.
