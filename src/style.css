@@ -2215,6 +2215,7 @@ body {
   margin: 0;
   font-size: clamp(11px, 2vw, 12px);
   color: var(--muted);
+  text-transform: capitalize;
 }
 
 .dc-section {
@@ -2286,6 +2287,28 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  position: relative;
+  cursor: help;
+}
+
+.dc-stat:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.3);
 }
 
 .dc-stat-label {

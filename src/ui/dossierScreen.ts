@@ -65,27 +65,27 @@ export function mountDossierScreen(
       </div>
       <div class="dc-section">Attributes</div>
       <div class="dc-stats">
-        <div class="dc-stat">
+        <div class="dc-stat" title="Acceleration and top speed during races">
           <span class="dc-stat-label">Speed</span>
           <span class="dc-stat-value">${Math.round(rival.stats.speed)}</span>
         </div>
-        <div class="dc-stat">
+        <div class="dc-stat" title="Endurance to maintain effort over distance">
           <span class="dc-stat-label">Stamina</span>
           <span class="dc-stat-value">${Math.round(rival.stats.stamina)}</span>
         </div>
-        <div class="dc-stat">
+        <div class="dc-stat" title="Ability to accelerate rapidly in short bursts">
           <span class="dc-stat-label">Burst</span>
           <span class="dc-stat-value">${Math.round(rival.stats.burst)}</span>
         </div>
-        <div class="dc-stat">
+        <div class="dc-stat" title="Resilience and ability to recover when fatigued">
           <span class="dc-stat-label">Grit</span>
           <span class="dc-stat-value">${Math.round(rival.stats.grit)}</span>
         </div>
-        <div class="dc-stat">
+        <div class="dc-stat" title="Composure and ability to handle pressure in close races">
           <span class="dc-stat-label">Temper</span>
           <span class="dc-stat-value">${Math.round(rival.stats.temper)}</span>
         </div>
-        <div class="dc-stat">
+        <div class="dc-stat" title="Reliable performance across different race conditions">
           <span class="dc-stat-label">Consistency</span>
           <span class="dc-stat-value">${Math.round(rival.stats.consistency)}</span>
         </div>
