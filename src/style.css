@@ -2907,19 +2907,9 @@ body {
     opacity: 0;
     transform: translateX(-60px);
   }
-  20% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 1;
-    transform: translateX(-20px);
-  }
-  80% {
-    opacity: 1;
-  }
   100% {
-    opacity: 0;
-    transform: translateX(-60px);
+    opacity: 1;
+    transform: translateX(60px);
   }
 }
 
