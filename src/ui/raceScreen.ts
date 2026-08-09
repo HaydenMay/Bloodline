@@ -179,6 +179,27 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const race: LiveRace = createRace(entrants, config);
   const totalMetres = race.totalMetres;
 
+  // Crowd camera flashes - track active flashes for drawing
+  interface Flash {
+    x: number;
+    y: number;
+    age: number;
+    duration: number;
+  }
+  const flashes: Flash[] = [];
+  const spawnFlash = (): void => {
+    // Random position in crowd area (top and sides)
+    const { width, height } = surface;
+    const x = Math.random() * width;
+    const y = Math.random() * (height * 0.4); // Top 40% for crowd area
+    flashes.push({
+      x,
+      y,
+      age: 0,
+      duration: 0.15 + Math.random() * 0.1, // 150-250ms
+    });
+  };
+
   // The player's horse runs the SAME base ride as every opponent; this input
   // only modulates it (REBUILD.md §11.4). When autopilot is OFF, this input
   // makes a hands-off player competitive rather than a passenger. When ON,
@@ -316,6 +337,27 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     calloutUntil = performance.now() + 2200;
   };
 
+  const drawFlash = (ctx: CanvasRenderingContext2D, x: number, y: number, alpha: number): void => {
+    // Draw a concave diamond (camera flash symbol) with pinched sides
+    const size = 6;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    // Top point
+    ctx.moveTo(x, y - size);
+    // Right point (with inward curve)
+    ctx.quadraticCurveTo(x + size * 0.6, y, x + size, y);
+    // Bottom point (with inward curve)
+    ctx.quadraticCurveTo(x, y + size * 0.6, x, y + size);
+    // Left point (with inward curve)
+    ctx.quadraticCurveTo(x - size * 0.6, y, x - size, y);
+    // Back to top (with inward curve)
+    ctx.quadraticCurveTo(x, y - size * 0.6, x, y - size);
+    ctx.fill();
+    ctx.restore();
+  };
+
   const draw = (alpha: number, dt: number): void => {
     const { ctx, width, height } = surface;
     const lerp = (a: number, b: number): number => a + (b - a) * alpha;
@@ -344,6 +386,25 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
     drawBackdrop(ctx, width, height, cam, config.hype);
     drawDistanceMarkers(ctx, height, cam, totalMetres);
+
+    // Spawn camera flashes from the crowd
+    if (Math.random() < 0.4) {
+      spawnFlash();
+    }
+
+    // Update and draw camera flashes
+    for (let i = flashes.length - 1; i >= 0; i--) {
+      const flash = flashes[i]!;
+      flash.age += dt;
+      if (flash.age > flash.duration) {
+        flashes.splice(i, 1);
+      } else {
+        // Fade in quickly, then fade out
+        const progress = flash.age / flash.duration;
+        const alpha = progress < 0.3 ? progress / 0.3 : 1 - (progress - 0.3) / 0.7;
+        drawFlash(ctx, flash.x, flash.y, alpha);
+      }
+    }
 
     // Lane 0 is the rail (furthest from camera), so higher lanes draw nearer
     // and larger. Sorting by lane keeps the overlap correct.
