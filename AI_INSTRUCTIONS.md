@@ -39,11 +39,7 @@ npm run check         # lint + build + test (pre-commit check)
 
 ## Session Log
 
-**Session Summary (Updated 2026-08-06):**
-
-Refactored carousel component system (starterSelection.ts, dossierScreen.ts) to match infoBox semantic structure pattern. Replaced nested grid/column structure with flat carousel-box containers containing badge + info sections. Added ~305 lines of CSS with semantic class naming (.sc-carousel-box, .sc-head, .sc-section, .sc-apt, .sc-row, .sc-stat, etc.) mirroring infoBox pattern for consistency. Implemented responsive layout: horizontal badge+info on desktop (120-160px responsive badge), vertical stacking on mobile (<768px). Fixed trait description layout shift: positioned absolutely at bottom of info section with opacity/visibility transitions instead of display changes to prevent page reflow. Increased spacing/readability (padding 8→12px, font-size 11→12px, line-height 1.4→1.5). All changes committed directly to main with focused commit messages.
-
-**Next Steps:** Continue UI refinement (carousel styling validation, mobile testing, accessibility). Race intro screen animation. Idle horse animation on training screen. All work should follow established patterns: commit directly to main, use centralized color system, run `npm run check` pre-commit.
+**Erased — see git history for details**
 
 ---
 
