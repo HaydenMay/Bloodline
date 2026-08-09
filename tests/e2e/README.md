@@ -2,6 +2,33 @@
 
 End-to-end tests for Bloodline game flows using Playwright.
 
+## Setup
+
+### Prerequisites
+- **Node.js 16+** - Download from https://nodejs.org/
+- **npm** - Comes with Node.js
+- **Git** - For version control
+
+### Windows Quick Start
+```powershell
+# 1. Install dependencies (one time)
+npm install
+
+# 2. Build the project
+npm run build
+
+# 3. Run tests
+npx playwright test
+```
+
+All commands work in:
+- **Command Prompt** (cmd)
+- **PowerShell** (recommended)
+- **Git Bash**
+- **Windows Terminal** (recommended)
+
+That's it! The dev server (`npm run dev`) starts automatically during tests.
+
 ## Running Tests
 
 ```bash
@@ -110,6 +137,43 @@ export async function navigateToDossier(page: Page): Promise<void> {
 // Then use in tests:
 // await navigateToDossier(page);
 ```
+
+## Windows-Specific Notes
+
+### Path Issues
+Windows uses backslashes (`\`) while the codebase uses forward slashes (`/`). This is handled automatically by:
+- Node.js/npm (understands both)
+- Git (normalizes paths)
+- Playwright (cross-platform)
+
+If you see path errors, try:
+```bash
+# Ensure npm is updated
+npm install -g npm@latest
+
+# Clear cache
+npm cache clean --force
+
+# Reinstall
+npm install
+```
+
+### Dev Server on Windows
+The app starts on `http://localhost:5173` automatically via playwright.config.ts.
+
+If port 5173 is blocked:
+```bash
+# Check what's using the port (PowerShell)
+netstat -ano | findstr :5173
+
+# Or change the port in vite.config.ts:
+# server: { port: 5174 }
+```
+
+### Running Long Tests
+Windows Defender or antivirus can slow tests. If tests timeout:
+- Add exclusion for project folder in antivirus
+- Increase timeout in playwright.config.ts: `timeout: 60000`
 
 ## Debugging Tests
 
