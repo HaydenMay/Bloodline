@@ -190,7 +190,7 @@ function startRace(seed: string): void {
     prize: 1000,
   };
 
-  const showDossier = (returnToIntro: () => void): void => {
+  const showDossier = (_returnToIntro: () => void): void => {
     // Hide the race intro while showing dossier
     const raceIntro = stage.querySelector<HTMLElement>('.race-intro');
     if (raceIntro) raceIntro.style.display = 'none';
@@ -198,7 +198,7 @@ function startRace(seed: string): void {
     const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
       dossierTeardown();
       if (raceIntro) raceIntro.style.display = '';
-      returnToIntro();
+      showRaceScreen();
     });
   };
 

@@ -188,10 +188,12 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   }
   const flashes: Flash[] = [];
   const spawnFlash = (): void => {
-    // Random position in crowd area (top and sides)
+    // Random position in crowd area (bleachers above horizon)
     const { width, height } = surface;
+    const horizon = height * 0.44;
     const x = Math.random() * width;
-    const y = Math.random() * (height * 0.4); // Top 40% for crowd area
+    // Crowd is positioned from horizon-58 to horizon, spawn flashes above them
+    const y = (horizon - 58) + Math.random() * 58; // Within crowd stand area
     flashes.push({
       x,
       y,
