@@ -89,6 +89,8 @@ export function mountDossierScreen(
   const wrappedOnContinue = () => {
     try {
       alert('DOSSIER: onSelect called - about to call onContinue');
+      alert(`DOSSIER: onContinue type is ${typeof onContinue}`);
+      alert(`DOSSIER: onContinue.toString = ${onContinue.toString().substring(0, 100)}`);
       onContinue();
       alert('DOSSIER: onContinue completed');
     } catch (error) {
