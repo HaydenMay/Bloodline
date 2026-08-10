@@ -852,10 +852,20 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         const playerFinishingPosition = playerIndex + 1;
         const isPromotionRace = race?.isPromotion === true;
         const isDemotionRace = race?.isDemotion === true;
+        console.log('Race type check:', { isPromotionRace, isDemotionRace, race });
 
         if (isPromotionRace) {
           // Finalize promotion result
+          console.log('Promotion race detected. Before:', {
+            divisionLevel: updatedCareer.horse.divisionLevel,
+            divisionPoints: updatedCareer.horse.divisionPoints,
+            position: playerFinishingPosition,
+          });
           finalizePromotion(updatedCareer.horse, playerFinishingPosition);
+          console.log('After promotion:', {
+            divisionLevel: updatedCareer.horse.divisionLevel,
+            divisionPoints: updatedCareer.horse.divisionPoints,
+          });
         } else if (isDemotionRace) {
           // Finalize demotion result
           finalizeDemotion(updatedCareer.horse, playerFinishingPosition);
