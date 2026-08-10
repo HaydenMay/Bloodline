@@ -133,16 +133,16 @@ export function mountTrainingScreen(
             </div>
             <div class="progress-bar-container">
               <div class="progress-segments">
-                <!-- 8-segment centered bar: red left (positions 0-2), green right (positions 3-7) -->
+                <!-- 8-segment centered bar: only show appropriate color -->
                 ${[0, 1, 2, 3, 4, 5, 6, 7].map(i => {
-                  if (i <= 2) {
-                    // Left side: red (demotion) - right-aligned, fills from right to left
+                  if (horse.divisionPoints < 0) {
+                    // Negative: show red segments right-aligned in positions 0-2
                     const absPoints = Math.abs(horse.divisionPoints);
                     const isFilled = i >= (3 - absPoints);
                     return `<div class="segment demotion ${isFilled ? 'filled' : ''}"></div>`;
                   } else {
-                    // Right side: green (promotion) - left-aligned, fills from left to right
-                    const isFilled = (i - 3) < horse.divisionPoints;
+                    // Positive: show green segments left-aligned in positions 3-7
+                    const isFilled = i >= 3 && (i - 3) < horse.divisionPoints;
                     return `<div class="segment promotion ${isFilled ? 'filled' : ''}"></div>`;
                   }
                 }).join('')}
