@@ -11,7 +11,6 @@ export function mountDossierScreen(
   _dossier: RivalDossier,
   onContinue: () => void,
 ): () => void {
-  alert('Dossier mounted');
   const rivals = field.filter((h) => h.id !== player.id);
 
   if (rivals.length === 0) {
@@ -86,24 +85,10 @@ export function mountDossierScreen(
     return container;
   };
 
-  const wrappedOnContinue = () => {
-    try {
-      alert('DOSSIER: onSelect called - about to call onContinue');
-      alert(`DOSSIER: onContinue type is ${typeof onContinue}`);
-      alert(`DOSSIER: onContinue.toString = ${onContinue.toString().substring(0, 100)}`);
-      onContinue();
-      alert('DOSSIER: onContinue completed');
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      alert(`DOSSIER ERROR: ${errorMsg}`);
-      alert(`Stack: ${error instanceof Error ? error.stack : 'no stack'}`);
-    }
-  };
-
   const { teardown, state } = mountCarousel(host, {
     items: rivals,
     renderItem,
-    onSelect: wrappedOnContinue,
+    onSelect: onContinue,
     title: 'Field Dossier',
     selectLabel: 'Start Race',
     className: 'dossier-carousel',

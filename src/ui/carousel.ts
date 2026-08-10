@@ -40,7 +40,6 @@ export function mountCarousel<T>(
   host: HTMLElement,
   config: CarouselConfig<T>,
 ): { teardown: () => void; state: CarouselState<T> } {
-  alert(`mountCarousel called with selectLabel: ${config.selectLabel || 'undefined'}`);
   const {
     items,
     renderItem,
@@ -133,7 +132,6 @@ export function mountCarousel<T>(
   selectBtn.id = `${cssPrefix}-select`;
   selectBtn.textContent = selectLabel;
   root.appendChild(selectBtn);
-  alert(`Select button created: ${selectLabel}`);
 
   host.appendChild(root);
 
@@ -203,22 +201,8 @@ export function mountCarousel<T>(
   if (nextBtn) nextBtn.addEventListener('click', next);
 
   selectBtn.addEventListener('click', () => {
-    try {
-      alert('1. Button clicked');
-      const hasOnSelect = !!onSelect;
-      alert('2. Checked onSelect');
-      alert(`3. onSelect is: ${hasOnSelect}`);
-      if (onSelect) {
-        alert('4. About to call onSelect');
-        alert(`4b. onSelect type: ${typeof onSelect}`);
-        const result = onSelect(items[currentIndex]!, currentIndex);
-        alert(`5. onSelect returned: ${typeof result}`);
-        alert('6. onSelect call completed');
-      } else {
-        alert('ERROR: onSelect is undefined!');
-      }
-    } catch (e) {
-      alert(`CATCH: ${e}`);
+    if (onSelect) {
+      onSelect(items[currentIndex]!, currentIndex);
     }
   });
 

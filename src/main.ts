@@ -201,13 +201,18 @@ function startRace(seed: string): void {
   };
 
   const showDossier = (_returnToIntro: () => void): void => {
-    alert('>>> showDossier() WAS CALLED <<<');
+    // FIXME: Dossier "Start Race" callback is not working on mobile
+    // Investigation shows the wrong callback is being passed to mountDossierScreen.
+    // The minified callback looks like: ()=>{c?.(),t.innerHTML='',l?.(),n()}
+    // which appears to be the career-mode callback, not the race-demo callback.
+    // This is blocking Phase 2 completion. Debug on desktop with full dev tools.
+    // See: https://github.com/HaydenMay/Bloodline/issues/[TODO]
+
     // Hide the race intro while showing dossier
     const raceIntro = stage.querySelector<HTMLElement>('.race-intro');
     if (raceIntro) raceIntro.style.display = 'none';
 
     const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
-      alert('>>> DOSSIER CALLBACK FIRED <<<');
       try {
         alert('Start Race clicked');
         console.log('[dossier] Start Race clicked');
