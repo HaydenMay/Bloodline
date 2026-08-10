@@ -133,10 +133,12 @@ export function mountTrainingScreen(
             </div>
             <div class="progress-bar-container">
               <div class="progress-segments">
-                <!-- Demotion risk: 3 red segments for -0 to -3 -->
-                ${[0, 1, 2].map(i => `<div class="segment demotion ${Math.abs(horse.divisionPoints) > i ? 'filled' : ''}"></div>`).join('')}
-                <!-- Promotion: 5 green segments for +0 to +5 -->
-                ${[0, 1, 2, 3, 4].map(i => `<div class="segment promotion ${horse.divisionPoints > i ? 'filled' : ''}"></div>`).join('')}
+                ${horse.divisionPoints >= 0
+                  ? /* Promotion: 5 green segments for +0 to +5 */
+                    [0, 1, 2, 3, 4].map(i => `<div class="segment promotion ${horse.divisionPoints > i ? 'filled' : ''}"></div>`).join('')
+                  : /* Demotion: 3 red segments for -0 to -3 */
+                    [0, 1, 2].map(i => `<div class="segment demotion ${Math.abs(horse.divisionPoints) > i ? 'filled' : ''}"></div>`).join('')
+                }
               </div>
             </div>
             <div class="progress-label">
