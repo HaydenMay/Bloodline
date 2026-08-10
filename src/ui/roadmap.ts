@@ -13,12 +13,13 @@ interface Phase {
   name: string;
   summary: string;
   done: boolean;
+  inProgress?: boolean;
 }
 
 const PHASES: Phase[] = [
   { n: 0, name: 'Foundation', summary: 'Tooling & deploy', done: true },
   { n: 1, name: 'Race simulation', summary: 'Engine & balance', done: true },
-  { n: 2, name: 'Playable race', summary: 'Renderer & controls', done: false },
+  { n: 2, name: 'Playable race', summary: 'Renderer & controls', done: false, inProgress: true },
   { n: 3, name: 'Full career', summary: 'Training & divisions', done: false },
   { n: 4, name: 'The stable', summary: 'Money & facilities', done: false },
   // 4.5, not 5, on purpose: it ships no new systems, and renumbering would
@@ -46,8 +47,8 @@ export function mountRoadmap(): void {
       <p class="rm-title">Build progress</p>
       ${PHASES.map(
         (p) => `
-        <div class="rm-phase ${p.done ? 'is-done' : ''}">
-          <span class="rm-box">${p.done ? '✓' : ''}</span>
+        <div class="rm-phase ${p.done ? 'is-done' : ''} ${p.inProgress ? 'is-in-progress' : ''}">
+          <span class="rm-box">${p.done ? '✓' : p.inProgress ? '◐' : ''}</span>
           <span class="rm-name">${p.name}</span>
           <span class="rm-summary">${p.summary}</span>
         </div>`,

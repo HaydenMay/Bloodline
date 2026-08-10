@@ -224,6 +224,16 @@ body {
   font-weight: 600;
 }
 
+.rm-phase.is-in-progress .rm-box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.rm-phase.is-in-progress .rm-name {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .rm-summary {
   font-size: 10.5px;
   color: var(--muted);
