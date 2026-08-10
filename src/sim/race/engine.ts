@@ -243,7 +243,10 @@ interface Runner {
 // ---------------------------------------------------------------------------
 
 function cruiseFor(horse: Horse): number {
-  return BASE_SPEED * (1 - SPEED_STAT_SPAN / 2 + SPEED_STAT_SPAN * (horse.stats.speed / 100));
+  const baseSpeed = BASE_SPEED * (1 - SPEED_STAT_SPAN / 2 + SPEED_STAT_SPAN * (horse.stats.speed / 100));
+  // Stamina gates speed: can't unlock full speed without stamina (0.85x to 1.0x range)
+  const staminaGate = 0.85 + 0.15 * (horse.stats.stamina / 100);
+  return baseSpeed * staminaGate;
 }
 
 function accelFor(horse: Horse): number {
