@@ -743,13 +743,13 @@ body {
 }
 
 .race-intro-marker.riders {
-  top: 35%;
+  top: 25%;
   opacity: 0;
   animation: ridersIn 0.6s ease-out forwards;
 }
 
 .race-intro-marker.marks {
-  top: 55%;
+  top: 45%;
   opacity: 0;
   animation: marksIn 0.7s ease-out forwards;
 }
