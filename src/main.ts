@@ -1,7 +1,7 @@
 import './style.css';
 import { createRng } from './sim/index.js';
 import { createNameGenerator } from './data/names.js';
-import { generateHorse } from './sim/horse.js';
+import { generateHorse, generateWorld } from './sim/horse.js';
 import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
 import type { RunnerSnapshot } from './sim/race/engine.js';
 import { attachInfoBox } from './ui/infoBox.js';
@@ -17,10 +17,12 @@ import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
+import { mountTestCareerSetup } from './ui/testCareerSetup.js';
 import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
 import { DEFAULTS } from './data/colors.js';
+import { updateDivisionProgression, updateAIDivisionProgression, populatePromotionRaceField, populateDemotionRaceField, finalizePromotion, finalizeDemotion } from './sim/division.js';
 
 /**
  * Phase 2 harness screen.
@@ -329,6 +331,25 @@ if (params.has('preview')) {
 } else if (params.has('test-race')) {
   // ?test-race opens the test race (development harness)
   startRace('bloodline-demo');
+} else if (params.has('test-career')) {
+  // ?test-career opens the test career setup
+  const rng = createRng(`test-career-${Date.now()}`);
+  const names = createNameGenerator(rng);
+
+  mountTestCareerSetup(app, (horse) => {
+    // Create career with test horse
+    const testCareer = createNewCareer(horse, DEFAULTS.playerSilksDefault);
+    // Generate a full world for testing
+    testCareer.stable.world = generateWorld(rng, names, {
+      maiden: 15,
+      novice: 12,
+      open: 10,
+      stakes: 8,
+      championship: 5,
+    });
+    // Start training screen immediately (no starter selection)
+    showTrainingScreen(testCareer);
+  });
 } else if (params.has('roadmap')) {
   // ?roadmap opens the build-progress panel — kept off every real game
   // screen so it never collides with game chrome (the starter carousel's
@@ -542,12 +563,71 @@ function showRaceCalendar(career: Career): void {
   teardown?.();
   app.innerHTML = '';
 
-  teardown = mountRaceCalendar(app, (race) => {
-    // Mark that a race has been selected for this week
-    const careerWithRaceSelected = { ...career, raceSelected: true };
-    saveCareer(careerWithRaceSelected);
-    startRaceWithHorse(careerWithRaceSelected, race);
-  }, career.horse.division);
+  // Check if player is ready for promotion or at demotion risk
+  const isPromotionReady = career.horse.divisionPoints >= 5 && career.horse.divisionLevel < 4;
+  const isDemotionRisk = career.horse.divisionPoints <= -3 && career.horse.divisionLevel > 0;
+
+  // Show demotion warning if at risk
+  if (isDemotionRisk) {
+    const warningModal = document.createElement('div');
+    warningModal.className = 'modal-overlay';
+    warningModal.innerHTML = `
+      <div class="modal-content demotion-warning">
+        <h2>⚠️ Demotion Risk</h2>
+        <p>You are at risk of demotion. You must finish in the top 4 of the Division Qualifier race to avoid being demoted to the previous division.</p>
+        <p>If you finish 5th-8th, you will be demoted and start fresh in the division below.</p>
+        <button class="btn btn-primary" id="demotion-warning-ok">Understood</button>
+      </div>
+    `;
+    app.appendChild(warningModal);
+
+    warningModal.querySelector('#demotion-warning-ok')!.addEventListener('click', () => {
+      warningModal.remove();
+      // Now show the race calendar
+      mountCalendarUI();
+    });
+
+    return;
+  }
+
+  // Show promotion ready alert if applicable
+  if (isPromotionReady) {
+    const promotionAlert = document.createElement('div');
+    promotionAlert.className = 'modal-overlay';
+    promotionAlert.innerHTML = `
+      <div class="modal-content promotion-alert">
+        <h2>🏆 Ready for Promotion!</h2>
+        <p>You've proven yourself in this division! This week's race calendar features a Promotion Test.</p>
+        <p>Finish in the top 4 to advance to the next division.</p>
+        <button class="btn btn-primary" id="promotion-alert-ok">Let's Go</button>
+      </div>
+    `;
+    app.appendChild(promotionAlert);
+
+    promotionAlert.querySelector('#promotion-alert-ok')!.addEventListener('click', () => {
+      promotionAlert.remove();
+      // Now show the race calendar
+      mountCalendarUI();
+    });
+
+    return;
+  }
+
+  // Show normal race calendar
+  mountCalendarUI();
+
+  function mountCalendarUI() {
+    teardown = mountRaceCalendar(app, (race) => {
+      // Mark that a race has been selected for this week
+      const careerWithRaceSelected = { ...career, raceSelected: true };
+      saveCareer(careerWithRaceSelected);
+      startRaceWithHorse(careerWithRaceSelected, race);
+    }, {
+      division: career.horse.division,
+      isPromotionReady,
+      isDemotionRisk,
+    });
+  }
 }
 
 function startRaceWithHorse(career: Career, race?: RaceOption): void {
@@ -566,33 +646,49 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
 
   let field: Horse[];
   try {
-    // Build field from stable world, filtered by player's current division
-    const rivalCandidates = career.stable.world.filter((h) => h.division === player.division);
+    // Check if this is a promotion or demotion race
+    const isPromotionRace = race?.isPromotion === true;
+    const isDemotionRace = race?.isDemotion === true;
 
-    // Select rivals for this race (next FIELD_SIZE-1 from candidates)
-    // Shuffle to avoid always seeing the same rivals first
-    const rng = createRng('field-select-' + Date.now());
-    const shuffled = rng.shuffle([...rivalCandidates]);
-    const selected = shuffled.slice(0, Math.min(FIELD_SIZE - 1, shuffled.length));
+    let opponents: Horse[];
 
-    // If not enough rivals in this division, top up with adjacent division
-    if (selected.length < FIELD_SIZE - 1) {
-      const adjacent = career.stable.world.filter(
-        (h) =>
-          (h.division === 'maiden' && player.division === 'novice') ||
-          (h.division === 'novice' && player.division === 'open') ||
-          (h.division === 'novice' && player.division === 'maiden') ||
-          (h.division === 'open' && player.division === 'novice') ||
-          (h.division === 'open' && player.division === 'stakes') ||
-          (h.division === 'stakes' && player.division === 'open') ||
-          (h.division === 'stakes' && player.division === 'championship') ||
-          (h.division === 'championship' && player.division === 'stakes'),
-      );
-      const shuffledAdj = rng.shuffle([...adjacent]);
-      selected.push(...shuffledAdj.slice(0, FIELD_SIZE - 1 - selected.length));
+    if (isPromotionRace) {
+      // Promotion race field uses special population logic
+      opponents = populatePromotionRaceField(player.division, career.stable.world, FIELD_SIZE - 1);
+    } else if (isDemotionRace) {
+      // Demotion race field uses special population logic
+      opponents = populateDemotionRaceField(player.division, career.stable.world, FIELD_SIZE - 1);
+    } else {
+      // Normal race: build field from stable world, filtered by player's current division
+      const rivalCandidates = career.stable.world.filter((h) => h.division === player.division);
+
+      // Select rivals for this race (next FIELD_SIZE-1 from candidates)
+      // Shuffle to avoid always seeing the same rivals first
+      const rng = createRng('field-select-' + Date.now());
+      const shuffled = rng.shuffle([...rivalCandidates]);
+      const selected = shuffled.slice(0, Math.min(FIELD_SIZE - 1, shuffled.length));
+
+      // If not enough rivals in this division, top up with adjacent division
+      if (selected.length < FIELD_SIZE - 1) {
+        const adjacent = career.stable.world.filter(
+          (h) =>
+            (h.division === 'maiden' && player.division === 'novice') ||
+            (h.division === 'novice' && player.division === 'open') ||
+            (h.division === 'novice' && player.division === 'maiden') ||
+            (h.division === 'open' && player.division === 'novice') ||
+            (h.division === 'open' && player.division === 'stakes') ||
+            (h.division === 'stakes' && player.division === 'open') ||
+            (h.division === 'stakes' && player.division === 'championship') ||
+            (h.division === 'championship' && player.division === 'stakes'),
+        );
+        const shuffledAdj = rng.shuffle([...adjacent]);
+        selected.push(...shuffledAdj.slice(0, FIELD_SIZE - 1 - selected.length));
+      }
+
+      opponents = selected;
     }
 
-    field = [player, ...selected];
+    field = [player, ...opponents];
 
     if (field.length < 2) {
       console.error('Field generation failed, not enough horses:', field.length);
@@ -742,7 +838,7 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
           }
         }
 
-        // Update player horse records
+        // Update player horse records and division progression
         if (playerIndex === 0) {
           updatedCareer.stats.wins += 1;
           updatedCareer.stats.totalEarnings += 1000; // TODO: Dynamic earnings
@@ -752,6 +848,43 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         }
         updatedCareer.horse.starts += 1;
 
+        // Update division points for player horse
+        const playerFinishingPosition = playerIndex + 1;
+        const isPromotionRace = race?.isPromotion === true;
+        const isDemotionRace = race?.isDemotion === true;
+        console.log('Race type check:', { isPromotionRace, isDemotionRace, race });
+
+        if (isPromotionRace) {
+          // Finalize promotion result
+          console.log('Promotion race detected. Before:', {
+            divisionLevel: updatedCareer.horse.divisionLevel,
+            divisionPoints: updatedCareer.horse.divisionPoints,
+            position: playerFinishingPosition,
+          });
+          finalizePromotion(updatedCareer.horse, playerFinishingPosition);
+          console.log('After promotion:', {
+            divisionLevel: updatedCareer.horse.divisionLevel,
+            divisionPoints: updatedCareer.horse.divisionPoints,
+          });
+        } else if (isDemotionRace) {
+          // Finalize demotion result
+          finalizeDemotion(updatedCareer.horse, playerFinishingPosition);
+        } else {
+          // Normal race - just update division points
+          updateDivisionProgression(updatedCareer.horse, playerFinishingPosition);
+        }
+
+        // Update division points for all AI horses
+        for (let i = 0; i < placings.length; i++) {
+          const placing = placings[i];
+          if (!placing || placing.id === player.id) continue; // Skip player
+
+          const rival = updatedCareer.stable.world.find((h) => h.id === placing.id);
+          if (rival) {
+            updateAIDivisionProgression(rival, i + 1);
+          }
+        }
+
         updatedCareer.stats.racesCompleted += 1;
         updatedCareer.week += 1;
         updatedCareer.raceSelected = false; // Clear race selection for next week
@@ -760,8 +893,8 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         const teardownResults = mountResultsScreen(app, placings, player.id, () => {
           infoBoxCleanup();
           teardownResults();
-          // Check if career should end (5 races completed)
-          if (updatedCareer.stats.racesCompleted >= 5) {
+          // Check if career should end (5 races completed OR 20 wins)
+          if (updatedCareer.stats.racesCompleted >= 5 || updatedCareer.stats.wins >= 20) {
             showCareerRecap(updatedCareer);
           } else {
             // Loop back to training instead of main menu

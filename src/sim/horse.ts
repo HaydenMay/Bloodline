@@ -43,6 +43,14 @@ const DIVISION_BANDS: Record<Division, DivisionBand> = {
   championship: { core: [63, 82], consistency: [70, 92], jockey: [65, 95] },
 };
 
+const DIVISION_MULTIPLIERS: Record<number, number> = {
+  0: 0.5,   // Maiden
+  1: 0.8,   // Novice
+  2: 1.0,   // Open (reference)
+  3: 1.25,  // Stakes
+  4: 1.55,  // Championship
+};
+
 const clamp100 = (v: number): number => Math.min(100, Math.max(1, Math.round(v)));
 
 function rollStats(rng: Rng, band: DivisionBand): Stats {
@@ -177,49 +185,87 @@ export interface GenerateOptions {
   /** Starter horses roll deliberately weak so growth is felt (DESIGN.md §2). */
   starter?: boolean;
   legacy?: number;
+  /** If true, generate as AI horse with base stats and random division assignment. */
+  isAI?: boolean;
 }
 
 export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOptions): Horse {
-  const band = DIVISION_BANDS[opts.division];
-  const stats = rollStats(rng, band);
-
-  if (opts.starter) {
-    // 18-34 across the board, per the design. Potential is what makes them
-    // differ, and that stays masked at selection.
-    for (const key of STAT_KEYS) {
-      stats[key] = clamp100(rng.range(18, 34));
-    }
-  }
-
   const style = opts.style ?? rng.pick(RUNNING_STYLES);
   const moment = opts.moment ?? rollMoment(rng, style);
 
-  return {
+  // AI horses: generate at Open division (1.0x), then apply division-specific multiplier
+  let baseStats: Stats | undefined;
+  let divisionLevel: number;
+  let displayStats: Stats;
+  let division: Division;
+  let jockeyBand: DivisionBand;
+
+  if (opts.isAI) {
+    // Generate base stats at Open division (1.0x reference)
+    const openBand = DIVISION_BANDS['open'];
+    baseStats = rollStats(rng, openBand);
+
+    // Use specified division
+    division = opts.division;
+    divisionLevel = Object.keys(DIVISION_BANDS).indexOf(opts.division);
+
+    // Apply multiplier to get display stats
+    const multiplier = DIVISION_MULTIPLIERS[divisionLevel]!;
+    displayStats = {} as Stats;
+    for (const key of STAT_KEYS) {
+      displayStats[key] = clamp100(baseStats[key] * multiplier);
+    }
+
+    // Use jockey skill from assigned division band
+    jockeyBand = DIVISION_BANDS[division];
+  } else {
+    // Player horse: use current logic with division-specific generation
+    const band = DIVISION_BANDS[opts.division];
+    jockeyBand = band;
+    division = opts.division;
+    divisionLevel = Object.keys(DIVISION_BANDS).indexOf(opts.division);
+    displayStats = rollStats(rng, band);
+
+    if (opts.starter) {
+      // 18-34 across the board, per the design. Potential is what makes them
+      // differ, and that stays masked at selection.
+      for (const key of STAT_KEYS) {
+        displayStats[key] = clamp100(rng.range(18, 34));
+      }
+    }
+  }
+
+  const horse: Horse = {
     // Derived purely from the rng so identity is reproducible from a seed.
     // A module-global counter here would silently break determinism.
     id: `h${Math.floor(rng.next() * 0xffffffff).toString(36)}`,
     name: names.next(),
     gender: opts.gender ?? (rng.chance(0.5) ? 'stallion' : 'mare'),
     age: opts.age ?? rng.int(2, 5),
-    stats,
-    potential: rollPotential(rng, stats, opts.starter ? 1.35 : 1),
+    stats: displayStats,
+    potential: rollPotential(rng, displayStats, opts.starter ? 1.35 : 1),
     style,
     moment,
     preferredDistance: rollPreferredDistance(rng, opts.distanceCentre),
     traits: rollTraits(rng, opts.legacy ?? 0),
     condition: opts.starter ? 70 : clamp100(rng.range(58, 88)),
     morale: 60,
-    division: opts.division,
+    division,
+    divisionLevel,
+    divisionPoints: 0,
     starts: opts.starter ? 0 : rng.int(0, 14),
     wins: 0,
     places: 0,
     shows: 0,
-    // Rolled HERE, not by the caller. The demo harness used to overwrite this
-    // afterwards, which meant every horse any other caller made was bay — and
-    // Phase 3 generates seventy of them.
     coat: rng.pick(COAT_IDS),
-    jockeySkill: clamp100(rng.range(band.jockey[0], band.jockey[1])),
+    jockeySkill: clamp100(rng.range(jockeyBand.jockey[0], jockeyBand.jockey[1])),
   };
+
+  if (baseStats) {
+    horse.baseStats = baseStats;
+  }
+
+  return horse;
 }
 
 /**
@@ -276,7 +322,8 @@ export function generateWorld(
   const world: Horse[] = [];
   for (const [division, count] of Object.entries(population) as [Division, number][]) {
     for (let i = 0; i < count; i++) {
-      world.push(generateHorse(rng, names, { division }));
+      // Generate AI horse with baseStats at Open level, then apply division-specific multiplier
+      world.push(generateHorse(rng, names, { division, isAI: true }));
     }
   }
   return world;
