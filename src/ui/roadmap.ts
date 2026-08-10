@@ -20,7 +20,7 @@ const PHASES: Phase[] = [
   { n: 0, name: 'Foundation', summary: 'Tooling & deploy', done: true },
   { n: 1, name: 'Race simulation', summary: 'Engine & balance', done: true },
   { n: 2, name: 'Playable race', summary: 'Renderer & controls', done: true },
-  { n: 3, name: 'Full career', summary: 'Training & divisions', done: true },
+  { n: 3, name: 'Full career', summary: 'Training & divisions', done: false, inProgress: true },
   { n: 4, name: 'The stable', summary: 'Money & facilities', done: false },
   // 4.5, not 5, on purpose: it ships no new systems, and renumbering would
   // strand every `Phase 5` reference already written into the code.
