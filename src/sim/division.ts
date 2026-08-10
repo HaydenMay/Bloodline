@@ -1,4 +1,5 @@
-import type { Horse, Division } from './types.js';
+import type { Horse } from './types.js';
+import type { Division } from '../data/index.js';
 
 /**
  * Division point calculation based on race finishing position.
@@ -151,4 +152,135 @@ export function updateAIDivisionProgression(
   if (horse.divisionLevel <= 0) {
     horse.divisionPoints = Math.max(horse.divisionPoints, -3);
   }
+}
+
+const DIVISIONS_BY_LEVEL = ['maiden', 'novice', 'open', 'stakes', 'championship'] as const;
+
+function getLevelFromDivision(division: Division): number {
+  return DIVISIONS_BY_LEVEL.indexOf(division as any);
+}
+
+function getDivisionFromLevel(level: number): Division {
+  return DIVISIONS_BY_LEVEL[Math.max(0, Math.min(4, level))] as Division;
+}
+
+/**
+ * Populates the opponent field for a promotion race.
+ * Player is trying to advance to the NEXT division.
+ *
+ * Field composition (in order of priority):
+ * 1. Other horses from current division at +5 points (promotion candidates)
+ * 2. Horses from next division at -3 points (at risk of demotion)
+ * 3. Any remaining horses from next division
+ * 4. Other horses from current division as fallback
+ */
+export function populatePromotionRaceField(
+  playerDivision: Division,
+  worldHorses: Horse[],
+  fieldSize: number = 8,
+): Horse[] {
+  const currentLevel = getLevelFromDivision(playerDivision);
+  const nextLevel = Math.min(4, currentLevel + 1);
+  const currentDiv = getDivisionFromLevel(currentLevel);
+  const nextDiv = getDivisionFromLevel(nextLevel);
+
+  const field: Horse[] = [];
+
+  // 1. Add horses from current division at +5 points (other promotion candidates)
+  const promotionCandidates = worldHorses.filter(
+    (h) => h.division === currentDiv && h.divisionPoints >= 5,
+  );
+  field.push(...promotionCandidates.slice(0, fieldSize - field.length));
+
+  // 2. Add horses from next division at -3 points (demotion risk)
+  if (field.length < fieldSize) {
+    const demotionRisk = worldHorses.filter(
+      (h) => h.division === nextDiv && h.divisionPoints <= -3,
+    );
+    field.push(...demotionRisk.slice(0, fieldSize - field.length));
+  }
+
+  // 3. Add any remaining horses from next division
+  if (field.length < fieldSize) {
+    const otherNext = worldHorses.filter(
+      (h) =>
+        h.division === nextDiv &&
+        h.divisionPoints > -3 &&
+        !field.some((f) => f.id === h.id),
+    );
+    field.push(...otherNext.slice(0, fieldSize - field.length));
+  }
+
+  // 4. Add other horses from current division as fallback
+  if (field.length < fieldSize) {
+    const fallback = worldHorses.filter(
+      (h) =>
+        h.division === currentDiv &&
+        h.divisionPoints < 5 &&
+        !field.some((f) => f.id === h.id),
+    );
+    field.push(...fallback.slice(0, fieldSize - field.length));
+  }
+
+  return field.slice(0, fieldSize);
+}
+
+/**
+ * Populates the opponent field for a demotion race.
+ * Player is trying to avoid demotion to the PREVIOUS division.
+ *
+ * Field composition (in order of priority):
+ * 1. Other horses from current division at -3 points (also at demotion risk)
+ * 2. Horses from previous division at +5 points (promotion candidates from lower tier)
+ * 3. Other horses from current division (non-risky horses)
+ * 4. Any horses from previous division as fallback
+ */
+export function populateDemotionRaceField(
+  playerDivision: Division,
+  worldHorses: Horse[],
+  fieldSize: number = 8,
+): Horse[] {
+  const currentLevel = getLevelFromDivision(playerDivision);
+  const prevLevel = Math.max(0, currentLevel - 1);
+  const currentDiv = getDivisionFromLevel(currentLevel);
+  const prevDiv = getDivisionFromLevel(prevLevel);
+
+  const field: Horse[] = [];
+
+  // 1. Add horses from current division at -3 points (other demotion risk)
+  const demotionRisk = worldHorses.filter(
+    (h) => h.division === currentDiv && h.divisionPoints <= -3,
+  );
+  field.push(...demotionRisk.slice(0, fieldSize - field.length));
+
+  // 2. Add horses from previous division at +5 points (hungry promotion candidates)
+  if (field.length < fieldSize) {
+    const promotionHungry = worldHorses.filter(
+      (h) => h.division === prevDiv && h.divisionPoints >= 5,
+    );
+    field.push(...promotionHungry.slice(0, fieldSize - field.length));
+  }
+
+  // 3. Add other horses from current division (non-risky stable-mates)
+  if (field.length < fieldSize) {
+    const stablemates = worldHorses.filter(
+      (h) =>
+        h.division === currentDiv &&
+        h.divisionPoints > -3 &&
+        !field.some((f) => f.id === h.id),
+    );
+    field.push(...stablemates.slice(0, fieldSize - field.length));
+  }
+
+  // 4. Add any other horses from previous division
+  if (field.length < fieldSize) {
+    const fallback = worldHorses.filter(
+      (h) =>
+        h.division === prevDiv &&
+        !field.some((f) => f.id === h.id),
+    );
+    field.push(...fallback.slice(0, fieldSize - field.length));
+  }
+
+  return field.slice(0, fieldSize);
 }

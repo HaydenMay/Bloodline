@@ -21,7 +21,7 @@ import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
 import { DEFAULTS } from './data/colors.js';
-import { updateDivisionProgression, updateAIDivisionProgression } from './sim/division.js';
+import { updateDivisionProgression, updateAIDivisionProgression, populatePromotionRaceField, populateDemotionRaceField, finalizePromotion, finalizeDemotion } from './sim/division.js';
 
 /**
  * Phase 2 harness screen.
@@ -543,12 +543,20 @@ function showRaceCalendar(career: Career): void {
   teardown?.();
   app.innerHTML = '';
 
+  // Check if player is ready for promotion or at demotion risk
+  const isPromotionReady = career.horse.divisionPoints >= 5 && career.horse.divisionLevel < 4;
+  const isDemotionRisk = career.horse.divisionPoints <= -3 && career.horse.divisionLevel > 0;
+
   teardown = mountRaceCalendar(app, (race) => {
     // Mark that a race has been selected for this week
     const careerWithRaceSelected = { ...career, raceSelected: true };
     saveCareer(careerWithRaceSelected);
     startRaceWithHorse(careerWithRaceSelected, race);
-  }, career.horse.division);
+  }, {
+    division: career.horse.division,
+    isPromotionReady,
+    isDemotionRisk,
+  });
 }
 
 function startRaceWithHorse(career: Career, race?: RaceOption): void {
@@ -567,33 +575,49 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
 
   let field: Horse[];
   try {
-    // Build field from stable world, filtered by player's current division
-    const rivalCandidates = career.stable.world.filter((h) => h.division === player.division);
+    // Check if this is a promotion or demotion race
+    const isPromotionRace = race?.isPromotion === true;
+    const isDemotionRace = race?.isDemotion === true;
 
-    // Select rivals for this race (next FIELD_SIZE-1 from candidates)
-    // Shuffle to avoid always seeing the same rivals first
-    const rng = createRng('field-select-' + Date.now());
-    const shuffled = rng.shuffle([...rivalCandidates]);
-    const selected = shuffled.slice(0, Math.min(FIELD_SIZE - 1, shuffled.length));
+    let opponents: Horse[];
 
-    // If not enough rivals in this division, top up with adjacent division
-    if (selected.length < FIELD_SIZE - 1) {
-      const adjacent = career.stable.world.filter(
-        (h) =>
-          (h.division === 'maiden' && player.division === 'novice') ||
-          (h.division === 'novice' && player.division === 'open') ||
-          (h.division === 'novice' && player.division === 'maiden') ||
-          (h.division === 'open' && player.division === 'novice') ||
-          (h.division === 'open' && player.division === 'stakes') ||
-          (h.division === 'stakes' && player.division === 'open') ||
-          (h.division === 'stakes' && player.division === 'championship') ||
-          (h.division === 'championship' && player.division === 'stakes'),
-      );
-      const shuffledAdj = rng.shuffle([...adjacent]);
-      selected.push(...shuffledAdj.slice(0, FIELD_SIZE - 1 - selected.length));
+    if (isPromotionRace) {
+      // Promotion race field uses special population logic
+      opponents = populatePromotionRaceField(player.division, career.stable.world, FIELD_SIZE - 1);
+    } else if (isDemotionRace) {
+      // Demotion race field uses special population logic
+      opponents = populateDemotionRaceField(player.division, career.stable.world, FIELD_SIZE - 1);
+    } else {
+      // Normal race: build field from stable world, filtered by player's current division
+      const rivalCandidates = career.stable.world.filter((h) => h.division === player.division);
+
+      // Select rivals for this race (next FIELD_SIZE-1 from candidates)
+      // Shuffle to avoid always seeing the same rivals first
+      const rng = createRng('field-select-' + Date.now());
+      const shuffled = rng.shuffle([...rivalCandidates]);
+      const selected = shuffled.slice(0, Math.min(FIELD_SIZE - 1, shuffled.length));
+
+      // If not enough rivals in this division, top up with adjacent division
+      if (selected.length < FIELD_SIZE - 1) {
+        const adjacent = career.stable.world.filter(
+          (h) =>
+            (h.division === 'maiden' && player.division === 'novice') ||
+            (h.division === 'novice' && player.division === 'open') ||
+            (h.division === 'novice' && player.division === 'maiden') ||
+            (h.division === 'open' && player.division === 'novice') ||
+            (h.division === 'open' && player.division === 'stakes') ||
+            (h.division === 'stakes' && player.division === 'open') ||
+            (h.division === 'stakes' && player.division === 'championship') ||
+            (h.division === 'championship' && player.division === 'stakes'),
+        );
+        const shuffledAdj = rng.shuffle([...adjacent]);
+        selected.push(...shuffledAdj.slice(0, FIELD_SIZE - 1 - selected.length));
+      }
+
+      opponents = selected;
     }
 
-    field = [player, ...selected];
+    field = [player, ...opponents];
 
     if (field.length < 2) {
       console.error('Field generation failed, not enough horses:', field.length);
@@ -755,7 +779,19 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
 
         // Update division points for player horse
         const playerFinishingPosition = playerIndex + 1;
-        updateDivisionProgression(updatedCareer.horse, playerFinishingPosition);
+        const isPromotionRace = race?.isPromotion === true;
+        const isDemotionRace = race?.isDemotion === true;
+
+        if (isPromotionRace) {
+          // Finalize promotion result
+          finalizePromotion(updatedCareer.horse, playerFinishingPosition);
+        } else if (isDemotionRace) {
+          // Finalize demotion result
+          finalizeDemotion(updatedCareer.horse, playerFinishingPosition);
+        } else {
+          // Normal race - just update division points
+          updateDivisionProgression(updatedCareer.horse, playerFinishingPosition);
+        }
 
         // Update division points for all AI horses
         for (let i = 0; i < placings.length; i++) {

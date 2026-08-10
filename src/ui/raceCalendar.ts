@@ -8,12 +8,21 @@ export interface RaceOption {
   distance: number;
   going: 'firm' | 'good' | 'soft' | 'heavy';
   hype: number;
+  isPromotion?: boolean;
+  isDemotion?: boolean;
 }
 
-export function generateRaceCalendar(seed: string, division?: Division): RaceOption[] {
-  const rng = createRng(seed);
+export interface RaceCalendarOptions {
+  division?: Division;
+  isPromotionReady?: boolean;
+  isDemotionRisk?: boolean;
+}
 
-  const names = [
+export function generateRaceCalendar(seed: string, opts: RaceCalendarOptions = {}): RaceOption[] {
+  const rng = createRng(seed);
+  const { division, isPromotionReady, isDemotionRisk } = opts;
+
+  const regularNames = [
     'Morning Glory Stakes',
     'Midnight Cup',
     'Rising Star Handicap',
@@ -22,6 +31,20 @@ export function generateRaceCalendar(seed: string, division?: Division): RaceOpt
     'Thunder Ridge Stakes',
     'Twilight Cup',
     'Dawn Breaker Handicap',
+  ];
+
+  const promotionNames = [
+    'Championship Qualifier',
+    'Promotion Test',
+    'Class Advancement',
+    'Tier Challenge',
+  ];
+
+  const demotionNames = [
+    'Division Qualifier',
+    'Survival Race',
+    'Hold Your Ground',
+    'Last Chance Derby',
   ];
 
   // Generate distance range based on division, or use default if not provided
@@ -35,10 +58,38 @@ export function generateRaceCalendar(seed: string, division?: Division): RaceOpt
   const goingTypes: Array<'firm' | 'good' | 'soft' | 'heavy'> = ['firm', 'good', 'soft', 'heavy'];
 
   const races: RaceOption[] = [];
+
+  // If promotion ready, show only promotion race
+  if (isPromotionReady) {
+    races.push({
+      id: 'race-promotion',
+      name: promotionNames[Math.floor(rng.next() * promotionNames.length)]!,
+      distance: distances[Math.floor(rng.next() * distances.length)]!,
+      going: goingTypes[Math.floor(rng.next() * goingTypes.length)]!,
+      hype: 0.7 + rng.next() * 0.3, // Higher hype for promotion race
+      isPromotion: true,
+    });
+    return races;
+  }
+
+  // If demotion risk, show only demotion race
+  if (isDemotionRisk) {
+    races.push({
+      id: 'race-demotion',
+      name: demotionNames[Math.floor(rng.next() * demotionNames.length)]!,
+      distance: distances[Math.floor(rng.next() * distances.length)]!,
+      going: goingTypes[Math.floor(rng.next() * goingTypes.length)]!,
+      hype: 0.6 + rng.next() * 0.4, // Medium-high hype for demotion race
+      isDemotion: true,
+    });
+    return races;
+  }
+
+  // Normal week: generate 3 regular races
   for (let i = 0; i < 3; i++) {
     races.push({
       id: `race-${i}`,
-      name: names[Math.floor(rng.next() * names.length)]!,
+      name: regularNames[Math.floor(rng.next() * regularNames.length)]!,
       distance: distances[Math.floor(rng.next() * distances.length)]!,
       going: goingTypes[Math.floor(rng.next() * goingTypes.length)]!,
       hype: 0.3 + rng.next() * 0.7, // Range from 0.3 to 1.0
@@ -51,12 +102,12 @@ export function generateRaceCalendar(seed: string, division?: Division): RaceOpt
 export function mountRaceCalendar(
   container: HTMLElement,
   onSelectRace: (race: RaceOption) => void,
-  division?: Division,
+  opts: RaceCalendarOptions = {},
 ): () => void {
   const root = document.createElement('div');
   root.className = 'race-calendar';
 
-  const races = generateRaceCalendar(`calendar-${Date.now()}`, division);
+  const races = generateRaceCalendar(`calendar-${Date.now()}`, opts);
 
   root.innerHTML = `
     <div class="calendar-container">
@@ -69,8 +120,10 @@ export function mountRaceCalendar(
         ${races
           .map(
             (race) => `
-          <button class="race-card" data-race-id="${race.id}">
+          <button class="race-card ${race.isPromotion ? 'race-promotion' : ''} ${race.isDemotion ? 'race-demotion' : ''}" data-race-id="${race.id}">
             <div class="race-card-main">
+              ${race.isPromotion ? '<div class="race-badge promotion">🏆 Promotion</div>' : ''}
+              ${race.isDemotion ? '<div class="race-badge demotion">⚠️ Demotion Risk</div>' : ''}
               <h3>${race.name}</h3>
               <p class="race-distance">${race.distance}m</p>
             </div>
