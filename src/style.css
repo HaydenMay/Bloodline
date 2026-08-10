@@ -2636,6 +2636,69 @@ body {
   letter-spacing: 0.5px;
 }
 
+.division-progress {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.division-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.division-name {
+  color: var(--text);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.points-text {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.progress-segments {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+}
+
+.segment {
+  flex: 1;
+  height: 12px;
+  background: var(--line);
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.segment.promotion.filled {
+  background: var(--ok);
+  box-shadow: 0 0 6px rgba(78, 201, 160, 0.5);
+}
+
+.segment.demotion.filled {
+  background: var(--warning);
+  box-shadow: 0 0 6px rgba(255, 107, 122, 0.5);
+}
+
+.progress-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
 .horse-preview-wrapper {
   width: 100%;
   height: 160px;
