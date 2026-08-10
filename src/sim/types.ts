@@ -90,6 +90,13 @@ export interface Horse {
   morale: number;
 
   division: Division;
+  /** Division level (0=Maiden, 1=Novice, 2=Open, 3=Stakes, 4=Championship) */
+  divisionLevel: number;
+  /** Points accumulated toward promotion/demotion in current division */
+  divisionPoints: number;
+  /** Base stats for AI horses. For player, use regular stats field. */
+  baseStats?: Stats;
+
   /** Career starts. Consistency climbs with these, not only training. */
   starts: number;
   wins: number;
