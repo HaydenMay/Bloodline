@@ -133,12 +133,19 @@ export function mountTrainingScreen(
             </div>
             <div class="progress-bar-container">
               <div class="progress-segments">
-                ${horse.divisionPoints >= 0
-                  ? /* Promotion: 5 green segments for +0 to +5 */
-                    [0, 1, 2, 3, 4].map(i => `<div class="segment promotion ${horse.divisionPoints > i ? 'filled' : ''}"></div>`).join('')
-                  : /* Demotion: 3 red segments for -0 to -3 */
-                    [0, 1, 2].map(i => `<div class="segment demotion ${Math.abs(horse.divisionPoints) > i ? 'filled' : ''}"></div>`).join('')
-                }
+                <!-- 8-segment centered bar: red left (positions 0-2), green right (positions 3-7) -->
+                ${[0, 1, 2, 3, 4, 5, 6, 7].map(i => {
+                  if (i <= 2) {
+                    // Left side: red (demotion) - right-aligned, fills from right to left
+                    const absPoints = Math.abs(horse.divisionPoints);
+                    const isFilled = i >= (3 - absPoints);
+                    return `<div class="segment demotion ${isFilled ? 'filled' : ''}"></div>`;
+                  } else {
+                    // Right side: green (promotion) - left-aligned, fills from left to right
+                    const isFilled = (i - 3) < horse.divisionPoints;
+                    return `<div class="segment promotion ${isFilled ? 'filled' : ''}"></div>`;
+                  }
+                }).join('')}
               </div>
             </div>
             <div class="progress-label">
