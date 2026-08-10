@@ -1,7 +1,7 @@
 import './style.css';
 import { createRng } from './sim/index.js';
 import { createNameGenerator } from './data/names.js';
-import { generateHorse } from './sim/horse.js';
+import { generateHorse, generateWorld } from './sim/horse.js';
 import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
 import type { RunnerSnapshot } from './sim/race/engine.js';
 import { attachInfoBox } from './ui/infoBox.js';
@@ -17,6 +17,7 @@ import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
+import { mountTestCareerSetup, type TestCareerConfig } from './ui/testCareerSetup.js';
 import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
@@ -330,6 +331,25 @@ if (params.has('preview')) {
 } else if (params.has('test-race')) {
   // ?test-race opens the test race (development harness)
   startRace('bloodline-demo');
+} else if (params.has('test-career')) {
+  // ?test-career opens the test career setup
+  const rng = createRng(`test-career-${Date.now()}`);
+  const names = createNameGenerator(rng);
+
+  mountTestCareerSetup(app, (horse, config) => {
+    // Create career with test horse
+    const testCareer = createNewCareer(horse, DEFAULTS.playerSilksDefault);
+    // Generate a full world for testing
+    testCareer.stable.world = generateWorld(rng, names, {
+      maiden: 15,
+      novice: 12,
+      open: 10,
+      stakes: 8,
+      championship: 5,
+    });
+    // Start training screen immediately (no starter selection)
+    showTrainingScreen(testCareer);
+  });
 } else if (params.has('roadmap')) {
   // ?roadmap opens the build-progress panel — kept off every real game
   // screen so it never collides with game chrome (the starter carousel's
