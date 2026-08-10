@@ -44,11 +44,11 @@ const DIVISION_BANDS: Record<Division, DivisionBand> = {
 };
 
 const DIVISION_MULTIPLIERS: Record<number, number> = {
-  0: 0.6,   // Maiden
+  0: 0.5,   // Maiden
   1: 0.8,   // Novice
   2: 1.0,   // Open (reference)
-  3: 1.2,   // Stakes
-  4: 1.5,   // Championship
+  3: 1.25,  // Stakes
+  4: 1.55,  // Championship
 };
 
 const DIVISIONS_BY_LEVEL = ['maiden', 'novice', 'open', 'stakes', 'championship'] as const;
