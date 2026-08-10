@@ -893,8 +893,8 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         const teardownResults = mountResultsScreen(app, placings, player.id, () => {
           infoBoxCleanup();
           teardownResults();
-          // Check if career should end (5 races completed)
-          if (updatedCareer.stats.racesCompleted >= 5) {
+          // Check if career should end (5 races completed OR 20 wins)
+          if (updatedCareer.stats.racesCompleted >= 5 || updatedCareer.stats.wins >= 20) {
             showCareerRecap(updatedCareer);
           } else {
             // Loop back to training instead of main menu
