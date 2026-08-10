@@ -854,6 +854,8 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         const isDemotionRace = race?.isDemotion === true;
         console.log('Race type check:', { isPromotionRace, isDemotionRace, race });
 
+        const DIVISIONS = ['Maiden', 'Novice', 'Open', 'Stakes', 'Championship'];
+
         if (isPromotionRace) {
           // Finalize promotion result
           console.log('Promotion race detected. Before:', {
@@ -861,14 +863,31 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
             divisionPoints: updatedCareer.horse.divisionPoints,
             position: playerFinishingPosition,
           });
+          const divBefore = updatedCareer.horse.divisionLevel;
           finalizePromotion(updatedCareer.horse, playerFinishingPosition);
+          const divAfter = updatedCareer.horse.divisionLevel;
           console.log('After promotion:', {
             divisionLevel: updatedCareer.horse.divisionLevel,
             divisionPoints: updatedCareer.horse.divisionPoints,
           });
+
+          // Show promotion/demotion result alert
+          if (divAfter > divBefore) {
+            alert(`🎉 PROMOTION! 🎉\n\nYou've been promoted to ${DIVISIONS[divAfter]}!\nYour division points reset to 0.`);
+          } else {
+            alert(`\u{1F50B} DEMOTION \u{1F50B}\n\nYou were not promoted this race.\nYour division points reset to 2.`);
+          }
         } else if (isDemotionRace) {
           // Finalize demotion result
+          const divBefore = updatedCareer.horse.divisionLevel;
           finalizeDemotion(updatedCareer.horse, playerFinishingPosition);
+          const divAfter = updatedCareer.horse.divisionLevel;
+
+          if (divAfter < divBefore) {
+            alert(`📉 DEMOTION 📉\n\nYou've been demoted to ${DIVISIONS[divAfter]}.`);
+          } else {
+            alert(`✅ Safe!\n\nYou stayed in ${DIVISIONS[divBefore]}.\nYour division points reset to 0.`);
+          }
         } else {
           // Normal race - just update division points
           updateDivisionProgression(updatedCareer.horse, playerFinishingPosition);
