@@ -21,6 +21,7 @@ import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
 import { DEFAULTS } from './data/colors.js';
+import { updateDivisionProgression, updateAIDivisionProgression } from './sim/division.js';
 
 /**
  * Phase 2 harness screen.
@@ -742,7 +743,7 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
           }
         }
 
-        // Update player horse records
+        // Update player horse records and division progression
         if (playerIndex === 0) {
           updatedCareer.stats.wins += 1;
           updatedCareer.stats.totalEarnings += 1000; // TODO: Dynamic earnings
@@ -751,6 +752,21 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
           updatedCareer.stats.losses += 1;
         }
         updatedCareer.horse.starts += 1;
+
+        // Update division points for player horse
+        const playerFinishingPosition = playerIndex + 1;
+        updateDivisionProgression(updatedCareer.horse, playerFinishingPosition);
+
+        // Update division points for all AI horses
+        for (let i = 0; i < placings.length; i++) {
+          const placing = placings[i];
+          if (placing.id === player.id) continue; // Skip player
+
+          const rival = updatedCareer.stable.world.find((h) => h.id === placing.id);
+          if (rival) {
+            updateAIDivisionProgression(rival, i + 1);
+          }
+        }
 
         updatedCareer.stats.racesCompleted += 1;
         updatedCareer.week += 1;
