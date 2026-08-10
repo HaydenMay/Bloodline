@@ -138,7 +138,7 @@ export function mountTrainingScreen(
                   if (horse.divisionPoints < 0) {
                     // Negative: show red segments right-aligned in positions 0-2
                     const absPoints = Math.abs(horse.divisionPoints);
-                    const isFilled = i >= (3 - absPoints);
+                    const isFilled = i <= 2 && i > (2 - absPoints);
                     return `<div class="segment demotion ${isFilled ? 'filled' : ''}"></div>`;
                   } else {
                     // Positive: show green segments left-aligned in positions 3-7
