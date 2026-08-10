@@ -17,7 +17,7 @@ import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
-import { mountTestCareerSetup, type TestCareerConfig } from './ui/testCareerSetup.js';
+import { mountTestCareerSetup } from './ui/testCareerSetup.js';
 import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
@@ -336,7 +336,7 @@ if (params.has('preview')) {
   const rng = createRng(`test-career-${Date.now()}`);
   const names = createNameGenerator(rng);
 
-  mountTestCareerSetup(app, (horse, config) => {
+  mountTestCareerSetup(app, (horse) => {
     // Create career with test horse
     const testCareer = createNewCareer(horse, DEFAULTS.playerSilksDefault);
     // Generate a full world for testing
@@ -867,7 +867,7 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         // Update division points for all AI horses
         for (let i = 0; i < placings.length; i++) {
           const placing = placings[i];
-          if (placing.id === player.id) continue; // Skip player
+          if (!placing || placing.id === player.id) continue; // Skip player
 
           const rival = updatedCareer.stable.world.find((h) => h.id === placing.id);
           if (rival) {

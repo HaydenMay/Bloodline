@@ -51,8 +51,6 @@ const DIVISION_MULTIPLIERS: Record<number, number> = {
   4: 1.55,  // Championship
 };
 
-const DIVISIONS_BY_LEVEL = ['maiden', 'novice', 'open', 'stakes', 'championship'] as const;
-
 const clamp100 = (v: number): number => Math.min(100, Math.max(1, Math.round(v)));
 
 function rollStats(rng: Rng, band: DivisionBand): Stats {
@@ -212,7 +210,7 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     divisionLevel = Object.keys(DIVISION_BANDS).indexOf(opts.division);
 
     // Apply multiplier to get display stats
-    const multiplier = DIVISION_MULTIPLIERS[divisionLevel];
+    const multiplier = DIVISION_MULTIPLIERS[divisionLevel]!;
     displayStats = {} as Stats;
     for (const key of STAT_KEYS) {
       displayStats[key] = clamp100(baseStats[key] * multiplier);
@@ -237,7 +235,7 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     }
   }
 
-  return {
+  const horse: Horse = {
     // Derived purely from the rng so identity is reproducible from a seed.
     // A module-global counter here would silently break determinism.
     id: `h${Math.floor(rng.next() * 0xffffffff).toString(36)}`,
@@ -255,7 +253,6 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     division,
     divisionLevel,
     divisionPoints: 0,
-    baseStats,
     starts: opts.starter ? 0 : rng.int(0, 14),
     wins: 0,
     places: 0,
@@ -263,6 +260,12 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     coat: rng.pick(COAT_IDS),
     jockeySkill: clamp100(rng.range(jockeyBand.jockey[0], jockeyBand.jockey[1])),
   };
+
+  if (baseStats) {
+    horse.baseStats = baseStats;
+  }
+
+  return horse;
 }
 
 /**

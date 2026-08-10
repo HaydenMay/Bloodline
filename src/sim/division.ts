@@ -48,8 +48,8 @@ export function updateDivisionProgression(
   const pointsEarned = calculateDivisionPoints(finishingPosition);
   horse.divisionPoints += pointsEarned;
 
-  let promoted = false;
-  let demoted = false;
+  const promoted = false;
+  const demoted = false;
 
   // Check for promotion threshold (+5 points)
   if (horse.divisionPoints >= 5) {
@@ -157,7 +157,7 @@ export function updateAIDivisionProgression(
 const DIVISIONS_BY_LEVEL = ['maiden', 'novice', 'open', 'stakes', 'championship'] as const;
 
 function getLevelFromDivision(division: Division): number {
-  return DIVISIONS_BY_LEVEL.indexOf(division as any);
+  return DIVISIONS_BY_LEVEL.indexOf(division);
 }
 
 function getDivisionFromLevel(level: number): Division {

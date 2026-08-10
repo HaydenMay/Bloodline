@@ -1,9 +1,7 @@
 import type { Horse } from '../sim/types.js';
-import type { Division } from '../data/index.js';
+import type { Division, RunningStyle } from '../data/index.js';
 import { RUNNING_STYLES } from '../data/index.js';
-import { generateHorse } from '../sim/horse.js';
 import { createRng } from '../sim/index.js';
-import { createNameGenerator } from '../data/names.js';
 
 export interface TestCareerConfig {
   horseName: string;
@@ -21,7 +19,7 @@ export interface TestCareerConfig {
 
 const DIVISIONS: Division[] = ['maiden', 'novice', 'open', 'stakes', 'championship'];
 
-const PRESETS: Record<string, TestCareerConfig> = {
+const PRESETS = {
   almostPromoted: {
     horseName: 'Test Horse',
     style: 'stalker',
@@ -74,7 +72,7 @@ const PRESETS: Record<string, TestCareerConfig> = {
     consistency: 63,
     age: 4,
   },
-};
+} as const;
 
 export function mountTestCareerSetup(
   container: HTMLElement,
@@ -95,7 +93,7 @@ export function mountTestCareerSetup(
         <div class="preset-buttons">
           ${Object.entries(PRESETS)
             .map(
-              ([key, preset]) => `
+              ([key, _preset]) => `
             <button class="preset-btn" data-preset="${key}">
               ${key
                 .replace(/([A-Z])/g, ' $1')
@@ -183,10 +181,10 @@ export function mountTestCareerSetup(
   // Stat sliders
   root.querySelectorAll('.stat-slider').forEach((slider) => {
     slider.addEventListener('input', (e) => {
-      const stat = (e.target as HTMLInputElement).id.replace('stat-', '') as keyof TestCareerConfig;
+      const statName = (e.target as HTMLInputElement).id.replace('stat-', '');
       const value = parseInt((e.target as HTMLInputElement).value);
-      currentConfig[stat as any] = value;
-      root.querySelector(`[data-stat="${stat}"]`)!.textContent = String(value);
+      (currentConfig as unknown as Record<string, number>)[statName] = value;
+      root.querySelector(`[data-stat="${statName}"]`)!.textContent = String(value);
     });
   });
 
@@ -226,7 +224,6 @@ export function mountTestCareerSetup(
 
     // Create a custom horse from the config
     const rng = createRng('test-career-' + Date.now());
-    const names = createNameGenerator(rng);
 
     const horse: Horse = {
       id: `h${Math.floor(rng.next() * 0xffffffff).toString(36)}`,
@@ -249,7 +246,7 @@ export function mountTestCareerSetup(
         temper: Math.min(100, currentConfig.temper + 20),
         consistency: Math.min(100, currentConfig.consistency + 20),
       },
-      style: currentConfig.style as any,
+      style: currentConfig.style as RunningStyle,
       moment: 'late',
       preferredDistance: { min: 1200, max: 1800 },
       traits: [],
