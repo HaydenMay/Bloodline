@@ -105,7 +105,7 @@ export function renderInfoBox(horse: Horse): string {
       ${badgeHtml}
       <div>
         <p class="ib-name">${horse.name}</p>
-        <p class="ib-sub">${coat.name} ${horse.gender === "stallion" ? "colt" : "filly"} · ${horse.age}yo</p>
+        <p class="ib-sub">${coat.name} ${horse.gender === "stallion" ? "colt" : "filly"} · ${horse.age}yo · ${horse.division}</p>
       </div>
     </div>
 
@@ -171,7 +171,13 @@ export function attachInfoBox(
     // Try positioning to the right first (most common), then fall back to left
     const rightPos = r.right + 12;
     const leftPos = r.left - cardRect.width - 12;
-    const top = Math.max(8, Math.min(triggerCenterY - cardRect.height / 2, window.innerHeight - cardRect.height - 8));
+    const top = Math.max(
+      8,
+      Math.min(
+        triggerCenterY - cardRect.height / 2,
+        window.innerHeight - cardRect.height - 8,
+      ),
+    );
 
     if (rightPos + cardRect.width + 8 <= window.innerWidth) {
       // Position to the right
