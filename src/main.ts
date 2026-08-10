@@ -547,16 +547,67 @@ function showRaceCalendar(career: Career): void {
   const isPromotionReady = career.horse.divisionPoints >= 5 && career.horse.divisionLevel < 4;
   const isDemotionRisk = career.horse.divisionPoints <= -3 && career.horse.divisionLevel > 0;
 
-  teardown = mountRaceCalendar(app, (race) => {
-    // Mark that a race has been selected for this week
-    const careerWithRaceSelected = { ...career, raceSelected: true };
-    saveCareer(careerWithRaceSelected);
-    startRaceWithHorse(careerWithRaceSelected, race);
-  }, {
-    division: career.horse.division,
-    isPromotionReady,
-    isDemotionRisk,
-  });
+  // Show demotion warning if at risk
+  if (isDemotionRisk) {
+    const warningModal = document.createElement('div');
+    warningModal.className = 'modal-overlay';
+    warningModal.innerHTML = `
+      <div class="modal-content demotion-warning">
+        <h2>⚠️ Demotion Risk</h2>
+        <p>You are at risk of demotion. You must finish in the top 4 of the Division Qualifier race to avoid being demoted to the previous division.</p>
+        <p>If you finish 5th-8th, you will be demoted and start fresh in the division below.</p>
+        <button class="btn btn-primary" id="demotion-warning-ok">Understood</button>
+      </div>
+    `;
+    app.appendChild(warningModal);
+
+    warningModal.querySelector('#demotion-warning-ok')!.addEventListener('click', () => {
+      warningModal.remove();
+      // Now show the race calendar
+      mountCalendarUI();
+    });
+
+    return;
+  }
+
+  // Show promotion ready alert if applicable
+  if (isPromotionReady) {
+    const promotionAlert = document.createElement('div');
+    promotionAlert.className = 'modal-overlay';
+    promotionAlert.innerHTML = `
+      <div class="modal-content promotion-alert">
+        <h2>🏆 Ready for Promotion!</h2>
+        <p>You've proven yourself in this division! This week's race calendar features a Promotion Test.</p>
+        <p>Finish in the top 4 to advance to the next division.</p>
+        <button class="btn btn-primary" id="promotion-alert-ok">Let's Go</button>
+      </div>
+    `;
+    app.appendChild(promotionAlert);
+
+    promotionAlert.querySelector('#promotion-alert-ok')!.addEventListener('click', () => {
+      promotionAlert.remove();
+      // Now show the race calendar
+      mountCalendarUI();
+    });
+
+    return;
+  }
+
+  // Show normal race calendar
+  mountCalendarUI();
+
+  function mountCalendarUI() {
+    teardown = mountRaceCalendar(app, (race) => {
+      // Mark that a race has been selected for this week
+      const careerWithRaceSelected = { ...career, raceSelected: true };
+      saveCareer(careerWithRaceSelected);
+      startRaceWithHorse(careerWithRaceSelected, race);
+    }, {
+      division: career.horse.division,
+      isPromotionReady,
+      isDemotionRisk,
+    });
+  }
 }
 
 function startRaceWithHorse(career: Career, race?: RaceOption): void {
