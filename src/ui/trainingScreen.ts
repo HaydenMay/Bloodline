@@ -125,6 +125,19 @@ export function mountTrainingScreen(
         <div class="horse-card">
           <h3>${horse.name}</h3>
           <p class="horse-meta">Age 2 • Trainer Career</p>
+
+          <div class="division-progress">
+            <div class="division-label">
+              <span class="division-name">${horse.division.charAt(0).toUpperCase() + horse.division.slice(1)}</span>
+              <span class="points-text">${horse.divisionPoints >= 0 ? '+' : ''}${horse.divisionPoints}/5</span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-bar ${horse.divisionPoints >= 0 ? 'promotion' : 'demotion'}" style="width: ${Math.abs(horse.divisionPoints) / 5 * 100}%"></div>
+            </div>
+            <div class="progress-label">
+              ${horse.divisionPoints >= 0 ? 'Promotion Progress' : 'Demotion Risk'}
+            </div>
+          </div>
         </div>
       </div>
 
