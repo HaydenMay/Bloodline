@@ -278,6 +278,8 @@ function tankModsFor(horse: Horse): TankModifiers {
   let recoverMult = 1;
   if (horse.traits.includes('ironLungs')) recoverMult *= TRAIT_IRON_LUNGS_RECOVER;
   if (horse.traits.includes('thirsty')) recoverMult *= TRAIT_THIRSTY_RECOVER;
+  // Grit increases tank recovery: 0.95x at 0 grit to 1.0x at 100 grit (5% max bonus)
+  recoverMult *= (0.95 + 0.05 * (horse.stats.grit / 100));
   let exponentRelief = 0;
   if (horse.traits.includes('cruiser')) exponentRelief += TRAIT_CRUISER_EXPONENT_RELIEF;
   if (horse.style === 'frontRunner') exponentRelief += FRONT_RUNNER_EXPONENT_RELIEF;
