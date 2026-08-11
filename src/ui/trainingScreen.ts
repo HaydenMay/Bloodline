@@ -255,7 +255,7 @@ export function mountTrainingScreen(
       const session = TRAINING_SESSIONS[trainingId]!;
 
       // Breakthrough chance based on morale and temper
-      const breakthroughChance = (horse.morale / 100) * (horse.stats.temper / 100) * 0.3; // 0-30% max
+      const breakthroughChance = (horse.morale / 100) * (horse.stats.temper / 100) * 0.5; // 0-50% max
       const isBreakthrough = Math.random() < breakthroughChance;
 
       // Calculate stat changes
