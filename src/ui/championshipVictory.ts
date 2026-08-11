@@ -16,7 +16,7 @@ export function mountChampionshipVictory(
     <div class="victory-container">
       <div class="victory-content">
         <div class="victory-horse-display">
-          <canvas id="victory-horse-canvas" width="300" height="300"></canvas>
+          <canvas id="victory-horse-canvas"></canvas>
           <div class="victory-wreath-overlay" id="victory-wreath-overlay"></div>
         </div>
         <h2 class="victory-title">🏆 Championship Victory!</h2>
@@ -31,8 +31,12 @@ export function mountChampionshipVictory(
 
   container.appendChild(root);
 
-  // Draw the horse sprite on canvas
+  // Set up responsive canvas
   const canvas = root.querySelector<HTMLCanvasElement>('#victory-horse-canvas')!;
+  const displaySize = Math.min(window.innerWidth * 0.6, 400);
+  canvas.width = displaySize;
+  canvas.height = displaySize;
+
   const ctx = canvas.getContext('2d')!;
   loadAndDrawHorseSprite(ctx, canvas.width, canvas.height, silks);
 
@@ -77,7 +81,7 @@ function loadAndDrawHorseSprite(
   horseImg.src = horseSrc;
   horseImg.onload = () => {
     // Scale and center the horse on the canvas
-    const scale = 3; // Scale up the sprite 3x
+    const scale = 2; // Horse sprite is now 184x184, scale up 2x
     const imgWidth = horseImg.width * scale;
     const imgHeight = horseImg.height * scale;
     const x = (width - imgWidth) / 2;
