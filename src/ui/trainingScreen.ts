@@ -123,7 +123,7 @@ export function mountTrainingScreen(
           <canvas class="horse-preview-canvas"></canvas>
         </div>
         <div class="horse-card">
-          <h3>${horse.name}</h3>
+          <h3>${horse.name}${horse.isChampion ? ' 🏆' : ''}</h3>
           <p class="horse-meta">Age 2 • Trainer Career</p>
 
           <div class="division-progress">
