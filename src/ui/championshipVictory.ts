@@ -68,8 +68,13 @@ function loadAndDrawHorseSprite(
   ctx.clearRect(0, 0, width, height);
 
   // Load and draw the horse sprite
+  const horseSrc = new URL(
+    '../assets/horse-positions/forward-no-jockey/south.png',
+    import.meta.url,
+  ).href;
+
   const horseImg = new Image();
-  horseImg.src = '/src/assets/horse-positions/forward-no-jockey/south.png';
+  horseImg.src = horseSrc;
   horseImg.onload = () => {
     // Center the horse on the canvas
     const imgWidth = horseImg.width;
@@ -119,8 +124,13 @@ function drawFallbackHorse(
 
 function animateWreath(element: HTMLElement): void {
   // Create wreath image element
+  const wreathSrc = new URL(
+    '../assets/wreaths/champ_wreath.png',
+    import.meta.url,
+  ).href;
+
   const wreathImg = document.createElement('img');
-  wreathImg.src = '/src/assets/wreaths/champ_wreath.png';
+  wreathImg.src = wreathSrc;
   wreathImg.className = 'victory-wreath-image';
   wreathImg.alt = 'Championship Wreath';
   element.appendChild(wreathImg);
