@@ -924,12 +924,12 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
             let victoryTeardown: (() => void) | null = null;
 
             // Build top 3 placings from race results
-            const topThree = [];
+            const topThree: Array<{ horse: Horse; position: 1 | 2 | 3 }> = [];
             for (let i = 0; i < Math.min(3, placings.length); i++) {
               const placing = placings[i];
               if (!placing) continue;
 
-              let horse: any = updatedCareer.horse; // 1st place is player's horse
+              let horse: Horse | undefined = updatedCareer.horse; // 1st place is player's horse
               if (i > 0) {
                 // 2nd and 3rd place: look up from stable
                 horse = updatedCareer.stable.world.find((h) => h.id === placing.id);

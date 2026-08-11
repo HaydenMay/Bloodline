@@ -1,6 +1,5 @@
 import type { Horse } from '../sim/types.js';
 import type { Silks } from '../render/palette.js';
-import type { Coat } from '../render/palette.js';
 
 export interface PodiumPlacing {
   horse: Horse;
@@ -76,14 +75,14 @@ export function mountChampionshipVictory(
     secondCanvas.width = canvasSize;
     secondCanvas.height = canvasSize;
     const secondCtx = secondCanvas.getContext('2d')!;
-    loadAndDrawHorseSprite(secondCtx, canvasSize, canvasSize, undefined, topThree[1]?.horse.coat);
+    loadAndDrawHorseSprite(secondCtx, canvasSize, canvasSize);
 
     // 1st place (center) with wreath
     const firstCanvas = root.querySelector<HTMLCanvasElement>('#first-place-canvas')!;
     firstCanvas.width = canvasSize;
     firstCanvas.height = canvasSize;
     const firstCtx = firstCanvas.getContext('2d')!;
-    loadAndDrawHorseSprite(firstCtx, canvasSize, canvasSize, undefined, topThree[0]?.horse.coat);
+    loadAndDrawHorseSprite(firstCtx, canvasSize, canvasSize);
 
     const wreathOverlay = root.querySelector<HTMLDivElement>('#victory-wreath-overlay')!;
     animateWreath(wreathOverlay);
@@ -93,7 +92,7 @@ export function mountChampionshipVictory(
     thirdCanvas.width = canvasSize;
     thirdCanvas.height = canvasSize;
     const thirdCtx = thirdCanvas.getContext('2d')!;
-    loadAndDrawHorseSprite(thirdCtx, canvasSize, canvasSize, undefined, topThree[2]?.horse.coat);
+    loadAndDrawHorseSprite(thirdCtx, canvasSize, canvasSize);
   } else {
     // Fallback: single horse display
     const canvas = root.querySelector<HTMLCanvasElement>('#victory-horse-canvas')!;
@@ -130,7 +129,6 @@ function loadAndDrawHorseSprite(
   width: number,
   height: number,
   silks?: Silks,
-  coat?: Coat,
 ): void {
   // Clear canvas
   ctx.fillStyle = 'transparent';
