@@ -69,7 +69,8 @@ function drawHorseSprite(
 
   // Draw a simple horse silhouette (front view)
   // This will be replaced with the actual sprite from src/assets/horse-positions/foward-no-jockey
-  ctx.fillStyle = silks?.bodyColor || '#8B7355';
+  const horseColor = silks?.primary || '#8B7355';
+  ctx.fillStyle = horseColor;
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
 
@@ -90,7 +91,7 @@ function drawHorseSprite(
   ctx.stroke();
 
   // Legs
-  ctx.fillStyle = silks?.bodyColor || '#8B7355';
+  ctx.fillStyle = horseColor;
   for (let i = 0; i < 4; i++) {
     const legX = centerX + (i < 2 ? -20 : 20);
     ctx.fillRect(legX - 8, centerY + 50, 16, 50);
