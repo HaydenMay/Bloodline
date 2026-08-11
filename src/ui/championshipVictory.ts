@@ -1,12 +1,18 @@
 import type { Horse } from '../sim/types.js';
 import type { Silks } from '../render/palette.js';
 
+export interface PodiumPlacing {
+  horse: Horse;
+  position: 1 | 2 | 3;
+}
+
 export function mountChampionshipVictory(
   container: HTMLElement,
   horse: Horse,
   silks?: Silks,
   onRetire?: () => void,
   onKeepRacing?: () => void,
+  topThree?: PodiumPlacing[],
 ): () => void {
   const root = document.createElement('div');
   root.className = 'championship-victory';
@@ -15,10 +21,38 @@ export function mountChampionshipVictory(
     <div class="victory-overlay"></div>
     <div class="victory-container">
       <div class="victory-content">
-        <div class="victory-horse-display">
-          <canvas id="victory-horse-canvas"></canvas>
-          <div class="victory-wreath-overlay" id="victory-wreath-overlay"></div>
-        </div>
+        ${
+          topThree && topThree.length >= 3
+            ? `
+          <div class="podium-display">
+            <div class="podium-slot podium-second">
+              <canvas id="second-place-canvas"></canvas>
+              <div class="podium-platform">
+                <span class="podium-number">2</span>
+              </div>
+            </div>
+            <div class="podium-slot podium-first">
+              <canvas id="first-place-canvas"></canvas>
+              <div class="victory-wreath-overlay" id="victory-wreath-overlay"></div>
+              <div class="podium-platform">
+                <span class="podium-number">1</span>
+              </div>
+            </div>
+            <div class="podium-slot podium-third">
+              <canvas id="third-place-canvas"></canvas>
+              <div class="podium-platform">
+                <span class="podium-number">3</span>
+              </div>
+            </div>
+          </div>
+        `
+            : `
+          <div class="victory-horse-display">
+            <canvas id="victory-horse-canvas"></canvas>
+            <div class="victory-wreath-overlay" id="victory-wreath-overlay"></div>
+          </div>
+        `
+        }
         <h2 class="victory-title">🏆 Championship Victory!</h2>
         <p class="victory-message">You've won the championship! Congratulations <strong>${horse.name}</strong></p>
         <div class="victory-buttons">
@@ -31,18 +65,47 @@ export function mountChampionshipVictory(
 
   container.appendChild(root);
 
-  // Set up responsive canvas
-  const canvas = root.querySelector<HTMLCanvasElement>('#victory-horse-canvas')!;
-  const displaySize = Math.min(window.innerWidth * 0.7, 600);
-  canvas.width = displaySize;
-  canvas.height = displaySize;
+  // Set up horses based on whether we have top 3 data
+  if (topThree && topThree.length >= 3) {
+    // Podium display with top 3
+    const canvasSize = 150;
 
-  const ctx = canvas.getContext('2d')!;
-  loadAndDrawHorseSprite(ctx, canvas.width, canvas.height, silks);
+    // 2nd place (left)
+    const secondCanvas = root.querySelector<HTMLCanvasElement>('#second-place-canvas')!;
+    secondCanvas.width = canvasSize;
+    secondCanvas.height = canvasSize;
+    const secondCtx = secondCanvas.getContext('2d')!;
+    loadAndDrawHorseSprite(secondCtx, canvasSize, canvasSize);
 
-  // Animate wreath
-  const wreathOverlay = root.querySelector<HTMLDivElement>('#victory-wreath-overlay')!;
-  animateWreath(wreathOverlay);
+    // 1st place (center) with wreath
+    const firstCanvas = root.querySelector<HTMLCanvasElement>('#first-place-canvas')!;
+    firstCanvas.width = canvasSize;
+    firstCanvas.height = canvasSize;
+    const firstCtx = firstCanvas.getContext('2d')!;
+    loadAndDrawHorseSprite(firstCtx, canvasSize, canvasSize);
+
+    const wreathOverlay = root.querySelector<HTMLDivElement>('#victory-wreath-overlay')!;
+    animateWreath(wreathOverlay);
+
+    // 3rd place (right)
+    const thirdCanvas = root.querySelector<HTMLCanvasElement>('#third-place-canvas')!;
+    thirdCanvas.width = canvasSize;
+    thirdCanvas.height = canvasSize;
+    const thirdCtx = thirdCanvas.getContext('2d')!;
+    loadAndDrawHorseSprite(thirdCtx, canvasSize, canvasSize);
+  } else {
+    // Fallback: single horse display
+    const canvas = root.querySelector<HTMLCanvasElement>('#victory-horse-canvas')!;
+    const displaySize = Math.min(window.innerWidth * 0.7, 600);
+    canvas.width = displaySize;
+    canvas.height = displaySize;
+
+    const ctx = canvas.getContext('2d')!;
+    loadAndDrawHorseSprite(ctx, canvas.width, canvas.height, silks);
+
+    const wreathOverlay = root.querySelector<HTMLDivElement>('#victory-wreath-overlay')!;
+    animateWreath(wreathOverlay);
+  }
 
   // Button handlers
   const retireBtn = root.querySelector<HTMLButtonElement>('#retire-btn')!;
