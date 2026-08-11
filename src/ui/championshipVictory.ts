@@ -81,7 +81,7 @@ function loadAndDrawHorseSprite(
   horseImg.src = horseSrc;
   horseImg.onload = () => {
     // Scale and center the horse on the canvas
-    const scale = 3; // Horse sprite is 184x184, scale up 3x for better visibility
+    const scale = 4; // Horse sprite is 184x184, scale up 4x for prominence
     const imgWidth = horseImg.width * scale;
     const imgHeight = horseImg.height * scale;
     const x = (width - imgWidth) / 2;
