@@ -33,7 +33,7 @@ export function mountChampionshipVictory(
 
   // Set up responsive canvas
   const canvas = root.querySelector<HTMLCanvasElement>('#victory-horse-canvas')!;
-  const displaySize = Math.min(window.innerWidth * 0.6, 400);
+  const displaySize = Math.min(window.innerWidth * 0.7, 600);
   canvas.width = displaySize;
   canvas.height = displaySize;
 
@@ -81,7 +81,7 @@ function loadAndDrawHorseSprite(
   horseImg.src = horseSrc;
   horseImg.onload = () => {
     // Scale and center the horse on the canvas
-    const scale = 2; // Horse sprite is now 184x184, scale up 2x
+    const scale = 3; // Horse sprite is 184x184, scale up 3x for better visibility
     const imgWidth = horseImg.width * scale;
     const imgHeight = horseImg.height * scale;
     const x = (width - imgWidth) / 2;
