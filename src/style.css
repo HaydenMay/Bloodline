@@ -4025,8 +4025,8 @@ body {
 }
 
 .victory-wreath-image {
-  width: min(50vw, 400px);
-  height: min(50vw, 400px);
+  width: 300px;
+  height: 300px;
   object-fit: contain;
   opacity: 0;
   animation: wreathFadeIn 0.8s ease-out forwards;
