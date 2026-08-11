@@ -15,6 +15,7 @@ import { mountStarterSelection } from './ui/starterSelection.js';
 import { mountResultsScreen } from './ui/resultsScreen.js';
 import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
+import { mountChampionshipVictory } from './ui/championshipVictory.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
 import { mountTestCareerSetup } from './ui/testCareerSetup.js';
@@ -912,12 +913,49 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         const teardownResults = mountResultsScreen(app, placings, player.id, () => {
           infoBoxCleanup();
           teardownResults();
-          // Check if career should end (5 races completed OR 20 wins)
-          if (updatedCareer.stats.racesCompleted >= 5 || updatedCareer.stats.wins >= 20) {
-            showCareerRecap(updatedCareer);
+
+          // Check for championship victory
+          const playerWon = playerIndex === 0;
+          const isChampionship = player.division === 'championship';
+          const notYetChampion = !updatedCareer.horse.isChampion;
+
+          if (playerWon && isChampionship && notYetChampion) {
+            // Show championship victory scene
+            let victoryTeardown: (() => void) | null = null;
+            victoryTeardown = mountChampionshipVictory(
+              app,
+              updatedCareer.horse,
+              career.playerSilks,
+              () => {
+                // Retire champion
+                victoryTeardown?.();
+                updatedCareer.horse.isChampion = true;
+                saveCareer(updatedCareer);
+                showCareerRecap(updatedCareer);
+              },
+              () => {
+                // Keep racing
+                victoryTeardown?.();
+                updatedCareer.horse.isChampion = true;
+                saveCareer(updatedCareer);
+                // Check if career should end
+                if (updatedCareer.stats.racesCompleted >= 5 || updatedCareer.stats.wins >= 20) {
+                  showCareerRecap(updatedCareer);
+                } else {
+                  // Loop back to training
+                  showTrainingScreen(updatedCareer);
+                }
+              }
+            );
           } else {
-            // Loop back to training instead of main menu
-            showTrainingScreen(updatedCareer);
+            // Normal race completion
+            // Check if career should end (5 races completed OR 20 wins)
+            if (updatedCareer.stats.racesCompleted >= 5 || updatedCareer.stats.wins >= 20) {
+              showCareerRecap(updatedCareer);
+            } else {
+              // Loop back to training instead of main menu
+              showTrainingScreen(updatedCareer);
+            }
           }
         }, field, silksMap);
       };
