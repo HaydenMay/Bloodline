@@ -4022,11 +4022,12 @@ body {
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  transform: translateY(60px);
 }
 
 .victory-wreath-image {
-  width: 200px;
-  height: 200px;
+  width: 5vw;
+  height: auto;
   object-fit: contain;
   opacity: 0;
   animation: wreathFadeIn 0.8s ease-out forwards;
