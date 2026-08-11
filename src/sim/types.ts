@@ -94,6 +94,8 @@ export interface Horse {
   divisionLevel: number;
   /** Points accumulated toward promotion/demotion in current division */
   divisionPoints: number;
+  /** Won championship division race (triggers victory scene once) */
+  isChampion?: boolean;
   /** Base stats for AI horses. For player, use regular stats field. */
   baseStats?: Stats;
 

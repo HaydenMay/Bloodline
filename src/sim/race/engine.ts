@@ -278,6 +278,8 @@ function tankModsFor(horse: Horse): TankModifiers {
   let recoverMult = 1;
   if (horse.traits.includes('ironLungs')) recoverMult *= TRAIT_IRON_LUNGS_RECOVER;
   if (horse.traits.includes('thirsty')) recoverMult *= TRAIT_THIRSTY_RECOVER;
+  // Grit increases tank recovery: 0.95x at 0 grit to 1.0x at 100 grit (5% max bonus)
+  recoverMult *= (0.95 + 0.05 * (horse.stats.grit / 100));
   let exponentRelief = 0;
   if (horse.traits.includes('cruiser')) exponentRelief += TRAIT_CRUISER_EXPONENT_RELIEF;
   if (horse.style === 'frontRunner') exponentRelief += FRONT_RUNNER_EXPONENT_RELIEF;
@@ -304,21 +306,25 @@ function makeRunner(
   const morale = lerp(MORALE_MIN_FACTOR, MORALE_MAX_FACTOR, horse.morale / 100);
 
   // Daily form: low Temper swings bigger in BOTH directions (DESIGN.md §2).
+  // Consistency raises the floor: at 100% consistency, no bad days, only average to good.
   const amplitude = FORM_BASE_SPREAD + FORM_TEMPER_AMPLIFY * (1 - horse.stats.temper / 100);
-  const form = 1 + rng.normal(0, amplitude);
+  const rawForm = rng.normal(0, amplitude);
+  const consistencyFloor = amplitude * (1 - consistency);
+  const form = 1 + Math.max(-consistencyFloor, rawForm);
 
   const going = goingFor(horse, config);
   const distance = distanceFactor(horse.preferredDistance, config.metres);
 
+  // Consistency prevents bad race events: at high consistency, fumbles/off-colour/greens can't happen
   const fumbleChance =
     FUMBLE_BASE * (1 - consistency) * (horse.traits.includes('alert') ? TRAIT_ALERT_FUMBLE : 1);
   const fumbledStart = rng.chance(fumbleChance);
-  const offColour = rng.chance(OFF_COLOUR_BASE * (1 - consistency));
+  const offColour = consistency < 1 && rng.chance(OFF_COLOUR_BASE * (1 - consistency));
   const delivery = offColour ? OFF_COLOUR_PENALTY : 1;
 
   const greenAt: number[] = [];
   for (let i = 0; i < 2; i++) {
-    if (rng.chance(GREEN_BASE * (1 - consistency))) greenAt.push(rng.range(0.1, 0.9));
+    if (consistency < 1 && rng.chance(GREEN_BASE * (1 - consistency))) greenAt.push(rng.range(0.1, 0.9));
   }
   greenAt.sort((a, b) => a - b);
 

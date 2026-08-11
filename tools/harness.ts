@@ -254,6 +254,45 @@ const BAR = 0.3;
 }
 
 // ---------------------------------------------------------------------------
+// B1b/B2b — championship-specific balance (high-tier horses)
+// ---------------------------------------------------------------------------
+
+{
+  const champStyleWins: Record<string, number> = {};
+  const champStyleRuns: Record<string, number> = {};
+
+  for (const s of RUNNING_STYLES) {
+    champStyleWins[s] = 0;
+    champStyleRuns[s] = 0;
+  }
+
+  for (let n = 0; n < Math.min(RACES, 300); n++) {
+    const field = buildField(`champ-${n}`, 'championship');
+    const byId = new Map(field.map((h) => [h.id, h]));
+    for (const h of field) {
+      champStyleRuns[h.style]! += 1;
+    }
+    const outcome = race(field, `champ-run-${n}`);
+    const winner = byId.get(outcome.results[0]!.horseId)!;
+    champStyleWins[winner.style]! += 1;
+  }
+
+  const champStyleRates = RUNNING_STYLES.map((s) => ({
+    key: s,
+    rate: champStyleWins[s]! / champStyleRuns[s]!,
+  }));
+  const worstChampStyle = champStyleRates.reduce((a, b) =>
+    Math.abs(b.rate - FAIR) > Math.abs(a.rate - FAIR) ? b : a,
+  );
+  report(
+    'B1b championship style balance',
+    champStyleRates.every((r) => Math.abs(r.rate - FAIR) / FAIR <= BAR),
+    champStyleRates.map((r) => `${r.key} ${pct(r.rate)}`).join('  ') +
+      `   (worst ${worstChampStyle.key})`,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // B3 — pace collapse. The load-bearing one.
 // ---------------------------------------------------------------------------
 

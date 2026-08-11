@@ -109,7 +109,9 @@ export function planKicks(horse: Horse, rng: Rng, raceSeconds: number): KickPlan
   // late collapsed to 4.9% against a fair 12.5% while the wider windows were
   // fine. Charges that cannot fit inside the window are placed just BEFORE it
   // instead, where they are worth less but are at least worth something.
-  const minSpacing = KICK_COOLDOWN / Math.max(1, raceSeconds);
+  // Grit reduces cooldown slightly: 2% reduction at 100 grit, scaling linearly.
+  const effectiveCooldown = KICK_COOLDOWN * (1 - 0.0002 * horse.stats.grit);
+  const minSpacing = effectiveCooldown / Math.max(1, raceSeconds);
   const span = window.to - window.from;
 
   const points: number[] = [];
