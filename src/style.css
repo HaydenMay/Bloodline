@@ -4050,6 +4050,88 @@ body {
   }
 }
 
+/* Podium Display */
+.podium-display {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 40px;
+  animation: scaleIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.podium-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.podium-slot canvas {
+  width: 150px;
+  height: 150px;
+  display: block;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+
+.podium-first {
+  order: 2;
+}
+
+.podium-second {
+  order: 1;
+}
+
+.podium-third {
+  order: 3;
+}
+
+.podium-platform {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #ffd700 0%, #daa520 100%);
+  border: 2px solid #b8860b;
+  border-radius: 4px;
+  font-weight: bold;
+  color: #000;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.podium-first .podium-platform {
+  width: 180px;
+  height: 80px;
+  font-size: 48px;
+}
+
+.podium-second .podium-platform {
+  width: 140px;
+  height: 60px;
+  font-size: 36px;
+}
+
+.podium-third .podium-platform {
+  width: 120px;
+  height: 50px;
+  font-size: 28px;
+}
+
+.podium-number {
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Position wreath over first place horse */
+.podium-first .victory-wreath-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 150px;
+  height: 150px;
+}
+
 /* Position flowers around the wreath circle */
 .wreath-flower[style*="--pos: 0"] {
   transform: translate(90px, 0);
