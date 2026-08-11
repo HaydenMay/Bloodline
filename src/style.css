@@ -3999,8 +3999,8 @@ body {
 
 .victory-horse-display {
   position: relative;
-  width: 300px;
-  height: 300px;
+  width: min(70vw, 600px);
+  height: min(70vw, 600px);
   animation: scaleIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -4025,8 +4025,8 @@ body {
 }
 
 .victory-wreath-image {
-  width: 200px;
-  height: 200px;
+  width: min(50vw, 400px);
+  height: min(50vw, 400px);
   object-fit: contain;
   opacity: 0;
   animation: wreathFadeIn 0.8s ease-out forwards;
