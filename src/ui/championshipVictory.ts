@@ -34,7 +34,7 @@ export function mountChampionshipVictory(
   // Draw the horse sprite on canvas
   const canvas = root.querySelector<HTMLCanvasElement>('#victory-horse-canvas')!;
   const ctx = canvas.getContext('2d')!;
-  drawHorseSprite(ctx, canvas.width, canvas.height, silks);
+  loadAndDrawHorseSprite(ctx, canvas.width, canvas.height, silks);
 
   // Animate wreath
   const wreathOverlay = root.querySelector<HTMLDivElement>('#victory-wreath-overlay')!;
@@ -57,7 +57,7 @@ export function mountChampionshipVictory(
   };
 }
 
-function drawHorseSprite(
+function loadAndDrawHorseSprite(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
@@ -65,32 +65,50 @@ function drawHorseSprite(
 ): void {
   // Clear canvas
   ctx.fillStyle = 'transparent';
-  ctx.fillRect(0, 0, width, height);
+  ctx.clearRect(0, 0, width, height);
 
-  // Draw a simple horse silhouette (front view)
-  // This will be replaced with the actual sprite from src/assets/horse-positions/foward-no-jockey
+  // Load and draw the horse sprite
+  const horseImg = new Image();
+  horseImg.src = '/src/assets/horse-positions/forward-no-jockey/south.png';
+  horseImg.onload = () => {
+    // Center the horse on the canvas
+    const imgWidth = horseImg.width;
+    const imgHeight = horseImg.height;
+    const x = (width - imgWidth) / 2;
+    const y = (height - imgHeight) / 2;
+    ctx.drawImage(horseImg, x, y);
+  };
+  horseImg.onerror = () => {
+    // Fallback if image doesn't load
+    drawFallbackHorse(ctx, width, height, silks);
+  };
+}
+
+function drawFallbackHorse(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  silks?: Silks,
+): void {
+  // Fallback silhouette if image fails to load
   const horseColor = silks?.primary || '#8B7355';
   ctx.fillStyle = horseColor;
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
 
-  // Horse body (front view - simplified)
   const centerX = width / 2;
   const centerY = height / 2;
 
-  // Head
   ctx.beginPath();
   ctx.arc(centerX, centerY - 40, 25, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  // Body
   ctx.beginPath();
   ctx.ellipse(centerX, centerY + 20, 35, 45, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  // Legs
   ctx.fillStyle = horseColor;
   for (let i = 0; i < 4; i++) {
     const legX = centerX + (i < 2 ? -20 : 20);
@@ -100,19 +118,12 @@ function drawHorseSprite(
 }
 
 function animateWreath(element: HTMLElement): void {
-  // Create wreath HTML with animation
-  element.innerHTML = `
-    <div class="wreath wreath-animated">
-      <span class="wreath-flower" style="--pos: 0;"></span>
-      <span class="wreath-flower" style="--pos: 1;"></span>
-      <span class="wreath-flower" style="--pos: 2;"></span>
-      <span class="wreath-flower" style="--pos: 3;"></span>
-      <span class="wreath-flower" style="--pos: 4;"></span>
-      <span class="wreath-flower" style="--pos: 5;"></span>
-      <span class="wreath-flower" style="--pos: 6;"></span>
-      <span class="wreath-flower" style="--pos: 7;"></span>
-    </div>
-  `;
+  // Create wreath image element
+  const wreathImg = document.createElement('img');
+  wreathImg.src = '/src/assets/wreaths/champ_wreath.png';
+  wreathImg.className = 'victory-wreath-image';
+  wreathImg.alt = 'Championship Wreath';
+  element.appendChild(wreathImg);
 
   // Trigger animation
   element.classList.add('show');
