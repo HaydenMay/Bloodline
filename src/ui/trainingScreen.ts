@@ -149,7 +149,7 @@ export function mountTrainingScreen(
               </div>
             </div>
             <div class="progress-label">
-              ${horse.divisionPoints >= 0 ? 'Promotion Progress' : 'Demotion Risk'}
+              ${horse.divisionPoints >= 5 ? '🏆 Ready for Promotion!' : (horse.divisionPoints >= 0 ? 'Promotion Progress' : 'Demotion Risk')}
             </div>
           </div>
         </div>
