@@ -33,7 +33,6 @@ export function mountChampionshipVictory(
             </div>
             <div class="podium-slot podium-first">
               <canvas id="first-place-canvas"></canvas>
-              <div class="victory-wreath-overlay" id="victory-wreath-overlay"></div>
               <div class="podium-platform">
                 <span class="podium-number">1</span>
               </div>
@@ -82,10 +81,7 @@ export function mountChampionshipVictory(
     firstCanvas.width = canvasSize;
     firstCanvas.height = canvasSize;
     const firstCtx = firstCanvas.getContext('2d')!;
-    loadAndDrawHorseSprite(firstCtx, canvasSize, canvasSize);
-
-    const wreathOverlay = root.querySelector<HTMLDivElement>('#victory-wreath-overlay')!;
-    animateWreath(wreathOverlay);
+    loadAndDrawHorseSprite(firstCtx, canvasSize, canvasSize, undefined, true);
 
     // 3rd place (right)
     const thirdCanvas = root.querySelector<HTMLCanvasElement>('#third-place-canvas')!;
@@ -129,6 +125,7 @@ function loadAndDrawHorseSprite(
   width: number,
   height: number,
   silks?: Silks,
+  withWreath?: boolean,
 ): void {
   // Clear canvas
   ctx.fillStyle = 'transparent';
@@ -136,7 +133,9 @@ function loadAndDrawHorseSprite(
 
   // Load and draw the horse sprite
   const horseSrc = new URL(
-    '../assets/horse-positions/forward-no-jockey/south.png',
+    withWreath
+      ? '../assets/horse-positions/forward-no-jockey/south_with_wreath.png'
+      : '../assets/horse-positions/forward-no-jockey/south.png',
     import.meta.url,
   ).href;
 
