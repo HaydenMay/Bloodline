@@ -2695,7 +2695,6 @@ body {
 .progress-label {
   font-size: 10px;
   color: var(--muted);
-  text-transform: uppercase;
   letter-spacing: 0.3px;
 }
 
