@@ -76,12 +76,13 @@ function loadAndDrawHorseSprite(
   const horseImg = new Image();
   horseImg.src = horseSrc;
   horseImg.onload = () => {
-    // Center the horse on the canvas
-    const imgWidth = horseImg.width;
-    const imgHeight = horseImg.height;
+    // Scale and center the horse on the canvas
+    const scale = 3; // Scale up the sprite 3x
+    const imgWidth = horseImg.width * scale;
+    const imgHeight = horseImg.height * scale;
     const x = (width - imgWidth) / 2;
     const y = (height - imgHeight) / 2;
-    ctx.drawImage(horseImg, x, y);
+    ctx.drawImage(horseImg, x, y, imgWidth, imgHeight);
   };
   horseImg.onerror = () => {
     // Fallback if image doesn't load
