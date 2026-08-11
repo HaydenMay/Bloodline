@@ -223,7 +223,7 @@ export function mountTrainingScreen(
           ctx.fillStyle = '#1a1a2e';
           ctx.fillRect(0, 0, width, height);
 
-          const phase = (time * 0.3) % 1;
+          const phase = (time * 0.1) % 1;
 
           const isSmallScreen = window.innerWidth < 600;
           const horseX = isSmallScreen ? width * 0.35 : width / 2;
