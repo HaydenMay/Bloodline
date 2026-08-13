@@ -96,6 +96,7 @@ All known defects and tuning passes listed in this phase are **documented in [HI
 - Five tracks, weather, going, crowd density scaling
 - Accessibility pass — colourblind palettes, reduced motion, text scaling, speed controls
 - PWA, offline, mobile performance tuning
+- UI polish — responsive sizing, screen transitions, visual refinements
 - Codex: racing manual and breeding manual
 - Opening sequence
 - Difficulty tiers verified through the harness
