@@ -15,6 +15,8 @@ export interface TestCareerConfig {
   temper: number;
   consistency: number;
   age: number;
+  racesCompleted: number;
+  wins: number;
 }
 
 const DIVISIONS: Division[] = ['maiden', 'novice', 'open', 'stakes', 'championship'];
@@ -32,6 +34,8 @@ const PRESETS = {
     temper: 61,
     consistency: 59,
     age: 3,
+    racesCompleted: 0,
+    wins: 0,
   },
   atRisk: {
     horseName: 'Risk Taker',
@@ -45,6 +49,8 @@ const PRESETS = {
     temper: 55,
     consistency: 51,
     age: 4,
+    racesCompleted: 12,
+    wins: 2,
   },
   freshStart: {
     horseName: 'New Prospect',
@@ -58,6 +64,8 @@ const PRESETS = {
     temper: 35,
     consistency: 30,
     age: 2,
+    racesCompleted: 0,
+    wins: 0,
   },
   stakesMidfield: {
     horseName: 'Stakes Runner',
@@ -71,6 +79,8 @@ const PRESETS = {
     temper: 64,
     consistency: 63,
     age: 4,
+    racesCompleted: 18,
+    wins: 5,
   },
 } as const;
 
@@ -144,6 +154,17 @@ export function mountTestCareerSetup(
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label>Races Completed (0-20)</label>
+            <input type="number" id="races-completed" min="0" max="20" value="${currentConfig.racesCompleted}" />
+          </div>
+          <div class="form-group">
+            <label>Wins (0-20)</label>
+            <input type="number" id="wins" min="0" max="20" value="${currentConfig.wins}" />
+          </div>
+        </div>
+
         <h4>Stats (0-100)</h4>
         <div class="stats-grid">
           ${(['speed', 'stamina', 'burst', 'grit', 'temper', 'consistency'] as const)
@@ -197,6 +218,10 @@ export function mountTestCareerSetup(
     currentConfig.divisionPoints = parseInt(
       (root.querySelector('#division-points') as HTMLInputElement).value,
     );
+    currentConfig.racesCompleted = parseInt(
+      (root.querySelector('#races-completed') as HTMLInputElement).value,
+    );
+    currentConfig.wins = parseInt((root.querySelector('#wins') as HTMLInputElement).value);
   };
 
   function updateFormFromConfig() {
@@ -207,6 +232,10 @@ export function mountTestCareerSetup(
     (root.querySelector('#division-points') as HTMLInputElement).value = String(
       currentConfig.divisionPoints,
     );
+    (root.querySelector('#races-completed') as HTMLInputElement).value = String(
+      currentConfig.racesCompleted,
+    );
+    (root.querySelector('#wins') as HTMLInputElement).value = String(currentConfig.wins);
 
     (
       ['speed', 'stamina', 'burst', 'grit', 'temper', 'consistency'] as const
@@ -255,8 +284,8 @@ export function mountTestCareerSetup(
       division: currentConfig.division,
       divisionLevel: DIVISIONS.indexOf(currentConfig.division),
       divisionPoints: currentConfig.divisionPoints,
-      starts: 0,
-      wins: 0,
+      starts: currentConfig.racesCompleted,
+      wins: currentConfig.wins,
       places: 0,
       shows: 0,
       coat: 'bay',
