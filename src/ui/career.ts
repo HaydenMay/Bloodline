@@ -130,11 +130,11 @@ export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
     week: 1,
     season: 1,
     stats: {
-      wins: 0,
-      losses: 0,
+      wins: horse.wins || 0,
+      losses: (horse.starts || 0) - (horse.wins || 0),
       totalEarnings: 0,
       topWins: [],
-      racesCompleted: 0,
+      racesCompleted: horse.starts || 0,
     },
     stable: {
       world,
