@@ -959,20 +959,15 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
                 victoryTeardown?.();
                 updatedCareer.horse.isChampion = true;
                 saveCareer(updatedCareer);
-                // Check if career should end
-                if (updatedCareer.stats.racesCompleted >= 5 || updatedCareer.stats.wins >= 20) {
-                  showCareerRecap(updatedCareer);
-                } else {
-                  // Loop back to training
-                  showTrainingScreen(updatedCareer);
-                }
+                // Loop back to training (career only ends at 18-20 starts or by retiring)
+                showTrainingScreen(updatedCareer);
               },
               topThree.length >= 3 ? topThree : undefined
             );
           } else {
             // Normal race completion
-            // Check if career should end (5 races completed OR 20 wins)
-            if (updatedCareer.stats.racesCompleted >= 5 || updatedCareer.stats.wins >= 20) {
+            // Check if career should end (18-20 races completed)
+            if (updatedCareer.stats.racesCompleted >= 20) {
               showCareerRecap(updatedCareer);
             } else {
               // Loop back to training instead of main menu
