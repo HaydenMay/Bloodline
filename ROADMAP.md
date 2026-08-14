@@ -30,17 +30,11 @@ Delivered: Vite + TS scaffold, ESLint-enforced `sim/` isolation (verified agains
 ---
 
 ## Phase 3 — A full career
-**~3–4 sessions** · 🚀 **IN PROGRESS**
+**~3–4 sessions** · ✅ **COMPLETE**
 
-- Starter selection — six horses, guaranteed archetype spread
-- Training weeks: sessions, condition, form states, injury, breakthroughs
-- Race calendar — choose from 2–3 upcoming races
-- Divisions, points-based promotion and demotion
-- The living world — ~70 AI horses generated to match their division
-- Save, load, slots, export/import
-- Auto-race and skip
+Delivered: Starter selection with six horses, training weeks with condition/form/injury/breakthroughs, race calendar with 2–3 upcoming races, divisions with points-based promotion/demotion, ~70 AI horses across divisions, save/load/slots, auto-race/skip, championship victory scene with podium, and career retirement at 18–20 starts with career recap.
 
-**Deliverable:** one horse, start to retirement, 18–20 starts.
+**Deliverable:** one horse, start to retirement, 18–20 starts. ✅
 
 ---
 
