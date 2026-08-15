@@ -178,7 +178,7 @@ export function mountLegacyScreen(
           </div>
           <div class="stat-card">
             <div class="stat-label">Cash</div>
-            <div class="stat-value">$${career.stats.cash.toLocaleString()}</div>
+            <div class="stat-value">$${career.stable.cash.toLocaleString()}</div>
           </div>
         </div>
       </div>

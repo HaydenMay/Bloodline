@@ -42,11 +42,11 @@ export function mountStableHub(
       <div class="hub-status-bar">
         <div class="status-item">
           <span class="status-label">Cash</span>
-          <span class="status-value">$${career.stats.cash.toLocaleString()}</span>
+          <span class="status-value">$${career.stable.cash.toLocaleString()}</span>
         </div>
         <div class="status-item">
           <span class="status-label">Reputation</span>
-          <span class="status-value">${career.stats.reputation}</span>
+          <span class="status-value">${career.stable.reputation}</span>
         </div>
       </div>
 

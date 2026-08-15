@@ -5527,3 +5527,822 @@ body {
     flex-direction: column-reverse;
   }
 }
+
+/* ============================================================================
+   Phase 4 stable screens — staff, supplies, race day, dossier
+   ========================================================================== */
+
+/* Shared shell for the new full-page stable screens */
+.staff-screen,
+.consumables-screen,
+.raceday-screen,
+.dossier-screen {
+  width: 100%;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg);
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.staff-container,
+.consumables-container,
+.raceday-container,
+.dossier-container {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: slideUp 0.4s ease-out;
+}
+
+.staff-top-bar,
+.consumables-top-bar,
+.raceday-top-bar,
+.dossier-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.staff-top-bar h2,
+.consumables-top-bar h2,
+.raceday-top-bar h2,
+.dossier-top-bar h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text);
+  flex: 1;
+  text-align: center;
+}
+
+.currency-chip {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, var(--accent-faint) 0%, transparent 100%);
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+}
+
+.currency-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.currency-value {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+
+.staff-currencies,
+.consumables-currencies {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* --- Staff --------------------------------------------------------------- */
+
+.staff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.staff-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.staff-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.staff-icon {
+  font-size: 2.5rem;
+  flex-shrink: 0;
+}
+
+.staff-info h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.1rem;
+  color: var(--text);
+}
+
+.staff-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.staff-level {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.staff-level .level-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.staff-level-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.staff-level-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+  transition: width 0.3s ease;
+}
+
+.staff-effect {
+  margin: 0;
+  padding: 8px;
+  background: rgba(78, 201, 160, 0.1);
+  border-left: 3px solid var(--ok);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: var(--ok-lighter);
+}
+
+.staff-upgrade {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.staff-next {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.next-label {
+  color: var(--muted);
+}
+
+.next-value {
+  color: var(--accent-bright);
+  font-weight: 600;
+  text-align: right;
+}
+
+.staff-locked {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--warning);
+}
+
+.staff-actions,
+.consumables-actions,
+.raceday-actions,
+.dossier-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* --- Supplies ------------------------------------------------------------ */
+
+.consumables-section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.consumables-section h3 {
+  margin: 0 0 14px 0;
+  font-size: 1.1rem;
+  color: var(--text);
+}
+
+.consumables-empty,
+.dossier-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.consumables-note {
+  margin: 12px 0 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.owned-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.owned-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.owned-icon {
+  font-size: 1.5rem;
+}
+
+.owned-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.owned-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.owned-effect {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.owned-tag {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.use-button {
+  padding: 8px 14px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: var(--bg);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s ease;
+}
+
+.use-button:hover {
+  background: var(--accent-bright);
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.shop-item {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shop-item.locked {
+  opacity: 0.55;
+}
+
+.shop-item-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.shop-icon {
+  font-size: 1.75rem;
+}
+
+.shop-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.shop-kind {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.held-badge {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent-faint);
+  color: var(--accent-bright);
+  font-weight: 600;
+}
+
+.shop-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.shop-effect {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ok-lighter);
+}
+
+.buy-button {
+  margin-top: auto;
+  padding: 10px;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: var(--bg);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: background 0.2s ease;
+}
+
+.buy-button:hover:not(.disabled) {
+  background: var(--accent-bright);
+}
+
+.buy-button.disabled {
+  background: var(--line);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.shop-locked {
+  margin-top: auto;
+  padding: 10px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+
+/* --- Race day ------------------------------------------------------------ */
+
+.raceday-race {
+  background: linear-gradient(135deg, var(--accent-faint) 0%, transparent 100%);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.raceday-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+
+.raceday-meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.raceday-section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.raceday-section h3 {
+  margin: 0 0 14px 0;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.raceday-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.raceday-note {
+  margin: 12px 0 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.raceday-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.raceday-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg);
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  font-family: var(--font);
+  color: var(--text);
+}
+
+.raceday-item:hover {
+  border-color: var(--accent);
+}
+
+.raceday-item.selected {
+  border-color: var(--accent-bright);
+  background: var(--accent-faint);
+}
+
+.raceday-item-icon {
+  font-size: 1.5rem;
+}
+
+.raceday-item-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.raceday-item-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.raceday-item-effect {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.raceday-item-check {
+  opacity: 0;
+  color: var(--accent-bright);
+  font-weight: 700;
+  transition: opacity 0.2s ease;
+}
+
+.raceday-item.selected .raceday-item-check {
+  opacity: 1;
+}
+
+.bet-types {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.bet-type {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  background: var(--bg);
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font);
+  color: var(--text);
+  transition: all 0.2s ease;
+}
+
+.bet-type:hover {
+  border-color: var(--accent);
+}
+
+.bet-type.selected {
+  border-color: var(--accent-bright);
+  background: var(--accent-faint);
+}
+
+.bet-type-label {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.bet-type-odds {
+  font-family: var(--mono);
+  font-size: 1.35rem;
+  color: var(--accent-bright);
+  font-weight: 700;
+}
+
+.bet-type-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.bet-stakes {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.bet-stakes-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.bet-stake-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.stake-btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 10px;
+  background: var(--bg);
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.88rem;
+  transition: all 0.2s ease;
+}
+
+.stake-btn:hover {
+  border-color: var(--accent);
+}
+
+.stake-btn.selected {
+  border-color: var(--accent-bright);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.bet-summary {
+  margin: 12px 0 0 0;
+  font-size: 0.85rem;
+  color: var(--accent);
+  line-height: 1.5;
+}
+
+/* --- Rival dossier ------------------------------------------------------- */
+
+.dossier-summary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dossier-stat {
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.dossier-stat-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.dossier-stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+
+.dossier-stat-sub {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.dossier-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dossier-search {
+  width: 100%;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.95rem;
+}
+
+.dossier-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.dossier-sorts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dossier-sort {
+  flex: 1;
+  min-width: 80px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dossier-sort:hover {
+  border-color: var(--accent);
+}
+
+.dossier-sort.active {
+  background: var(--accent);
+  border-color: var(--accent-bright);
+  color: var(--bg);
+}
+
+.dossier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dossier-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.dossier-row-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dossier-rival-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.dossier-rival-div {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dossier-row-record {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.dossier-h2h {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.dossier-h2h.ahead {
+  color: var(--ok);
+}
+
+.dossier-h2h.behind {
+  color: var(--warning);
+}
+
+.dossier-h2h.level {
+  color: var(--muted);
+}
+
+.dossier-h2h-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.dossier-row-form {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  text-align: right;
+}
+
+/* --- Facility tier gating ------------------------------------------------ */
+
+.facilities-tier {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.facilities-tier-name {
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+
+.facilities-tier-cap {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.facilities-tier-next {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* Pips past the prestige ceiling read as unavailable, not merely unbuilt. */
+.level-pip.capped {
+  border: 1px dashed var(--line);
+  background: transparent;
+  opacity: 0.5;
+}
+
+.facility-locked {
+  padding: 10px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+
+@media (max-width: 600px) {
+  .dossier-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .dossier-row-form {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}

@@ -18,6 +18,12 @@ import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { mountChampionshipVictory } from './ui/championshipVictory.js';
 import { mountStableHub } from './ui/stableHub.js';
 import { mountLegacyScreen } from './ui/legacyScreen.js';
+import { mountStaffScreen } from './ui/staffScreen.js';
+import { mountConsumablesScreen } from './ui/consumablesScreen.js';
+import { mountRivalDossierScreen } from './ui/rivalDossierScreen.js';
+import { mountRaceDayScreen, type RaceDayChoices } from './ui/raceDayScreen.js';
+import { applyRaceDayItems } from './data/consumables.js';
+import { settleBet, type PlacedBet } from './data/wagering.js';
 import type { NoticeOptions } from './ui/noticeModal.js';
 import { showNotice } from './ui/noticeModal.js';
 import {
@@ -26,7 +32,17 @@ import {
   createStableLegacy,
 } from './data/legacy.js';
 import { mountFacilitiesScreen } from './ui/facilitiesScreen.js';
-import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
+import { getPrizeMultiplier, getTrainingMultiplier } from './data/facilities.js';
+import { applyRaceUpkeep } from './sim/upkeep.js';
+import { getJockeySkill, getTrainerBonus } from './data/staff.js';
+import {
+  loadCareer,
+  saveCareer,
+  createNewCareer,
+  createStable,
+  retireCurrentHorse,
+  type Career,
+} from './ui/career.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
 import { mountTestCareerSetup } from './ui/testCareerSetup.js';
 import type { Horse } from './sim/types.js';
@@ -94,7 +110,12 @@ function buildField(seed: string): { field: Horse[]; playerId: string } {
  * Calculate race earnings and reputation gain based on division and finishing position.
  * Prize distribution: 1st=50%, 2nd=25%, 3rd=15%, 4th+=10%
  */
-function calculateRaceRewards(division: string, finishingPosition: number, fieldSize: number): { earnings: number; reputation: number } {
+function calculateRaceRewards(
+  division: string,
+  finishingPosition: number,
+  fieldSize: number,
+  facilities: Record<string, number> = {},
+): { earnings: number; reputation: number } {
   const basePrizes: Record<string, number> = {
     maiden: 5000,
     novice: 10000,
@@ -120,7 +141,9 @@ function calculateRaceRewards(division: string, finishingPosition: number, field
     reputationGain = 2;
   }
 
-  const earnings = Math.round(basePrize * prizePercentage);
+  // Administration takes a cut of the paperwork off your hands and a bigger
+  // share of the purse home with it.
+  const earnings = Math.round(basePrize * prizePercentage * getPrizeMultiplier(facilities));
 
   // Scale reputation by field size (tighter races = more competitive)
   const competitionMultiplier = Math.max(1, fieldSize / 12);
@@ -361,25 +384,12 @@ function generateRandomCareer(): Career {
       racesCompleted,
       totalEarnings,
       topWins,
-      cash: totalEarnings + 5000,
-      reputation: wins * 2,
     },
     stable: {
+      ...createStable(),
       world: [],
-      dossier: {},
-      settings: {
-        autopilotEnabled: false,
-      },
-      facilities: {
-        barn: 0,
-        training: 0,
-        medical: 0,
-        feed: 0,
-        stud: 0,
-        admin: 0,
-        paddock: 0,
-      },
-      legacy: createStableLegacy(),
+      cash: totalEarnings + 5000,
+      reputation: wins * 2,
     },
     horseLegacy: createHorseLegacy(wins * 12),
     createdAt: Date.now() - Math.random() * 100000000,
@@ -407,10 +417,10 @@ if (params.has('preview')) {
   const names = createNameGenerator(rng);
 
   mountTestCareerSetup(app, (horse, config) => {
-    // Create career with test horse
-    const testCareer = createNewCareer(horse, DEFAULTS.playerSilksDefault);
-    // Override starting cash from config
-    testCareer.stats.cash = config.startingCash;
+    // A test career always starts from a clean yard, so a previous run's
+    // facilities and staff cannot skew what is being tested.
+    const testCareer = createNewCareer(horse, DEFAULTS.playerSilksDefault, createStable());
+    testCareer.stable.cash = config.startingCash;
     // Seed both legacy scores: the horse's own, and prestige banked from past horses
     testCareer.horseLegacy = createHorseLegacy(config.horseLegacyPoints);
     testCareer.stable.legacy = createStableLegacy(config.stableLegacyPoints);
@@ -542,14 +552,33 @@ function showCareerRecap(career: Career): void {
 
   const newGameBtn = recap.querySelector<HTMLButtonElement>('#new-game-btn')!;
   newGameBtn.addEventListener('click', () => {
-    deleteCareer();
+    // Bank what this horse earned the yard before clearing the career. The
+    // stable survives; only the horse's run ends.
+    const stable = retireCurrentHorse(career);
+    const banked = career.horseLegacy.peak;
 
-    // Show unlock popup if this was a full 20-race career
-    if (career.stats.racesCompleted >= 20) {
-      showSkipRaceUnlock();
-    } else {
-      showMainMenu();
-    }
+    showNotice(
+      app,
+      {
+        icon: '🏛️',
+        title: 'Career Complete',
+        lines: [
+          `${career.horse.name} retires having added ${banked} prestige to the yard.`,
+          `Your facilities, staff, ${'$' + stable.cash.toLocaleString()} in cash and ${stable.reputation} reputation all carry over.`,
+        ],
+        hint: 'Your next horse starts from everything this one built.',
+        tone: 'positive',
+        buttonLabel: 'Continue',
+      },
+      () => {
+        // Show unlock popup if this was a full 20-race career
+        if (career.stats.racesCompleted >= 20) {
+          showSkipRaceUnlock();
+        } else {
+          showMainMenu();
+        }
+      },
+    );
   });
 }
 
@@ -692,31 +721,19 @@ function showStableHub(career: Career): void {
       teardown = mountFacilitiesScreen(app, career, () => showStableHub(career));
     },
     onTrainerJockey: () => {
-      // TODO: Implement trainer/jockey screen
-      showNotice(app, {
-        icon: '👥',
-        title: 'Coming Soon',
-        lines: ['Trainer and jockey management arrives in a future update.'],
-        tone: 'neutral',
-      });
+      teardown?.();
+      app.innerHTML = '';
+      teardown = mountStaffScreen(app, career, () => showStableHub(career));
     },
     onConsumables: () => {
-      // TODO: Implement consumables screen
-      showNotice(app, {
-        icon: '💊',
-        title: 'Coming Soon',
-        lines: ['The consumables shop arrives in a future update.'],
-        tone: 'neutral',
-      });
+      teardown?.();
+      app.innerHTML = '';
+      teardown = mountConsumablesScreen(app, career, () => showStableHub(career));
     },
     onDossier: () => {
-      // TODO: Fix dossier screen and integrate properly
-      showNotice(app, {
-        icon: '📋',
-        title: 'Coming Soon',
-        lines: ['The rival dossier is being rebuilt and will return shortly.'],
-        tone: 'neutral',
-      });
+      teardown?.();
+      app.innerHTML = '';
+      teardown = mountRivalDossierScreen(app, career, () => showStableHub(career));
     },
     onLegacy: () => {
       teardown?.();
@@ -730,11 +747,23 @@ function showTrainingScreen(career: Career): void {
   teardown?.();
   app.innerHTML = '';
 
-  teardown = mountTrainingScreen(app, career.horse, career.playerSilks, (updatedHorse, _session) => {
-    const updatedCareer = { ...career, horse: updatedHorse, trainingDoneThisWeek: true };
-    saveCareer(updatedCareer);
-    showStableHub(updatedCareer);
-  });
+  // The grounds and the head trainer stack: a well-built yard with a good
+  // trainer gets substantially more out of the same week's work.
+  const gainMultiplier =
+    getTrainingMultiplier(career.stable.facilities) *
+    (1 + getTrainerBonus(career.stable.staff.trainer.level));
+
+  teardown = mountTrainingScreen(
+    app,
+    career.horse,
+    career.playerSilks,
+    (updatedHorse, _session) => {
+      const updatedCareer = { ...career, horse: updatedHorse, trainingDoneThisWeek: true };
+      saveCareer(updatedCareer);
+      showStableHub(updatedCareer);
+    },
+    gainMultiplier,
+  );
 }
 
 function showRaceCalendar(career: Career): void {
@@ -802,7 +831,11 @@ function showRaceCalendar(career: Career): void {
   }
 }
 
-function startRaceWithHorse(career: Career, race?: RaceOption): void {
+function startRaceWithHorse(
+  career: Career,
+  race?: RaceOption,
+  choices?: RaceDayChoices,
+): void {
   const player = career.horse;
 
   // Validate player horse exists and has required properties
@@ -811,6 +844,10 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
     showMainMenu();
     return;
   }
+
+  // Your stable jockey takes the mount. Rivals keep the skill they were
+  // generated with, so hiring up is a real edge over the field.
+  player.jockeySkill = getJockeySkill(career.stable.staff.jockey.level);
 
   const raceDistance = race?.distance || 1400;
   const raceGoing = race?.going || 'good';
@@ -875,6 +912,25 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
 
   teardown?.();
   app.innerHTML = '';
+
+  // Race day comes first: items and a bet are committed before the field is
+  // shown, so they are decided without knowing how the race unfolds.
+  if (!choices) {
+    teardown = mountRaceDayScreen(
+      app,
+      career,
+      field,
+      race?.name ?? 'Next Race',
+      (made) => startRaceWithHorse(career, race, made),
+      () => showRaceCalendar(career),
+    );
+    return;
+  }
+
+  // Race-day items lift a copy of the horse, so the boost lasts one race only.
+  const runner = applyRaceDayItems(player, choices.items);
+  field = field.map((h) => (h.id === player.id ? runner : h));
+  const placedBet: PlacedBet | null = choices.bet;
 
   let dossierTeardown: (() => void) | null = null;
   let introTeardown: (() => void) | null = null;
@@ -989,30 +1045,44 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
             if (i === 3) rival.shows += 1;
           }
 
-          // Also track in dossier
+          // The dossier is permanent, so it keeps its own copy of the name and
+          // the head-to-head rather than depending on the rival still existing.
           if (!updatedCareer.stable.dossier[placing.id]) {
             updatedCareer.stable.dossier[placing.id] = {
+              name: rival?.name ?? placing.name,
               wins: 0,
               places: 0,
               shows: 0,
               starts: 0,
               division: rival?.division || 'maiden',
               lastSeen: updatedCareer.week,
+              meetings: 0,
+              beaten: 0,
             };
           }
           const entry = updatedCareer.stable.dossier[placing.id];
           if (entry) {
+            entry.name = rival?.name ?? entry.name;
+            entry.division = rival?.division ?? entry.division;
             entry.starts += 1;
             if (i === 0) entry.wins += 1;
             if (i === 1 || i === 2) entry.places += 1;
             if (i === 3) entry.shows += 1;
             entry.lastSeen = updatedCareer.week;
+            entry.meetings += 1;
+            // playerIndex is this race's finishing slot for the player.
+            if (playerIndex !== -1 && playerIndex < i) entry.beaten += 1;
           }
         }
 
         // Update player horse records and division progression
         const playerFinishingPosition = playerIndex + 1;
-        const { earnings, reputation } = calculateRaceRewards(player.division, playerFinishingPosition, placings.length);
+        const { earnings, reputation } = calculateRaceRewards(
+          player.division,
+          playerFinishingPosition,
+          placings.length,
+          updatedCareer.stable.facilities,
+        );
 
         if (playerIndex === 0) {
           updatedCareer.stats.wins += 1;
@@ -1022,8 +1092,15 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         }
 
         updatedCareer.stats.totalEarnings += earnings;
-        updatedCareer.stats.cash += earnings;
-        updatedCareer.stats.reputation += reputation;
+        updatedCareer.stable.cash += earnings;
+        updatedCareer.stable.reputation += reputation;
+
+        // Settle any bet. The stake already left the wallet at race day, so
+        // only the return comes back here.
+        const settlement = placedBet
+          ? settleBet(placedBet, playerFinishingPosition, placings.length)
+          : null;
+        if (settlement) updatedCareer.stable.cash += settlement.payout;
         updatedCareer.horse.starts += 1;
 
         // Update division points for player horse
@@ -1150,6 +1227,15 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
           };
         }
 
+        // The race takes its toll on the horse, and the yard's facilities give
+        // some of it back over the following week.
+        applyRaceUpkeep(
+          updatedCareer.horse,
+          playerFinishingPosition,
+          placings.length,
+          updatedCareer.stable.facilities,
+        );
+
         updatedCareer.stats.racesCompleted += 1;
         updatedCareer.week += 1;
         updatedCareer.raceSelected = false; // Clear race selection for next week
@@ -1228,7 +1314,23 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
 
         // Stack any notices over the results, so the player reads the outcome
         // with the finishing order already behind it.
-        const notices = [divisionNotice, hallOfFameNotice].filter(
+        const betNotice: NoticeOptions | null = settlement
+          ? {
+              icon: settlement.won ? '🎟️' : '🎫',
+              title: settlement.won ? 'Bet Paid' : 'Bet Lost',
+              lines: [
+                settlement.won
+                  ? `Your $${settlement.stake.toLocaleString()} returned $${settlement.payout.toLocaleString()}.`
+                  : `Your $${settlement.stake.toLocaleString()} stake is gone.`,
+              ],
+              hint: settlement.won
+                ? `A profit of $${settlement.net.toLocaleString()} on the day.`
+                : 'The bookmaker holds an edge on every race — bet the ones you believe in.',
+              tone: settlement.won ? 'positive' : 'setback',
+            }
+          : null;
+
+        const notices = [divisionNotice, betNotice, hallOfFameNotice].filter(
           (n): n is NoticeOptions => n !== null,
         );
         const showNext = (): void => {

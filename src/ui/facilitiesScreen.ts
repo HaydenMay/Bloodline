@@ -1,5 +1,6 @@
 import type { Career } from './career.js';
-import { FACILITIES, getUpgradeCost } from '../data/facilities.js';
+import { FACILITIES, checkFacilityUpgrade, getLevelCapForTier } from '../data/facilities.js';
+import { getStableLegacyPoints, getTier, getTierFromPoints, LEGACY_TIERS } from '../data/legacy.js';
 import { saveCareer } from './career.js';
 import { showNotice } from './noticeModal.js';
 
@@ -11,7 +12,12 @@ export function mountFacilitiesScreen(
   const root = document.createElement('div');
   root.className = 'facilities-screen';
 
-  const facilityEntries = Object.entries(FACILITIES);
+  const stable = career.stable;
+  const prestige = getStableLegacyPoints(stable.legacy, career.horseLegacy);
+  const tierIndex = getTierFromPoints(prestige);
+  const tier = getTier(prestige);
+  const cap = getLevelCapForTier(tierIndex);
+  const nextTier = LEGACY_TIERS[tierIndex + 1];
 
   root.innerHTML = `
     <div class="facilities-container">
@@ -20,22 +26,46 @@ export function mountFacilitiesScreen(
         <h2>Stable Facilities</h2>
         <div style="width: 80px;"></div>
       </div>
+
       <div class="facilities-header">
-        <p class="subtitle">Upgrade your facilities to improve your horse's performance</p>
+        <p class="subtitle">Cash builds the yard. Prestige decides how far it can go.</p>
         <div class="cash-display">
           <span class="label">Available Cash:</span>
-          <span class="amount">$${career.stats.cash.toLocaleString()}</span>
+          <span class="amount">$${stable.cash.toLocaleString()}</span>
+        </div>
+        <div class="facilities-tier">
+          <span class="facilities-tier-name">${tier.icon} ${tier.name} Stable</span>
+          <span class="facilities-tier-cap">Building up to level ${cap}</span>
+          ${
+            nextTier
+              ? `<span class="facilities-tier-next">${nextTier.minPoints - prestige} more prestige unlocks level ${getLevelCapForTier(tierIndex + 1)}</span>`
+              : ''
+          }
         </div>
       </div>
 
       <div class="facilities-grid">
-        ${facilityEntries
+        ${Object.entries(FACILITIES)
           .map(([facilityId, facility]) => {
-            const currentLevel = career.stable.facilities[facilityId] || 0;
-            const isMaxed = currentLevel >= 5;
-            const nextLevel = currentLevel + 1;
-            const upgradeCost = isMaxed ? 0 : getUpgradeCost(facility.baseCost, nextLevel);
-            const canAfford = career.stats.cash >= upgradeCost;
+            const level = stable.facilities[facilityId] || 0;
+            const check = checkFacilityUpgrade(facility, level, stable.cash, tierIndex);
+
+            let action: string;
+            if (check.atMax) {
+              action = `<button class="upgrade-button disabled" disabled>Fully Built</button>`;
+            } else if (check.tierLocked) {
+              action = `<div class="facility-locked">Level ${check.nextLevel} needs a ${nextTier?.name ?? 'higher'} stable</div>`;
+            } else {
+              action = `
+                <div class="upgrade-cost">
+                  <span class="cost-label">Upgrade to Level ${check.nextLevel}</span>
+                  <span class="cost-amount">$${check.cost.toLocaleString()}</span>
+                </div>
+                <button class="upgrade-button ${check.canAfford ? '' : 'disabled'}"
+                        data-facility="${facilityId}" ${check.canAfford ? '' : 'disabled'}>
+                  ${check.canAfford ? 'Upgrade' : 'Not Enough Cash'}
+                </button>`;
+            }
 
             return `
               <div class="facility-card" data-facility="${facilityId}">
@@ -51,37 +81,18 @@ export function mountFacilitiesScreen(
                   <span class="level-label">Level</span>
                   <div class="level-bar">
                     ${[1, 2, 3, 4, 5]
-                      .map((level) => `<div class="level-pip ${level <= currentLevel ? 'filled' : ''}"></div>`)
+                      .map(
+                        (l) =>
+                          `<div class="level-pip ${l <= level ? 'filled' : ''} ${l > cap ? 'capped' : ''}"></div>`,
+                      )
                       .join('')}
                   </div>
-                  <span class="level-text">${currentLevel}/5</span>
+                  <span class="level-text">${level}/5</span>
                 </div>
 
-                <p class="facility-benefit">${facility.benefit}</p>
+                <p class="facility-benefit">${facility.effectAt(level)}</p>
 
-                ${
-                  isMaxed
-                    ? `
-                  <div class="upgrade-section">
-                    <div class="upgrade-button disabled">
-                      <span>Maxed Out</span>
-                    </div>
-                  </div>
-                `
-                    : `
-                  <div class="upgrade-section">
-                    <div class="upgrade-cost">
-                      <span class="cost-label">Upgrade to Level ${nextLevel}:</span>
-                      <span class="cost-amount">$${upgradeCost.toLocaleString()}</span>
-                    </div>
-                    <button class="upgrade-button ${canAfford ? '' : 'disabled'}"
-                            data-facility="${facilityId}"
-                            ${!canAfford ? 'disabled' : ''}>
-                      ${canAfford ? 'Upgrade' : 'Not Enough Cash'}
-                    </button>
-                  </div>
-                `
-                }
+                <div class="upgrade-section">${action}</div>
               </div>
             `;
           })
@@ -96,47 +107,45 @@ export function mountFacilitiesScreen(
 
   container.appendChild(root);
 
-  // Attach upgrade button listeners
-  const upgradeButtons = root.querySelectorAll('.upgrade-button:not(.disabled)');
-  upgradeButtons.forEach((btn) => {
+  root.querySelectorAll<HTMLButtonElement>('.upgrade-button:not(.disabled)').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const facilityId = (btn as HTMLElement).dataset.facility;
-      if (!facilityId) return;
+      const facilityId = btn.dataset.facility;
+      const facility = facilityId ? FACILITIES[facilityId] : undefined;
+      if (!facilityId || !facility) return;
 
-      const facility = FACILITIES[facilityId];
-      if (!facility) return;
+      const level = stable.facilities[facilityId] || 0;
+      const check = checkFacilityUpgrade(facility, level, stable.cash, tierIndex);
 
-      const currentLevel = career.stable.facilities[facilityId] || 0;
-      const nextLevel = currentLevel + 1;
-      const cost = getUpgradeCost(facility.baseCost, nextLevel);
-
-      if (career.stats.cash < cost) {
+      if (!check.canUpgrade) {
         showNotice(container, {
-          icon: '💰',
-          title: 'Not Enough Cash',
-          lines: [
-            `Upgrading the ${facility.name} to level ${nextLevel} costs $${cost.toLocaleString()}.`,
-            `You have $${career.stats.cash.toLocaleString()}.`,
-          ],
-          hint: 'Prize money from your next few races will cover the difference.',
+          icon: check.tierLocked ? '🔒' : '💰',
+          title: check.tierLocked ? 'Prestige Too Low' : 'Not Enough Cash',
+          lines: check.tierLocked
+            ? [
+                `A ${tier.name} stable can build the ${facility.name} to level ${cap}.`,
+                `Level ${check.nextLevel} needs a more established yard.`,
+              ]
+            : [
+                `Level ${check.nextLevel} of the ${facility.name} costs $${check.cost.toLocaleString()}.`,
+                `You have $${stable.cash.toLocaleString()}.`,
+              ],
+          hint: check.tierLocked
+            ? 'Prestige comes from how your horses run — keep winning and the yard grows with them.'
+            : 'Prize money from your next few races will cover the difference.',
           tone: 'warning',
         });
         return;
       }
 
-      // Deduct cost and upgrade facility
-      const updatedCareer = { ...career };
-      updatedCareer.stats.cash -= cost;
-      updatedCareer.stable.facilities[facilityId] = nextLevel;
-      saveCareer(updatedCareer);
+      stable.cash -= check.cost;
+      stable.facilities[facilityId] = check.nextLevel;
+      saveCareer(career);
 
-      // Refresh screen
       root.remove();
-      mountFacilitiesScreen(container, updatedCareer, onBack);
+      mountFacilitiesScreen(container, career, onBack);
     });
   });
 
-  // Back buttons
   root.querySelector('#back-btn')?.addEventListener('click', onBack);
   root.querySelector('#back-btn-top')?.addEventListener('click', onBack);
 

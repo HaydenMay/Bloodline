@@ -111,6 +111,11 @@ export function mountTrainingScreen(
   horse: Horse,
   playerSilks: Silks,
   onTrainingSelect: (horse: Horse, training: TrainingSession) => void,
+  /**
+   * Multiplies every gain — the Training Grounds and the head trainer combined.
+   * 1 is a bare yard with a novice trainer.
+   */
+  gainMultiplier = 1,
 ): () => void {
   const root = document.createElement('div');
   root.className = 'training-screen';
@@ -273,6 +278,17 @@ export function mountTrainingScreen(
         for (const stat of positiveStats) {
           const originalGain = session.statEffects[stat]!;
           statChanges[stat] = originalGain + 2; // Bonus of +2
+        }
+      }
+
+      // Better grounds and a better trainer get more out of the same session.
+      // Only gains scale; a session's downsides are not softened by spending.
+      if (gainMultiplier !== 1) {
+        for (const key of Object.keys(statChanges) as Array<keyof typeof statChanges>) {
+          const change = statChanges[key];
+          if (change !== undefined && change > 0) {
+            statChanges[key] = Math.round(change * gainMultiplier);
+          }
         }
       }
 

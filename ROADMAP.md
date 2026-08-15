@@ -41,13 +41,13 @@ Delivered: Starter selection with six horses, training weeks with condition/form
 ## Phase 4 — The stable
 **~2–3 sessions**
 
-- Cash and Reputation as separate currencies
-- Seven facilities, five levels each
-- Trainer and Jockey, levelling, **capped by Reputation**
-- Consumables
-- Retirement, Legacy scoring, Hall of Fame
-- The permanent **rival dossier**
-- Wagering on your own horse
+✅ **Cash and Reputation as separate currencies** — both live on the stable, not the career
+✅ **Seven facilities, five levels each** — with real effects, gated by stable prestige
+✅ **Trainer and Jockey, levelling, capped by Reputation**
+✅ **Consumables** — upkeep items and one-race race-day items
+✅ **Retirement, Legacy scoring, Hall of Fame** — horse legacy banks into stable prestige on retirement
+✅ **The permanent rival dossier** — head-to-head records surviving across careers
+✅ **Wagering on your own horse** — win and place, priced off the field
 
 **Deliverable:** careers connect. Run 2 opens stronger than run 1.
 
@@ -119,9 +119,9 @@ All known defects and tuning passes listed in this phase are **documented in [HI
 | 1 · Race sim + harness | ~2–3 | ✅ Complete |
 | 2 · Playable race | ~3–4 | ✅ Complete |
 | **3 · Full career** | **~3–4** | 🚀 **IN PROGRESS** |
-| 4 · The stable | ~2–3 | ⏳ After Phase 3 |
+| 4 · The stable | ~2–3 | ✅ Complete |
 | 4.5 · Re-balance & physics | ~2–3 | ✅ Complete |
-| 5 · Breeding | ~3–4 | ⏳ After Phase 4 |
+| 5 · Breeding | ~3–4 | 🚀 **NEXT** |
 | 6 · Polish | ~3+ | ⏳ After Phase 5 |
 | **Total estimate** | **~20–25** | |
 
