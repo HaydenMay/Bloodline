@@ -36,6 +36,7 @@ export interface Stable {
   world: Horse[];
   dossier: RivalDossier;
   settings: SaveSettings;
+  facilities: Record<string, number>; // facility id -> level (0-5)
 }
 
 export interface Career {
@@ -155,6 +156,15 @@ export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
       dossier: {},
       settings: {
         autopilotEnabled: false,
+      },
+      facilities: {
+        barn: 0,
+        training: 0,
+        medical: 0,
+        feed: 0,
+        stud: 0,
+        admin: 0,
+        paddock: 0,
       },
     },
     createdAt: Date.now(),

@@ -17,6 +17,7 @@ import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { mountChampionshipVictory } from './ui/championshipVictory.js';
 import { mountStableHub } from './ui/stableHub.js';
+import { mountFacilitiesScreen } from './ui/facilitiesScreen.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
 import { mountTestCareerSetup } from './ui/testCareerSetup.js';
@@ -354,6 +355,15 @@ function generateRandomCareer(): Career {
       settings: {
         autopilotEnabled: false,
       },
+      facilities: {
+        barn: 0,
+        training: 0,
+        medical: 0,
+        feed: 0,
+        stud: 0,
+        admin: 0,
+        paddock: 0,
+      },
     },
     createdAt: Date.now() - Math.random() * 100000000,
     lastUpdated: Date.now(),
@@ -660,9 +670,9 @@ function showStableHub(career: Career): void {
       }
     },
     onFacilities: () => {
-      // TODO: Implement facilities screen
-      alert('Facilities screen coming in next phase!');
-      showStableHub(career);
+      teardown?.();
+      app.innerHTML = '';
+      teardown = mountFacilitiesScreen(app, career, () => showStableHub(career));
     },
     onTrainerJockey: () => {
       // TODO: Implement trainer/jockey screen
