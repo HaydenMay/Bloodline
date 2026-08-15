@@ -72,7 +72,7 @@ export function mountStableHub(
             <div class="nav-label">Race Calendar</div>
             <div class="nav-desc">Pick next race</div>
           </button>
-          <button class="nav-button" id="nav-facilities" data-action="facilities" disabled>
+          <button class="nav-button" id="nav-facilities" data-action="facilities">
             <div class="nav-icon">🏗️</div>
             <div class="nav-label">Facilities</div>
             <div class="nav-desc">Build your stable</div>
