@@ -49,6 +49,8 @@ export interface Career {
   lastUpdated: number;
   /** Whether a race has been selected for this week (prevents multiple trainings). */
   raceSelected?: boolean;
+  /** Whether training has been completed this week. */
+  trainingDoneThisWeek?: boolean;
 }
 
 const STORAGE_KEY = 'bloodline_career';

@@ -580,6 +580,21 @@ function startCareer(starterHorse: Horse, playerSilks: Silks): void {
   showStableHub(career);
 }
 
+/**
+ * Check if user has disabled the "no training" warning for this week.
+ */
+function shouldShowNoTrainingWarning(): boolean {
+  const stored = localStorage.getItem('bloodline_no_training_warning_disabled');
+  return stored !== 'true';
+}
+
+/**
+ * Mark the "no training" warning as permanently disabled by the user.
+ */
+function disableNoTrainingWarning(): void {
+  localStorage.setItem('bloodline_no_training_warning_disabled', 'true');
+}
+
 function resumeCareer(career: Career): void {
   // Resume existing career
   showStableHub(career);
@@ -590,8 +605,57 @@ function showStableHub(career: Career): void {
   app.innerHTML = '';
 
   teardown = mountStableHub(app, career, {
-    onTraining: () => showTrainingScreen(career),
-    onRaceCalendar: () => showRaceCalendar(career),
+    onTraining: () => {
+      // Check if training already done this week
+      if (career.trainingDoneThisWeek) {
+        alert('You already trained this week! Pick a race from the Race Calendar.');
+        return;
+      }
+      showTrainingScreen(career);
+    },
+    onRaceCalendar: () => {
+      // If training not done yet, warn player
+      if (!career.trainingDoneThisWeek && shouldShowNoTrainingWarning()) {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+          <div class="modal-content">
+            <h2>⚠️ No Training Yet</h2>
+            <p>You haven't trained this week. Racing without training may hurt your horse's performance.</p>
+            <p>Are you sure you want to go to the Race Calendar?</p>
+            <div style="display: flex; gap: 12px; margin: 20px 0;">
+              <label style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                <input type="checkbox" id="dont-show-again" />
+                <span style="font-size: 0.9rem;">Don't show again</span>
+              </label>
+            </div>
+            <div style="display: flex; gap: 12px;">
+              <button class="btn btn-secondary" id="modal-no">Go Back to Hub</button>
+              <button class="btn btn-primary" id="modal-yes">Go to Calendar</button>
+            </div>
+          </div>
+        `;
+        app.appendChild(modal);
+
+        const noBtn = modal.querySelector('#modal-no') as HTMLButtonElement;
+        const yesBtn = modal.querySelector('#modal-yes') as HTMLButtonElement;
+        const checkbox = modal.querySelector('#dont-show-again') as HTMLInputElement;
+
+        noBtn.addEventListener('click', () => {
+          modal.remove();
+        });
+
+        yesBtn.addEventListener('click', () => {
+          if (checkbox.checked) {
+            disableNoTrainingWarning();
+          }
+          modal.remove();
+          showRaceCalendar(career);
+        });
+      } else {
+        showRaceCalendar(career);
+      }
+    },
     onFacilities: () => {
       // TODO: Implement facilities screen
       alert('Facilities screen coming in next phase!');
@@ -620,7 +684,7 @@ function showTrainingScreen(career: Career): void {
   app.innerHTML = '';
 
   teardown = mountTrainingScreen(app, career.horse, career.playerSilks, (updatedHorse, _session) => {
-    const updatedCareer = { ...career, horse: updatedHorse, raceSelected: true };
+    const updatedCareer = { ...career, horse: updatedHorse, raceSelected: true, trainingDoneThisWeek: true };
     saveCareer(updatedCareer);
     showRaceCalendar(updatedCareer);
   });
@@ -979,6 +1043,7 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         updatedCareer.stats.racesCompleted += 1;
         updatedCareer.week += 1;
         updatedCareer.raceSelected = false; // Clear race selection for next week
+        updatedCareer.trainingDoneThisWeek = false; // Reset training flag for next week
         saveCareer(updatedCareer);
 
         const teardownResults = mountResultsScreen(app, placings, player.id, () => {
