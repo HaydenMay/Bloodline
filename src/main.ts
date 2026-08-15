@@ -684,9 +684,9 @@ function showTrainingScreen(career: Career): void {
   app.innerHTML = '';
 
   teardown = mountTrainingScreen(app, career.horse, career.playerSilks, (updatedHorse, _session) => {
-    const updatedCareer = { ...career, horse: updatedHorse, raceSelected: true, trainingDoneThisWeek: true };
+    const updatedCareer = { ...career, horse: updatedHorse, trainingDoneThisWeek: true };
     saveCareer(updatedCareer);
-    showRaceCalendar(updatedCareer);
+    showStableHub(updatedCareer);
   });
 }
 
