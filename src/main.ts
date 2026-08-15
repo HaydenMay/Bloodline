@@ -656,9 +656,11 @@ function showStableHub(career: Career): void {
           icon: '⚠️',
           title: 'No Training Yet',
           lines: [
-            `${career.horse.name} hasn't trained this week, and racing untrained may hurt its performance.`,
+            `${career.horse.name} hasn't trained this week, so it will run with the stats it has.`,
           ],
-          hint: 'Training first is usually worth the week.',
+          // Training does not advance the calendar — only finishing a race does.
+          // Say so plainly, because players reasonably assume it costs the week.
+          hint: "Training doesn't use up the week — you can train and still race straight after.",
           tone: 'warning',
           checkbox: { label: "Don't show again" },
           actions: [
