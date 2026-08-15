@@ -2,7 +2,7 @@ import type { Horse } from '../sim/types.js';
 import type { Division, RunningStyle } from '../data/index.js';
 import { RUNNING_STYLES } from '../data/index.js';
 import { createRng } from '../sim/index.js';
-import { LEGACY_TIERS } from '../data/legacy.js';
+import { LEGACY_TIERS, getTier } from '../data/legacy.js';
 
 export interface TestCareerConfig {
   horseName: string;
@@ -19,8 +19,10 @@ export interface TestCareerConfig {
   racesCompleted: number;
   wins: number;
   startingCash: number;
-  legacyPoints: number;
-  legacyTier: number;
+  /** The active horse's own legacy score. Volatile once racing starts. */
+  horseLegacyPoints: number;
+  /** Prestige banked from previous horses. Added to the horse's score. */
+  stableLegacyPoints: number;
 }
 
 const DIVISIONS: Division[] = ['maiden', 'novice', 'open', 'stakes', 'championship'];
@@ -41,8 +43,8 @@ const PRESETS = {
     racesCompleted: 0,
     wins: 0,
     startingCash: 10000,
-    legacyPoints: 0,
-    legacyTier: 0,
+    horseLegacyPoints: 0,
+    stableLegacyPoints: 0,
   },
   atRisk: {
     horseName: 'Risk Taker',
@@ -59,8 +61,8 @@ const PRESETS = {
     racesCompleted: 12,
     wins: 2,
     startingCash: 10000,
-    legacyPoints: 50,
-    legacyTier: 0,
+    horseLegacyPoints: 40,
+    stableLegacyPoints: 60,
   },
   freshStart: {
     horseName: 'New Prospect',
@@ -77,8 +79,8 @@ const PRESETS = {
     racesCompleted: 0,
     wins: 0,
     startingCash: 10000,
-    legacyPoints: 0,
-    legacyTier: 0,
+    horseLegacyPoints: 0,
+    stableLegacyPoints: 0,
   },
   stakesMidfield: {
     horseName: 'Stakes Runner',
@@ -95,8 +97,8 @@ const PRESETS = {
     racesCompleted: 18,
     wins: 5,
     startingCash: 10000,
-    legacyPoints: 300,
-    legacyTier: 1,
+    horseLegacyPoints: 180,
+    stableLegacyPoints: 220,
   },
 } as const;
 
@@ -195,14 +197,25 @@ export function mountTestCareerSetup(
 
         <div class="form-row">
           <div class="form-group">
-            <label>Legacy Tier</label>
-            <select id="legacy-tier">
-              ${LEGACY_TIERS.map((tier) => `<option value="${tier.level}" ${tier.level === currentConfig.legacyTier ? 'selected' : ''}>${tier.icon} ${tier.name}</option>`).join('')}
-            </select>
+            <label>Horse Legacy Points</label>
+            <input type="number" id="horse-legacy-points" min="0" max="9999" value="${currentConfig.horseLegacyPoints}" />
           </div>
           <div class="form-group">
-            <label>Legacy Points (0-1000+)</label>
-            <input type="number" id="legacy-points" min="0" max="9999" value="${currentConfig.legacyPoints}" />
+            <label>Banked Stable Prestige</label>
+            <input type="number" id="stable-legacy-points" min="0" max="9999" value="${currentConfig.stableLegacyPoints}" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" style="flex: 1;">
+            <label>Stable Tier Shortcut</label>
+            <div class="cash-buttons">
+              ${LEGACY_TIERS.map(
+                (tier) =>
+                  `<button type="button" class="tier-btn" data-tier-points="${tier.minPoints}">${tier.icon} ${tier.name}</button>`,
+              ).join('')}
+            </div>
+            <p class="tier-preview" id="tier-preview"></p>
           </div>
         </div>
 
@@ -253,6 +266,31 @@ export function mountTestCareerSetup(
     });
   });
 
+  // Tier shortcuts bank enough prestige to land exactly on a tier threshold.
+  root.querySelectorAll('.tier-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const target = parseInt((e.currentTarget as HTMLElement).dataset.tierPoints || '0');
+      currentConfig.stableLegacyPoints = Math.max(0, target - currentConfig.horseLegacyPoints);
+      (root.querySelector('#stable-legacy-points') as HTMLInputElement).value = String(
+        currentConfig.stableLegacyPoints,
+      );
+      root.querySelectorAll('.tier-btn').forEach((b) => b.classList.remove('active'));
+      (e.currentTarget as HTMLElement).classList.add('active');
+      updateTierPreview();
+    });
+  });
+
+  // Keep the prestige preview honest as either score is typed.
+  ['#horse-legacy-points', '#stable-legacy-points'].forEach((selector) => {
+    root.querySelector(selector)?.addEventListener('input', (e) => {
+      const value = parseInt((e.target as HTMLInputElement).value) || 0;
+      if (selector === '#horse-legacy-points') currentConfig.horseLegacyPoints = value;
+      else currentConfig.stableLegacyPoints = value;
+      updateTierPreview();
+    });
+  });
+
   // Stat sliders
   root.querySelectorAll('.stat-slider').forEach((slider) => {
     slider.addEventListener('input', (e) => {
@@ -276,13 +314,23 @@ export function mountTestCareerSetup(
       (root.querySelector('#races-completed') as HTMLInputElement).value,
     );
     currentConfig.wins = parseInt((root.querySelector('#wins') as HTMLInputElement).value);
-    currentConfig.legacyTier = parseInt(
-      (root.querySelector('#legacy-tier') as HTMLSelectElement).value,
+    currentConfig.horseLegacyPoints = parseInt(
+      (root.querySelector('#horse-legacy-points') as HTMLInputElement).value,
     );
-    currentConfig.legacyPoints = parseInt(
-      (root.querySelector('#legacy-points') as HTMLInputElement).value,
+    currentConfig.stableLegacyPoints = parseInt(
+      (root.querySelector('#stable-legacy-points') as HTMLInputElement).value,
     );
   };
+
+  /** Stable prestige is the two scores combined, so preview what they add up to. */
+  function updateTierPreview() {
+    const total = currentConfig.horseLegacyPoints + currentConfig.stableLegacyPoints;
+    const tier = getTier(total);
+    const preview = root.querySelector('#tier-preview');
+    if (preview) {
+      preview.textContent = `${total} prestige → ${tier.icon} ${tier.name} stable`;
+    }
+  }
 
   function updateFormFromConfig() {
     (root.querySelector('#horse-name') as HTMLInputElement).value = currentConfig.horseName;
@@ -296,10 +344,13 @@ export function mountTestCareerSetup(
       currentConfig.racesCompleted,
     );
     (root.querySelector('#wins') as HTMLInputElement).value = String(currentConfig.wins);
-    (root.querySelector('#legacy-tier') as HTMLSelectElement).value = String(currentConfig.legacyTier);
-    (root.querySelector('#legacy-points') as HTMLInputElement).value = String(
-      currentConfig.legacyPoints,
+    (root.querySelector('#horse-legacy-points') as HTMLInputElement).value = String(
+      currentConfig.horseLegacyPoints,
     );
+    (root.querySelector('#stable-legacy-points') as HTMLInputElement).value = String(
+      currentConfig.stableLegacyPoints,
+    );
+    updateTierPreview();
 
     // Update cash button active state
     root.querySelectorAll('.cash-btn').forEach((btn) => {
@@ -371,6 +422,8 @@ export function mountTestCareerSetup(
   root.querySelector('#cancel-btn')!.addEventListener('click', () => {
     root.remove();
   });
+
+  updateTierPreview();
 
   return () => {
     root.remove();

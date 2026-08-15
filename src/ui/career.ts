@@ -1,13 +1,17 @@
 import type { Horse } from '../sim/types.js';
 import type { Division } from '../data/index.js';
 import type { Silks } from '../render/palette.js';
-import type { LegacyStats } from '../data/legacy.js';
+import type { HorseLegacy, StableLegacy } from '../data/legacy.js';
 import { DEFAULTS } from '../data/colors.js';
 import { WORLD_POPULATION } from '../data/index.js';
 import { createRng } from '../sim/index.js';
 import { createNameGenerator } from '../data/names.js';
 import { generateWorld } from '../sim/horse.js';
-import { calculateLegacyPoints } from '../data/legacy.js';
+import {
+  createHorseLegacy,
+  createStableLegacy,
+  seedLegacyFromRecord,
+} from '../data/legacy.js';
 
 export interface CareerStats {
   wins: number;
@@ -39,6 +43,8 @@ export interface Stable {
   dossier: RivalDossier;
   settings: SaveSettings;
   facilities: Record<string, number>; // facility id -> level (0-5)
+  /** Farm-wide prestige. Gates facility upgrades. */
+  legacy: StableLegacy;
 }
 
 export interface Career {
@@ -48,7 +54,8 @@ export interface Career {
   season: number;
   stats: CareerStats;
   stable: Stable;
-  legacy: LegacyStats;
+  /** The active horse's own legacy. Rises and falls with its results. */
+  horseLegacy: HorseLegacy;
   createdAt: number;
   lastUpdated: number;
   /** Whether a race has been selected for this week (prevents multiple trainings). */
@@ -119,20 +126,36 @@ export function loadCareer(): Career | null {
       career.stats.reputation = (career.stats.wins || 0) * 2;
     }
 
-    // Ensure legacy stats exist (for saves before legacy system)
-    if (!career.legacy) {
-      const legacyPoints = calculateLegacyPoints(
-        career.stats.wins || 0,
-        career.stats.totalEarnings || 0,
-        career.horse.division,
-      );
-      career.legacy = {
-        totalPoints: legacyPoints,
-        tier: Math.floor(legacyPoints / 200), // rough tier estimation
-        hallOfFame: false,
-        achievements: {},
+    // Ensure facilities exist (for saves before the facilities system)
+    if (!career.stable.facilities) {
+      career.stable.facilities = {
+        barn: 0,
+        training: 0,
+        medical: 0,
+        feed: 0,
+        stud: 0,
+        admin: 0,
+        paddock: 0,
       };
     }
+
+    // Legacy split into horse/stable scores. Saves from the first legacy build
+    // carry a single `legacy` blob; fold its points into the horse's score.
+    const legacyBlob = (career as unknown as { legacy?: { totalPoints?: number } }).legacy;
+    if (!career.horseLegacy) {
+      const seed =
+        legacyBlob?.totalPoints ??
+        seedLegacyFromRecord(
+          career.stats.wins || 0,
+          career.stats.totalEarnings || 0,
+          career.horse.division,
+        );
+      career.horseLegacy = createHorseLegacy(seed);
+    }
+    if (!career.stable.legacy) {
+      career.stable.legacy = createStableLegacy();
+    }
+    delete (career as unknown as { legacy?: unknown }).legacy;
 
     return career;
   } catch (error) {
@@ -155,11 +178,8 @@ export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
   const names = createNameGenerator(rng);
   const world = generateWorld(rng, names, WORLD_POPULATION);
 
-  const legacyPoints = calculateLegacyPoints(
-    horse.wins || 0,
-    0, // no earnings yet
-    horse.division,
-  );
+  // A horse with a record already carries some standing; a debutant starts at 0.
+  const seededLegacy = seedLegacyFromRecord(horse.wins || 0, 0, horse.division);
 
   return {
     horse,
@@ -190,13 +210,9 @@ export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
         admin: 0,
         paddock: 0,
       },
+      legacy: createStableLegacy(),
     },
-    legacy: {
-      totalPoints: legacyPoints,
-      tier: 0,
-      hallOfFame: false,
-      achievements: {},
-    },
+    horseLegacy: createHorseLegacy(seededLegacy),
     createdAt: Date.now(),
     lastUpdated: Date.now(),
   };

@@ -18,6 +18,11 @@ import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { mountChampionshipVictory } from './ui/championshipVictory.js';
 import { mountStableHub } from './ui/stableHub.js';
 import { mountLegacyScreen } from './ui/legacyScreen.js';
+import {
+  applyRaceToHorseLegacy,
+  createHorseLegacy,
+  createStableLegacy,
+} from './data/legacy.js';
 import { mountFacilitiesScreen } from './ui/facilitiesScreen.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
@@ -365,7 +370,9 @@ function generateRandomCareer(): Career {
         admin: 0,
         paddock: 0,
       },
+      legacy: createStableLegacy(),
     },
+    horseLegacy: createHorseLegacy(wins * 12),
     createdAt: Date.now() - Math.random() * 100000000,
     lastUpdated: Date.now(),
   };
@@ -395,9 +402,9 @@ if (params.has('preview')) {
     const testCareer = createNewCareer(horse, DEFAULTS.playerSilksDefault);
     // Override starting cash from config
     testCareer.stats.cash = config.startingCash;
-    // Override legacy from config
-    testCareer.legacy.totalPoints = config.legacyPoints;
-    testCareer.legacy.tier = config.legacyTier;
+    // Seed both legacy scores: the horse's own, and prestige banked from past horses
+    testCareer.horseLegacy = createHorseLegacy(config.horseLegacyPoints);
+    testCareer.stable.legacy = createStableLegacy(config.stableLegacyPoints);
     // Generate a full world for testing
     testCareer.stable.world = generateWorld(rng, names, {
       maiden: 15,
@@ -1016,6 +1023,11 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
 
         const DIVISIONS = ['Maiden', 'Novice', 'Open', 'Stakes', 'Championship'];
 
+        // Division the race was actually run in — legacy swings are scaled by it,
+        // so it must be read before a promotion moves the horse up.
+        const racedDivision = updatedCareer.horse.division;
+        const divisionLevelBefore = updatedCareer.horse.divisionLevel;
+
         if (isPromotionRace) {
           // Finalize promotion result
           console.log('Promotion race detected. Before:', {
@@ -1062,6 +1074,35 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
           if (rival) {
             updateAIDivisionProgression(rival, i + 1);
           }
+        }
+
+        // Fold the result into the horse's legacy. Good days lift it, bad days
+        // shave a little off, and moving divisions dwarfs either.
+        const divisionLevelAfter = updatedCareer.horse.divisionLevel;
+        const legacySwing = applyRaceToHorseLegacy(
+          updatedCareer.horseLegacy,
+          playerFinishingPosition,
+          racedDivision,
+          {
+            promoted: divisionLevelAfter > divisionLevelBefore,
+            demoted: divisionLevelAfter < divisionLevelBefore,
+          },
+        );
+
+        if (legacySwing.inducted) {
+          updatedCareer.stable.legacy.hallOfFame.push({
+            horseName: updatedCareer.horse.name,
+            wins: updatedCareer.horse.wins,
+            starts: updatedCareer.horse.starts,
+            earnings: updatedCareer.stats.totalEarnings,
+            legacyPoints: updatedCareer.horseLegacy.peak,
+            division: updatedCareer.horse.division,
+            season: updatedCareer.season,
+            timestamp: Date.now(),
+          });
+          alert(
+            `⭐ HALL OF FAME ⭐\n\n${updatedCareer.horse.name} has been inducted into the Hall of Fame with ${updatedCareer.horseLegacy.peak} legacy points.`,
+          );
         }
 
         updatedCareer.stats.racesCompleted += 1;
@@ -1134,7 +1175,11 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
               showStableHub(updatedCareer);
             }
           }
-        }, field, silksMap);
+        }, field, silksMap, {
+          raceDelta: legacySwing.raceDelta,
+          bonus: legacySwing.bonus,
+          total: legacySwing.total,
+        });
       };
 
       const skipBtn = bar.querySelector<HTMLButtonElement>('#skip-race-btn')!;

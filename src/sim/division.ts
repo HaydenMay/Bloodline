@@ -9,6 +9,24 @@ import type { Division } from '../data/index.js';
  * - 4th-6th Place (Mid-field): 0 points (no change)
  * - 7th-8th Place (Outer): -1 point
  */
+const DIVISIONS_BY_LEVEL = ['maiden', 'novice', 'open', 'stakes', 'championship'] as const;
+
+function getDivisionFromLevel(level: number): Division {
+  return DIVISIONS_BY_LEVEL[Math.max(0, Math.min(4, level))] as Division;
+}
+
+/**
+ * Keep the `division` name in step with `divisionLevel`.
+ *
+ * Every caller that moves a horse up or down must call this: race fields,
+ * prize money and legacy scaling are all looked up by the division *name*, so
+ * a level that advances without its name leaves the horse racing — and being
+ * paid — as though it never moved.
+ */
+function syncDivision(horse: Horse): void {
+  horse.division = getDivisionFromLevel(horse.divisionLevel);
+}
+
 export function calculateDivisionPoints(finishingPosition: number): number {
   if (finishingPosition === 1) return 3;
   if (finishingPosition === 2 || finishingPosition === 3) return 1;
@@ -96,6 +114,7 @@ export function finalizePromotion(horse: Horse, finishingPosition: number): void
     if (horse.divisionLevel < 4) {
       horse.divisionLevel += 1;
       horse.divisionPoints = 0;
+      syncDivision(horse);
     }
   }
   // 5th-8th: Stay, reset to 2
@@ -117,6 +136,7 @@ export function finalizeDemotion(horse: Horse, finishingPosition: number): void 
   else if (finishingPosition >= 5 && finishingPosition <= 8) {
     if (horse.divisionLevel > 0) {
       horse.divisionLevel -= 1;
+      syncDivision(horse);
     }
     horse.divisionPoints = 0;
   }
@@ -137,12 +157,14 @@ export function updateAIDivisionProgression(
   if (horse.divisionPoints >= 5 && horse.divisionLevel < 4) {
     horse.divisionLevel += 1;
     horse.divisionPoints = 0;
+    syncDivision(horse);
   }
 
   // Check for AI demotion
   if (horse.divisionPoints <= -3 && horse.divisionLevel > 0) {
     horse.divisionLevel -= 1;
     horse.divisionPoints = 0;
+    syncDivision(horse);
   }
 
   // Cap at boundaries
@@ -154,14 +176,8 @@ export function updateAIDivisionProgression(
   }
 }
 
-const DIVISIONS_BY_LEVEL = ['maiden', 'novice', 'open', 'stakes', 'championship'] as const;
-
 function getLevelFromDivision(division: Division): number {
   return DIVISIONS_BY_LEVEL.indexOf(division);
-}
-
-function getDivisionFromLevel(level: number): Division {
-  return DIVISIONS_BY_LEVEL[Math.max(0, Math.min(4, level))] as Division;
 }
 
 /**

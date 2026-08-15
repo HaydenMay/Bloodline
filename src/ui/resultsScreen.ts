@@ -3,6 +3,13 @@ import type { Horse } from '../sim/types.js';
 import type { Silks } from '../render/palette.js';
 import { attachInfoBox } from './infoBox.js';
 
+/** The legacy swing this result produced, shown alongside the finishing order. */
+export interface LegacySwing {
+  raceDelta: number;
+  bonus: number;
+  total: number;
+}
+
 export function mountResultsScreen(
   container: HTMLElement,
   placings: RunnerSnapshot[],
@@ -10,6 +17,7 @@ export function mountResultsScreen(
   onReturn: () => void,
   field?: Horse[],
   silksMap?: Map<string, Silks>,
+  legacySwing?: LegacySwing,
 ): () => void {
   const root = document.createElement('div');
   root.className = 'results-screen';
@@ -18,6 +26,10 @@ export function mountResultsScreen(
   if (!playerHorse) throw new Error('Player horse not found in results');
 
   const playerPosition = placings.findIndex((p) => p.id === playerHorseId) + 1;
+
+  const swingTotal = legacySwing ? legacySwing.raceDelta + legacySwing.bonus : 0;
+  const swingClass = swingTotal > 0 ? 'up' : swingTotal < 0 ? 'down' : 'flat';
+  const signed = (n: number): string => (n > 0 ? `+${n}` : String(n));
 
   root.innerHTML = `
     <div class="results-container">
@@ -28,6 +40,18 @@ export function mountResultsScreen(
           <span class="badge-name">${playerHorse.name}</span>
         </div>
       </div>
+      ${
+        legacySwing
+          ? `
+        <div class="results-legacy ${swingClass}">
+          <span class="legacy-swing-label">Legacy</span>
+          <span class="legacy-swing-delta">${signed(swingTotal)}</span>
+          ${legacySwing.bonus !== 0 ? `<span class="legacy-swing-bonus">(${signed(legacySwing.raceDelta)} result, ${signed(legacySwing.bonus)} division)</span>` : ''}
+          <span class="legacy-swing-total">${legacySwing.total} pts</span>
+        </div>
+      `
+          : ''
+      }
       <div class="results-list" id="results-list"></div>
       <button class="btn btn-primary results-return" id="return-btn">Return to Menu</button>
     </div>

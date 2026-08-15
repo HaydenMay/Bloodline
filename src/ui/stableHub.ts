@@ -1,5 +1,5 @@
 import type { Career } from './career.js';
-import { LEGACY_TIERS } from '../data/legacy.js';
+import { getStableLegacyPoints, getTier } from '../data/legacy.js';
 
 export interface StableHubCallbacks {
   onTraining: () => void;
@@ -20,6 +20,21 @@ export function mountStableHub(
   root.className = 'stable-hub';
 
   const horse = career.horse;
+  const stablePoints = getStableLegacyPoints(career.stable.legacy, career.horseLegacy);
+  const stableTier = getTier(stablePoints);
+
+  // Direction of the horse's last result, so the hub reads as a live arc.
+  const history = career.horseLegacy.history;
+  const previous = history.length > 1 ? history[history.length - 2]! : null;
+  const trend =
+    previous === null
+      ? ''
+      : career.horseLegacy.points > previous
+        ? 'up'
+        : career.horseLegacy.points < previous
+          ? 'down'
+          : 'flat';
+  const trendArrow = trend === 'up' ? '▲' : trend === 'down' ? '▼' : '';
 
   root.innerHTML = `
     <div class="hub-container">
@@ -63,11 +78,15 @@ export function mountStableHub(
       <!-- Legacy Tier Display -->
       <div class="hub-legacy-banner">
         <div class="legacy-tier">
-          <span class="tier-icon">${LEGACY_TIERS[career.legacy.tier].icon}</span>
+          <span class="tier-icon">${stableTier.icon}</span>
           <div class="tier-details">
-            <div class="tier-name">${LEGACY_TIERS[career.legacy.tier].name}</div>
-            <div class="tier-points">${career.legacy.totalPoints} Legacy Points</div>
+            <div class="tier-name">${stableTier.name} Stable</div>
+            <div class="tier-points">${stablePoints} prestige</div>
           </div>
+        </div>
+        <div class="legacy-horse-score ${trend}">
+          <span class="horse-score-label">${horse.name}${career.horseLegacy.hallOfFame ? ' ⭐' : ''}</span>
+          <span class="horse-score-value">${career.horseLegacy.points} ${trendArrow}</span>
         </div>
       </div>
 
