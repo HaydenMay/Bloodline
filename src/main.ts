@@ -162,7 +162,6 @@ function startRace(seed: string): void {
 
   const showRaceScreen = (opts?: { autoStartCountdown?: boolean }): void => {
     try {
-      alert('showRaceScreen started');
       console.log('[showRaceScreen] Starting race screen', { autoStartCountdown: opts?.autoStartCountdown });
       introTeardown?.();
       app.innerHTML = '';
@@ -239,8 +238,14 @@ function startRace(seed: string): void {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('[showRaceScreen] Error:', error);
-      alert(`Error starting race: ${errorMsg}`);
-      app.innerHTML = `<div style="color: red; padding: 20px; font-family: monospace;">Error starting race: ${errorMsg}</div>`;
+      app.innerHTML = '';
+      showNotice(app, {
+        icon: '⚠️',
+        title: 'Could not start the race',
+        lines: [errorMsg],
+        hint: 'Return to the menu and try again.',
+        tone: 'setback',
+      });
     }
   };
 
@@ -266,19 +271,21 @@ function startRace(seed: string): void {
 
     const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
       try {
-        alert('Start Race clicked');
         console.log('[dossier] Start Race clicked');
         dossierTeardown();
         if (raceIntro) raceIntro.style.display = '';
-        alert('Calling showRaceScreen');
         console.log('[dossier] About to call showRaceScreen');
         showRaceScreen();
-        alert('showRaceScreen completed');
         console.log('[dossier] showRaceScreen completed');
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         console.error('[dossier] Error in Start Race:', error);
-        alert(`Error in Start Race: ${errorMsg}`);
+        showNotice(app, {
+          icon: '⚠️',
+          title: 'Could not start the race',
+          lines: [errorMsg],
+          tone: 'setback',
+        });
       }
     });
   };
@@ -549,22 +556,20 @@ function showCareerRecap(career: Career): void {
 function showSkipRaceUnlock(): void {
   unlockSkipRace();
 
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.innerHTML = `
-    <div class="modal-content unlock-popup">
-      <h2>🏁 Feature Unlocked!</h2>
-      <p>You've completed a full career! You've unlocked <strong>Skip Race</strong> for future careers.</p>
-      <p>Use it to quickly jump through races you don't want to watch, and focus on training and strategy.</p>
-      <button class="btn btn-primary" id="unlock-ok">Got it</button>
-    </div>
-  `;
-  app.appendChild(modal);
-
-  modal.querySelector('#unlock-ok')!.addEventListener('click', () => {
-    modal.remove();
-    showMainMenu();
-  });
+  showNotice(
+    app,
+    {
+      icon: '🏁',
+      title: 'Feature Unlocked!',
+      lines: [
+        "You've completed a full career and unlocked Skip Race for future careers.",
+        "Use it to jump through races you don't want to watch and focus on training and strategy.",
+      ],
+      tone: 'positive',
+      buttonLabel: 'Got it',
+    },
+    showMainMenu,
+  );
 }
 
 function showMainMenu(): void {
@@ -633,7 +638,13 @@ function showStableHub(career: Career): void {
     onTraining: () => {
       // Check if training already done this week
       if (career.trainingDoneThisWeek) {
-        alert('You already trained this week! Pick a race from the Race Calendar.');
+        showNotice(app, {
+          icon: '🏋️',
+          title: 'Already Trained',
+          lines: [`${career.horse.name} has done its work for the week.`],
+          hint: 'Pick a race from the Race Calendar to move the week along.',
+          tone: 'neutral',
+        });
         return;
       }
       showTrainingScreen(career);
@@ -641,44 +652,31 @@ function showStableHub(career: Career): void {
     onRaceCalendar: () => {
       // If training not done yet, warn player
       if (!career.trainingDoneThisWeek && shouldShowNoTrainingWarning()) {
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        modal.innerHTML = `
-          <div class="modal-content">
-            <h2>⚠️ No Training Yet</h2>
-            <p>You haven't trained this week. Racing without training may hurt your horse's performance.</p>
-            <p>Are you sure you want to go to the Race Calendar?</p>
-            <div style="display: flex; gap: 12px; margin: 20px 0;">
-              <label style="display: flex; align-items: center; gap: 8px; flex: 1;">
-                <input type="checkbox" id="dont-show-again" />
-                <span style="font-size: 0.9rem;">Don't show again</span>
-              </label>
-            </div>
-            <div style="display: flex; gap: 12px;">
-              <button class="btn btn-secondary" id="modal-no">Go Back to Hub</button>
-              <button class="btn btn-primary" id="modal-yes">Go to Calendar</button>
-            </div>
-          </div>
-        `;
-        app.appendChild(modal);
-
-        const noBtn = modal.querySelector('#modal-no') as HTMLButtonElement;
-        const yesBtn = modal.querySelector('#modal-yes') as HTMLButtonElement;
-        const checkbox = modal.querySelector('#dont-show-again') as HTMLInputElement;
-
-        noBtn.addEventListener('click', () => {
-          if (checkbox.checked) {
-            disableNoTrainingWarning();
-          }
-          modal.remove();
-        });
-
-        yesBtn.addEventListener('click', () => {
-          if (checkbox.checked) {
-            disableNoTrainingWarning();
-          }
-          modal.remove();
-          showRaceCalendar(career);
+        showNotice(app, {
+          icon: '⚠️',
+          title: 'No Training Yet',
+          lines: [
+            `${career.horse.name} hasn't trained this week, and racing untrained may hurt its performance.`,
+          ],
+          hint: 'Training first is usually worth the week.',
+          tone: 'warning',
+          checkbox: { label: "Don't show again" },
+          actions: [
+            {
+              label: 'Back to Hub',
+              variant: 'secondary',
+              onSelect: (dontShowAgain) => {
+                if (dontShowAgain) disableNoTrainingWarning();
+              },
+            },
+            {
+              label: 'Go to Calendar',
+              onSelect: (dontShowAgain) => {
+                if (dontShowAgain) disableNoTrainingWarning();
+                showRaceCalendar(career);
+              },
+            },
+          ],
         });
       } else {
         showRaceCalendar(career);
@@ -691,18 +689,30 @@ function showStableHub(career: Career): void {
     },
     onTrainerJockey: () => {
       // TODO: Implement trainer/jockey screen
-      alert('Trainer & Jockey management coming in next phase!');
-      showStableHub(career);
+      showNotice(app, {
+        icon: '👥',
+        title: 'Coming Soon',
+        lines: ['Trainer and jockey management arrives in a future update.'],
+        tone: 'neutral',
+      });
     },
     onConsumables: () => {
       // TODO: Implement consumables screen
-      alert('Consumables shop coming in next phase!');
-      showStableHub(career);
+      showNotice(app, {
+        icon: '💊',
+        title: 'Coming Soon',
+        lines: ['The consumables shop arrives in a future update.'],
+        tone: 'neutral',
+      });
     },
     onDossier: () => {
       // TODO: Fix dossier screen and integrate properly
-      alert('Rival Dossier screen - coming soon!');
-      showStableHub(career);
+      showNotice(app, {
+        icon: '📋',
+        title: 'Coming Soon',
+        lines: ['The rival dossier is being rebuilt and will return shortly.'],
+        tone: 'neutral',
+      });
     },
     onLegacy: () => {
       teardown?.();
@@ -733,47 +743,41 @@ function showRaceCalendar(career: Career): void {
 
   // Show demotion warning if at risk
   if (isDemotionRisk) {
-    const warningModal = document.createElement('div');
-    warningModal.className = 'modal-overlay';
-    warningModal.innerHTML = `
-      <div class="modal-content demotion-warning">
-        <h2>⚠️ Demotion Risk</h2>
-        <p>You are at risk of demotion. You must finish in the top 4 of the Division Qualifier race to avoid being demoted to the previous division.</p>
-        <p>If you finish 5th-8th, you will be demoted and start fresh in the division below.</p>
-        <button class="btn btn-primary" id="demotion-warning-ok">Understood</button>
-      </div>
-    `;
-    app.appendChild(warningModal);
-
-    warningModal.querySelector('#demotion-warning-ok')!.addEventListener('click', () => {
-      warningModal.remove();
-      // Now show the race calendar
-      mountCalendarUI();
-    });
-
+    showNotice(
+      app,
+      {
+        icon: '⚠️',
+        title: 'Demotion Risk',
+        lines: [
+          "This week's card is a Division Qualifier. Finish in the top 4 to hold your place.",
+          'Finish 5th or worse and you drop to the division below.',
+        ],
+        hint: 'A strong training week before this one counts for a lot.',
+        tone: 'warning',
+        buttonLabel: 'Understood',
+      },
+      mountCalendarUI,
+    );
     return;
   }
 
   // Show promotion ready alert if applicable
   if (isPromotionReady) {
-    const promotionAlert = document.createElement('div');
-    promotionAlert.className = 'modal-overlay';
-    promotionAlert.innerHTML = `
-      <div class="modal-content promotion-alert">
-        <h2>🏆 Ready for Promotion!</h2>
-        <p>You've proven yourself in this division! This week's race calendar features a Promotion Test.</p>
-        <p>Finish in the top 4 to advance to the next division.</p>
-        <button class="btn btn-primary" id="promotion-alert-ok">Let's Go</button>
-      </div>
-    `;
-    app.appendChild(promotionAlert);
-
-    promotionAlert.querySelector('#promotion-alert-ok')!.addEventListener('click', () => {
-      promotionAlert.remove();
-      // Now show the race calendar
-      mountCalendarUI();
-    });
-
+    showNotice(
+      app,
+      {
+        icon: '🏆',
+        title: 'Ready for Promotion!',
+        lines: [
+          "You've proven yourself in this division, so this week's card features a Promotion Test.",
+          'Finish in the top 4 to advance.',
+        ],
+        hint: 'Fall short and you keep your division and 2 points — another shot comes around soon.',
+        tone: 'positive',
+        buttonLabel: "Let's Go",
+      },
+      mountCalendarUI,
+    );
     return;
   }
 

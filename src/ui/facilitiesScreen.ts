@@ -1,6 +1,7 @@
 import type { Career } from './career.js';
 import { FACILITIES, getUpgradeCost } from '../data/facilities.js';
 import { saveCareer } from './career.js';
+import { showNotice } from './noticeModal.js';
 
 export function mountFacilitiesScreen(
   container: HTMLElement,
@@ -110,7 +111,16 @@ export function mountFacilitiesScreen(
       const cost = getUpgradeCost(facility.baseCost, nextLevel);
 
       if (career.stats.cash < cost) {
-        alert('Not enough cash!');
+        showNotice(container, {
+          icon: '💰',
+          title: 'Not Enough Cash',
+          lines: [
+            `Upgrading the ${facility.name} to level ${nextLevel} costs $${cost.toLocaleString()}.`,
+            `You have $${career.stats.cash.toLocaleString()}.`,
+          ],
+          hint: 'Prize money from your next few races will cover the difference.',
+          tone: 'warning',
+        });
         return;
       }
 

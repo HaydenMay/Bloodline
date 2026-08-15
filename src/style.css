@@ -5379,6 +5379,10 @@ body {
   border-top-color: var(--accent);
 }
 
+.notice-modal.notice-warning {
+  border-top-color: var(--accent-bright);
+}
+
 .notice-icon {
   font-size: 2.75rem;
   line-height: 1;
@@ -5408,7 +5412,60 @@ body {
   color: var(--muted);
 }
 
-.notice-btn {
+/* Opt-out checkbox, e.g. "Don't show again" */
+.notice-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: left;
+  transition: border-color 0.2s ease;
+}
+
+.notice-checkbox:hover {
+  border-color: var(--accent);
+}
+
+.notice-checkbox-input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.notice-actions {
+  display: flex;
+  gap: 12px;
   margin-top: 8px;
+  width: 100%;
+}
+
+.notice-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A lone button should not stretch edge to edge. */
+.notice-actions:has(.notice-btn:only-child) {
+  justify-content: center;
+}
+
+.notice-actions .notice-btn:only-child {
+  flex: 0 1 auto;
   min-width: 160px;
+}
+
+@media (max-width: 380px) {
+  /* Two full labels stop fitting side by side on the narrowest phones. */
+  .notice-actions {
+    flex-direction: column-reverse;
+  }
 }
