@@ -4245,3 +4245,222 @@ body {
     transform: scale(1);
   }
 }
+
+/* ========================================================================== *
+   Stable Hub — Main navigation and status screen
+   ========================================================================== */
+
+.stable-hub {
+  width: 100%;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.hub-container {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  animation: slideUp 0.4s ease-out;
+}
+
+/* Status Bar */
+.hub-status-bar {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  padding: 20px;
+  background: linear-gradient(135deg, var(--accent-faint) 0%, transparent 100%);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+}
+
+.status-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-label {
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.status-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--accent-bright);
+  font-family: var(--mono);
+}
+
+/* Horse Profile */
+.hub-horse-profile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-header h2 {
+  margin: 0;
+  font-size: 1.75rem;
+  color: var(--text);
+}
+
+.profile-meta {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.profile-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.profile-stats .stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-stats .stat-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.profile-stats .stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Navigation Grid */
+.hub-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hub-navigation h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.nav-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  min-height: 140px;
+}
+
+.nav-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, var(--accent-faint) 0%, transparent 100%);
+  transform: translateY(-2px);
+}
+
+.nav-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.nav-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nav-icon {
+  font-size: 2rem;
+}
+
+.nav-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.nav-desc {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Week Info */
+.hub-week-info {
+  text-align: center;
+  padding: 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.hub-week-info p {
+  margin: 0;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .hub-status-bar {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .status-item {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .profile-stats {
+    gap: 12px;
+  }
+
+  .nav-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .nav-button {
+    min-height: 120px;
+  }
+}

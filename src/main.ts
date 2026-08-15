@@ -16,6 +16,7 @@ import { mountResultsScreen } from './ui/resultsScreen.js';
 import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { mountChampionshipVictory } from './ui/championshipVictory.js';
+import { mountStableHub } from './ui/stableHub.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
 import { mountTestCareerSetup } from './ui/testCareerSetup.js';
@@ -581,7 +582,37 @@ function startCareer(starterHorse: Horse, playerSilks: Silks): void {
 
 function resumeCareer(career: Career): void {
   // Resume existing career
-  showTrainingScreen(career);
+  showStableHub(career);
+}
+
+function showStableHub(career: Career): void {
+  teardown?.();
+  app.innerHTML = '';
+
+  teardown = mountStableHub(app, career, {
+    onTraining: () => showTrainingScreen(career),
+    onRaceCalendar: () => showRaceCalendar(career),
+    onFacilities: () => {
+      // TODO: Implement facilities screen
+      alert('Facilities screen coming in next phase!');
+      showStableHub(career);
+    },
+    onTrainerJockey: () => {
+      // TODO: Implement trainer/jockey screen
+      alert('Trainer & Jockey management coming in next phase!');
+      showStableHub(career);
+    },
+    onConsumables: () => {
+      // TODO: Implement consumables screen
+      alert('Consumables shop coming in next phase!');
+      showStableHub(career);
+    },
+    onDossier: () => {
+      // TODO: Fix dossier screen and integrate properly
+      alert('Rival Dossier screen - coming soon!');
+      showStableHub(career);
+    },
+  });
 }
 
 function showTrainingScreen(career: Career): void {
@@ -1005,8 +1036,8 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
                 victoryTeardown?.();
                 updatedCareer.horse.isChampion = true;
                 saveCareer(updatedCareer);
-                // Loop back to training (career only ends at 18-20 starts or by retiring)
-                showTrainingScreen(updatedCareer);
+                // Loop back to stable hub (career only ends at 18-20 starts or by retiring)
+                showStableHub(updatedCareer);
               },
               topThree.length >= 3 ? topThree : undefined
             );
@@ -1016,8 +1047,8 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
             if (updatedCareer.stats.racesCompleted >= 20) {
               showCareerRecap(updatedCareer);
             } else {
-              // Loop back to training instead of main menu
-              showTrainingScreen(updatedCareer);
+              // Loop back to stable hub instead of main menu
+              showStableHub(updatedCareer);
             }
           }
         }, field, silksMap);
