@@ -389,9 +389,11 @@ if (params.has('preview')) {
   const rng = createRng(`test-career-${Date.now()}`);
   const names = createNameGenerator(rng);
 
-  mountTestCareerSetup(app, (horse) => {
+  mountTestCareerSetup(app, (horse, config) => {
     // Create career with test horse
     const testCareer = createNewCareer(horse, DEFAULTS.playerSilksDefault);
+    // Override starting cash from config
+    testCareer.stats.cash = config.startingCash;
     // Generate a full world for testing
     testCareer.stable.world = generateWorld(rng, names, {
       maiden: 15,
@@ -400,8 +402,8 @@ if (params.has('preview')) {
       stakes: 8,
       championship: 5,
     });
-    // Start training screen immediately (no starter selection)
-    showTrainingScreen(testCareer);
+    // Start stable hub (not training directly)
+    showStableHub(testCareer);
   });
 } else if (params.has('roadmap')) {
   // ?roadmap opens the build-progress panel — kept off every real game

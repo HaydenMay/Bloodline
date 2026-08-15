@@ -4711,3 +4711,40 @@ body {
     padding: 16px;
   }
 }
+
+/* Cash button selector for test career setup */
+.cash-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cash-btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.cash-btn:hover {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, var(--accent-faint) 0%, transparent 100%);
+}
+
+.cash-btn.active {
+  border-color: var(--accent-bright);
+  background: var(--accent);
+  color: var(--bg);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.cash-btn:active {
+  transform: scale(0.98);
+}

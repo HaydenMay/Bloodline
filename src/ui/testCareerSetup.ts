@@ -17,6 +17,7 @@ export interface TestCareerConfig {
   age: number;
   racesCompleted: number;
   wins: number;
+  startingCash: number;
 }
 
 const DIVISIONS: Division[] = ['maiden', 'novice', 'open', 'stakes', 'championship'];
@@ -36,6 +37,7 @@ const PRESETS = {
     age: 3,
     racesCompleted: 0,
     wins: 0,
+    startingCash: 10000,
   },
   atRisk: {
     horseName: 'Risk Taker',
@@ -51,6 +53,7 @@ const PRESETS = {
     age: 4,
     racesCompleted: 12,
     wins: 2,
+    startingCash: 10000,
   },
   freshStart: {
     horseName: 'New Prospect',
@@ -66,6 +69,7 @@ const PRESETS = {
     age: 2,
     racesCompleted: 0,
     wins: 0,
+    startingCash: 10000,
   },
   stakesMidfield: {
     horseName: 'Stakes Runner',
@@ -81,6 +85,7 @@ const PRESETS = {
     age: 4,
     racesCompleted: 18,
     wins: 5,
+    startingCash: 10000,
   },
 } as const;
 
@@ -165,6 +170,18 @@ export function mountTestCareerSetup(
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group" style="flex: 1;">
+            <label>Starting Cash</label>
+            <div class="cash-buttons">
+              <button type="button" class="cash-btn ${currentConfig.startingCash === 10000 ? 'active' : ''}" data-amount="10000">$10K</button>
+              <button type="button" class="cash-btn ${currentConfig.startingCash === 50000 ? 'active' : ''}" data-amount="50000">$50K</button>
+              <button type="button" class="cash-btn ${currentConfig.startingCash === 100000 ? 'active' : ''}" data-amount="100000">$100K</button>
+              <button type="button" class="cash-btn ${currentConfig.startingCash === 250000 ? 'active' : ''}" data-amount="250000">$250K</button>
+            </div>
+          </div>
+        </div>
+
         <h4>Stats (0-100)</h4>
         <div class="stats-grid">
           ${(['speed', 'stamina', 'burst', 'grit', 'temper', 'consistency'] as const)
@@ -196,6 +213,19 @@ export function mountTestCareerSetup(
       const presetKey = (e.target as HTMLElement).dataset.preset as keyof typeof PRESETS;
       currentConfig = { ...PRESETS[presetKey] };
       updateFormFromConfig();
+    });
+  });
+
+  // Cash buttons
+  root.querySelectorAll('.cash-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const amount = parseInt((e.target as HTMLElement).dataset.amount || '10000');
+      currentConfig.startingCash = amount;
+
+      // Update active state
+      root.querySelectorAll('.cash-btn').forEach((b) => b.classList.remove('active'));
+      (e.target as HTMLElement).classList.add('active');
     });
   });
 
@@ -236,6 +266,14 @@ export function mountTestCareerSetup(
       currentConfig.racesCompleted,
     );
     (root.querySelector('#wins') as HTMLInputElement).value = String(currentConfig.wins);
+
+    // Update cash button active state
+    root.querySelectorAll('.cash-btn').forEach((btn) => {
+      btn.classList.remove('active');
+      if (parseInt((btn as HTMLElement).dataset.amount || '10000') === currentConfig.startingCash) {
+        btn.classList.add('active');
+      }
+    });
 
     (
       ['speed', 'stamina', 'burst', 'grit', 'temper', 'consistency'] as const
