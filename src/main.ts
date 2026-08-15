@@ -669,14 +669,14 @@ function showStableHub(career: Career): void {
             {
               label: 'Back to Hub',
               variant: 'secondary',
-              onSelect: (dontShowAgain) => {
-                if (dontShowAgain) disableNoTrainingWarning();
+              onSelect: ({ checked }) => {
+                if (checked) disableNoTrainingWarning();
               },
             },
             {
               label: 'Go to Calendar',
-              onSelect: (dontShowAgain) => {
-                if (dontShowAgain) disableNoTrainingWarning();
+              onSelect: ({ checked }) => {
+                if (checked) disableNoTrainingWarning();
                 showRaceCalendar(career);
               },
             },

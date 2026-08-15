@@ -109,12 +109,12 @@ export function mountStableHub(
             <div class="nav-label">Facilities</div>
             <div class="nav-desc">Build your stable</div>
           </button>
-          <button class="nav-button" id="nav-trainer-jockey" data-action="trainer-jockey" disabled>
+          <button class="nav-button" id="nav-trainer-jockey" data-action="trainer-jockey">
             <div class="nav-icon">👥</div>
             <div class="nav-label">Staff</div>
             <div class="nav-desc">Hire & level up</div>
           </button>
-          <button class="nav-button" id="nav-consumables" data-action="consumables" disabled>
+          <button class="nav-button" id="nav-consumables" data-action="consumables">
             <div class="nav-icon">💊</div>
             <div class="nav-label">Consumables</div>
             <div class="nav-desc">Supplements & items</div>
