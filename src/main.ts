@@ -577,7 +577,7 @@ function startCareer(starterHorse: Horse, playerSilks: Silks): void {
   // Create new career with selected starter
   const career = createNewCareer(starterHorse, playerSilks);
   saveCareer(career);
-  showTrainingScreen(career);
+  showStableHub(career);
 }
 
 function resumeCareer(career: Career): void {
