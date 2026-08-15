@@ -619,12 +619,6 @@ function showTrainingScreen(career: Career): void {
   teardown?.();
   app.innerHTML = '';
 
-  // If a race has already been selected for this week, go to race calendar instead
-  if (career.raceSelected) {
-    showRaceCalendar(career);
-    return;
-  }
-
   teardown = mountTrainingScreen(app, career.horse, career.playerSilks, (updatedHorse, _session) => {
     const updatedCareer = { ...career, horse: updatedHorse, raceSelected: true };
     saveCareer(updatedCareer);
