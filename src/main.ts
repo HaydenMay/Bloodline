@@ -642,6 +642,9 @@ function showStableHub(career: Career): void {
         const checkbox = modal.querySelector('#dont-show-again') as HTMLInputElement;
 
         noBtn.addEventListener('click', () => {
+          if (checkbox.checked) {
+            disableNoTrainingWarning();
+          }
           modal.remove();
         });
 
