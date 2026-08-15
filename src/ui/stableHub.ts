@@ -1,4 +1,5 @@
 import type { Career } from './career.js';
+import { LEGACY_TIERS } from '../data/legacy.js';
 
 export interface StableHubCallbacks {
   onTraining: () => void;
@@ -7,6 +8,7 @@ export interface StableHubCallbacks {
   onTrainerJockey: () => void;
   onConsumables: () => void;
   onDossier: () => void;
+  onLegacy: () => void;
 }
 
 export function mountStableHub(
@@ -58,6 +60,17 @@ export function mountStableHub(
         </div>
       </div>
 
+      <!-- Legacy Tier Display -->
+      <div class="hub-legacy-banner">
+        <div class="legacy-tier">
+          <span class="tier-icon">${LEGACY_TIERS[career.legacy.tier].icon}</span>
+          <div class="tier-details">
+            <div class="tier-name">${LEGACY_TIERS[career.legacy.tier].name}</div>
+            <div class="tier-points">${career.legacy.totalPoints} Legacy Points</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Navigation Grid -->
       <div class="hub-navigation">
         <h3>What's Next?</h3>
@@ -92,6 +105,11 @@ export function mountStableHub(
             <div class="nav-label">Dossier</div>
             <div class="nav-desc">Track rivals</div>
           </button>
+          <button class="nav-button" id="nav-legacy" data-action="legacy">
+            <div class="nav-icon">⭐</div>
+            <div class="nav-label">Legacy</div>
+            <div class="nav-desc">View achievements</div>
+          </button>
         </div>
       </div>
 
@@ -111,6 +129,7 @@ export function mountStableHub(
   const trainerJockeyBtn = root.querySelector('#nav-trainer-jockey');
   const consumablesBtn = root.querySelector('#nav-consumables');
   const dossierBtn = root.querySelector('#nav-dossier');
+  const legacyBtn = root.querySelector('#nav-legacy');
 
   trainingBtn?.addEventListener('click', callbacks.onTraining);
   raceCalendarBtn?.addEventListener('click', callbacks.onRaceCalendar);
@@ -118,6 +137,7 @@ export function mountStableHub(
   trainerJockeyBtn?.addEventListener('click', callbacks.onTrainerJockey);
   consumablesBtn?.addEventListener('click', callbacks.onConsumables);
   dossierBtn?.addEventListener('click', callbacks.onDossier);
+  legacyBtn?.addEventListener('click', callbacks.onLegacy);
 
   return () => {
     root.remove();

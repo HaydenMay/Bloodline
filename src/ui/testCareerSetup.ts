@@ -2,6 +2,7 @@ import type { Horse } from '../sim/types.js';
 import type { Division, RunningStyle } from '../data/index.js';
 import { RUNNING_STYLES } from '../data/index.js';
 import { createRng } from '../sim/index.js';
+import { LEGACY_TIERS } from '../data/legacy.js';
 
 export interface TestCareerConfig {
   horseName: string;
@@ -18,6 +19,8 @@ export interface TestCareerConfig {
   racesCompleted: number;
   wins: number;
   startingCash: number;
+  legacyPoints: number;
+  legacyTier: number;
 }
 
 const DIVISIONS: Division[] = ['maiden', 'novice', 'open', 'stakes', 'championship'];
@@ -38,6 +41,8 @@ const PRESETS = {
     racesCompleted: 0,
     wins: 0,
     startingCash: 10000,
+    legacyPoints: 0,
+    legacyTier: 0,
   },
   atRisk: {
     horseName: 'Risk Taker',
@@ -54,6 +59,8 @@ const PRESETS = {
     racesCompleted: 12,
     wins: 2,
     startingCash: 10000,
+    legacyPoints: 50,
+    legacyTier: 0,
   },
   freshStart: {
     horseName: 'New Prospect',
@@ -70,6 +77,8 @@ const PRESETS = {
     racesCompleted: 0,
     wins: 0,
     startingCash: 10000,
+    legacyPoints: 0,
+    legacyTier: 0,
   },
   stakesMidfield: {
     horseName: 'Stakes Runner',
@@ -86,6 +95,8 @@ const PRESETS = {
     racesCompleted: 18,
     wins: 5,
     startingCash: 10000,
+    legacyPoints: 300,
+    legacyTier: 1,
   },
 } as const;
 
@@ -182,6 +193,19 @@ export function mountTestCareerSetup(
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label>Legacy Tier</label>
+            <select id="legacy-tier">
+              ${LEGACY_TIERS.map((tier) => `<option value="${tier.level}" ${tier.level === currentConfig.legacyTier ? 'selected' : ''}>${tier.icon} ${tier.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Legacy Points (0-1000+)</label>
+            <input type="number" id="legacy-points" min="0" max="9999" value="${currentConfig.legacyPoints}" />
+          </div>
+        </div>
+
         <h4>Stats (0-100)</h4>
         <div class="stats-grid">
           ${(['speed', 'stamina', 'burst', 'grit', 'temper', 'consistency'] as const)
@@ -252,6 +276,12 @@ export function mountTestCareerSetup(
       (root.querySelector('#races-completed') as HTMLInputElement).value,
     );
     currentConfig.wins = parseInt((root.querySelector('#wins') as HTMLInputElement).value);
+    currentConfig.legacyTier = parseInt(
+      (root.querySelector('#legacy-tier') as HTMLSelectElement).value,
+    );
+    currentConfig.legacyPoints = parseInt(
+      (root.querySelector('#legacy-points') as HTMLInputElement).value,
+    );
   };
 
   function updateFormFromConfig() {
@@ -266,6 +296,10 @@ export function mountTestCareerSetup(
       currentConfig.racesCompleted,
     );
     (root.querySelector('#wins') as HTMLInputElement).value = String(currentConfig.wins);
+    (root.querySelector('#legacy-tier') as HTMLSelectElement).value = String(currentConfig.legacyTier);
+    (root.querySelector('#legacy-points') as HTMLInputElement).value = String(
+      currentConfig.legacyPoints,
+    );
 
     // Update cash button active state
     root.querySelectorAll('.cash-btn').forEach((btn) => {

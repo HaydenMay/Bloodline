@@ -17,6 +17,7 @@ import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { mountChampionshipVictory } from './ui/championshipVictory.js';
 import { mountStableHub } from './ui/stableHub.js';
+import { mountLegacyScreen } from './ui/legacyScreen.js';
 import { mountFacilitiesScreen } from './ui/facilitiesScreen.js';
 import { loadCareer, saveCareer, createNewCareer, deleteCareer, type Career } from './ui/career.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
@@ -394,6 +395,9 @@ if (params.has('preview')) {
     const testCareer = createNewCareer(horse, DEFAULTS.playerSilksDefault);
     // Override starting cash from config
     testCareer.stats.cash = config.startingCash;
+    // Override legacy from config
+    testCareer.legacy.totalPoints = config.legacyPoints;
+    testCareer.legacy.tier = config.legacyTier;
     // Generate a full world for testing
     testCareer.stable.world = generateWorld(rng, names, {
       maiden: 15,
@@ -690,6 +694,11 @@ function showStableHub(career: Career): void {
       // TODO: Fix dossier screen and integrate properly
       alert('Rival Dossier screen - coming soon!');
       showStableHub(career);
+    },
+    onLegacy: () => {
+      teardown?.();
+      app.innerHTML = '';
+      teardown = mountLegacyScreen(app, career, () => showStableHub(career));
     },
   });
 }

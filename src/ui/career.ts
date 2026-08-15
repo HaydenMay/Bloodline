@@ -1,11 +1,13 @@
 import type { Horse } from '../sim/types.js';
 import type { Division } from '../data/index.js';
 import type { Silks } from '../render/palette.js';
+import type { LegacyStats } from '../data/legacy.js';
 import { DEFAULTS } from '../data/colors.js';
 import { WORLD_POPULATION } from '../data/index.js';
 import { createRng } from '../sim/index.js';
 import { createNameGenerator } from '../data/names.js';
 import { generateWorld } from '../sim/horse.js';
+import { calculateLegacyPoints } from '../data/legacy.js';
 
 export interface CareerStats {
   wins: number;
@@ -46,6 +48,7 @@ export interface Career {
   season: number;
   stats: CareerStats;
   stable: Stable;
+  legacy: LegacyStats;
   createdAt: number;
   lastUpdated: number;
   /** Whether a race has been selected for this week (prevents multiple trainings). */
@@ -116,6 +119,21 @@ export function loadCareer(): Career | null {
       career.stats.reputation = (career.stats.wins || 0) * 2;
     }
 
+    // Ensure legacy stats exist (for saves before legacy system)
+    if (!career.legacy) {
+      const legacyPoints = calculateLegacyPoints(
+        career.stats.wins || 0,
+        career.stats.totalEarnings || 0,
+        career.horse.division,
+      );
+      career.legacy = {
+        totalPoints: legacyPoints,
+        tier: Math.floor(legacyPoints / 200), // rough tier estimation
+        hallOfFame: false,
+        achievements: {},
+      };
+    }
+
     return career;
   } catch (error) {
     console.error('Failed to load career:', error);
@@ -136,6 +154,12 @@ export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
   const rng = createRng(`career-${Date.now()}`);
   const names = createNameGenerator(rng);
   const world = generateWorld(rng, names, WORLD_POPULATION);
+
+  const legacyPoints = calculateLegacyPoints(
+    horse.wins || 0,
+    0, // no earnings yet
+    horse.division,
+  );
 
   return {
     horse,
@@ -166,6 +190,12 @@ export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
         admin: 0,
         paddock: 0,
       },
+    },
+    legacy: {
+      totalPoints: legacyPoints,
+      tier: 0,
+      hallOfFame: false,
+      achievements: {},
     },
     createdAt: Date.now(),
     lastUpdated: Date.now(),
