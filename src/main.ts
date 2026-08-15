@@ -642,7 +642,7 @@ function showStableHub(career: Career): void {
           icon: '🏋️',
           title: 'Already Trained',
           lines: [`${career.horse.name} has done its work for the week.`],
-          hint: 'Pick a race from the Race Calendar to move the week along.',
+          hint: "It's ready to run whenever you are — pick a race from the calendar.",
           tone: 'neutral',
         });
         return;
@@ -656,11 +656,13 @@ function showStableHub(career: Career): void {
           icon: '⚠️',
           title: 'No Training Yet',
           lines: [
-            `${career.horse.name} hasn't trained this week, so it will run with the stats it has.`,
+            `${career.horse.name} hasn't been worked this week, so it'll run on the form it already has.`,
           ],
-          // Training does not advance the calendar — only finishing a race does.
-          // Say so plainly, because players reasonably assume it costs the week.
-          hint: "Training doesn't use up the week — you can train and still race straight after.",
+          // The point of this warning is the improvement being left behind, not a
+          // penalty and not a cost. Said in a trainer's language rather than the
+          // game's — DESIGN.md §12 keeps the stable screens warm and tactile, and
+          // naming the numbers outright would break that.
+          hint: "Time on the training grounds is where a horse finds its edge — this one heads to the gate without it.",
           tone: 'warning',
           checkbox: { label: "Don't show again" },
           actions: [
@@ -754,7 +756,7 @@ function showRaceCalendar(career: Career): void {
           "This week's card is a Division Qualifier. Finish in the top 4 to hold your place.",
           'Finish 5th or worse and you drop to the division below.',
         ],
-        hint: 'A strong training week before this one counts for a lot.',
+        hint: 'A session on the training grounds before this one counts for a lot.',
         tone: 'warning',
         buttonLabel: 'Understood',
       },
