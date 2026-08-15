@@ -18,6 +18,8 @@ import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
 import { mountChampionshipVictory } from './ui/championshipVictory.js';
 import { mountStableHub } from './ui/stableHub.js';
 import { mountLegacyScreen } from './ui/legacyScreen.js';
+import type { NoticeOptions } from './ui/noticeModal.js';
+import { showNotice } from './ui/noticeModal.js';
 import {
   applyRaceToHorseLegacy,
   createHorseLegacy,
@@ -1028,37 +1030,65 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         const racedDivision = updatedCareer.horse.division;
         const divisionLevelBefore = updatedCareer.horse.divisionLevel;
 
+        // Shown over the results once they are up, rather than as a native alert.
+        let divisionNotice: NoticeOptions | null = null;
+
         if (isPromotionRace) {
-          // Finalize promotion result
-          console.log('Promotion race detected. Before:', {
-            divisionLevel: updatedCareer.horse.divisionLevel,
-            divisionPoints: updatedCareer.horse.divisionPoints,
-            position: playerFinishingPosition,
-          });
           const divBefore = updatedCareer.horse.divisionLevel;
           finalizePromotion(updatedCareer.horse, playerFinishingPosition);
           const divAfter = updatedCareer.horse.divisionLevel;
-          console.log('After promotion:', {
-            divisionLevel: updatedCareer.horse.divisionLevel,
-            divisionPoints: updatedCareer.horse.divisionPoints,
-          });
 
-          // Show promotion/demotion result alert
           if (divAfter > divBefore) {
-            alert(`🎉 PROMOTION! 🎉\n\nYou've been promoted to ${DIVISIONS[divAfter]}!\nYour division points reset to 0.`);
+            divisionNotice = {
+              icon: '🎉',
+              title: `Promoted to ${DIVISIONS[divAfter]}!`,
+              lines: [
+                `${updatedCareer.horse.name} has earned a place in the ${DIVISIONS[divAfter]} division.`,
+              ],
+              hint: 'The competition steps up from here — but so do the purses and the prestige.',
+              tone: 'positive',
+            };
           } else {
-            alert(`\u{1F50B} DEMOTION \u{1F50B}\n\nYou were not promoted this race.\nYour division points reset to 2.`);
+            // Falling short of a promotion is not a demotion. The horse holds its
+            // division and keeps most of its points, so say so plainly.
+            divisionNotice = {
+              icon: '🎯',
+              title: 'So Close!',
+              lines: [
+                `${updatedCareer.horse.name} stays in ${DIVISIONS[divBefore]} for now.`,
+                'You held onto 2 division points, so another promotion race is not far off.',
+              ],
+              hint: 'Keep training and placing well to earn your next shot.',
+              tone: 'neutral',
+            };
           }
         } else if (isDemotionRace) {
-          // Finalize demotion result
           const divBefore = updatedCareer.horse.divisionLevel;
           finalizeDemotion(updatedCareer.horse, playerFinishingPosition);
           const divAfter = updatedCareer.horse.divisionLevel;
 
           if (divAfter < divBefore) {
-            alert(`📉 DEMOTION 📉\n\nYou've been demoted to ${DIVISIONS[divAfter]}.`);
+            divisionNotice = {
+              icon: '📉',
+              title: `Dropped to ${DIVISIONS[divAfter]}`,
+              lines: [
+                `${updatedCareer.horse.name} moves back to the ${DIVISIONS[divAfter]} division.`,
+                'Your division points reset to 0.',
+              ],
+              hint: 'An easier field is a chance to rebuild form and climb straight back.',
+              tone: 'setback',
+            };
           } else {
-            alert(`✅ Safe!\n\nYou stayed in ${DIVISIONS[divBefore]}.\nYour division points reset to 0.`);
+            divisionNotice = {
+              icon: '✅',
+              title: 'Safe!',
+              lines: [
+                `${updatedCareer.horse.name} holds its place in ${DIVISIONS[divBefore]}.`,
+                'Your division points reset to 0.',
+              ],
+              hint: 'Fresh start in this division — build those points back up.',
+              tone: 'positive',
+            };
           }
         } else {
           // Normal race - just update division points
@@ -1089,6 +1119,7 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
           },
         );
 
+        let hallOfFameNotice: NoticeOptions | null = null;
         if (legacySwing.inducted) {
           updatedCareer.stable.legacy.hallOfFame.push({
             horseName: updatedCareer.horse.name,
@@ -1100,9 +1131,15 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
             season: updatedCareer.season,
             timestamp: Date.now(),
           });
-          alert(
-            `⭐ HALL OF FAME ⭐\n\n${updatedCareer.horse.name} has been inducted into the Hall of Fame with ${updatedCareer.horseLegacy.peak} legacy points.`,
-          );
+          hallOfFameNotice = {
+            icon: '⭐',
+            title: 'Hall of Fame',
+            lines: [
+              `${updatedCareer.horse.name} has been inducted with ${updatedCareer.horseLegacy.peak} legacy points.`,
+            ],
+            hint: 'This honour is permanent — no run of bad form can take it away.',
+            tone: 'positive',
+          };
         }
 
         updatedCareer.stats.racesCompleted += 1;
@@ -1180,6 +1217,17 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
           bonus: legacySwing.bonus,
           total: legacySwing.total,
         });
+
+        // Stack any notices over the results, so the player reads the outcome
+        // with the finishing order already behind it.
+        const notices = [divisionNotice, hallOfFameNotice].filter(
+          (n): n is NoticeOptions => n !== null,
+        );
+        const showNext = (): void => {
+          const next = notices.shift();
+          if (next) showNotice(app, next, showNext);
+        };
+        showNext();
       };
 
       const skipBtn = bar.querySelector<HTMLButtonElement>('#skip-race-btn')!;

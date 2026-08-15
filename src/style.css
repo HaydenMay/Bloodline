@@ -5353,3 +5353,62 @@ body {
   color: var(--accent);
   font-family: var(--mono);
 }
+
+/* ============================================================================
+   Notice modal — division outcomes, Hall of Fame. Replaces native alert().
+   ========================================================================== */
+
+.notice-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 420px;
+  border-top: 3px solid var(--line);
+}
+
+.notice-modal.notice-positive {
+  border-top-color: var(--ok);
+}
+
+.notice-modal.notice-setback {
+  border-top-color: var(--warning);
+}
+
+.notice-modal.notice-neutral {
+  border-top-color: var(--accent);
+}
+
+.notice-icon {
+  font-size: 2.75rem;
+  line-height: 1;
+}
+
+.notice-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.notice-line {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.notice-hint {
+  margin: 4px 0 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  width: 100%;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.notice-btn {
+  margin-top: 8px;
+  min-width: 160px;
+}
