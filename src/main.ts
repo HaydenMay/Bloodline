@@ -80,6 +80,45 @@ function buildField(seed: string): { field: Horse[]; playerId: string } {
   return { field, playerId: field[playerIndex]!.id };
 }
 
+/**
+ * Calculate race earnings and reputation gain based on division and finishing position.
+ * Prize distribution: 1st=50%, 2nd=25%, 3rd=15%, 4th+=10%
+ */
+function calculateRaceRewards(division: string, finishingPosition: number, fieldSize: number): { earnings: number; reputation: number } {
+  const basePrizes: Record<string, number> = {
+    maiden: 5000,
+    novice: 10000,
+    open: 20000,
+    stakes: 50000,
+    championship: 100000,
+  };
+
+  const basePrize = basePrizes[division] || 5000;
+
+  // Determine prize percentage based on position
+  let prizePercentage = 0.1; // 4th+ gets 10%
+  let reputationGain = 1;
+
+  if (finishingPosition === 1) {
+    prizePercentage = 0.5;
+    reputationGain = 5;
+  } else if (finishingPosition === 2) {
+    prizePercentage = 0.25;
+    reputationGain = 3;
+  } else if (finishingPosition === 3) {
+    prizePercentage = 0.15;
+    reputationGain = 2;
+  }
+
+  const earnings = Math.round(basePrize * prizePercentage);
+
+  // Scale reputation by field size (tighter races = more competitive)
+  const competitionMultiplier = Math.max(1, fieldSize / 12);
+  const scaledReputation = Math.round(reputationGain * competitionMultiplier);
+
+  return { earnings, reputation: scaledReputation };
+}
+
 function startRace(seed: string): void {
   teardown?.();
   app.innerHTML = '';
@@ -305,6 +344,8 @@ function generateRandomCareer(): Career {
       racesCompleted,
       totalEarnings,
       topWins,
+      cash: totalEarnings + 5000,
+      reputation: wins * 2,
     },
     stable: {
       world: [],
@@ -840,17 +881,22 @@ function startRaceWithHorse(career: Career, race?: RaceOption): void {
         }
 
         // Update player horse records and division progression
+        const playerFinishingPosition = playerIndex + 1;
+        const { earnings, reputation } = calculateRaceRewards(player.division, playerFinishingPosition, placings.length);
+
         if (playerIndex === 0) {
           updatedCareer.stats.wins += 1;
-          updatedCareer.stats.totalEarnings += 1000; // TODO: Dynamic earnings
           updatedCareer.horse.wins += 1;
         } else {
           updatedCareer.stats.losses += 1;
         }
+
+        updatedCareer.stats.totalEarnings += earnings;
+        updatedCareer.stats.cash += earnings;
+        updatedCareer.stats.reputation += reputation;
         updatedCareer.horse.starts += 1;
 
         // Update division points for player horse
-        const playerFinishingPosition = playerIndex + 1;
         const isPromotionRace = race?.isPromotion === true;
         const isDemotionRace = race?.isDemotion === true;
         console.log('Race type check:', { isPromotionRace, isDemotionRace, race });

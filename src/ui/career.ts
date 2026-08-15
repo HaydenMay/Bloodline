@@ -13,6 +13,8 @@ export interface CareerStats {
   totalEarnings: number;
   topWins: Array<{ raceName: string; margin: string }>;
   racesCompleted: number;
+  cash: number;
+  reputation: number;
 }
 
 export interface RivalDossier {
@@ -103,6 +105,14 @@ export function loadCareer(): Career | null {
       career.stats.racesCompleted = (career.stats.wins || 0) + (career.stats.losses || 0);
     }
 
+    // Ensure cash and reputation exist (for saves before Phase 4 currency system)
+    if (career.stats.cash === undefined) {
+      career.stats.cash = 10000;
+    }
+    if (career.stats.reputation === undefined) {
+      career.stats.reputation = (career.stats.wins || 0) * 2;
+    }
+
     return career;
   } catch (error) {
     console.error('Failed to load career:', error);
@@ -135,6 +145,8 @@ export function createNewCareer(horse: Horse, playerSilks: Silks): Career {
       totalEarnings: 0,
       topWins: [],
       racesCompleted: horse.starts || 0,
+      cash: 10000,
+      reputation: 0,
     },
     stable: {
       world,
