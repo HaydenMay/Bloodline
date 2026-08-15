@@ -14,8 +14,12 @@ export function mountFacilitiesScreen(
 
   root.innerHTML = `
     <div class="facilities-container">
-      <div class="facilities-header">
+      <div class="facilities-top-bar">
+        <button class="btn-back" id="back-btn-top">← Back</button>
         <h2>Stable Facilities</h2>
+        <div style="width: 80px;"></div>
+      </div>
+      <div class="facilities-header">
         <p class="subtitle">Upgrade your facilities to improve your horse's performance</p>
         <div class="cash-display">
           <span class="label">Available Cash:</span>
@@ -122,8 +126,9 @@ export function mountFacilitiesScreen(
     });
   });
 
-  // Back button
+  // Back buttons
   root.querySelector('#back-btn')?.addEventListener('click', onBack);
+  root.querySelector('#back-btn-top')?.addEventListener('click', onBack);
 
   return () => {
     root.remove();

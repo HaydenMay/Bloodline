@@ -81,10 +81,11 @@ body {
 #app {
   min-height: 100svh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: max(20px, env(safe-area-inset-top)) 20px
     max(20px, env(safe-area-inset-bottom));
+  overflow-y: auto;
 }
 
 .boot {
@@ -4496,16 +4497,47 @@ body {
   animation: slideUp 0.4s ease-out;
 }
 
+.facilities-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.facilities-top-bar h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text);
+  flex: 1;
+  text-align: center;
+}
+
+.btn-back {
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.btn-back:hover {
+  border-color: var(--accent);
+  background: rgba(242, 193, 78, 0.1);
+  transform: translateX(-2px);
+}
+
+.btn-back:active {
+  transform: translateX(0);
+}
+
 .facilities-header {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.facilities-header h2 {
-  margin: 0;
-  font-size: 2rem;
-  color: var(--text);
 }
 
 .facilities-header .subtitle {
