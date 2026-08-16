@@ -11,17 +11,41 @@ export interface RaceDayChoices {
   bet: PlacedBet | null;
 }
 
+export interface RaceDayRace {
+  name: string;
+  distance: number;
+  going: string;
+  purse: number;
+  toWinner: number;
+}
+
 /**
- * The last stop before a race: spend race-day items, and optionally back your
- * own horse. Both cost money now against a result you do not control yet.
+ * The last stop before a race, and the only screen where anything is decided.
+ *
+ * Three choices sit side by side in a grid — study the opposition, spend
+ * race-day items, back your own horse — because they are the same kind of
+ * decision: money or information committed now against a result you do not
+ * control yet. Studying the field first is the point of the layout. Betting
+ * used to be offered before the player had seen a single rival, which made the
+ * wager closer to a coin flip than a judgement.
+ *
+ * Everything after this screen is spectacle. The race intro is a cinematic with
+ * nothing to press, because by then the horse is walking to the gate.
  */
 export function mountRaceDayScreen(
   container: HTMLElement,
   career: Career,
   field: Horse[],
-  raceName: string,
+  race: RaceDayRace,
   onConfirm: (choices: RaceDayChoices) => void,
   onBack: () => void,
+  /**
+   * Opens the opponents dossier. Called with a function that brings this screen
+   * back exactly as it was left — the screen hides rather than unmounts, so a
+   * player can study the field, come back and place a bet without losing the
+   * items they had already picked.
+   */
+  onShowOpponents?: (resume: () => void) => void,
 ): () => void {
   const root = document.createElement('div');
   root.className = 'raceday-screen';
@@ -50,11 +74,35 @@ export function mountRaceDayScreen(
       </div>
 
       <div class="raceday-race">
-        <div class="raceday-name">${raceName}</div>
-        <div class="raceday-meta">${field.length} runners · ${horse.name} · ${Math.round(horse.condition)} cond · ${Math.round(horse.morale)} mor</div>
+        <div class="raceday-name">${race.name}</div>
+        <div class="raceday-meta">${race.distance}m · ${race.going} · ${field.length} runners</div>
+        <div class="raceday-meta">Purse $${race.purse.toLocaleString()} · $${race.toWinner.toLocaleString()} to the winner</div>
+        <div class="raceday-meta">${horse.name} · ${Math.round(horse.condition)} cond · ${Math.round(horse.morale)} mor</div>
       </div>
 
-      <div class="raceday-section">
+      <div class="raceday-grid">
+        <button class="raceday-option" data-panel="opponents">
+          <span class="raceday-option-icon">🔍</span>
+          <span class="raceday-option-name">Opponents</span>
+          <span class="raceday-option-state">${field.length - 1} rivals</span>
+        </button>
+        <button class="raceday-option" data-panel="prep">
+          <span class="raceday-option-icon">💊</span>
+          <span class="raceday-option-name">Preparation</span>
+          <span class="raceday-option-state" id="prep-state">${
+            heldRaceDay.length === 0 ? 'Nothing held' : 'None used'
+          }</span>
+        </button>
+        <button class="raceday-option" data-panel="bet">
+          <span class="raceday-option-icon">🎟️</span>
+          <span class="raceday-option-name">Betting</span>
+          <span class="raceday-option-state" id="bet-state">${
+            stakes.length === 0 ? 'No cash' : 'No bet'
+          }</span>
+        </button>
+      </div>
+
+      <div class="raceday-section" id="panel-prep" hidden>
         <h3>Race-Day Preparation</h3>
         ${
           heldRaceDay.length === 0
@@ -79,7 +127,7 @@ export function mountRaceDayScreen(
         }
       </div>
 
-      <div class="raceday-section">
+      <div class="raceday-section" id="panel-bet" hidden>
         <h3>Back Your Horse</h3>
         ${
           stakes.length === 0
@@ -110,7 +158,7 @@ export function mountRaceDayScreen(
       </div>
 
       <div class="raceday-actions">
-        <button class="btn btn-primary" id="go-btn">To the Start</button>
+        <button class="btn btn-primary" id="go-btn">Start Race</button>
       </div>
     </div>
   `;
@@ -119,8 +167,28 @@ export function mountRaceDayScreen(
 
   const stakesBox = root.querySelector<HTMLElement>('#bet-stakes');
   const summary = root.querySelector<HTMLElement>('#bet-summary');
+  const prepState = root.querySelector<HTMLElement>('#prep-state');
+  const betState = root.querySelector<HTMLElement>('#bet-state');
+
+  /**
+   * Keeps the grid readable once a panel is closed again. Without it the only
+   * record of a bet or a selected item is inside a panel nobody has open.
+   */
+  const refreshGridState = (): void => {
+    if (prepState && heldRaceDay.length > 0) {
+      prepState.textContent =
+        selectedItems.size === 0 ? 'None used' : `${selectedItems.size} selected`;
+    }
+    if (betState && stakes.length > 0) {
+      betState.textContent =
+        betType && stake > 0
+          ? `$${stake.toLocaleString()} to ${betType}`
+          : 'No bet';
+    }
+  };
 
   const updateSummary = (): void => {
+    refreshGridState();
     if (!summary) return;
     if (!betType || stake === 0) {
       summary.textContent = '';
@@ -131,12 +199,46 @@ export function mountRaceDayScreen(
     summary.textContent = `$${stake.toLocaleString()} to ${option.label.toLowerCase()} at ${option.odds.toFixed(1)}× returns $${ret.toLocaleString()} — taken from your cash now.`;
   };
 
+  // One panel open at a time, so the grid stays the thing you navigate from.
+  const openPanel = (name: string | null): void => {
+    for (const id of ['prep', 'bet']) {
+      const panel = root.querySelector<HTMLElement>(`#panel-${id}`);
+      if (panel) panel.hidden = id !== name;
+    }
+    root.querySelectorAll<HTMLButtonElement>('.raceday-option').forEach((btn) => {
+      btn.classList.toggle('selected', btn.dataset.panel === name);
+    });
+  };
+
+  let openedPanel: string | null = null;
+
+  root.querySelectorAll<HTMLButtonElement>('.raceday-option').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const panel = btn.dataset.panel!;
+
+      if (panel === 'opponents') {
+        if (!onShowOpponents) return;
+        // Hide rather than unmount, so the items and bet already chosen survive
+        // a trip to the dossier and back.
+        root.hidden = true;
+        onShowOpponents(() => {
+          root.hidden = false;
+        });
+        return;
+      }
+
+      openedPanel = openedPanel === panel ? null : panel;
+      openPanel(openedPanel);
+    });
+  });
+
   root.querySelectorAll<HTMLButtonElement>('.raceday-item').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.item!;
       if (selectedItems.has(id)) selectedItems.delete(id);
       else selectedItems.add(id);
       btn.classList.toggle('selected', selectedItems.has(id));
+      refreshGridState();
     });
   });
 

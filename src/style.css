@@ -5549,6 +5549,12 @@ body {
 
 .staff-container,
 .consumables-container,
+/* `display: flex` above outranks the browser's own [hidden] rule, so hiding the
+   screen to show the dossier over it silently did nothing. */
+.raceday-screen[hidden] {
+  display: none;
+}
+
 .raceday-container,
 .dossier-container {
   width: 100%;
@@ -5940,6 +5946,55 @@ body {
   font-size: 0.85rem;
   color: var(--muted);
   font-family: var(--mono);
+}
+
+/* The three race-day decisions, side by side. Everything below the grid is the
+   panel for whichever one is open. */
+.raceday-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.raceday-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.raceday-option:hover {
+  border-color: var(--accent-border);
+}
+
+.raceday-option.selected {
+  border-color: var(--accent-bright);
+  background: var(--accent-faint);
+}
+
+.raceday-option-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.raceday-option-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* Carries the choice back out to the grid, so a closed panel still reads. */
+.raceday-option-state {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  text-align: center;
 }
 
 .raceday-section {

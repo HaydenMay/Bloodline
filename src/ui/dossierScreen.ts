@@ -9,7 +9,8 @@ export function mountDossierScreen(
   field: Horse[],
   player: Horse,
   _dossier: RivalDossier,
-  onContinue: () => void,
+  /** Closes the dossier. Named for what it does now: hands you back where you were. */
+  onClose: () => void,
 ): () => void {
   const rivals = field.filter((h) => h.id !== player.id);
 
@@ -88,9 +89,11 @@ export function mountDossierScreen(
   const { teardown, state } = mountCarousel(host, {
     items: rivals,
     renderItem,
-    onSelect: onContinue,
+    onSelect: onClose,
     title: 'Field Dossier',
-    selectLabel: 'Start Race',
+    // The dossier decides nothing — studying the field is not committing to it.
+    // The Race Day screen owns Start Race.
+    selectLabel: 'Back to Race Card',
     className: 'dossier-carousel',
     cssPrefix: 'dc',
     showCounter: true,

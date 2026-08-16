@@ -1,8 +1,6 @@
 import { createSurface, startLoop, type Loop } from '../render/canvas.js';
 import { drawBackdrop } from '../render/track.js';
 import type { Camera } from '../render/track.js';
-import type { Horse } from '../sim/types.js';
-import type { RivalDossier } from './career.js';
 
 export interface RaceIntroConfig {
   name: string;
@@ -15,23 +13,16 @@ export interface RaceIntroConfig {
   toWinner?: number;
 }
 
-export interface RaceIntroOptions {
-  field?: Horse[];
-  playerHorse?: Horse;
-  dossier?: RivalDossier;
-  /**
-   * Opens the opponents dossier. The dossier owns what happens next — its own
-   * button starts the race — so nothing is handed back here.
-   */
-  onShowOpponents?: () => void;
-}
-
 /**
  * Race intro screen.
  *
- * Displays race details over a blurred, panning track background with cinematic
- * atmosphere. Includes button to view opponents. On click: fades out details,
- * shows "Riders....take your marks", then transitions to race screen.
+ * Race details over a blurred, panning track. Tapping fades them out, shows
+ * "Riders…. take your marks", and hands over to the race screen.
+ *
+ * **Nothing is decided here.** Every choice — studying the opposition, race-day
+ * items, backing your own horse — belongs to the Race Day screen before it. By
+ * the time this plays the horse is walking to the gate, so the intro is a
+ * loading screen with atmosphere rather than a place to press things.
  *
  * Returns a teardown function.
  */
@@ -39,7 +30,6 @@ export function mountRaceIntro(
   host: HTMLElement,
   config: RaceIntroConfig,
   onContinue: () => void,
-  options?: RaceIntroOptions,
 ): () => void {
   const container = document.createElement('div');
   container.className = 'race-intro';
@@ -87,24 +77,11 @@ export function mountRaceIntro(
       </div>`
       }
     </div>
-    <div class="race-intro-actions">
-      ${options?.field && options?.playerHorse ? `<button class="race-intro-btn opponents-btn">View Opponents</button>` : ''}
-    </div>
     <div class="race-intro-cue">Tap to continue</div>
   `;
 
   container.appendChild(content);
   host.appendChild(container);
-
-  // Handle view opponents button
-  const opponentsBtn = content.querySelector('.opponents-btn') as HTMLButtonElement | null;
-  const onShowOpponents = options?.onShowOpponents;
-  if (opponentsBtn && onShowOpponents) {
-    opponentsBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      onShowOpponents();
-    });
-  }
 
   // Track background animation
   let time = 0;
@@ -129,11 +106,7 @@ export function mountRaceIntro(
   let clicked = false;
 
   // Click/tap to advance
-  const onClick = (e: MouseEvent): void => {
-    // Don't advance if clicking on the button
-    if ((e.target as HTMLElement)?.closest('.opponents-btn')) {
-      return;
-    }
+  const onClick = (): void => {
     if (clicked) return;
     clicked = true;
 

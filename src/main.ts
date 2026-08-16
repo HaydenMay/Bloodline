@@ -275,34 +275,9 @@ function startRace(seed: string): void {
     toWinner: getPrizeMoney('open', 1, 0.65),
   };
 
-  const showDossier = (): void => {
-    // Hide the race intro while showing dossier
-    const raceIntro = stage.querySelector<HTMLElement>('.race-intro');
-    if (raceIntro) raceIntro.style.display = 'none';
-
-    const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
-      try {
-        dossierTeardown();
-        if (raceIntro) raceIntro.style.display = '';
-        showRaceScreen();
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        console.error('[dossier] Error in Start Race:', error);
-        showNotice(app, {
-          icon: '⚠️',
-          title: 'Could not start the race',
-          lines: [errorMsg],
-          tone: 'setback',
-        });
-      }
-    });
-  };
-
-  introTeardown = mountRaceIntro(stage, introConfig, showRaceScreen, {
-    field,
-    playerHorse: player,
-    onShowOpponents: showDossier,
-  });
+  // The intro decides nothing now, in the harness as in the career: the
+  // dossier lives on the Race Day screen, which this Phase 2 path never had.
+  introTeardown = mountRaceIntro(stage, introConfig, showRaceScreen);
   teardown = () => {
     introTeardown?.();
     raceScreenTeardown?.();
@@ -1140,13 +1115,34 @@ function startRaceWithHorse(
   // Race day comes first: items and a bet are committed before the field is
   // shown, so they are decided without knowing how the race unfolds.
   if (!choices) {
+    const difficulty = race?.hype ?? 0.5;
     teardown = mountRaceDayScreen(
       app,
       career,
       field,
-      race?.name ?? 'Next Race',
+      {
+        name: race?.name ?? 'Next Race',
+        distance: race?.distance ?? 1400,
+        going: race?.going ?? 'good',
+        purse: getPurse(player.division, difficulty),
+        toWinner: getPrizeMoney(player.division, 1, difficulty),
+      },
       (made) => startRaceWithHorse(career, race, made),
       () => showRaceCalendar(career),
+      (resume) => {
+        // Race Day hides itself before calling, so the dossier mounts over a
+        // screen that is still holding the items and bet already chosen.
+        const dossierTeardown = mountDossierScreen(
+          app,
+          field,
+          player,
+          career.stable.dossier,
+          () => {
+            dossierTeardown();
+            resume();
+          },
+        );
+      },
     );
     return;
   }
@@ -1156,12 +1152,10 @@ function startRaceWithHorse(
   field = field.map((h) => (h.id === player.id ? runner : h));
   const placedBet: PlacedBet | null = choices.bet;
 
-  let dossierTeardown: (() => void) | null = null;
   let introTeardown: (() => void) | null = null;
   let raceScreenTeardown: (() => void) | null = null;
 
   const startRaceScreen = () => {
-    dossierTeardown?.();
     app.innerHTML = '';
 
     // Show race intro first
@@ -1690,46 +1684,13 @@ function startRaceWithHorse(
       toWinner: getPrizeMoney(player.division, 1, raceHype),
     };
 
-    introTeardown = mountRaceIntro(
-      introStage,
-      introConfig,
-      showActualRaceScreen,
-      {
-        field,
-        playerHorse: player,
-        dossier: career.stable.dossier,
-        onShowOpponents: () => {
-          // Tear the intro down rather than wiping its markup — emptying the
-          // host leaves the intro's backdrop animation looping behind the
-          // dossier, on a canvas nothing can reach any more.
-          introTeardown?.();
-          introTeardown = null;
-
-          dossierTeardown = mountDossierScreen(
-            introStage,
-            field,
-            player,
-            career.stable.dossier,
-            () => {
-              // The carousel's button reads "Start Race", so it starts the
-              // race. It used to call the intro's return-to-intro callback,
-              // which un-faded an element that had already been removed —
-              // leaving the player looking at an empty screen.
-              dossierTeardown?.();
-              dossierTeardown = null;
-              showActualRaceScreen();
-            }
-          );
-        },
-      }
-    );
+    introTeardown = mountRaceIntro(introStage, introConfig, showActualRaceScreen);
   };
 
   // Start with race intro
   startRaceScreen();
 
   teardown = () => {
-    dossierTeardown?.();
     introTeardown?.();
     raceScreenTeardown?.();
   };

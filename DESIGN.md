@@ -184,12 +184,31 @@ One toggle in settings, applied everywhere the game names a horse's gender.
   plan tactics, not a full stat dump.
 - **Odds are displayed, never bet against.** You may wager on your own horse only; stakes are
   capped relative to the purse so betting never out-earns racing.
+- **The bet comes after the form guide, never before it.** ✅ Betting used to sit on a screen the
+  player reached before seeing a single rival, which made it a coin flip rather than a judgement.
 - **Post-race:** an objective narrative recap with key moments, *plus* your jockey's
   in-character verdict, which sharpens as they level.
 
 ---
 
 ## 4. Racing
+
+### The race-day flow ✅
+
+**One screen decides, everything after it is spectacle.**
+
+The **Race Day** screen is the hub: the racecard up top (distance, going, field, purse and what
+the winner collects), then a grid of the three things a player can commit — **Opponents**,
+**Preparation**, **Betting** — and a Start Race button beneath. Each tile carries its own state,
+so a bet placed and a panel closed still reads from the grid. Opening the dossier hides the hub
+rather than replacing it, so items and stakes already chosen survive the trip.
+
+The three sit together because they are the same kind of decision: money or information committed
+now, against a result not yet run. Studying the field first is the point of the ordering.
+
+The **race intro** that follows has nothing to press. By the time it plays the horse is walking to
+the gate, so it is a loading screen with atmosphere — racecard, blurred panning track,
+"Riders…. take your marks" — and nothing else.
 
 ### The energy economy ✅
 **One currency governs everything.** Energy drains when you push and **recovers when you
