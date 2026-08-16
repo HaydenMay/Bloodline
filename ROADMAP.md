@@ -122,6 +122,44 @@ early and everything after it is texture on top.
 §10 says reputation unlocks higher-calibre outside partners. Reputation no longer exists — prestige
 gates them.
 
+### What Stage 1 must record even though it does not use it
+
+The one category of mistake that forces real rework. Stages 3 and 4 read history, and history
+cannot be reconstructed after the fact — a pedigree tree built in Stage 4 can only show ancestry
+that Stage 1 wrote down at the time. All of this ships in Stage 1, unused:
+
+| Field | Needed by | Why it cannot wait |
+|---|---|---|
+| `sireId` / `damId` on every horse | Stage 3, Stage 4 | The tree and linebreeding are *only* these links. A foal born without them is permanently rootless |
+| `generation` number | Stage 1 balance work | The gen-3/gen-5 banking measurement is impossible without it |
+| Pairing key + times bred | Stage 1 | The first-cross bonus tapers per repeat, so the count must persist across careers |
+| Coat **genotype**, not just the coat name | Stage 3 | Real dominant/recessive inheritance needs the hidden allele. A recessive that "hides for three generations" (§10) must have been stored for three generations |
+| Stable-wide horse archive | Stage 4 | Bloodstock holds horses you retired. The tree also needs foals you rejected and sold |
+
+Rejected foals (Stage 3) are sold and released as rivals, so they need their ancestry recorded at
+birth too, even though nothing reads it until Stage 3.
+
+### Open questions, by stage
+
+Not decided yet. Listed so they are answered deliberately at the time rather than defaulted into.
+
+**Stage 2** — How steeply do stud fees scale with a partner's calibre, and are they a flat fee or a
+share of the foal's projected budget? What budget bonus does a Hall of Fame parent carry (§10's
+worked example says +50 on a ~200 base — roughly a quarter)? At what age does a retired horse stop
+being eligible, and does its contribution taper before then or stop dead?
+
+**Stage 3** — Which coat loci ship (base black/bay/chestnut plus how many modifiers)? What mutation
+chance applies to traits and aptitude? How fast does relatedness narrow variance — §10 wants a
+favourite line viable for "many generations", which needs a number. What does a rejected foal sell
+for, and how long before it turns up on a racecard?
+
+**Stage 4** — Does the tree render every horse, or collapse rejected foals until asked? What is the
+performance ceiling once a yard is fifty horses deep?
+
+**Stage 5** — How large is the development pool, and does it scale with anything? What can points
+buy beyond stats — aptitude nudges and latent traits are named in §10, and both change what the
+foal *is* rather than how big its numbers are.
+
 ### To measure once Stage 1 lands
 What a gen-3 and gen-5 horse actually banks. Two open numbers depend on it and neither should be
 touched before: whether the Hall of Fame at 1,000 is reachable, and whether the prestige walls

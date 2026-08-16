@@ -510,6 +510,18 @@ inherits.
 | **Budget** | Career achievement + first-cross bonus, declining per repeat |
 | **Variance** | Genetic diversity of the pairing × freshness |
 
+**Career achievement means banked legacy, and nothing else.** An earlier draft of this section
+listed races won, divisions reached, titles, legacy *and* finishing stats together. But legacy is
+already all of those, weighted by division — adding them alongside it would score a Championship
+win two or three times over, and give the game two competing definitions of what a good career is.
+The budget therefore reads **banked legacy for the achievement half, and the parents' finishing
+potentials for the floor**. One economy, one spine: racing well raises legacy, legacy raises the
+budget, the budget raises the next horse.
+
+This also means the retirement timing rule (§8) reaches all the way into the bloodline. A horse run
+into the ground banks less legacy, so it breeds a weaker foal — the gamble costs a generation, not
+just a number.
+
 ### Variance, boom and bust ✅
 **Diversity controls variance, not quality.** A fresh outcross is a wide roll — boom or bust, and
 that's the thrill. A tightly inbred line is a narrow roll — safe, predictable, dull. So grinding
