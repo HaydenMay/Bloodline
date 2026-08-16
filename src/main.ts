@@ -41,8 +41,12 @@ import {
   createNewCareer,
   createStable,
   retireCurrentHorse,
+  exportSave,
+  importSave,
+  takeRecoveryNotice,
   type Career,
 } from './ui/career.js';
+import { saveFileName } from './save/durability.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
 import { mountTestCareerSetup } from './ui/testCareerSetup.js';
 import type { Horse } from './sim/types.js';
@@ -609,8 +613,74 @@ function showMainMenu(): void {
 
   const callbacks: MainMenuCallbacks = {
     onNewGame: () => {
+      // Starting fresh while a horse is mid-career would drop everything that
+      // horse has earned the yard, because its legacy only banks on retirement.
+      if (savedCareer) {
+        const peak = savedCareer.horseLegacy?.peak ?? 0;
+        showNotice(app, {
+          icon: '🐎',
+          title: 'Retire the current horse?',
+          lines: [
+            `${savedCareer.horse.name} is still in training with ${peak} legacy to its name.`,
+            'Starting a new horse retires this one and banks that prestige to the yard.',
+          ],
+          hint: 'Your facilities, staff, cash and prestige carry over either way.',
+          tone: 'warning',
+          actions: [
+            { label: 'Keep Racing', variant: 'secondary' },
+            {
+              label: 'Retire & Start New',
+              onSelect: () => {
+                retireCurrentHorse(savedCareer);
+                teardownMenu();
+                showStarterSelection();
+              },
+            },
+          ],
+        });
+        return;
+      }
       teardownMenu();
       showStarterSelection();
+    },
+    onExport: () => {
+      const blob = new Blob([exportSave()], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = saveFileName();
+      a.click();
+      URL.revokeObjectURL(url);
+      showNotice(app, {
+        icon: '💾',
+        title: 'Save Backed Up',
+        lines: ['A copy of your stable has been downloaded.'],
+        hint: 'Keep it somewhere safe — restoring it brings the whole yard back.',
+        tone: 'positive',
+      });
+    },
+    onImport: (text) => {
+      const result = importSave(text);
+      if (!result.ok) {
+        showNotice(app, {
+          icon: '⚠️',
+          title: 'Could Not Restore',
+          lines: [result.error ?? 'That save could not be read.'],
+          hint: 'Your existing save has not been touched.',
+          tone: 'setback',
+        });
+        return;
+      }
+      showNotice(
+        app,
+        {
+          icon: '📦',
+          title: 'Save Restored',
+          lines: [result.summary ?? 'Your stable is back.'],
+          tone: 'positive',
+        },
+        showMainMenu,
+      );
     },
     ...(savedCareer && {
       onContinue: () => {
@@ -621,6 +691,19 @@ function showMainMenu(): void {
   };
 
   const teardownMenu = mountMainMenu(app, callbacks);
+
+  // If loading had to fall back to a backup, say so — a silent recovery leaves
+  // the player unable to tell a restored save from a lost one.
+  const recovery = takeRecoveryNotice();
+  if (recovery) {
+    showNotice(app, {
+      icon: '🛟',
+      title: 'Save Recovered',
+      lines: [recovery],
+      hint: 'Back up your save from this menu to keep a copy of your own.',
+      tone: 'warning',
+    });
+  }
 }
 
 function showStarterSelection(): void {

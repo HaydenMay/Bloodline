@@ -6346,3 +6346,42 @@ body {
     text-align: left;
   }
 }
+
+/* ============================================================================
+   Main menu save management
+   ========================================================================== */
+
+.main-menu-save {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.menu-link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 4px;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.menu-link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.main-menu-save-note {
+  margin: 10px auto 0;
+  max-width: 320px;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--muted);
+  opacity: 0.8;
+}

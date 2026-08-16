@@ -10,6 +10,14 @@ import { createNameGenerator } from '../data/names.js';
 import { generateWorld } from '../sim/horse.js';
 import { createStaffRoster } from '../data/staff.js';
 import {
+  buildBundle,
+  clearSlot,
+  parseBundle,
+  readSlot,
+  slotsFor,
+  writeSlot,
+} from '../save/durability.js';
+import {
   createHorseLegacy,
   createStableLegacy,
   seedLegacyFromRecord,
@@ -94,20 +102,42 @@ const STORAGE_KEY = 'bloodline_career';
 const STABLE_STORAGE_KEY = 'bloodline_stable';
 const STORAGE_VERSION = 1;
 
-interface StoredCareer {
-  version: number;
-  data: Career;
-}
-
-interface StoredStable {
-  version: number;
-  data: Stable;
-}
-
 /**
  * Abstract storage layer for future migration to filesystem/IndexedDB.
  * Currently uses localStorage; can be swapped to fs.writeFileSync in Electron.
+ *
+ * Reads and writes go through `src/save/durability.ts`, which keeps a rolling
+ * backup and quarantines anything unreadable rather than discarding it. The
+ * stable is the record that outlives every horse, so losing it must take more
+ * than a single bad write.
  */
+
+/** Enough of a shape check to tell a real stable from junk in the slot. */
+function looksLikeStable(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const s = value as Partial<Stable>;
+  return (
+    typeof s.cash === 'number' &&
+    typeof s.reputation === 'number' &&
+    typeof s.facilities === 'object' &&
+    s.facilities !== null
+  );
+}
+
+function looksLikeCareer(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const c = value as Partial<Career>;
+  return !!c.horse && typeof c.horse === 'object' && typeof c.week === 'number';
+}
+
+/** Set when a load had to fall back, so the UI can tell the player. */
+let lastRecovery: string | null = null;
+
+export function takeRecoveryNotice(): string | null {
+  const notice = lastRecovery;
+  lastRecovery = null;
+  return notice;
+}
 
 export function createStable(): Stable {
   const rng = createRng(`stable-${Date.now()}`);
@@ -153,24 +183,38 @@ function normaliseStable(stable: Stable): Stable {
 }
 
 export function saveStable(stable: Stable): void {
-  const stored: StoredStable = { version: STORAGE_VERSION, data: stable };
-  try {
-    localStorage.setItem(STABLE_STORAGE_KEY, JSON.stringify(stored));
-  } catch (error) {
-    console.error('Failed to save stable:', error);
-  }
+  writeSlot(STABLE_STORAGE_KEY, stable, STORAGE_VERSION, looksLikeStable);
 }
 
-/** The yard as it stands, or null if this account has never had one. */
+/**
+ * The yard as it stands, or null if this account has never had one.
+ *
+ * A yard that exists but cannot be read is never silently replaced with a new
+ * one: the backup is tried first, and an unrecoverable copy is quarantined so
+ * it can still be rescued by hand.
+ */
 export function loadStable(): Stable | null {
+  const outcome = readSlot<Stable>(STABLE_STORAGE_KEY, looksLikeStable);
+
+  if (outcome.status === 'ok') return normaliseStable(outcome.data);
+  if (outcome.status === 'recovered') {
+    lastRecovery = outcome.reason;
+    console.warn('Stable recovered from backup:', outcome.reason);
+    return normaliseStable(outcome.data);
+  }
+  if (outcome.status === 'unreadable') {
+    lastRecovery = outcome.reason;
+    console.error('Stable unreadable:', outcome.reason);
+  }
+  return null;
+}
+
+/** True when a stable exists in storage but could not be read at all. */
+export function hasUnreadableStable(): boolean {
   try {
-    const item = localStorage.getItem(STABLE_STORAGE_KEY);
-    if (!item) return null;
-    const stored = JSON.parse(item) as StoredStable;
-    return normaliseStable(stored.data);
-  } catch (error) {
-    console.error('Failed to load stable:', error);
-    return null;
+    return localStorage.getItem(slotsFor(STABLE_STORAGE_KEY).quarantine) !== null;
+  } catch {
+    return false;
   }
 }
 
@@ -179,19 +223,12 @@ export function loadStable(): Stable | null {
  * written together so the yard is never a step behind the horse.
  */
 export function saveCareer(career: Career): void {
-  const stored: StoredCareer = {
-    version: STORAGE_VERSION,
-    data: {
-      ...career,
-      lastUpdated: Date.now(),
-    },
-  };
-
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
-  } catch (error) {
-    console.error('Failed to save career:', error);
-  }
+  writeSlot(
+    STORAGE_KEY,
+    { ...career, lastUpdated: Date.now() },
+    STORAGE_VERSION,
+    looksLikeCareer,
+  );
   saveStable(career.stable);
 }
 
@@ -213,18 +250,15 @@ export function retireCurrentHorse(career: Career): Stable {
 
 export function loadCareer(): Career | null {
   try {
-    const item = localStorage.getItem(STORAGE_KEY);
-    if (!item) return null;
-
-    const stored = JSON.parse(item) as StoredCareer;
-
-    // Check version for future schema migrations
-    if (stored.version !== STORAGE_VERSION) {
-      console.warn(`Save version mismatch: ${stored.version} vs ${STORAGE_VERSION}`);
-      // TODO: Add migration logic here
+    const outcome = readSlot<Career>(STORAGE_KEY, looksLikeCareer);
+    if (outcome.status === 'empty') return null;
+    if (outcome.status === 'unreadable') {
+      lastRecovery = outcome.reason;
+      return null;
     }
+    if (outcome.status === 'recovered') lastRecovery = outcome.reason;
 
-    const career = stored.data;
+    const career = outcome.data;
 
     // Ensure playerSilks exists (for saves before playerSilks was added)
     if (!career.playerSilks) {
@@ -272,6 +306,11 @@ export function loadCareer(): Career | null {
     if (persisted) {
       persisted.world = career.stable.world?.length ? career.stable.world : persisted.world;
       career.stable = persisted;
+    } else {
+      // The yard's own slot is gone but the career carries a copy of it. Write
+      // it straight back rather than waiting for the next save, so a player who
+      // quits here does not lose the yard as well.
+      saveStable(career.stable);
     }
 
     return career;
@@ -281,12 +320,67 @@ export function loadCareer(): Career | null {
   }
 }
 
+/**
+ * Ends the current horse's run. The yard is untouched.
+ *
+ * The career's backup goes too: retiring is deliberate, and a backup that
+ * resurrected the retired horse on the next load would be a bug, not a rescue.
+ */
 export function deleteCareer(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    console.error('Failed to delete career:', error);
+  clearSlot(STORAGE_KEY);
+}
+
+/* ---------------------------------------------------------------------------
+   Export and import — the player's own copy
+   ------------------------------------------------------------------------ */
+
+/** The whole save as a JSON string, for the player to keep. */
+export function exportSave(): string {
+  const career = loadCareer();
+  const stable = career?.stable ?? loadStable();
+  return JSON.stringify(buildBundle(career, stable), null, 2);
+}
+
+export interface ImportResult {
+  ok: boolean;
+  error?: string;
+  summary?: string;
+}
+
+/**
+ * Replaces the current save with an exported one.
+ *
+ * The existing save is written to the backup slot first, so importing the
+ * wrong file is recoverable rather than final.
+ */
+export function importSave(text: string): ImportResult {
+  const parsed = parseBundle(text);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+
+  const { career, stable } = parsed.bundle;
+
+  if (stable && !looksLikeStable(stable)) {
+    return { ok: false, error: 'The stable in that save is missing or damaged.' };
   }
+  if (career && !looksLikeCareer(career)) {
+    return { ok: false, error: 'The career in that save is missing or damaged.' };
+  }
+
+  if (stable) {
+    writeSlot(STABLE_STORAGE_KEY, normaliseStable(stable as Stable), STORAGE_VERSION, looksLikeStable);
+  }
+  if (career) {
+    writeSlot(STORAGE_KEY, career as Career, STORAGE_VERSION, looksLikeCareer);
+  } else {
+    clearSlot(STORAGE_KEY);
+  }
+
+  const yard = stable as Stable | null;
+  const summary = yard
+    ? `${(yard.careersCompleted ?? 0) + (career ? 1 : 0)} horse(s), $${(yard.cash ?? 0).toLocaleString()}, ${yard.legacy?.archivedPoints ?? 0} banked prestige.`
+    : 'Career restored.';
+
+  return { ok: true, summary };
 }
 
 /**
