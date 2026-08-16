@@ -6555,6 +6555,46 @@ body {
   font-weight: 600;
 }
 
+/* The trainer's retirement counsel, beside the horse it is about. Deliberately
+   not styled as a warning — retiring on time is the good outcome, not a
+   failure state, and the decision stays the player's (DESIGN.md 8). */
+.retire-advice {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--accent-faint);
+  border: 1px solid var(--accent-border);
+  border-left: 3px solid var(--accent-bright);
+  border-radius: 8px;
+}
+
+.retire-advice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.retire-advice-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-bright);
+  font-weight: 700;
+}
+
+.retire-advice .btn {
+  align-self: flex-start;
+}
+
+/* The permanent way out, kept quiet so it never reads as a suggestion. */
+.retire-quiet {
+  text-align: center;
+  padding: 4px 0 8px;
+}
+
 .nav-button.nav-blocked {
   opacity: 0.5;
 }

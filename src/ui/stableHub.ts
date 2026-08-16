@@ -87,6 +87,20 @@ export function mountStableHub(
             ? `<div class="injury-banner">🩹 ${career.injuryName ?? 'Injured'} — ${layoff} week${layoff === 1 ? '' : 's'} of rest remaining</div>`
             : ''
         }
+        ${
+          // Once the trainer has something to say, the decision it is about
+          // belongs next to the horse — not at the foot of a page the player
+          // has to go looking down for.
+          retirementAdvice
+            ? `<div class="retire-advice">
+                 <div class="retire-advice-text">
+                   <span class="retire-advice-label">Your trainer</span>
+                   <span>${retirementAdvice}</span>
+                 </div>
+                 <button class="btn btn-secondary retire-btn">Retire ${horse.name}</button>
+               </div>`
+            : ''
+        }
         <div class="profile-condition">
           <div class="cond-item">
             <span class="cond-label">Form</span>
@@ -177,17 +191,9 @@ export function mountStableHub(
         </div>
       </div>
 
-      ${
-        retirementAdvice
-          ? `<div class="retire-advice">
-               <div class="retire-advice-text">
-                 <span class="retire-advice-label">Your trainer</span>
-                 <span>${retirementAdvice}</span>
-               </div>
-               <button class="btn btn-secondary" id="nav-retire">Retire ${horse.name}</button>
-             </div>`
-          : `<div class="retire-quiet"><button class="menu-link" id="nav-retire">Retire ${horse.name}</button></div>`
-      }
+      <!-- Always reachable, never shouting. The prompt that actually asks for a
+           decision is up beside the horse, once the trainer has something to say. -->
+      <div class="retire-quiet"><button class="menu-link retire-btn">Retire ${horse.name}</button></div>
 
       <!-- Week Info -->
       <div class="hub-week-info">
@@ -207,7 +213,9 @@ export function mountStableHub(
   const dossierBtn = root.querySelector('#nav-dossier');
   const legacyBtn = root.querySelector('#nav-legacy');
   const restBtn = root.querySelector('#nav-rest');
-  const retireBtn = root.querySelector('#nav-retire');
+  // Two of these when the trainer is prompting — the callout by the horse and
+  // the quiet link at the foot. Both retire.
+  const retireBtns = root.querySelectorAll('.retire-btn');
 
   trainingBtn?.addEventListener('click', callbacks.onTraining);
   raceCalendarBtn?.addEventListener('click', callbacks.onRaceCalendar);
@@ -217,7 +225,7 @@ export function mountStableHub(
   dossierBtn?.addEventListener('click', callbacks.onDossier);
   legacyBtn?.addEventListener('click', callbacks.onLegacy);
   restBtn?.addEventListener('click', callbacks.onRest);
-  retireBtn?.addEventListener('click', callbacks.onRetire);
+  retireBtns.forEach((btn) => btn.addEventListener('click', callbacks.onRetire));
 
   return () => {
     root.remove();
