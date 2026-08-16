@@ -184,6 +184,13 @@ export function describeStatChanges(changes: Partial<Stats>): string {
  * horse into losses. The advice therefore sharpens as the case strengthens —
  * quiet at the peak, insistent once a horse is visibly past it and its legacy
  * is slipping away from what it once was.
+ *
+ * **Tone: the trainer is a partner, not a mourner.** Every line opens with "we
+ * should think about retiring while…", because the mechanic it is pointing at
+ * is a reward, not a failure — stopping near the peak banks a bonus and feeds
+ * the next generation. An earlier draft ("the legs are going", "nothing left to
+ * prove") read as an obituary for a horse the player was still winning with,
+ * which is the wrong feeling for the good ending of a career.
  */
 export function getRetirementAdvice(
   horse: Horse,
@@ -196,16 +203,16 @@ export function getRetirementAdvice(
   const slipped = legacyPeak > 0 ? (legacyPeak - legacyNow) / legacyPeak : 0;
 
   if (horse.age >= FINAL_AGE && racesCompleted >= 16) {
-    return 'This one has given you everything it has. Retire it while it is still worth something at stud.';
+    return 'We should think about retiring while it is still near its best — that is what carries into the next generation.';
   }
   if (stage === 'declining' && slipped >= 0.25) {
-    return 'It is going the wrong way, and every beaten run is prestige it will never bank. I would stop now.';
+    return 'We should think about retiring while there is still plenty to bank. It has come back a way from its peak.';
   }
   if (stage === 'declining') {
-    return 'The legs are going. Anything more is borrowed time — but it can still win the right race.';
+    return 'We should think about retiring while it is still winning — though there is a good race left in this one if we pick it right.';
   }
   if (racesCompleted >= 18) {
-    return 'That is a full career behind it. Nothing left to prove.';
+    return 'We should think about retiring while it is on top. That is a full career behind it, and a fine one.';
   }
   // Nothing to say while the horse is holding its form — advice the player
   // cannot act on is nagging, not counsel.
