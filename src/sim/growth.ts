@@ -1,0 +1,211 @@
+import type { Horse, Stats } from './types.js';
+
+/**
+ * How a horse changes with age and training.
+ *
+ * DESIGN.md §2 gives every horse hidden potentials that training must not
+ * exceed, and §8 gives it an arc — steep growth at 2-3, a peak at 4, decline at
+ * 5. Neither was implemented: potentials were generated and read by nothing,
+ * training was unbounded, and age never advanced at all, so a horse was
+ * identical at its first start and its twentieth.
+ */
+
+export type StatKey = keyof Stats;
+
+export const STAT_KEYS: StatKey[] = [
+  'speed',
+  'stamina',
+  'burst',
+  'grit',
+  'temper',
+  'consistency',
+];
+
+/** Racing ages. A horse debuts at 2 and is retired by the end of 5. */
+export const DEBUT_AGE = 2;
+export const PEAK_AGE = 4;
+export const FINAL_AGE = 5;
+
+/**
+ * Training multiplier by age. Young horses improve fastest; a five-year-old is
+ * holding on rather than building.
+ */
+export function getAgeTrainingFactor(age: number): number {
+  if (age <= 2) return 1.25;
+  if (age === 3) return 1.1;
+  if (age === 4) return 0.85;
+  return 0.5;
+}
+
+/**
+ * How much of a raw gain survives as the stat approaches its ceiling.
+ *
+ * §5 asks for "sharply diminishing returns" near a cap — an unstated signal
+ * that a stat is finished. The last few points cost many sessions, and nothing
+ * ever crosses the ceiling.
+ */
+export function getCapFactor(current: number, potential: number): number {
+  const headroom = potential - current;
+  if (headroom <= 0) return 0;
+  if (headroom >= 15) return 1;
+  // 15 points out: full value. On the ceiling: nothing.
+  return Math.max(0.1, headroom / 15);
+}
+
+/**
+ * Applies a training gain to one stat, honouring both the ceiling and the
+ * diminishing returns before it. Returns the change actually applied.
+ *
+ * Losses pass through untouched: a session's downside is not softened by being
+ * near a cap, and may take a horse below one.
+ */
+export function applyTrainedStat(
+  horse: Horse,
+  key: StatKey,
+  rawChange: number,
+): number {
+  const current = horse.stats[key];
+  const ceiling = horse.potential?.[key] ?? 100;
+
+  if (rawChange <= 0) {
+    const next = Math.max(0, current + rawChange);
+    horse.stats[key] = next;
+    return next - current;
+  }
+
+  const scaled = rawChange * getCapFactor(current, ceiling);
+  // A gain that rounds to nothing still nudges by a point while there is
+  // headroom, so training never feels entirely wasted.
+  const applied = scaled > 0 && Math.round(scaled) === 0 ? 1 : Math.round(scaled);
+  const next = Math.min(ceiling, current + applied);
+  horse.stats[key] = next;
+  return next - current;
+}
+
+/** True when every stat is within a point of its ceiling. */
+export function isFullyDeveloped(horse: Horse): boolean {
+  return STAT_KEYS.every((key) => (horse.potential?.[key] ?? 100) - horse.stats[key] <= 1);
+}
+
+/* ---------------------------------------------------------------------------
+   The decline arc
+   ------------------------------------------------------------------------ */
+
+/** Where a horse sits on its arc, for the UI and the trainer's advice. */
+export type CareerStage = 'developing' | 'peak' | 'declining';
+
+export function getCareerStage(age: number): CareerStage {
+  if (age < PEAK_AGE) return 'developing';
+  if (age === PEAK_AGE) return 'peak';
+  return 'declining';
+}
+
+/**
+ * Stat erosion applied when a horse ages into decline.
+ *
+ * Deliberately gradual. §8 wants retiring to be a judgement call, and a cliff
+ * would make it obvious instead — the horse should get quietly worse while
+ * still being capable of winning, so "one more season" is a real gamble.
+ */
+export function applyAgeing(horse: Horse, newAge: number): Partial<Stats> {
+  if (newAge <= PEAK_AGE) return {};
+
+  const changes: Partial<Stats> = {};
+  // Speed and burst go first — the sharp end of a horse dulls before its
+  // stamina and grit do.
+  const erosion: Partial<Record<StatKey, number>> = {
+    speed: 4,
+    burst: 5,
+    stamina: 2,
+    grit: 1,
+    temper: 0,
+    consistency: 0,
+  };
+
+  for (const key of STAT_KEYS) {
+    const loss = erosion[key] ?? 0;
+    if (loss === 0) continue;
+    const before = horse.stats[key];
+    horse.stats[key] = Math.max(0, before - loss);
+    // Potential erodes with the stat, so decline cannot be trained back off.
+    if (horse.potential) {
+      horse.potential[key] = Math.max(horse.stats[key], horse.potential[key] - loss);
+    }
+    changes[key] = horse.stats[key] - before;
+  }
+
+  return changes;
+}
+
+/**
+ * Races per season, used to decide when a birthday falls.
+ *
+ * §8 wants 18-20 starts across ages 2-5 — roughly five runs a year.
+ */
+export const RACES_PER_SEASON = 5;
+
+export interface AgeingResult {
+  aged: boolean;
+  newAge: number;
+  stage: CareerStage;
+  changes: Partial<Stats>;
+}
+
+/**
+ * Advances the horse a season if it has run enough races, and applies whatever
+ * that costs it. Returns what happened so the UI can report a birthday.
+ */
+export function advanceSeasonIfDue(horse: Horse, racesCompleted: number): AgeingResult {
+  const seasonsElapsed = Math.floor(racesCompleted / RACES_PER_SEASON);
+  const targetAge = Math.min(FINAL_AGE, DEBUT_AGE + seasonsElapsed);
+
+  if (targetAge <= horse.age) {
+    return { aged: false, newAge: horse.age, stage: getCareerStage(horse.age), changes: {} };
+  }
+
+  horse.age = targetAge;
+  const changes = applyAgeing(horse, targetAge);
+  return { aged: true, newAge: targetAge, stage: getCareerStage(targetAge), changes };
+}
+
+/** Human-readable summary of what a birthday cost, for the notice. */
+export function describeStatChanges(changes: Partial<Stats>): string {
+  const parts = STAT_KEYS.filter((key) => (changes[key] ?? 0) !== 0).map(
+    (key) => `${key} ${changes[key]}`,
+  );
+  return parts.length ? parts.join(', ') : '';
+}
+
+/**
+ * What the trainer says about retiring, or null when there is nothing to say.
+ *
+ * §8 makes retirement the player's call "with the trainer hinting once decline
+ * sets in", and pairs it with a legacy score that erodes if you run a declining
+ * horse into losses. The advice therefore sharpens as the case strengthens —
+ * quiet at the peak, insistent once a horse is visibly past it and its legacy
+ * is slipping away from what it once was.
+ */
+export function getRetirementAdvice(
+  horse: Horse,
+  racesCompleted: number,
+  legacyNow: number,
+  legacyPeak: number,
+): string | null {
+  const stage = getCareerStage(horse.age);
+  // How much of its best the horse has given back.
+  const slipped = legacyPeak > 0 ? (legacyPeak - legacyNow) / legacyPeak : 0;
+
+  if (horse.age >= FINAL_AGE && racesCompleted >= 16) {
+    return 'This one has given you everything it has. Retire it while it is still worth something at stud.';
+  }
+  if (stage === 'declining' && slipped >= 0.25) {
+    return 'It is going the wrong way, and every beaten run costs it standing. I would stop now.';
+  }
+  if (stage === 'declining') {
+    return 'The legs are going. Anything more is borrowed time — but it can still win the right race.';
+  }
+  if (racesCompleted >= 18) {
+    return 'That is a full career behind it. Nothing left to prove.';
+  }
+  return null;
+}

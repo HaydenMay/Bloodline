@@ -79,6 +79,30 @@ export interface Stable {
   consumables: Record<string, number>;
   /** Horses campaigned to the end of their careers. */
   careersCompleted: number;
+  /**
+   * Every horse this yard has retired, newest last.
+   *
+   * DESIGN.md §1 and §10: a horse leaves the racetrack, it never leaves the
+   * yard. This is what Phase 5 breeds from and what the pedigree archive draws,
+   * and it is why taking on a new horse can never end a bloodline.
+   */
+  bloodstock: RetiredHorse[];
+}
+
+/** A horse that has finished racing and is now part of the yard's stock. */
+export interface RetiredHorse {
+  horse: Horse;
+  /** Legacy at its highest, which is what breeding values it on. */
+  legacyPeak: number;
+  wins: number;
+  starts: number;
+  earnings: number;
+  hallOfFame: boolean;
+  /** §6: a career ended by injury still carries full breeding value. */
+  retiredByInjury: boolean;
+  retiredAt: number;
+  /** Season of the yard's life, for the archive's generational rows. */
+  careerNumber: number;
 }
 
 export interface Career {
@@ -96,6 +120,16 @@ export interface Career {
   raceSelected?: boolean;
   /** Whether training has been completed this week. */
   trainingDoneThisWeek?: boolean;
+  /** Races remaining on an injury lay-off. The horse cannot run while above 0. */
+  weeksInjured?: number;
+  /** What it is recovering from, for the UI. */
+  injuryName?: string;
+  /**
+   * Set when a career-ending injury forces retirement. The horse still retires
+   * with full breeding value — §6 turns the worst outcome into the next run's
+   * hook rather than a loss.
+   */
+  careerEndedByInjury?: boolean;
 }
 
 const STORAGE_KEY = 'bloodline_career';
@@ -162,6 +196,7 @@ export function createStable(): Stable {
     staff: createStaffRoster(),
     consumables: {},
     careersCompleted: 0,
+    bloodstock: [],
   };
 }
 
@@ -178,6 +213,7 @@ function normaliseStable(stable: Stable): Stable {
   if (typeof stable.cash !== 'number') stable.cash = STARTING_CASH;
   if (typeof stable.reputation !== 'number') stable.reputation = 0;
   if (typeof stable.careersCompleted !== 'number') stable.careersCompleted = 0;
+  if (!Array.isArray(stable.bloodstock)) stable.bloodstock = [];
   if (!Array.isArray(stable.world)) stable.world = [];
   return stable;
 }
@@ -243,6 +279,22 @@ export function retireCurrentHorse(career: Career): Stable {
   const stable = career.stable;
   stable.legacy.archivedPoints += career.horseLegacy.peak;
   stable.careersCompleted += 1;
+
+  // The horse itself joins the yard's stock. Previously only the number
+  // survived and the animal was discarded, which left no horse related to any
+  // other — untenable in a game named after the opposite.
+  stable.bloodstock.push({
+    horse: JSON.parse(JSON.stringify(career.horse)) as Horse,
+    legacyPeak: career.horseLegacy.peak,
+    wins: career.stats.wins,
+    starts: career.stats.racesCompleted,
+    earnings: career.stats.totalEarnings,
+    hallOfFame: career.horseLegacy.hallOfFame,
+    retiredByInjury: career.careerEndedByInjury === true,
+    retiredAt: Date.now(),
+    careerNumber: stable.careersCompleted,
+  });
+
   saveStable(stable);
   deleteCareer();
   return stable;

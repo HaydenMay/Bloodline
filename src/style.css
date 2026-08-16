@@ -6415,3 +6415,101 @@ body {
   border-bottom-color: var(--warning);
   opacity: 1;
 }
+
+/* Form and spirit on the hub — the readable face of condition and morale. */
+.profile-condition {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.cond-item {
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.cond-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.cond-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.cond-note {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.cond-value.form-peak { color: var(--accent-bright); }
+.cond-value.form-inForm { color: var(--ok); }
+.cond-value.form-steady { color: var(--text); }
+.cond-value.form-offForm { color: var(--warning); }
+.cond-value.form-jaded { color: var(--warning); }
+
+/* Where the horse sits on its age arc. */
+.stage-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.stage-developing {
+  background: rgba(78, 201, 160, 0.15);
+  color: var(--ok);
+}
+
+.stage-peak {
+  background: var(--accent-faint);
+  color: var(--accent-bright);
+}
+
+.stage-declining {
+  background: var(--warning-light);
+  color: var(--warning);
+}
+
+/* An injured horse cannot be entered, and the hub says so plainly. */
+.injury-banner {
+  padding: 10px 12px;
+  background: var(--warning-light);
+  border: 1px solid rgba(255, 107, 122, 0.4);
+  border-left: 3px solid var(--warning);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.nav-button.nav-blocked {
+  opacity: 0.5;
+}
+
+.nav-button.nav-blocked .nav-desc {
+  color: var(--warning);
+}
+
+/* Bloodstock entries that are not Hall of Fame still belong in the yard. */
+.hof-entry.plain {
+  border-left-color: var(--line);
+  background: var(--bg);
+}

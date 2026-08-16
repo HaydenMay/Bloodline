@@ -33,7 +33,9 @@ import {
 } from './data/legacy.js';
 import { mountFacilitiesScreen } from './ui/facilitiesScreen.js';
 import { getPrizeMultiplier, getTrainingMultiplier } from './data/facilities.js';
-import { applyRaceUpkeep } from './sim/upkeep.js';
+import { applyRaceUpkeep, applyRestWeek } from './sim/upkeep.js';
+import { advanceSeasonIfDue, describeStatChanges } from './sim/growth.js';
+import { applyInjury, isCareerEnding, rollForInjury } from './sim/injury.js';
 import { getJockeySkill, getTrainerBonus } from './data/staff.js';
 import {
   loadCareer,
@@ -438,7 +440,9 @@ if (params.has('preview')) {
       stakes: 8,
       championship: 5,
     });
-    // Start stable hub (not training directly)
+    // Persist before showing the hub, matching the real startCareer path — a
+    // test career that only lives in memory cannot be reloaded or inspected.
+    saveCareer(testCareer);
     showStableHub(testCareer);
   });
 } else if (params.has('roadmap')) {
@@ -569,8 +573,11 @@ function showCareerRecap(career: Career): void {
         icon: '🏛️',
         title: 'Career Complete',
         lines: [
-          `${career.horse.name} retires having added ${banked} prestige to the yard.`,
-          `Your facilities, staff, ${'$' + stable.cash.toLocaleString()} in cash and ${stable.reputation} reputation all carry over.`,
+          career.careerEndedByInjury
+            ? `${career.horse.name} retires hurt, having added ${banked} prestige to the yard. Its breeding value is untouched.`
+            : `${career.horse.name} retires having added ${banked} prestige to the yard.`,
+          `It joins your bloodstock — ${stable.bloodstock.length} horse${stable.bloodstock.length === 1 ? '' : 's'} in the yard now.`,
+          `Facilities, staff, ${'$' + stable.cash.toLocaleString()} in cash and ${stable.reputation} reputation all carry over.`,
         ],
         hint: 'Your next horse starts from everything this one built.',
         tone: 'positive',
@@ -763,9 +770,18 @@ function showStarterSelection(): void {
   teardown?.();
   app.innerHTML = '';
 
-  teardown = mountStarterSelection(app, (selectedHorse, selectedSilks) => {
-    startCareer(selectedHorse, selectedSilks);
-  });
+  // A better-known yard is offered better horses. generateStarterSix has always
+  // taken this, but the call site passed a hardcoded 0, so the pool never moved.
+  const yard = loadStable();
+  const prestige = yard ? yard.legacy.archivedPoints : 0;
+
+  teardown = mountStarterSelection(
+    app,
+    (selectedHorse, selectedSilks) => {
+      startCareer(selectedHorse, selectedSilks);
+    },
+    prestige,
+  );
 }
 
 function startCareer(starterHorse: Horse, playerSilks: Silks): void {
@@ -876,6 +892,70 @@ function showStableHub(career: Career): void {
       app.innerHTML = '';
       teardown = mountLegacyScreen(app, career, () => showStableHub(career));
     },
+    onRetire: () => {
+      const peak = career.horseLegacy.peak;
+      const slipped = peak > 0 ? Math.round(((peak - career.horseLegacy.points) / peak) * 100) : 0;
+      showNotice(app, {
+        icon: '🏛️',
+        title: `Retire ${career.horse.name}?`,
+        lines: [
+          `${career.stats.wins} wins from ${career.stats.racesCompleted} starts, peaking at ${peak} legacy.`,
+          slipped > 10
+            ? `It has given back ${slipped}% of its best. Retiring now banks the peak, not the present.`
+            : 'It retires at or near its best.',
+        ],
+        hint: 'It joins your bloodstock and can be bred from. Nothing about it is lost.',
+        tone: 'neutral',
+        actions: [
+          { label: 'Keep Racing', variant: 'secondary' },
+          {
+            label: 'Retire',
+            onSelect: () => showCareerRecap(career),
+          },
+        ],
+      });
+    },
+    onRest: () => {
+      // A week off: recovers condition and morale, works down a lay-off, and
+      // advances the calendar without a race. This is the lever that makes an
+      // injury survivable and a jaded horse manageable.
+      const change = applyRestWeek(career.horse, career.stable.facilities);
+      const before = career.weeksInjured ?? 0;
+      const after = Math.max(0, before - 1);
+
+      const rested: Career = {
+        ...career,
+        week: career.week + 1,
+        trainingDoneThisWeek: false,
+        raceSelected: false,
+        weeksInjured: after,
+      };
+      if (after === 0) delete rested.injuryName;
+      saveCareer(rested);
+
+      const parts: string[] = [];
+      if (change.condition) parts.push(`${change.condition > 0 ? '+' : ''}${change.condition} condition`);
+      if (change.morale) parts.push(`${change.morale > 0 ? '+' : ''}${change.morale} morale`);
+
+      showStableHub(rested);
+      showNotice(app, {
+        icon: '🌙',
+        title: 'A Week Off',
+        lines: [
+          parts.length
+            ? `${rested.horse.name}: ${parts.join(', ')}.`
+            : `${rested.horse.name} is already as fresh as this yard can get it.`,
+          ...(before > 0
+            ? [
+                after > 0
+                  ? `${after} week${after === 1 ? '' : 's'} of the lay-off still to go.`
+                  : 'Passed sound — it can race again.',
+              ]
+            : []),
+        ],
+        tone: before > 0 && after === 0 ? 'positive' : 'neutral',
+      });
+    },
   });
 }
 
@@ -905,6 +985,24 @@ function showTrainingScreen(career: Career): void {
 function showRaceCalendar(career: Career): void {
   teardown?.();
   app.innerHTML = '';
+
+  // An injured horse cannot be entered. Resting is the only way through, and
+  // it is what advances the lay-off, so the player is never stuck.
+  const layoff = career.weeksInjured ?? 0;
+  if (layoff > 0) {
+    showStableHub(career);
+    showNotice(app, {
+      icon: '🩹',
+      title: `${career.horse.name} is Sidelined`,
+      lines: [
+        `Recovering from ${career.injuryName ?? 'an injury'}.`,
+        `${layoff} week${layoff === 1 ? '' : 's'} of rest still to go.`,
+      ],
+      hint: 'Rest the week from the hub to bring it back sooner.',
+      tone: 'warning',
+    });
+    return;
+  }
 
   // Check if player is ready for promotion or at demotion risk
   const isPromotionReady = career.horse.divisionPoints >= 5 && career.horse.divisionLevel < 4;
@@ -1373,6 +1471,71 @@ function startRaceWithHorse(
         );
 
         updatedCareer.stats.racesCompleted += 1;
+
+        // A season may turn on this race. Past the peak that costs the horse
+        // something, which is what makes retiring a judgement rather than a
+        // race counter.
+        const ageing = advanceSeasonIfDue(
+          updatedCareer.horse,
+          updatedCareer.stats.racesCompleted,
+        );
+        if (ageing.aged) updatedCareer.season = updatedCareer.horse.age - 1;
+
+        // Did the horse come home sound? Risk rises with tiredness and age, and
+        // the Medical Wing is what buys it down.
+        const injury = rollForInjury(
+          updatedCareer.horse,
+          updatedCareer.stable.facilities,
+          createRng(`injury-${updatedCareer.horse.id}-${updatedCareer.stats.racesCompleted}`),
+        );
+        if (injury) {
+          applyInjury(updatedCareer.horse, injury);
+          if (isCareerEnding(injury)) {
+            updatedCareer.careerEndedByInjury = true;
+          } else {
+            updatedCareer.weeksInjured = injury.weeksOut;
+            updatedCareer.injuryName = injury.name;
+          }
+        }
+
+        const injuryNotice: NoticeOptions | null = injury
+          ? {
+              icon: isCareerEnding(injury) ? '🏛️' : '🩹',
+              title: injury.name,
+              lines: isCareerEnding(injury)
+                ? [
+                    `${updatedCareer.horse.name} will not race again.`,
+                    injury.description,
+                  ]
+                : [injury.description, `Out for ${injury.weeksOut} week${injury.weeksOut === 1 ? '' : 's'}.`],
+              ...(isCareerEnding(injury)
+                ? {
+                    hint: 'It retires with its full breeding value and a Legacy marker — its foals carry an edge.',
+                  }
+                : { hint: 'A better Medical Wing shortens and prevents these.' }),
+              tone: 'setback' as const,
+            }
+          : null;
+
+        const ageingNotice: NoticeOptions | null = ageing.aged
+          ? {
+              icon: ageing.stage === 'declining' ? '🍂' : '🎂',
+              title: `${updatedCareer.horse.name} turns ${ageing.newAge}`,
+              lines:
+                ageing.stage === 'declining'
+                  ? [
+                      'Age is starting to tell. Speed and burst are going first.',
+                      describeStatChanges(ageing.changes),
+                    ].filter(Boolean)
+                  : ageing.stage === 'peak'
+                    ? ['This is the season a horse is at its best.']
+                    : ['Still growing — training lands hardest at this age.'],
+              ...(ageing.stage === 'declining' && {
+                hint: 'Retiring on top protects what this horse passes on. Racing on is a gamble.',
+              }),
+              tone: ageing.stage === 'declining' ? ('setback' as const) : ('positive' as const),
+            }
+          : null;
         updatedCareer.week += 1;
         updatedCareer.raceSelected = false; // Clear race selection for next week
         updatedCareer.trainingDoneThisWeek = false; // Reset training flag for next week
@@ -1433,9 +1596,11 @@ function startRaceWithHorse(
               topThree.length >= 3 ? topThree : undefined
             );
           } else {
-            // Normal race completion
-            // Check if career should end (18-20 races completed)
-            if (updatedCareer.stats.racesCompleted >= 20) {
+            // A career-ending injury stops the horse whatever the player wants;
+            // §6 compensates with full breeding value rather than a penalty.
+            // Otherwise 20 starts is the hard ceiling of a 2-5 racing life, and
+            // everything before it is the player's call from the hub.
+            if (updatedCareer.careerEndedByInjury || updatedCareer.stats.racesCompleted >= 20) {
               showCareerRecap(updatedCareer);
             } else {
               // Loop back to stable hub instead of main menu
@@ -1466,7 +1631,13 @@ function startRaceWithHorse(
             }
           : null;
 
-        const notices = [divisionNotice, betNotice, hallOfFameNotice].filter(
+        const notices = [
+          divisionNotice,
+          betNotice,
+          injuryNotice,
+          ageingNotice,
+          hallOfFameNotice,
+        ].filter(
           (n): n is NoticeOptions => n !== null,
         );
         const showNext = (): void => {

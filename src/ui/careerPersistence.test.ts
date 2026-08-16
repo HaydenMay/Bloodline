@@ -175,3 +175,80 @@ describe('migrating older saves', () => {
     expect(loadCareer()!.stable.cash).toBe(80_000);
   });
 });
+
+describe('bloodstock', () => {
+  it('keeps the retired horse itself, not just a number', () => {
+    const career = createNewCareer(horse('Zenith'), DEFAULTS.playerSilksDefault, createStable());
+    career.horse.stats.speed = 88;
+    career.stats.wins = 7;
+    career.stats.racesCompleted = 15;
+    career.horseLegacy.peak = 310;
+    saveCareer(career);
+
+    const stable = retireCurrentHorse(career);
+    expect(stable.bloodstock).toHaveLength(1);
+
+    const entry = stable.bloodstock[0]!;
+    expect(entry.horse.name).toBe('Zenith');
+    expect(entry.horse.stats.speed).toBe(88);
+    expect(entry.wins).toBe(7);
+    expect(entry.starts).toBe(15);
+    expect(entry.legacyPeak).toBe(310);
+  });
+
+  /** A horse leaves the racetrack; it never leaves the yard. */
+  it('carries bloodstock into the next career', () => {
+    const first = createNewCareer(horse('First'), DEFAULTS.playerSilksDefault, createStable());
+    saveCareer(first);
+    retireCurrentHorse(first);
+
+    const second = createNewCareer(horse('Second'), DEFAULTS.playerSilksDefault);
+    expect(second.stable.bloodstock.map((b) => b.horse.name)).toEqual(['First']);
+  });
+
+  it('accumulates a line across many horses', () => {
+    let stable = createStable();
+    for (const name of ['One', 'Two', 'Three']) {
+      const career = createNewCareer(horse(name), DEFAULTS.playerSilksDefault, stable);
+      saveCareer(career);
+      stable = retireCurrentHorse(career);
+    }
+    expect(stable.bloodstock).toHaveLength(3);
+    expect(stable.bloodstock.map((b) => b.careerNumber)).toEqual([1, 2, 3]);
+  });
+
+  it('snapshots the horse, so later edits cannot rewrite history', () => {
+    const career = createNewCareer(horse('Ghost'), DEFAULTS.playerSilksDefault, createStable());
+    saveCareer(career);
+    const stable = retireCurrentHorse(career);
+
+    career.horse.name = 'Renamed';
+    career.horse.stats.speed = 1;
+
+    expect(stable.bloodstock[0]!.horse.name).toBe('Ghost');
+    expect(stable.bloodstock[0]!.horse.stats.speed).not.toBe(1);
+  });
+
+  it('records a career ended by injury as still carrying full value', () => {
+    const career = createNewCareer(horse('Unlucky'), DEFAULTS.playerSilksDefault, createStable());
+    career.careerEndedByInjury = true;
+    career.horseLegacy.peak = 150;
+    saveCareer(career);
+
+    const stable = retireCurrentHorse(career);
+    expect(stable.bloodstock[0]!.retiredByInjury).toBe(true);
+    // §6: the injury costs the racing career, not the breeding value.
+    expect(stable.bloodstock[0]!.legacyPeak).toBe(150);
+    expect(stable.legacy.archivedPoints).toBe(150);
+  });
+
+  it('gives an older save an empty bloodstock rather than undefined', () => {
+    const career = createNewCareer(horse(), DEFAULTS.playerSilksDefault, createStable());
+    const raw = JSON.parse(JSON.stringify({ version: 1, data: career }));
+    delete raw.data.stable.bloodstock;
+    localStorage.setItem('bloodline_career', JSON.stringify(raw));
+    localStorage.removeItem('bloodline_stable');
+
+    expect(loadCareer()!.stable.bloodstock).toEqual([]);
+  });
+});

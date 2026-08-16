@@ -1,4 +1,5 @@
 import type { Horse } from '../sim/types.js';
+import { STAT_KEYS, applyTrainedStat, getAgeTrainingFactor } from '../sim/growth.js';
 import { TRAITS } from '../data/traits.js';
 import type { TraitId } from '../data/traits.js';
 import { createSurface, startLoop } from '../render/canvas.js';
@@ -281,29 +282,33 @@ export function mountTrainingScreen(
         }
       }
 
-      // Better grounds and a better trainer get more out of the same session.
-      // Only gains scale; a session's downsides are not softened by spending.
-      if (gainMultiplier !== 1) {
+      // Grounds, trainer and the horse's own age all scale what a session is
+      // worth. Only gains scale; a session's downsides are not softened.
+      const ageFactor = getAgeTrainingFactor(horse.age);
+      const totalMultiplier = gainMultiplier * ageFactor;
+      if (totalMultiplier !== 1) {
         for (const key of Object.keys(statChanges) as Array<keyof typeof statChanges>) {
           const change = statChanges[key];
           if (change !== undefined && change > 0) {
-            statChanges[key] = Math.round(change * gainMultiplier);
+            statChanges[key] = Math.round(change * totalMultiplier);
           }
         }
       }
 
-      // Apply training effects to horse
+      // Apply the session against the horse's hidden ceilings. applyTrainedStat
+      // mutates, so work on a copy. The result screen diffs old against new, so
+      // it reports what a capped stat actually kept rather than what was asked
+      // for.
       const updatedHorse: Horse = {
         ...horse,
-        stats: {
-          speed: Math.max(0, horse.stats.speed + (statChanges.speed || 0)),
-          stamina: Math.max(0, horse.stats.stamina + (statChanges.stamina || 0)),
-          grit: Math.max(0, horse.stats.grit + (statChanges.grit || 0)),
-          burst: Math.max(0, horse.stats.burst + (statChanges.burst || 0)),
-          temper: Math.max(0, horse.stats.temper + (statChanges.temper || 0)),
-          consistency: horse.stats.consistency,
-        },
+        stats: { ...horse.stats },
+        potential: { ...horse.potential },
       };
+      for (const key of STAT_KEYS) {
+        const raw = statChanges[key as keyof typeof statChanges];
+        if (raw === undefined || raw === 0) continue;
+        applyTrainedStat(updatedHorse, key, raw);
+      }
 
       // Rare trait instillment (5% chance, or higher if breakthrough)
       let newTrait: TraitId | null = null;

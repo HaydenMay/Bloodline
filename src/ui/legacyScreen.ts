@@ -65,6 +65,7 @@ export function mountLegacyScreen(
   const nextTier = LEGACY_TIERS[getTierFromPoints(stablePoints) + 1];
 
   const hofProgress = Math.min(100, (horseLegacy.peak / HALL_OF_FAME_THRESHOLD) * 100);
+  const bloodstock = career.stable.bloodstock ?? [];
 
   root.innerHTML = `
     <div class="legacy-container">
@@ -181,6 +182,31 @@ export function mountLegacyScreen(
             <div class="stat-value">$${career.stable.cash.toLocaleString()}</div>
           </div>
         </div>
+      </div>
+
+      <div class="hof-roster">
+        <h4>Bloodstock</h4>
+        ${
+          bloodstock.length === 0
+            ? `<p class="hof-empty">No horse has retired to the yard yet. Every horse you retire stays here — it leaves the racetrack, never the stable.</p>`
+            : `<div class="hof-list">
+                ${[...bloodstock]
+                  .reverse()
+                  .map(
+                    (b) => `
+                  <div class="hof-entry ${b.hallOfFame ? '' : 'plain'}">
+                    <div class="hof-entry-name">${b.hallOfFame ? '⭐ ' : ''}${b.horse.name}${b.retiredByInjury ? ' 🩹' : ''}</div>
+                    <div class="hof-entry-meta">
+                      ${b.wins} wins from ${b.starts} starts •
+                      ${b.horse.division.charAt(0).toUpperCase() + b.horse.division.slice(1)} •
+                      retired at ${b.horse.age} • ${b.legacyPeak} pts
+                    </div>
+                  </div>
+                `,
+                  )
+                  .join('')}
+              </div>`
+        }
       </div>
 
       <div class="hof-roster">

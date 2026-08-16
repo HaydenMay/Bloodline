@@ -1,5 +1,7 @@
 import type { Career } from './career.js';
 import { getStableLegacyPoints, getTier } from '../data/legacy.js';
+import { getForm, getSpirit } from '../sim/upkeep.js';
+import { getCareerStage, getRetirementAdvice } from '../sim/growth.js';
 
 export interface StableHubCallbacks {
   onTraining: () => void;
@@ -9,6 +11,10 @@ export interface StableHubCallbacks {
   onConsumables: () => void;
   onDossier: () => void;
   onLegacy: () => void;
+  /** Skip the week to recover — and the only way to work off an injury. */
+  onRest: () => void;
+  /** End this horse's career on the player's terms. */
+  onRetire: () => void;
 }
 
 export function mountStableHub(
@@ -20,6 +26,22 @@ export function mountStableHub(
   root.className = 'stable-hub';
 
   const horse = career.horse;
+  const form = getForm(horse.condition);
+  const stage = getCareerStage(horse.age);
+  const stageLabel =
+    stage === 'developing' ? 'Improving' : stage === 'peak' ? 'At peak' : 'Declining';
+  const layoff = career.weeksInjured ?? 0;
+  const injured = layoff > 0;
+
+  // DESIGN.md 8: the trainer hints once decline sets in, and retiring stays the
+  // player's call. The advice appears only when there is something to say, so
+  // it reads as counsel rather than a permanent nag.
+  const retirementAdvice = getRetirementAdvice(
+    horse,
+    career.stats.racesCompleted,
+    career.horseLegacy.points,
+    career.horseLegacy.peak,
+  );
   const stablePoints = getStableLegacyPoints(career.stable.legacy, career.horseLegacy);
   const stableTier = getTier(stablePoints);
 
@@ -56,8 +78,26 @@ export function mountStableHub(
           <h2>${horse.name}${horse.isChampion ? ' 🏆' : ''}</h2>
           <p class="profile-meta">
             ${horse.style.charAt(0).toUpperCase() + horse.style.slice(1)} •
-            ${horse.division.charAt(0).toUpperCase() + horse.division.slice(1)}
+            ${horse.division.charAt(0).toUpperCase() + horse.division.slice(1)} •
+            ${horse.age}yo <span class="stage-tag stage-${stage}">${stageLabel}</span>
           </p>
+        </div>
+        ${
+          injured
+            ? `<div class="injury-banner">🩹 ${career.injuryName ?? 'Injured'} — ${layoff} week${layoff === 1 ? '' : 's'} of rest remaining</div>`
+            : ''
+        }
+        <div class="profile-condition">
+          <div class="cond-item">
+            <span class="cond-label">Form</span>
+            <span class="cond-value form-${form.state}">${form.label}</span>
+            <span class="cond-note">${form.note}</span>
+          </div>
+          <div class="cond-item">
+            <span class="cond-label">Spirit</span>
+            <span class="cond-value">${getSpirit(horse.morale)}</span>
+            <span class="cond-note">${Math.round(horse.morale)} morale</span>
+          </div>
         </div>
         <div class="profile-stats">
           <div class="stat">
@@ -99,10 +139,15 @@ export function mountStableHub(
             <div class="nav-label">Training</div>
             <div class="nav-desc">Build your horse</div>
           </button>
-          <button class="nav-button" id="nav-race-calendar" data-action="race-calendar">
+          <button class="nav-button ${injured ? 'nav-blocked' : ''}" id="nav-race-calendar" data-action="race-calendar">
             <div class="nav-icon">📅</div>
             <div class="nav-label">Race Calendar</div>
-            <div class="nav-desc">Pick next race</div>
+            <div class="nav-desc">${injured ? 'Sidelined' : 'Pick next race'}</div>
+          </button>
+          <button class="nav-button" id="nav-rest" data-action="rest">
+            <div class="nav-icon">🌙</div>
+            <div class="nav-label">Rest</div>
+            <div class="nav-desc">${injured ? `${layoff} week${layoff === 1 ? '' : 's'} to go` : 'Freshen up'}</div>
           </button>
           <button class="nav-button" id="nav-facilities" data-action="facilities">
             <div class="nav-icon">🏗️</div>
@@ -132,6 +177,18 @@ export function mountStableHub(
         </div>
       </div>
 
+      ${
+        retirementAdvice
+          ? `<div class="retire-advice">
+               <div class="retire-advice-text">
+                 <span class="retire-advice-label">Your trainer</span>
+                 <span>${retirementAdvice}</span>
+               </div>
+               <button class="btn btn-secondary" id="nav-retire">Retire ${horse.name}</button>
+             </div>`
+          : `<div class="retire-quiet"><button class="menu-link" id="nav-retire">Retire ${horse.name}</button></div>`
+      }
+
       <!-- Week Info -->
       <div class="hub-week-info">
         <p>Week ${career.week} of Season ${career.season}</p>
@@ -149,6 +206,8 @@ export function mountStableHub(
   const consumablesBtn = root.querySelector('#nav-consumables');
   const dossierBtn = root.querySelector('#nav-dossier');
   const legacyBtn = root.querySelector('#nav-legacy');
+  const restBtn = root.querySelector('#nav-rest');
+  const retireBtn = root.querySelector('#nav-retire');
 
   trainingBtn?.addEventListener('click', callbacks.onTraining);
   raceCalendarBtn?.addEventListener('click', callbacks.onRaceCalendar);
@@ -157,6 +216,8 @@ export function mountStableHub(
   consumablesBtn?.addEventListener('click', callbacks.onConsumables);
   dossierBtn?.addEventListener('click', callbacks.onDossier);
   legacyBtn?.addEventListener('click', callbacks.onLegacy);
+  restBtn?.addEventListener('click', callbacks.onRest);
+  retireBtn?.addEventListener('click', callbacks.onRetire);
 
   return () => {
     root.remove();

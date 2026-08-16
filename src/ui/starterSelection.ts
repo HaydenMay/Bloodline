@@ -10,10 +10,18 @@ import { createBadgeElement } from './badgeLoader.js';
 export function mountStarterSelection(
   container: HTMLElement,
   onSelect: (horse: Horse, silks: Silks) => void,
+  /**
+   * The yard's prestige. DESIGN.md §13: the pool scales with the stable so a
+   * fresh line is never a punishment — a well-known yard is offered better
+   * yearlings. It scales *with* the stable, not past it: a starter is still
+   * generation 1 and inherits nothing, so it never matches what a good
+   * bloodline produces (§1).
+   */
+  stablePrestige = 0,
 ): () => void {
   const rng = createRng(`starter-${Date.now()}`);
   const names = createNameGenerator(rng);
-  const starters = generateStarterSix(rng, names, 0);
+  const starters = generateStarterSix(rng, names, stablePrestige);
 
   const silksFor = new Map<string, Silks>();
   const taken = new Set<number>();

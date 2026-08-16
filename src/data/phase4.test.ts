@@ -320,13 +320,66 @@ describe('condition and morale upkeep', () => {
     expect(peak.morale).toBeLessThanOrEqual(100);
   });
 
-  it('recovers on a rest week only as far as the yard allows', () => {
-    const bare = horse({ condition: 60, morale: 60 });
-    expect(applyRestWeek(bare, {})).toEqual({ condition: 0, morale: 0 });
-
-    const built = horse({ condition: 60, morale: 60 });
-    const change = applyRestWeek(built, { medical: 3, paddock: 3 });
+  /**
+   * Every yard recovers something. A bare yard giving nothing back is what
+   * made a first career unfinishable — facilities raise the ceiling, they are
+   * not the only thing standing between the horse and zero.
+   */
+  it('recovers on a rest week even with no facilities', () => {
+    const bare = horse({ condition: 60, morale: 40 });
+    const change = applyRestWeek(bare, {});
     expect(change.condition).toBeGreaterThan(0);
     expect(change.morale).toBeGreaterThan(0);
+  });
+
+  it('recovers further in a better yard', () => {
+    const bare = horse({ condition: 60, morale: 60 });
+    const built = horse({ condition: 60, morale: 60 });
+    applyRestWeek(bare, {});
+    applyRestWeek(built, { medical: 5, paddock: 5 });
+    expect(built.condition).toBeGreaterThan(bare.condition);
+    expect(built.morale).toBeGreaterThan(bare.morale);
+  });
+
+  it('rests toward a ceiling rather than past it', () => {
+    // A bare yard cannot rest a horse up to 100 however many weeks it takes.
+    const h = horse({ condition: 60, morale: 60 });
+    for (let i = 0; i < 40; i++) applyRestWeek(h, {});
+    expect(h.condition).toBeLessThan(75);
+    expect(h.condition).toBeGreaterThan(65);
+  });
+
+  it('never drags a horse back down to the ceiling', () => {
+    // A well-peaked horse in a modest yard holds what it earned.
+    const h = horse({ condition: 95, morale: 95 });
+    applyRestWeek(h, {});
+    expect(h.condition).toBe(95);
+    expect(h.morale).toBe(95);
+  });
+
+  /** The spiral this replaced: zero condition by race 7 with no way back. */
+  it('keeps a horse raceable across a full career in a bare yard', () => {
+    const h = horse({ condition: 75, morale: 65 });
+    for (let race = 0; race < 20; race++) applyRaceUpkeep(h, 5, 8, {});
+    expect(h.condition).toBeGreaterThan(25);
+  });
+
+  it('settles higher the better the yard', () => {
+    const bare = horse({ condition: 75, morale: 65 });
+    const built = horse({ condition: 75, morale: 65 });
+    for (let race = 0; race < 20; race++) {
+      applyRaceUpkeep(bare, 5, 8, {});
+      applyRaceUpkeep(built, 5, 8, { barn: 5, medical: 5 });
+    }
+    expect(built.condition).toBeGreaterThan(bare.condition + 30);
+    // ...but even a maxed yard does not pin a raced horse at 100.
+    expect(built.condition).toBeLessThan(100);
+  });
+
+  it('treats an ordinary mid-pack run as neither a lift nor a dent', () => {
+    // 5th of 8 used to cost the same as finishing last.
+    const h = horse({ morale: 50, condition: 100 });
+    applyRaceUpkeep(h, 5, 8, {});
+    expect(h.morale).toBeGreaterThanOrEqual(50);
   });
 });
