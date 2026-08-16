@@ -32,9 +32,17 @@ Delivered: Vite + TS scaffold, ESLint-enforced `sim/` isolation (verified agains
 ## Phase 3 — A full career
 **~3–4 sessions** · ✅ **COMPLETE**
 
-Delivered: Starter selection with six horses, training weeks with condition/form/injury/breakthroughs, race calendar with 2–3 upcoming races, divisions with points-based promotion/demotion, ~70 AI horses across divisions, save/load/slots, auto-race/skip, championship victory scene with podium, and career retirement at 18–20 starts with career recap.
+Delivered: Starter selection with six horses (pool scaling with stable prestige), training weeks with condition/form/breakthroughs and **potential ceilings**, the **age arc** — growth at 2–3, peak at 4, decline at 5 — **injuries** including the career-ending case, **rest weeks**, race calendar with 2–3 upcoming races, divisions with points-based promotion/demotion, ~70 AI horses across divisions, save/load, auto-race/skip, championship victory scene with podium, **player-called retirement** with the trainer hinting once decline sets in, career recap, and **retirement into bloodstock**.
 
 **Deliverable:** one horse, start to retirement, 18–20 starts. ✅
+
+> **Corrected after audit.** This section previously claimed condition, form,
+> injuries and 18–20-start retirement as delivered while the summary table
+> marked the phase in progress. Injuries and the form state had never been
+> written, potentials were generated and read by nothing, age never advanced,
+> and retirement was hardcoded to force at exactly 20 starts. Those are now
+> built. Remaining known gap: **multiple save slots** (§13) — a single slot
+> plus export/import ships today.
 
 ---
 
@@ -118,7 +126,7 @@ All known defects and tuning passes listed in this phase are **documented in [HI
 | 0 · Foundation | ~1 | ✅ Complete |
 | 1 · Race sim + harness | ~2–3 | ✅ Complete |
 | 2 · Playable race | ~3–4 | ✅ Complete |
-| **3 · Full career** | **~3–4** | 🚀 **IN PROGRESS** |
+| 3 · Full career | ~3–4 | ✅ Complete |
 | 4 · The stable | ~2–3 | ✅ Complete |
 | 4.5 · Re-balance & physics | ~2–3 | ✅ Complete |
 | 5 · Breeding | ~3–4 | 🚀 **NEXT** |
