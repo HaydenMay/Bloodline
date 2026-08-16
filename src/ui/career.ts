@@ -21,6 +21,8 @@ import {
   createHorseLegacy,
   createStableLegacy,
   getRetirementValue,
+  rescaleHorseLegacy,
+  rescaleStableLegacy,
   seedLegacyFromRecord,
 } from '../data/legacy.js';
 
@@ -210,6 +212,9 @@ function normaliseStable(stable: Stable): Stable {
     stable.facilities = { barn: 0, training: 0, medical: 0, feed: 0, stud: 0, admin: 0, paddock: 0 };
   }
   if (!stable.legacy) stable.legacy = createStableLegacy();
+  // Prestige banked before the exponential curve is lifted onto the new scale,
+  // so a returning player's yard keeps the tier it earned.
+  rescaleStableLegacy(stable.legacy);
   if (!stable.staff) stable.staff = createStaffRoster();
   if (!stable.consumables) stable.consumables = {};
   if (!stable.dossier) stable.dossier = {};
@@ -348,8 +353,12 @@ export function loadCareer(): Career | null {
           career.horse.division,
         );
       career.horseLegacy = createHorseLegacy(seed);
+      // The single-blob build predates the exponential curve, so its total is
+      // on the old scale even though the record is newly built.
+      if (legacyBlob?.totalPoints !== undefined) career.horseLegacy.scale = 1;
     }
     delete (career as unknown as { legacy?: unknown }).legacy;
+    rescaleHorseLegacy(career.horseLegacy);
 
     // Cash and reputation used to live on the career, which meant they died
     // with the horse. Move them onto the yard, where they belong.

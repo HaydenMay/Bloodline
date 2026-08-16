@@ -378,6 +378,39 @@ Championship horse run into the ground does not.
 on is genuinely two-sided: it can still lift a horse into the Hall of Fame, while bleeding the
 prestige and breeding value it banks.
 
+### The legacy economy ✅
+
+Points come from finishing position, multiplied by the division. The multiplier is **exponential —
+1.6× per rung** (Maiden 1, Novice 1.6, Open 2.56, Stakes 4.1, Championship 6.55), plus a one-off
+promotion bonus of 25 / 50 / 75 / 100 for the division reached.
+
+The curve is exponential because a flat one let **volume beat class**: a horse that never left
+Stakes out-scored one winning Championships, simply by running more races. Compounding per rung
+puts the champion back on top while still leaving room for the rare horse that dominated a lower
+division without ever winning a title.
+
+**Hall of Fame: 1000 peak points**, deliberately beyond a first-generation horse. Modelled career
+shapes on this curve:
+
+| Career | Peak |
+|---|---|
+| Typical gen-1, peaks in Open | ~410 |
+| Strong gen-1, reaches Stakes | ~715 |
+| Flawless Stakes campaign, never promoted | ~1130 |
+| Championship winner, 3 titles | ~1225 |
+| Theoretical perfect, 20 straight wins | ~1585 |
+
+An ordinary or even strong first horse falls well short; clearing the bar takes a horse that
+arrives already good, which is breeding (§10) and a built-up yard. The one gap left is a
+near-flawless gen-1 climb into Championship (~1055), which still clears. That is a **starter-strength
+question, not a threshold question** — any bar high enough to exclude it also excludes a genuine
+champion — so it is closed in §10 by what a generation-1 horse is allowed to be, not by raising
+the number.
+
+**The yard's tier ladder** (Novice 0 / Professional 400 / Elite 1500 / Champion 3500 / Legend 7500)
+is paced across careers, not races: no single horse can reach the top tier, and facility unlocks
+stay ahead of the player for a long time.
+
 ---
 
 ## 9. Divisions & the Living World ✅

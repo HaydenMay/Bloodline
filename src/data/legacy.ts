@@ -41,6 +41,8 @@ export interface HorseLegacy {
   history: number[];
   /** Inducted into the Hall of Fame. Once true, stays true. */
   hallOfFame: boolean;
+  /** Which point scale these figures are on. Absent means the original one. */
+  scale?: number;
 }
 
 /** The farm's standing, accumulated across every horse it has campaigned. */
@@ -49,6 +51,8 @@ export interface StableLegacy {
   archivedPoints: number;
   /** Horses inducted into the Hall of Fame, newest last. */
   hallOfFame: HallOfFameEntry[];
+  /** Which point scale these figures are on. Absent means the original one. */
+  scale?: number;
 }
 
 export const LEGACY_TIERS: LegacyTier[] = [
@@ -63,7 +67,7 @@ export const LEGACY_TIERS: LegacyTier[] = [
   {
     level: 1,
     name: 'Professional',
-    minPoints: 100,
+    minPoints: 400,
     description: 'A name on the racecard',
     icon: '🌟',
     benefits: [
@@ -75,7 +79,7 @@ export const LEGACY_TIERS: LegacyTier[] = [
   {
     level: 2,
     name: 'Elite',
-    minPoints: 300,
+    minPoints: 1500,
     description: 'Championship caliber',
     icon: '👑',
     benefits: [
@@ -87,7 +91,7 @@ export const LEGACY_TIERS: LegacyTier[] = [
   {
     level: 3,
     name: 'Champion',
-    minPoints: 600,
+    minPoints: 3500,
     description: 'A yard that produces winners',
     icon: '🏆',
     benefits: [
@@ -100,7 +104,7 @@ export const LEGACY_TIERS: LegacyTier[] = [
   {
     level: 4,
     name: 'Legend',
-    minPoints: 1000,
+    minPoints: 7500,
     description: 'Immortal racing legacy',
     icon: '⭐',
     benefits: [
@@ -112,17 +116,39 @@ export const LEGACY_TIERS: LegacyTier[] = [
   },
 ];
 
-/** A horse peaking at or above this earns its place in the Hall of Fame. */
-export const HALL_OF_FAME_THRESHOLD = 500;
+/**
+ * A horse peaking at or above this earns its place in the Hall of Fame.
+ *
+ * Deliberately out of reach of a first-generation horse. Modelling careers
+ * against the multiplier curve below puts a typical gen-1 horse near 370, a
+ * strong one near 640, and even one that steals a Championship berth at 918 —
+ * short of the bar. Clearing it takes a horse that arrives already good, which
+ * means breeding and a built-up yard rather than one lucky run.
+ */
+export const HALL_OF_FAME_THRESHOLD = 1000;
 
-/** Higher divisions swing harder in both directions. */
-const DIVISION_MULTIPLIERS: Record<string, number> = {
-  maiden: 1.0,
-  novice: 1.3,
-  open: 1.6,
-  stakes: 2.0,
-  championship: 2.5,
-};
+/**
+ * Divisions, lowest to highest. The index is the exponent on the curve below.
+ */
+export const DIVISION_ORDER = ['maiden', 'novice', 'open', 'stakes', 'championship'] as const;
+
+/**
+ * How much harder each division swings, per rung.
+ *
+ * Exponential rather than linear. A flat-ish ladder let a horse that never left
+ * Stakes out-score one that won Championships, because volume beat class — the
+ * grinder simply had more races. Compounding class per rung puts the champion
+ * back on top while still leaving room for the rare horse that dominated a
+ * lower division without ever winning a title.
+ */
+export const DIVISION_MULTIPLIER_BASE = 1.6;
+
+const DIVISION_MULTIPLIERS: Record<string, number> = Object.fromEntries(
+  DIVISION_ORDER.map((division, level) => [
+    division,
+    Math.round(DIVISION_MULTIPLIER_BASE ** level * 100) / 100,
+  ]),
+);
 
 /** Base points by finishing position. 7th and back is a small, survivable dent. */
 const FINISH_POINTS: Record<number, number> = {
@@ -181,11 +207,16 @@ export function createHorseLegacy(seedPoints = 0): HorseLegacy {
     peak: points,
     history: [points],
     hallOfFame: points >= HALL_OF_FAME_THRESHOLD,
+    scale: LEGACY_SCALE,
   };
 }
 
 export function createStableLegacy(archivedPoints = 0): StableLegacy {
-  return { archivedPoints: Math.max(0, archivedPoints), hallOfFame: [] };
+  return {
+    archivedPoints: Math.max(0, archivedPoints),
+    hallOfFame: [],
+    scale: LEGACY_SCALE,
+  };
 }
 
 /**
@@ -252,23 +283,74 @@ export function seedLegacyFromRecord(
 ): number {
   let points = 0;
 
-  if (wins >= 50) points += 200;
-  else if (wins >= 20) points += 100;
-  else if (wins >= 10) points += 50;
-  else if (wins >= 1) points += 10;
+  if (wins >= 50) points += 300;
+  else if (wins >= 20) points += 150;
+  else if (wins >= 10) points += 75;
+  else if (wins >= 1) points += 15;
 
-  points += Math.min(150, Math.floor(earnings / 10000));
+  points += Math.min(225, Math.floor(earnings / 6666));
 
   const divisionSeed: Record<string, number> = {
     maiden: 0,
-    novice: 40,
-    open: 100,
-    stakes: 200,
-    championship: 350,
+    novice: 60,
+    open: 150,
+    stakes: 300,
+    championship: 525,
   };
   points += divisionSeed[division] ?? 0;
 
   return points;
+}
+
+/* ---------------------------------------------------------------------------
+   Rescaling saves written before the exponential curve
+   ------------------------------------------------------------------------ */
+
+/**
+ * How much larger the same career scores on the current curve.
+ *
+ * Modelling six career shapes on both the old flat-ish ladder and the current
+ * exponential one put the ratio between 1.26 and 1.76, averaging 1.53. A single
+ * constant cannot be exact — a Maiden horse's points did not change at all,
+ * while a Championship horse's more than doubled — but the alternative is a
+ * player logging in to find their yard demoted, which is worse than approximate.
+ * Rounding down to 1.5 keeps the error on the generous side of a tier boundary
+ * for the mid-table careers that most saves actually hold.
+ */
+export const LEGACY_RESCALE = 1.5;
+
+/**
+ * The scale the numbers above are on. 1 was the original flat-ish ladder; 2 is
+ * the exponential curve. Stamped on every legacy record so a save can be lifted
+ * exactly once, however many times it is loaded.
+ */
+export const LEGACY_SCALE = 2;
+
+const rescale = (points: number): number => Math.round(points * LEGACY_RESCALE);
+
+/** Lift a horse's legacy onto the current scale. Mutates. Safe to call twice. */
+export function rescaleHorseLegacy(legacy: HorseLegacy): HorseLegacy {
+  if ((legacy.scale ?? 1) >= LEGACY_SCALE) return legacy;
+
+  legacy.points = rescale(legacy.points);
+  legacy.peak = rescale(legacy.peak);
+  legacy.history = legacy.history.map(rescale);
+  legacy.scale = LEGACY_SCALE;
+  // An honour already awarded is never taken back, so this only ever adds.
+  if (legacy.peak >= HALL_OF_FAME_THRESHOLD) legacy.hallOfFame = true;
+  return legacy;
+}
+
+/** Lift a yard's banked prestige onto the current scale. Mutates. Safe to call twice. */
+export function rescaleStableLegacy(legacy: StableLegacy): StableLegacy {
+  if ((legacy.scale ?? 1) >= LEGACY_SCALE) return legacy;
+
+  legacy.archivedPoints = rescale(legacy.archivedPoints);
+  for (const entry of legacy.hallOfFame) {
+    entry.legacyPoints = rescale(entry.legacyPoints);
+  }
+  legacy.scale = LEGACY_SCALE;
+  return legacy;
 }
 
 /* ---------------------------------------------------------------------------

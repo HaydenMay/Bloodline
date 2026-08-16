@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  DIVISION_ORDER,
   HALL_OF_FAME_THRESHOLD,
+  LEGACY_TIERS,
   getPromotionBonus,
+  rescaleHorseLegacy,
+  rescaleStableLegacy,
   applyRaceToHorseLegacy,
   calculateRaceLegacyChange,
   createHorseLegacy,
@@ -182,18 +186,163 @@ describe('stable prestige', () => {
 
 describe('tiers', () => {
   it('maps points onto the tier ladder', () => {
-    expect(getTierFromPoints(0)).toBe(0);
-    expect(getTierFromPoints(99)).toBe(0);
-    expect(getTierFromPoints(100)).toBe(1);
-    expect(getTierFromPoints(300)).toBe(2);
-    expect(getTierFromPoints(600)).toBe(3);
-    expect(getTierFromPoints(1000)).toBe(4);
-    expect(getTierFromPoints(999999)).toBe(4);
+    // Derived from the ladder itself, so rebalancing the economy does not mean
+    // rewriting the test that proves the mapping works.
+    LEGACY_TIERS.forEach((tier, index) => {
+      expect(getTierFromPoints(tier.minPoints)).toBe(index);
+      if (index > 0) expect(getTierFromPoints(tier.minPoints - 1)).toBe(index - 1);
+    });
+  });
+
+  it('climbs strictly, so no tier is unreachable', () => {
+    for (let i = 1; i < LEGACY_TIERS.length; i++) {
+      expect(LEGACY_TIERS[i]!.minPoints).toBeGreaterThan(LEGACY_TIERS[i - 1]!.minPoints);
+    }
   });
 
   it('always resolves to a tier', () => {
     expect(getTier(-50).name).toBe('Novice');
-    expect(getTier(1200).name).toBe('Legend');
+    expect(getTier(999_999).name).toBe('Legend');
+  });
+});
+
+/**
+ * The economy is only as good as the orderings it produces. These replay whole
+ * career shapes rather than single races, because every problem this curve was
+ * built to fix — a Stakes grinder out-scoring a champion, a first horse walking
+ * into the Hall of Fame — only shows up across twenty starts.
+ */
+describe('what a whole career is worth', () => {
+  /** Replays a career as [division, finishes[]] phases, promoting between them. */
+  function runCareer(phases: Array<[string, number[]]>): number {
+    const legacy = createHorseLegacy(0);
+    phases.forEach(([division, finishes], i) => {
+      for (const finish of finishes) applyRaceToHorseLegacy(legacy, finish, division);
+      const next = phases[i + 1];
+      if (next) {
+        const level = DIVISION_ORDER.indexOf(next[0] as (typeof DIVISION_ORDER)[number]);
+        applyRaceToHorseLegacy(legacy, 1, division, {
+          promoted: true,
+          newDivisionLevel: level,
+          qualifier: true,
+        });
+      }
+    });
+    return legacy.peak;
+  }
+
+  const win = (n: number): number[] => Array(n).fill(1);
+
+  const TYPICAL: Array<[string, number[]]> = [
+    ['maiden', [2, 1, 3, 1]],
+    ['novice', [1, 4, 2, 1, 5]],
+    ['open', [3, 1, 7, 2, 3, 1, 8, 4, 3, 1, 6]],
+  ];
+
+  const GRINDER: Array<[string, number[]]> = [
+    ['maiden', win(3)],
+    ['novice', win(3)],
+    ['open', win(3)],
+    ['stakes', win(11)],
+  ];
+
+  const CHAMPION: Array<[string, number[]]> = [
+    ['maiden', [1, 2, 1]],
+    ['novice', [1, 1, 3]],
+    ['open', [2, 1, 1]],
+    ['stakes', [1, 3, 1]],
+    ['championship', [1, 4, 1, 2, 1, 3, 5, 2]],
+  ];
+
+  /**
+   * The failure the exponential curve exists to fix: on a flat ladder, volume
+   * beat class, so a horse that never left Stakes out-scored one winning titles.
+   */
+  it('ranks a Championship campaign above a flawless Stakes one', () => {
+    expect(runCareer(CHAMPION)).toBeGreaterThan(runCareer(GRINDER));
+  });
+
+  /**
+   * "A first year horse should NOT be able to reach it. It should come with
+   * strong breeding and/or stable upgrades."
+   */
+  it('keeps the Hall of Fame out of reach of an ordinary first career', () => {
+    expect(runCareer(TYPICAL)).toBeLessThan(HALL_OF_FAME_THRESHOLD * 0.6);
+  });
+
+  /** Even a first horse good enough to reach Stakes falls short of the honour. */
+  it('keeps it out of reach of a strong first career too', () => {
+    const strong: Array<[string, number[]]> = [
+      ['maiden', [1, 1, 2]],
+      ['novice', [1, 2, 1, 3]],
+      ['open', [1, 3, 1, 2, 1]],
+      ['stakes', [4, 2, 5, 3, 1, 4, 3, 2]],
+    ];
+    expect(runCareer(strong)).toBeLessThan(HALL_OF_FAME_THRESHOLD);
+  });
+
+  /** Still reachable, or the honour is decoration. */
+  it('lets a title-winning campaign clear the Hall of Fame', () => {
+    expect(runCareer(CHAMPION)).toBeGreaterThan(HALL_OF_FAME_THRESHOLD);
+  });
+
+  /**
+   * §12: the yard's ladder is a long game. One good horse should not hand a
+   * player the top tier — the ladder is paced across careers, not races.
+   */
+  it('leaves the top tier well beyond a single career', () => {
+    const best = Math.max(runCareer(CHAMPION), runCareer(GRINDER));
+    expect(best).toBeLessThan(LEGACY_TIERS[LEGACY_TIERS.length - 1]!.minPoints);
+  });
+});
+
+describe('lifting an older save onto the current scale', () => {
+  it('scales a horse legacy and marks it done', () => {
+    const legacy = { points: 200, peak: 400, history: [0, 200, 400], hallOfFame: false };
+    rescaleHorseLegacy(legacy);
+    expect(legacy.points).toBe(300);
+    expect(legacy.peak).toBe(600);
+    expect(legacy.history).toEqual([0, 300, 600]);
+  });
+
+  it('never scales the same record twice', () => {
+    const legacy = { points: 200, peak: 400, history: [400], hallOfFame: false };
+    rescaleHorseLegacy(legacy);
+    rescaleHorseLegacy(legacy);
+    rescaleHorseLegacy(legacy);
+    expect(legacy.peak).toBe(600);
+  });
+
+  it('leaves a freshly created legacy alone', () => {
+    const legacy = createHorseLegacy(120);
+    rescaleHorseLegacy(legacy);
+    expect(legacy.points).toBe(120);
+  });
+
+  /** A yard that was Professional must not load back as a Novice. */
+  it('carries banked prestige and its Hall of Fame across', () => {
+    const stable = createStableLegacy(0);
+    delete stable.scale;
+    stable.archivedPoints = 400;
+    stable.hallOfFame = [
+      {
+        horseName: 'Zenith',
+        wins: 9,
+        starts: 20,
+        earnings: 400_000,
+        legacyPoints: 520,
+        division: 'stakes',
+        season: 3,
+        timestamp: 0,
+      },
+    ];
+
+    rescaleStableLegacy(stable);
+    expect(stable.archivedPoints).toBe(600);
+    expect(stable.hallOfFame[0]!.legacyPoints).toBe(780);
+
+    rescaleStableLegacy(stable);
+    expect(stable.archivedPoints).toBe(600);
   });
 });
 
