@@ -91,11 +91,55 @@ early and everything after it is texture on top.
 
 **Deliverable: the loop closes.** Retire, breed, race the foal.
 
-### Stage 2 — Partners and the cash sink
-- Stud fees, scaling with a partner's calibre — the sink that keeps cash meaningful after the
-  unlock ladder is exhausted
-- Own Hall of Fame horses free forever, and carrying a budget bonus
+### Stage 2 — Partners, the cash sink, and stud influence
+- **Stud fees priced on what you are buying** — the partner's banked legacy *and* its potential
+  grades, so you pay for the foal you can actually expect rather than for a reputation
+- Own Hall of Fame horses free forever, and carrying **+25% of that parent's contribution** to the
+  budget (§10's worked example: +50 on a ~200 base)
 - Retired horses keep ageing into ineligibility
+- **Stud influence pays prestige, never cash** — see below
+
+#### Breeding lifespan: 4 full foals per horse
+
+A horse races ages 2→5, so **each career advances the world about four years**. A stallion retired
+at 5 therefore breeds at 5, 9, 13, 17 and 21.
+
+| Rule | Value |
+|---|---|
+| Full contribution | to age 17 |
+| Tapering | 18–21 |
+| Ineligible | 22 |
+
+That yields **four foals at full strength plus a fading fifth**, which is the intended "3–5 fully
+raced foals per horse". The taper matters more than the cutoff: a sire visibly running out of years
+is a warning a player can act on, where a hard stop just removes a favourite between careers.
+
+Two consequences worth stating, both intended:
+
+- **The self-sufficient line converges toward dull.** Breeding a stud back to its own foal is
+  inbreeding, and §10 narrows variance each time a line doubles back. A player who never buys an
+  outside partner gets progressively safer, duller foals — the pressure back toward outcrossing is
+  the system working, not a gap.
+- **Gender is a coin flip.** A stallion needs its foal to be a mare to continue the line without
+  help. Half the time it will not be, which is a second reason outside partners must always be
+  available.
+
+#### Stud influence pays prestige, not cash
+
+Rival yards breeding to your Hall of Fame stallions earn you **prestige**, and no money at all.
+
+Two income faucets against a fixed set of sinks inflates the economy, and cash is already the one
+currency that runs out of things to buy. But what a yard genuinely earns when its bloodline spreads
+through the league is *influence* — which is exactly what prestige measures. It shows up twice: on
+the family tree, as descendants racing against you, and on the ladder.
+
+It also answers the late-game flatness directly. Prestige from stud influence keeps accruing after
+the yard is fully built, and it scales with how good the bloodline is rather than how many races
+have been ground out.
+
+**Rejected:** splitting legacy into separate racing and breeding scores gating different unlocks.
+This session removed reputation for being a second counter nobody could distinguish from prestige;
+two legacy tracks would rebuild that problem with new names. One prestige score, two sources.
 
 ### Stage 3 — Genetics texture
 - Coat genetics with real dominant/recessive inheritance
@@ -143,10 +187,9 @@ birth too, even though nothing reads it until Stage 3.
 
 Not decided yet. Listed so they are answered deliberately at the time rather than defaulted into.
 
-**Stage 2** — How steeply do stud fees scale with a partner's calibre, and are they a flat fee or a
-share of the foal's projected budget? What budget bonus does a Hall of Fame parent carry (§10's
-worked example says +50 on a ~200 base — roughly a quarter)? At what age does a retired horse stop
-being eligible, and does its contribution taper before then or stop dead?
+**Stage 2** — Settled above, except: how much prestige does one outside mare bred to your stallion
+actually pay, and is it per pairing or per career? Too generous and it becomes the fastest route up
+the ladder; too little and enshrining a horse loses half its point.
 
 **Stage 3** — Which coat loci ship (base black/bay/chestnut plus how many modifiers)? What mutation
 chance applies to traits and aptitude? How fast does relatedness narrow variance — §10 wants a
