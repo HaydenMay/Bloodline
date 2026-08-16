@@ -289,26 +289,16 @@ function startRace(seed: string): void {
     prize: 1000,
   };
 
-  const showDossier = (_returnToIntro: () => void): void => {
-    // FIXME: Dossier "Start Race" callback is not working on mobile
-    // Investigation shows the wrong callback is being passed to mountDossierScreen.
-    // The minified callback looks like: ()=>{c?.(),t.innerHTML='',l?.(),n()}
-    // which appears to be the career-mode callback, not the race-demo callback.
-    // This is blocking Phase 2 completion. Debug on desktop with full dev tools.
-    // See: https://github.com/HaydenMay/Bloodline/issues/[TODO]
-
+  const showDossier = (): void => {
     // Hide the race intro while showing dossier
     const raceIntro = stage.querySelector<HTMLElement>('.race-intro');
     if (raceIntro) raceIntro.style.display = 'none';
 
     const dossierTeardown = mountDossierScreen(stage, field, player, {}, () => {
       try {
-        console.log('[dossier] Start Race clicked');
         dossierTeardown();
         if (raceIntro) raceIntro.style.display = '';
-        console.log('[dossier] About to call showRaceScreen');
         showRaceScreen();
-        console.log('[dossier] showRaceScreen completed');
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         console.error('[dossier] Error in Start Race:', error);
@@ -1713,9 +1703,12 @@ function startRaceWithHorse(
         field,
         playerHorse: player,
         dossier: career.stable.dossier,
-        onShowOpponents: (returnCallback) => {
-          // Clear intro and show dossier
-          introStage.innerHTML = '';
+        onShowOpponents: () => {
+          // Tear the intro down rather than wiping its markup — emptying the
+          // host leaves the intro's backdrop animation looping behind the
+          // dossier, on a canvas nothing can reach any more.
+          introTeardown?.();
+          introTeardown = null;
 
           dossierTeardown = mountDossierScreen(
             introStage,
@@ -1723,11 +1716,13 @@ function startRaceWithHorse(
             player,
             career.stable.dossier,
             () => {
-              // Return to intro
+              // The carousel's button reads "Start Race", so it starts the
+              // race. It used to call the intro's return-to-intro callback,
+              // which un-faded an element that had already been removed —
+              // leaving the player looking at an empty screen.
               dossierTeardown?.();
-              introStage.innerHTML = '';
-              introTeardown?.();
-              returnCallback();
+              dossierTeardown = null;
+              showActualRaceScreen();
             }
           );
         },

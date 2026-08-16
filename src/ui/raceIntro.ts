@@ -16,7 +16,11 @@ export interface RaceIntroOptions {
   field?: Horse[];
   playerHorse?: Horse;
   dossier?: RivalDossier;
-  onShowOpponents?: (callback: () => void) => void;
+  /**
+   * Opens the opponents dossier. The dossier owns what happens next — its own
+   * button starts the race — so nothing is handed back here.
+   */
+  onShowOpponents?: () => void;
 }
 
 /**
@@ -87,12 +91,7 @@ export function mountRaceIntro(
   if (opponentsBtn && onShowOpponents) {
     opponentsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const returnToIntro = (): void => {
-        // Cleanup dossier and return focus to intro
-        content.classList.remove('fade-out');
-        content.style.opacity = '1';
-      };
-      onShowOpponents(returnToIntro);
+      onShowOpponents();
     });
   }
 

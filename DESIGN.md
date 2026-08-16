@@ -284,20 +284,35 @@ race is a genuine skill.
 
 ### Sessions ✅
 
-| Session | Trains | Risk |
+**Every stat has a session that specialises in it**, each with a cost attached, so a player who
+needs one thing can go and get it rather than hoping it comes attached to something else:
+
+| Stat | Specialist session | The trade |
 |---|---|---|
-| Sprint work | Speed, Burst | High |
-| Long gallops | Stamina | Medium |
-| Hill work | Stamina, Grit | High |
-| Gate practice | Burst, Temper | Low |
-| Swimming | Stamina, recovers condition | None |
-| Rest | Condition, small Temper | None |
+| Speed | Sprint Work | −Stamina |
+| Stamina | Swimming | −Speed |
+| Burst | Work Off the Bend | −Grit |
+| Grit | Deep Sand Gallops | −Burst |
+| Temper | Groundwork | −Speed |
+| Consistency | Racecourse Schooling | −Burst |
+
+Around them sit broader sessions that combine two or three stats for a smaller gain each — Cross
+Training, Settled Routine, Match Gallop, Hill Repeats — plus Rest and Recovery days.
 
 **Predictable gain plus breakthrough chance.** Each session previews a reliable stat gain, with
 occasional breakthroughs and rare bad days driven by morale. No minigames.
 
+**The preview is the real number.** Grounds, trainer and age all multiply what a session gives, and
+the card shows the figure *after* that multiplication — an upgraded yard shows bigger numbers on
+the cards, not the same numbers that quietly land bigger. Only gains scale; a session's downsides
+are never softened, so upgrading sharpens the trade-offs rather than removing them.
+
+The preview deliberately does **not** subtract what a potential cap will swallow — that would
+reveal the hidden ceiling that §3 keeps private. A capped stat simply gains less than promised,
+which is the unstated signal that it is maxed.
+
 Gains are gated by **age** (young horses gain fastest) and by **potential caps** (approaching a
-cap yields sharply diminishing returns — an unstated signal you've maxed a stat).
+cap yields sharply diminishing returns).
 
 ### Consumables ✅
 Feed, supplements and treats **bought with cash** and applied at the end of a training session for

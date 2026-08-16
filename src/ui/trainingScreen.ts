@@ -17,8 +17,33 @@ export interface TrainingSession {
     grit?: number;
     burst?: number;
     temper?: number;
+    consistency?: number;
   };
   traitPool: TraitId[];
+}
+
+export type StatEffects = TrainingSession['statEffects'];
+
+/**
+ * What a session is actually worth to this horse.
+ *
+ * The Training Grounds, the head trainer and the horse's own age all scale what
+ * a session gives. Only gains scale — a session's downsides are never softened,
+ * so an upgraded yard makes the trade-offs sharper rather than free.
+ *
+ * The training cards and the session itself both run through here, because they
+ * used to compute this separately: the card showed the unscaled figure while the
+ * session applied the scaled one, so a card promising +1 stamina handed back +3.
+ */
+export function scaleTrainingEffects(effects: StatEffects, multiplier: number): StatEffects {
+  const scaled: StatEffects = { ...effects };
+  if (multiplier === 1) return scaled;
+
+  for (const key of Object.keys(scaled) as Array<keyof StatEffects>) {
+    const change = scaled[key];
+    if (change !== undefined && change > 0) scaled[key] = Math.round(change * multiplier);
+  }
+  return scaled;
 }
 
 export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
@@ -106,6 +131,48 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
     statEffects: { speed: 3, stamina: 2, temper: -2 },
     traitPool: ['turnOfFoot', 'professional'],
   },
+  schooling: {
+    id: 'schooling',
+    name: 'Racecourse Schooling',
+    description: 'Parade ring, stalls and crowd, without the race.',
+    statEffects: { consistency: 3, temper: 2, burst: -1 },
+    traitPool: ['professional', 'alert'],
+  },
+  routineWork: {
+    id: 'routineWork',
+    name: 'Settled Routine',
+    description: 'The same work, the same order, every morning.',
+    statEffects: { consistency: 2, temper: 1, stamina: 1 },
+    traitPool: ['professional', 'tractable'],
+  },
+  groundwork: {
+    id: 'groundwork',
+    name: 'Groundwork',
+    description: 'Patient handling on the ground. Nothing is asked at pace.',
+    statEffects: { temper: 4, consistency: 1, speed: -1 },
+    traitPool: ['tractable', 'professional'],
+  },
+  deepSand: {
+    id: 'deepSand',
+    name: 'Deep Sand Gallops',
+    description: 'Heavy going that punishes every stride.',
+    statEffects: { grit: 4, stamina: 2, burst: -2 },
+    traitPool: ['grinder', 'hardKnocker'],
+  },
+  bendWork: {
+    id: 'bendWork',
+    name: 'Work Off the Bend',
+    description: 'Asked to quicken the moment the track straightens.',
+    statEffects: { burst: 4, temper: 1, grit: -1 },
+    traitPool: ['turnOfFoot', 'coiled'],
+  },
+  matchGallop: {
+    id: 'matchGallop',
+    name: 'Match Gallop',
+    description: 'Upsides with a stablemate, both asked to win it.',
+    statEffects: { grit: 3, consistency: 2, temper: -2 },
+    traitPool: ['bigGame', 'relentless'],
+  },
 };
 
 export function mountTrainingScreen(
@@ -121,6 +188,10 @@ export function mountTrainingScreen(
 ): () => void {
   const root = document.createElement('div');
   root.className = 'training-screen';
+
+  // What this horse, in this yard, actually gets out of a session. The cards
+  // below are drawn from this, so what is promised is what lands.
+  const totalMultiplier = gainMultiplier * getAgeTrainingFactor(horse.age);
 
   root.innerHTML = `
     <div class="training-container">
@@ -170,7 +241,7 @@ export function mountTrainingScreen(
             <h4>${session.name}</h4>
             <p class="training-desc">${session.description}</p>
             <div class="training-stats">
-              ${Object.entries(session.statEffects)
+              ${Object.entries(scaleTrainingEffects(session.statEffects, totalMultiplier))
                 .map(([stat, effect]) => {
                   const sign = effect > 0 ? '+' : '';
                   const color = effect > 0 ? 'positive' : 'negative';
@@ -253,7 +324,7 @@ export function mountTrainingScreen(
       const isBreakthrough = Math.random() < breakthroughChance;
 
       // Calculate stat changes
-      let statChanges = { ...session.statEffects };
+      let statChanges: StatEffects = { ...session.statEffects };
 
       if (isBreakthrough) {
         // Remove negative effects and add bonus gains
@@ -270,18 +341,7 @@ export function mountTrainingScreen(
         }
       }
 
-      // Grounds, trainer and the horse's own age all scale what a session is
-      // worth. Only gains scale; a session's downsides are not softened.
-      const ageFactor = getAgeTrainingFactor(horse.age);
-      const totalMultiplier = gainMultiplier * ageFactor;
-      if (totalMultiplier !== 1) {
-        for (const key of Object.keys(statChanges) as Array<keyof typeof statChanges>) {
-          const change = statChanges[key];
-          if (change !== undefined && change > 0) {
-            statChanges[key] = Math.round(change * totalMultiplier);
-          }
-        }
-      }
+      statChanges = scaleTrainingEffects(statChanges, totalMultiplier);
 
       // Apply the session against the horse's hidden ceilings. applyTrainedStat
       // mutates, so work on a copy. The result screen diffs old against new, so
