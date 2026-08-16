@@ -23,7 +23,8 @@ import { mountConsumablesScreen } from './ui/consumablesScreen.js';
 import { mountRivalDossierScreen } from './ui/rivalDossierScreen.js';
 import { mountRaceDayScreen, type RaceDayChoices } from './ui/raceDayScreen.js';
 import { applyRaceDayItems } from './data/consumables.js';
-import { settleBet, type PlacedBet } from './data/wagering.js';
+import { rateHorse, settleBet, type PlacedBet } from './data/wagering.js';
+import { getPrizeMoney, getPurse } from './data/purse.js';
 import type { NoticeOptions } from './ui/noticeModal.js';
 import { showNotice } from './ui/noticeModal.js';
 import {
@@ -124,35 +125,19 @@ function calculateRaceRewards(
   finishingPosition: number,
   fieldSize: number,
   facilities: Record<string, number> = {},
+  /** The calendar's 0-1 difficulty rating for this race. */
+  difficulty = 0.5,
 ): { earnings: number; reputation: number } {
-  const basePrizes: Record<string, number> = {
-    maiden: 5000,
-    novice: 10000,
-    open: 20000,
-    stakes: 50000,
-    championship: 100000,
-  };
-
-  const basePrize = basePrizes[division] || 5000;
-
-  // Determine prize percentage based on position
-  let prizePercentage = 0.1; // 4th+ gets 10%
   let reputationGain = 1;
-
-  if (finishingPosition === 1) {
-    prizePercentage = 0.5;
-    reputationGain = 5;
-  } else if (finishingPosition === 2) {
-    prizePercentage = 0.25;
-    reputationGain = 3;
-  } else if (finishingPosition === 3) {
-    prizePercentage = 0.15;
-    reputationGain = 2;
-  }
+  if (finishingPosition === 1) reputationGain = 5;
+  else if (finishingPosition === 2) reputationGain = 3;
+  else if (finishingPosition === 3) reputationGain = 2;
 
   // Administration takes a cut of the paperwork off your hands and a bigger
   // share of the purse home with it.
-  const earnings = Math.round(basePrize * prizePercentage * getPrizeMultiplier(facilities));
+  const earnings = Math.round(
+    getPrizeMoney(division, finishingPosition, difficulty) * getPrizeMultiplier(facilities),
+  );
 
   // Scale reputation by field size (tighter races = more competitive)
   const competitionMultiplier = Math.max(1, fieldSize / 12);
@@ -286,7 +271,8 @@ function startRace(seed: string): void {
     distance: RACE_METRES,
     going: 'good',
     fieldSize: field.length,
-    prize: 1000,
+    prize: getPurse('open', 0.65),
+    toWinner: getPrizeMoney('open', 1, 0.65),
   };
 
   const showDossier = (): void => {
@@ -1104,11 +1090,16 @@ function startRaceWithHorse(
       // Normal race: build field from stable world, filtered by player's current division
       const rivalCandidates = career.stable.world.filter((h) => h.division === player.division);
 
-      // Select rivals for this race (next FIELD_SIZE-1 from candidates)
-      // Shuffle to avoid always seeing the same rivals first
+      // The calendar's difficulty rating decides *which* rivals turn up, not
+      // just how loud the crowd is. Sorting the division by rating and sliding
+      // the selection window with the rating is what makes a hard race
+      // genuinely hard — and therefore what earns it the bigger purse and the
+      // longer odds. Without this the difficulty bars were decoration.
       const rng = createRng('field-select-' + Date.now());
-      const shuffled = rng.shuffle([...rivalCandidates]);
-      const selected = shuffled.slice(0, Math.min(FIELD_SIZE - 1, shuffled.length));
+      const need = FIELD_SIZE - 1;
+      const ranked = [...rivalCandidates].sort((a, b) => rateHorse(b) - rateHorse(a));
+      const windowStart = Math.round((1 - raceHype) * Math.max(0, ranked.length - need));
+      const selected = rng.shuffle(ranked.slice(windowStart, windowStart + need));
 
       // If not enough rivals in this division, top up with adjacent division
       if (selected.length < FIELD_SIZE - 1) {
@@ -1316,6 +1307,7 @@ function startRaceWithHorse(
           playerFinishingPosition,
           placings.length,
           updatedCareer.stable.facilities,
+          raceHype,
         );
 
         if (playerIndex === 0) {
@@ -1692,7 +1684,10 @@ function startRaceWithHorse(
       distance: raceDistance,
       going: raceGoing,
       fieldSize: field.length,
-      prize: 1000,
+      // The real purse for this division at this difficulty. It used to be a
+      // hardcoded $1,000 on every race in the game.
+      prize: getPurse(player.division, raceHype),
+      toWinner: getPrizeMoney(player.division, 1, raceHype),
     };
 
     introTeardown = mountRaceIntro(

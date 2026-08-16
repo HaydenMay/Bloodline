@@ -34,8 +34,15 @@ export interface BetSettlement {
   net: number;
 }
 
-/** A rough rating for comparing a horse against a field. */
-function rate(horse: Horse): number {
+/**
+ * A rough rating for comparing a horse against a field.
+ *
+ * Shared with race-day field selection, so the strength the calendar's
+ * difficulty rating promises is measured the same way the betting market
+ * prices it. If the two drifted apart, a "hard" race could quietly draw a weak
+ * field and still pay long odds.
+ */
+export function rateHorse(horse: Horse): number {
   const s = horse.stats;
   const core = (s.speed + s.stamina + s.burst + s.grit) / 4;
   const reliability = (s.temper + s.consistency) / 2;
@@ -50,10 +57,10 @@ function rate(horse: Horse): number {
  */
 export function winProbability(player: Horse, field: Horse[]): number {
   const runners = field.length > 0 ? field : [player];
-  const ratings = runners.map(rate);
+  const ratings = runners.map(rateHorse);
   const total = ratings.reduce((a, b) => a + b, 0);
   if (total <= 0) return 1 / runners.length;
-  const share = rate(player) / total;
+  const share = rateHorse(player) / total;
   return Math.max(0.03, Math.min(0.85, share));
 }
 

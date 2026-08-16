@@ -1,6 +1,7 @@
 import { createRng } from '../sim/rng.js';
 import type { Division } from '../data/index.js';
 import { DIVISION_DISTANCES } from '../data/index.js';
+import { getPurse } from '../data/purse.js';
 
 export interface RaceOption {
   id: string;
@@ -139,6 +140,10 @@ export function mountRaceCalendar(
                     .map((_, i) => `<span class="bar ${i < Math.round(race.hype * 5) ? 'filled' : ''}"></span>`)
                     .join('')}
                 </span>
+              </div>
+              <div class="race-detail">
+                <span class="detail-label">Purse</span>
+                <span class="detail-value">$${getPurse(opts.division ?? 'maiden', race.hype).toLocaleString()}</span>
               </div>
             </div>
           </button>

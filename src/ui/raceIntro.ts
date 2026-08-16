@@ -9,7 +9,10 @@ export interface RaceIntroConfig {
   distance: number;
   going: string;
   fieldSize: number;
+  /** Total purse for the race. */
   prize: number;
+  /** What first place actually collects, if the caller knows it. */
+  toWinner?: number;
 }
 
 export interface RaceIntroOptions {
@@ -72,9 +75,17 @@ export function mountRaceIntro(
         <span class="rid-value">${config.fieldSize} runners</span>
       </div>
       <div class="rid-row">
-        <span class="rid-label">Prize</span>
+        <span class="rid-label">Purse</span>
         <span class="rid-value">$${config.prize.toLocaleString()}</span>
       </div>
+      ${
+        config.toWinner === undefined
+          ? ''
+          : `<div class="rid-row">
+        <span class="rid-label">To the winner</span>
+        <span class="rid-value">$${config.toWinner.toLocaleString()}</span>
+      </div>`
+      }
     </div>
     <div class="race-intro-actions">
       ${options?.field && options?.playerHorse ? `<button class="race-intro-btn opponents-btn">View Opponents</button>` : ''}
