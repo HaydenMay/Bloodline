@@ -330,6 +330,27 @@ export function deleteCareer(): void {
   clearSlot(STORAGE_KEY);
 }
 
+/**
+ * Wipes everything — career, yard, backups and any quarantined copy.
+ *
+ * The one deliberately irreversible action in the game. Backups exist to
+ * survive accidents, so leaving them behind here would make "start over" a lie;
+ * the guard against a mistake is the confirmation in front of it, not a copy
+ * the player does not know about.
+ */
+export function resetEverything(): void {
+  for (const key of [STORAGE_KEY, STABLE_STORAGE_KEY]) {
+    const slots = slotsFor(key);
+    for (const slot of [slots.primary, slots.backup, slots.quarantine]) {
+      try {
+        localStorage.removeItem(slot);
+      } catch (error) {
+        console.error(`Failed to clear ${slot}:`, error);
+      }
+    }
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Export and import — the player's own copy
    ------------------------------------------------------------------------ */

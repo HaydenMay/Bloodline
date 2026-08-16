@@ -1,5 +1,9 @@
 /**
- * Main menu: landing page with game title and "New Game"/"Continue" buttons.
+ * Main menu.
+ *
+ * "New Horse" rather than "New Game": the yard persists across horses by
+ * design, so a button labelled New Game would promise a reset it does not
+ * perform. Wiping the yard is a separate, deliberately awkward action.
  */
 
 export interface MainMenuCallbacks {
@@ -9,6 +13,10 @@ export interface MainMenuCallbacks {
   onExport?: () => void;
   /** Receives the text of a save file the player chose. */
   onImport?: (text: string) => void;
+  /** Wipes the yard and starts over. Guarded behind a confirmation. */
+  onResetStable?: () => void;
+  /** Whether a yard already exists, which changes what the buttons mean. */
+  hasStable?: boolean;
 }
 
 export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbacks): () => void {
@@ -22,8 +30,13 @@ export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbac
       </div>
       <div class="main-menu-actions">
         ${callbacks.onContinue ? '<button class="btn btn-primary" id="continue-btn">Continue Career</button>' : ''}
-        <button class="btn btn-primary" id="new-game-btn">New Game</button>
+        <button class="btn btn-primary" id="new-game-btn">${callbacks.hasStable ? 'New Horse' : 'Start Your Stable'}</button>
       </div>
+      ${
+        callbacks.hasStable
+          ? `<p class="main-menu-context">A new horse joins your existing stable — facilities, staff and prestige carry over.</p>`
+          : ''
+      }
       <div class="main-menu-save">
         <button class="menu-link" id="export-btn">Back Up Save</button>
         <button class="menu-link" id="import-btn">Restore Save</button>
@@ -33,6 +46,13 @@ export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbac
         Your stable lives in this browser. Back it up to keep it if you clear your
         data or move to another device.
       </p>
+      ${
+        callbacks.hasStable
+          ? `<div class="main-menu-danger">
+               <button class="menu-link danger" id="reset-btn">Start a New Stable</button>
+             </div>`
+          : ''
+      }
     </div>
   `;
 
@@ -54,6 +74,10 @@ export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbac
   menu.querySelector<HTMLButtonElement>('#import-btn')!.addEventListener('click', () => {
     fileInput.click();
   });
+  menu.querySelector<HTMLButtonElement>('#reset-btn')?.addEventListener('click', () => {
+    callbacks.onResetStable?.();
+  });
+
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
     if (!file) return;

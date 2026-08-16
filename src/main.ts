@@ -41,6 +41,8 @@ import {
   createNewCareer,
   createStable,
   retireCurrentHorse,
+  loadStable,
+  resetEverything,
   exportSave,
   importSave,
   takeRecoveryNotice,
@@ -622,7 +624,7 @@ function showMainMenu(): void {
           title: 'Retire the current horse?',
           lines: [
             `${savedCareer.horse.name} is still in training with ${peak} legacy to its name.`,
-            'Starting a new horse retires this one and banks that prestige to the yard.',
+            'Taking on a new horse retires this one and banks that prestige to the yard.',
           ],
           hint: 'Your facilities, staff, cash and prestige carry over either way.',
           tone: 'warning',
@@ -659,6 +661,55 @@ function showMainMenu(): void {
         tone: 'positive',
       });
     },
+    onResetStable: () => {
+      const yard = savedCareer?.stable ?? loadStable();
+      const prestige = yard ? yard.legacy.archivedPoints : 0;
+      const built = yard
+        ? Object.values(yard.facilities).filter((l) => l > 0).length
+        : 0;
+
+      showNotice(app, {
+        icon: '🔥',
+        title: 'Start a New Stable?',
+        lines: [
+          `This permanently deletes your yard: ${prestige} banked prestige, ${built} built facilit${built === 1 ? 'y' : 'ies'}, all staff, supplies and rival records.`,
+          'It cannot be undone, and no backup is kept.',
+        ],
+        hint: 'Back Up Save first if there is any chance you want this yard again.',
+        tone: 'setback',
+        input: { label: 'Type DELETE to confirm', placeholder: 'DELETE', required: true },
+        actions: [
+          { label: 'Cancel', variant: 'secondary' },
+          {
+            label: 'Delete Everything',
+            onSelect: ({ value }) => {
+              // A required field only guarantees *something* was typed, so the
+              // word itself still has to be checked here.
+              if (value.trim().toUpperCase() !== 'DELETE') {
+                showNotice(app, {
+                  icon: '✋',
+                  title: 'Not Deleted',
+                  lines: ['You did not type DELETE, so nothing was changed.'],
+                  tone: 'neutral',
+                });
+                return;
+              }
+              resetEverything();
+              showNotice(
+                app,
+                {
+                  icon: '🌱',
+                  title: 'New Stable',
+                  lines: ['Everything has been cleared. Your next horse starts from nothing.'],
+                  tone: 'neutral',
+                },
+                showMainMenu,
+              );
+            },
+          },
+        ],
+      });
+    },
     onImport: (text) => {
       const result = importSave(text);
       if (!result.ok) {
@@ -689,6 +740,8 @@ function showMainMenu(): void {
       },
     }),
   };
+
+  callbacks.hasStable = !!(savedCareer?.stable ?? loadStable());
 
   const teardownMenu = mountMainMenu(app, callbacks);
 
