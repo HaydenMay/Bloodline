@@ -1,7 +1,7 @@
 import type { Horse } from '../sim/types.js';
 import type { Division } from '../data/index.js';
 import type { Silks } from '../render/palette.js';
-import type { HorseLegacy, StableLegacy } from '../data/legacy.js';
+import type { HorseLegacy, RetirementReason, StableLegacy } from '../data/legacy.js';
 import type { StaffRoster } from '../data/staff.js';
 import { DEFAULTS } from '../data/colors.js';
 import { WORLD_POPULATION } from '../data/index.js';
@@ -20,6 +20,7 @@ import {
 import {
   createHorseLegacy,
   createStableLegacy,
+  getRetirementValue,
   seedLegacyFromRecord,
 } from '../data/legacy.js';
 
@@ -92,8 +93,11 @@ export interface Stable {
 /** A horse that has finished racing and is now part of the yard's stock. */
 export interface RetiredHorse {
   horse: Horse;
-  /** Legacy at its highest, which is what breeding values it on. */
+  /** Legacy at its highest. What the Hall of Fame judged it on. */
   legacyPeak: number;
+  /** Prestige it actually banked — lower than the peak if it was run on. */
+  legacyBanked: number;
+  retirementReason: RetirementReason;
   wins: number;
   starts: number;
   earnings: number;
@@ -277,7 +281,13 @@ export function saveCareer(career: Career): void {
  */
 export function retireCurrentHorse(career: Career): Stable {
   const stable = career.stable;
-  stable.legacy.archivedPoints += career.horseLegacy.peak;
+
+  // Banks what the horse is worth now, not what it was worth at its best —
+  // §8's gamble only exists if running one into the ground actually costs
+  // something. Retiring on top pays a bonus; a career ended by injury banks the
+  // peak regardless, per §6.
+  const value = getRetirementValue(career.horseLegacy, career.careerEndedByInjury === true);
+  stable.legacy.archivedPoints += value.banked;
   stable.careersCompleted += 1;
 
   // The horse itself joins the yard's stock. Previously only the number
@@ -286,6 +296,8 @@ export function retireCurrentHorse(career: Career): Stable {
   stable.bloodstock.push({
     horse: JSON.parse(JSON.stringify(career.horse)) as Horse,
     legacyPeak: career.horseLegacy.peak,
+    legacyBanked: value.banked,
+    retirementReason: value.reason,
     wins: career.stats.wins,
     starts: career.stats.racesCompleted,
     earnings: career.stats.totalEarnings,

@@ -66,28 +66,70 @@ describe('the stable outlives the horse', () => {
     expect(second.stable.consumables.bran_mash).toBe(2);
   });
 
-  it('banks the retired horse’s peak legacy as permanent prestige', () => {
+  /**
+   * §8: "chasing one more purse is a real gamble that costs future value".
+   * Banking the peak made running a horse into the ground free, so the yard
+   * banks what the horse still holds instead.
+   */
+  it('banks only what a faded horse still holds, not its peak', () => {
     const first = createNewCareer(horse('First'), DEFAULTS.playerSilksDefault, createStable());
     first.horseLegacy.peak = 420;
-    // A slump before retirement must not reduce what the yard keeps.
     first.horseLegacy.points = 90;
     saveCareer(first);
 
     retireCurrentHorse(first);
 
     const second = createNewCareer(horse('Second'), DEFAULTS.playerSilksDefault);
-    expect(second.stable.legacy.archivedPoints).toBe(420);
+    expect(second.stable.legacy.archivedPoints).toBe(90);
+  });
+
+  it('pays a bonus for retiring on top', () => {
+    const career = createNewCareer(horse('Sound'), DEFAULTS.playerSilksDefault, createStable());
+    career.horseLegacy.peak = 400;
+    career.horseLegacy.points = 400;
+    saveCareer(career);
+
+    const stable = retireCurrentHorse(career);
+    // 400 held plus the 20% sound-retirement bonus.
+    expect(stable.legacy.archivedPoints).toBe(480);
+    expect(stable.bloodstock[0]!.retirementReason).toBe('sound');
+  });
+
+  /** §6: the injury costs the racing career, never the breeding value. */
+  it('banks the full peak when a career is ended by injury', () => {
+    const career = createNewCareer(horse('Unlucky'), DEFAULTS.playerSilksDefault, createStable());
+    career.horseLegacy.peak = 300;
+    career.horseLegacy.points = 120;
+    career.careerEndedByInjury = true;
+    saveCareer(career);
+
+    const stable = retireCurrentHorse(career);
+    expect(stable.legacy.archivedPoints).toBe(300);
+    expect(stable.bloodstock[0]!.retirementReason).toBe('injured');
+  });
+
+  it('records what each horse actually banked alongside its peak', () => {
+    const career = createNewCareer(horse('Faded'), DEFAULTS.playerSilksDefault, createStable());
+    career.horseLegacy.peak = 500;
+    career.horseLegacy.points = 200;
+    saveCareer(career);
+
+    const stable = retireCurrentHorse(career);
+    expect(stable.bloodstock[0]!.legacyPeak).toBe(500);
+    expect(stable.bloodstock[0]!.legacyBanked).toBe(200);
   });
 
   it('accumulates prestige across several horses', () => {
     let stable = createStable();
-    for (const peak of [100, 250, 75]) {
-      const career = createNewCareer(horse(`H${peak}`), DEFAULTS.playerSilksDefault, stable);
-      career.horseLegacy.peak = peak;
+    for (const points of [100, 250, 75]) {
+      const career = createNewCareer(horse(`H${points}`), DEFAULTS.playerSilksDefault, stable);
+      career.horseLegacy.peak = points;
+      career.horseLegacy.points = points;
       saveCareer(career);
       stable = retireCurrentHorse(career);
     }
-    expect(stable.legacy.archivedPoints).toBe(425);
+    // Each retired on top, so each banked its legacy plus 20%.
+    expect(stable.legacy.archivedPoints).toBe(100 + 20 + 250 + 50 + 75 + 15);
     expect(stable.careersCompleted).toBe(3);
   });
 
@@ -233,6 +275,7 @@ describe('bloodstock', () => {
     const career = createNewCareer(horse('Unlucky'), DEFAULTS.playerSilksDefault, createStable());
     career.careerEndedByInjury = true;
     career.horseLegacy.peak = 150;
+    career.horseLegacy.points = 150;
     saveCareer(career);
 
     const stable = retireCurrentHorse(career);

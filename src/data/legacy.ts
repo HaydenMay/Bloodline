@@ -244,3 +244,66 @@ export function seedLegacyFromRecord(
 
   return points;
 }
+
+/* ---------------------------------------------------------------------------
+   What a career is worth at retirement
+   ------------------------------------------------------------------------ */
+
+/**
+ * Retiring within this share of the horse's peak counts as retiring on top.
+ */
+export const SOUND_RETIREMENT_THRESHOLD = 0.9;
+
+/** What retiring on top adds, on top of the legacy the horse still holds. */
+export const SOUND_RETIREMENT_BONUS = 0.2;
+
+export type RetirementReason = 'sound' | 'faded' | 'injured';
+
+export interface RetirementValue {
+  /** Prestige banked to the yard, and the horse's worth at stud. */
+  banked: number;
+  /** Before the bonus. */
+  base: number;
+  bonus: number;
+  reason: RetirementReason;
+}
+
+/**
+ * What a horse is worth when it stops racing.
+ *
+ * §8 wants chasing one more purse to be "a real gamble that costs future value".
+ * That only works if the yard banks what the horse is worth **now** rather than
+ * what it was worth at its best — banking the peak made running a horse into
+ * the ground free, which is the opposite of a gamble.
+ *
+ * Three outcomes:
+ *   - **sound**   retired at or near its peak. Banks its legacy plus a bonus.
+ *                 This is §8's retiring-on-top reward, named for the timing it
+ *                 actually measures rather than the Championship division.
+ *   - **faded**   run on past its best. Banks only what is left, which is the
+ *                 cost of the gamble.
+ *   - **injured** §6 promises a career-ending injury keeps "full breeding
+ *                 value", so it banks the peak regardless of where the horse
+ *                 had slipped to. The worst luck must not also be the worst
+ *                 outcome.
+ *
+ * Hall of Fame is deliberately *not* judged here — it stays on the peak, and
+ * once earned it cannot be lost.
+ */
+export function getRetirementValue(
+  legacy: HorseLegacy,
+  endedByInjury = false,
+): RetirementValue {
+  if (endedByInjury) {
+    return { banked: legacy.peak, base: legacy.peak, bonus: 0, reason: 'injured' };
+  }
+
+  const heldOn = legacy.peak > 0 ? legacy.points / legacy.peak : 1;
+
+  if (heldOn >= SOUND_RETIREMENT_THRESHOLD) {
+    const bonus = Math.round(legacy.points * SOUND_RETIREMENT_BONUS);
+    return { banked: legacy.points + bonus, base: legacy.points, bonus, reason: 'sound' };
+  }
+
+  return { banked: legacy.points, base: legacy.points, bonus: 0, reason: 'faded' };
+}

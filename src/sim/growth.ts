@@ -199,7 +199,7 @@ export function getRetirementAdvice(
     return 'This one has given you everything it has. Retire it while it is still worth something at stud.';
   }
   if (stage === 'declining' && slipped >= 0.25) {
-    return 'It is going the wrong way, and every beaten run costs it standing. I would stop now.';
+    return 'It is going the wrong way, and every beaten run is prestige it will never bank. I would stop now.';
   }
   if (stage === 'declining') {
     return 'The legs are going. Anything more is borrowed time — but it can still win the right race.';
@@ -207,5 +207,7 @@ export function getRetirementAdvice(
   if (racesCompleted >= 18) {
     return 'That is a full career behind it. Nothing left to prove.';
   }
+  // Nothing to say while the horse is holding its form — advice the player
+  // cannot act on is nagging, not counsel.
   return null;
 }

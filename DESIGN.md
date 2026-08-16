@@ -359,9 +359,24 @@ and the decline arc room to actually breathe.
 
 **Retirement is the player's call**, with the trainer hinting once decline sets in.
 
-**Legacy score** peaks and then **erodes if you keep running a declining horse into losses**,
-while retiring on top grants a *Retired Champion* bonus to breeding value. Chasing one more purse
-is a real gamble that costs future value rather than punishing you now.
+**Legacy score** peaks and then **erodes if you keep running a declining horse into losses**.
+
+What the yard banks at retirement is the legacy the horse **still holds**, not its peak — that is
+what makes chasing one more purse a real gamble rather than a free roll. Three outcomes:
+
+| Retirement | Banks |
+|---|---|
+| **Sound** — stopped within 10% of its peak | Its legacy **plus a 20% bonus**. This is the retiring-on-top reward |
+| **Faded** — run on past its best | Only what is left. The cost of the gamble |
+| **Injured** — career ended by injury (§6) | Its **peak**, in full. The worst luck must not also be the worst outcome |
+
+Named for the timing it measures. An earlier draft called this a *Retired Champion* bonus, which
+read as a Championship-division title — a Stakes horse retired at its peak earns it too, and a
+Championship horse run into the ground does not.
+
+**The Hall of Fame is judged separately, on the peak**, and once earned cannot be lost. So racing
+on is genuinely two-sided: it can still lift a horse into the Hall of Fame, while bleeding the
+prestige and breeding value it banks.
 
 ---
 

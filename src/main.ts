@@ -30,6 +30,7 @@ import {
   applyRaceToHorseLegacy,
   createHorseLegacy,
   createStableLegacy,
+  getRetirementValue,
 } from './data/legacy.js';
 import { mountFacilitiesScreen } from './ui/facilitiesScreen.js';
 import { getPrizeMultiplier, getTrainingMultiplier } from './data/facilities.js';
@@ -564,8 +565,9 @@ function showCareerRecap(career: Career): void {
   newGameBtn.addEventListener('click', () => {
     // Bank what this horse earned the yard before clearing the career. The
     // stable survives; only the horse's run ends.
+    const value = getRetirementValue(career.horseLegacy, career.careerEndedByInjury === true);
     const stable = retireCurrentHorse(career);
-    const banked = career.horseLegacy.peak;
+    const banked = value.banked;
 
     showNotice(
       app,
@@ -574,8 +576,10 @@ function showCareerRecap(career: Career): void {
         title: 'Career Complete',
         lines: [
           career.careerEndedByInjury
-            ? `${career.horse.name} retires hurt, having added ${banked} prestige to the yard. Its breeding value is untouched.`
-            : `${career.horse.name} retires having added ${banked} prestige to the yard.`,
+            ? `${career.horse.name} retires hurt, banking its full ${banked} prestige. The injury cost the racing career, not its breeding value.`
+            : value.reason === 'sound'
+              ? `${career.horse.name} retires on top, banking ${value.base} prestige plus a ${value.bonus} bonus.`
+              : `${career.horse.name} retires having banked ${banked} prestige, down from a peak of ${career.horseLegacy.peak}.`,
           `It joins your bloodstock — ${stable.bloodstock.length} horse${stable.bloodstock.length === 1 ? '' : 's'} in the yard now.`,
           `Facilities, staff, ${'$' + stable.cash.toLocaleString()} in cash and ${stable.reputation} reputation all carry over.`,
         ],
@@ -893,18 +897,23 @@ function showStableHub(career: Career): void {
       teardown = mountLegacyScreen(app, career, () => showStableHub(career));
     },
     onRetire: () => {
+      const value = getRetirementValue(career.horseLegacy, career.careerEndedByInjury === true);
       const peak = career.horseLegacy.peak;
-      const slipped = peak > 0 ? Math.round(((peak - career.horseLegacy.points) / peak) * 100) : 0;
       showNotice(app, {
         icon: '🏛️',
         title: `Retire ${career.horse.name}?`,
         lines: [
           `${career.stats.wins} wins from ${career.stats.racesCompleted} starts, peaking at ${peak} legacy.`,
-          slipped > 10
-            ? `It has given back ${slipped}% of its best. Retiring now banks the peak, not the present.`
-            : 'It retires at or near its best.',
+          value.reason === 'sound'
+            ? `Retiring on top: banks ${value.base} prestige plus a ${value.bonus} bonus for stopping at its best.`
+            : value.reason === 'injured'
+              ? `Retiring hurt, so it banks its full peak of ${value.banked} regardless.`
+              : `It has slipped to ${value.base} from a peak of ${peak}, and banks the ${value.base} it still holds.`,
         ],
-        hint: 'It joins your bloodstock and can be bred from. Nothing about it is lost.',
+        hint:
+          value.reason === 'faded'
+            ? 'Racing on can still lift its peak, but every beaten run costs what it banks.'
+            : 'It joins your bloodstock at full worth.',
         tone: 'neutral',
         actions: [
           { label: 'Keep Racing', variant: 'secondary' },

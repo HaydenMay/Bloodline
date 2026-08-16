@@ -7,6 +7,7 @@ import {
   createHorseLegacy,
   createStableLegacy,
   getStableLegacyPoints,
+  getRetirementValue,
   getTier,
   getTierFromPoints,
 } from './legacy.js';
@@ -160,5 +161,74 @@ describe('tiers', () => {
   it('always resolves to a tier', () => {
     expect(getTier(-50).name).toBe('Novice');
     expect(getTier(1200).name).toBe('Legend');
+  });
+});
+
+describe('what a career is worth at retirement', () => {
+  const legacy = (points: number, peak: number) => ({
+    points,
+    peak,
+    history: [points],
+    hallOfFame: peak >= HALL_OF_FAME_THRESHOLD,
+  });
+
+  it('pays a bonus for stopping at the peak', () => {
+    const value = getRetirementValue(legacy(400, 400));
+    expect(value.reason).toBe('sound');
+    expect(value.base).toBe(400);
+    expect(value.bonus).toBe(80);
+    expect(value.banked).toBe(480);
+  });
+
+  it('still counts as sound just inside the threshold', () => {
+    const value = getRetirementValue(legacy(365, 400)); // 91% held
+    expect(value.reason).toBe('sound');
+  });
+
+  it('banks only what is left once a horse has faded', () => {
+    const value = getRetirementValue(legacy(250, 400)); // 63% held
+    expect(value.reason).toBe('faded');
+    expect(value.bonus).toBe(0);
+    expect(value.banked).toBe(250);
+  });
+
+  /** The gamble: racing on past the peak has to cost something. */
+  it('makes running a horse down strictly worse than stopping', () => {
+    const stopped = getRetirementValue(legacy(400, 400));
+    const ranOn = getRetirementValue(legacy(300, 420));
+    expect(ranOn.banked).toBeLessThan(stopped.banked);
+  });
+
+  /** §6: the injury costs the racing career, not the breeding value. */
+  it('banks the full peak when a career ends in injury', () => {
+    const value = getRetirementValue(legacy(120, 300), true);
+    expect(value.reason).toBe('injured');
+    expect(value.banked).toBe(300);
+  });
+
+  it('does not let an injury bonus stack on top of the peak', () => {
+    const value = getRetirementValue(legacy(300, 300), true);
+    expect(value.bonus).toBe(0);
+    expect(value.banked).toBe(300);
+  });
+
+  it('handles a horse that never scored', () => {
+    const value = getRetirementValue(legacy(0, 0));
+    expect(value.banked).toBe(0);
+    expect(value.reason).toBe('sound');
+  });
+
+  /**
+   * Hall of Fame is judged on the peak and is deliberately untouched by any of
+   * this — racing on can still earn it while bleeding what the yard banks.
+   */
+  it('leaves the Hall of Fame decided by the peak alone', () => {
+    const enshrined = legacy(50, HALL_OF_FAME_THRESHOLD + 10);
+    expect(enshrined.hallOfFame).toBe(true);
+    const value = getRetirementValue(enshrined);
+    expect(value.reason).toBe('faded');
+    // Faded badly, banks little — but the honour stands.
+    expect(value.banked).toBe(50);
+    expect(enshrined.hallOfFame).toBe(true);
   });
 });
