@@ -1,5 +1,6 @@
 import type { Horse } from '../sim/types.js';
 import { STAT_KEYS, applyTrainedStat, getAgeTrainingFactor } from '../sim/growth.js';
+import { attachStatReveal, renderStatRows } from './statDisplay.js';
 import { TRAITS } from '../data/traits.js';
 import type { TraitId } from '../data/traits.js';
 import { createSurface, startLoop } from '../render/canvas.js';
@@ -184,34 +185,21 @@ export function mountTrainingScreen(
       </div>
 
       <div class="current-stats">
-        <h3>Current Stats</h3>
-        <div class="stats-row">
-          <div class="stat-item">
-            <span class="label">Speed</span>
-            <span class="value">${Math.round(horse.stats.speed)}</span>
-          </div>
-          <div class="stat-item">
-            <span class="label">Stamina</span>
-            <span class="value">${Math.round(horse.stats.stamina)}</span>
-          </div>
-          <div class="stat-item">
-            <span class="label">Grit</span>
-            <span class="value">${Math.round(horse.stats.grit)}</span>
-          </div>
-          <div class="stat-item">
-            <span class="label">Burst</span>
-            <span class="value">${Math.round(horse.stats.burst)}</span>
-          </div>
-          <div class="stat-item">
-            <span class="label">Temper</span>
-            <span class="value">${Math.round(horse.stats.temper)}</span>
-          </div>
+        <div class="current-stats-head">
+          <h3>Current Stats</h3>
+          <span class="stats-hint">Tap for exact numbers</span>
+        </div>
+        <div class="stat-rows" id="training-stat-rows">
+          ${renderStatRows(horse)}
         </div>
       </div>
     </div>
   `;
 
   container.appendChild(root);
+
+  // Grades read first; tapping any row switches the whole block to numbers.
+  const detachReveal = attachStatReveal(root);
 
   // Set up horse preview canvas
   const canvasWrapper = root.querySelector('.horse-preview-wrapper') as HTMLElement;
@@ -336,6 +324,7 @@ export function mountTrainingScreen(
   });
 
   return () => {
+    detachReveal();
     root.remove();
   };
 }

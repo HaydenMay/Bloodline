@@ -1,4 +1,5 @@
 import { toGrade, STAT_KEYS, type Horse, type StatKey } from "../sim/types.js";
+import { getPotentialBand } from "./statDisplay.js";
 import { TRAITS } from "../data/traits.js";
 import { coatFor, type Silks } from "../render/palette.js";
 import { getBadgeDataUri } from "../render/shieldBadge.js";
@@ -41,29 +42,31 @@ const STYLE_LABELS: Record<string, { name: string; seat: string }> = {
   closer: { name: "Closer", seat: "Settles at the back" },
 };
 
-/** Potential shown as a band, since the exact ceiling is never revealed. */
-function potentialBand(current: number, potential: number): string {
-  const room = potential - current;
-  if (room < 12) return "close to its ceiling";
-  if (room < 26) return "some room left";
-  if (room < 42) return "plenty of room";
-  return "barely scratched";
-}
-
-export function renderInfoBox(horse: Horse): string {
+export function renderInfoBox(horse: Horse, showPotential = false): string {
   const style = STYLE_LABELS[horse.style] ?? STYLE_LABELS["closer"]!;
   const coat = coatFor(horse.coat);
 
+  // Rivals never show their ceilings — §3 gives you a form guide, not a stat
+  // dump. Your own horse shows a per-stat band.
+  const isPlayerHorse = horse.potential !== undefined && showPotential;
   const stats = STAT_KEYS.map((key) => {
-    const value = horse.stats[key];
+    const value = Math.round(horse.stats[key]);
     const grade = toGrade(value);
+    const ceiling = horse.potential?.[key];
+    const band = isPlayerHorse && ceiling !== undefined
+      ? getPotentialBand(value, ceiling)
+      : null;
     return `
       <div class="ib-stat">
         <span class="ib-stat-name">${STAT_LABELS[key]}</span>
-        <span class="ib-bar"><i style="width:${value}%"></i></span>
+        <span class="ib-bar">
+          ${band ? `<i class="ib-ceiling" style="width:${band.ceilingAt.toFixed(0)}%"></i>` : ""}
+          <i style="width:${value}%"></i>
+        </span>
         <span class="ib-grade ib-g${grade}">${grade}</span>
         <span class="ib-num">${value}</span>
-      </div>`;
+      </div>
+      ${band ? `<div class="ib-room room-${band.id}">${band.label}</div>` : ""}`;
   }).join("");
 
   // A plain range in metres, not a grade per band. The bands needed explaining
@@ -95,8 +98,6 @@ export function renderInfoBox(horse: Horse): string {
         .join("")
     : '<span class="ib-trait ib-none">None discovered</span>';
 
-  const speedRoom = potentialBand(horse.stats.speed, horse.potential.speed);
-
   // Placeholder for badge; will be updated once loaded
   const badgeHtml = `<span class="ib-badge-placeholder" style="background:${coat.body};border-color:${coat.hair}"></span>`;
 
@@ -117,7 +118,6 @@ export function renderInfoBox(horse: Horse): string {
 
     <p class="ib-section">Attributes</p>
     ${stats}
-    <p class="ib-hint">Potential: ${speedRoom}</p>
 
     <p class="ib-section">Distance</p>
     <div class="ib-apts">${distance}</div>
@@ -132,13 +132,18 @@ export function attachInfoBox(
   trigger: HTMLElement,
   horse: Horse,
   silks?: Silks,
+  /**
+   * Whether to show potential bands. Off by default: §3 gives you a form guide
+   * on a rival, not its ceilings — only your own horse reveals headroom.
+   */
+  showPotential = false,
 ): () => void {
   const card = document.createElement("div");
   card.className = "info-box-popover";
   card.hidden = true;
   const content = document.createElement("div");
   content.className = "info-box-content";
-  content.innerHTML = renderInfoBox(horse);
+  content.innerHTML = renderInfoBox(horse, showPotential);
   card.appendChild(content);
   document.body.appendChild(card);
 

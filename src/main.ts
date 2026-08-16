@@ -229,7 +229,7 @@ function startRace(seed: string): void {
     `;
     app.appendChild(bar);
 
-    attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks);
+    attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks, true);
 
     const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
     const hintText = bar.querySelector<HTMLElement>('#rb-hint-text')!;
@@ -1213,7 +1213,8 @@ function startRaceWithHorse(
 
       // Attach infobox to player horse name
       const playerHorseNameEl = bar.querySelector<HTMLElement>('.rb-horse')!;
-      const infoBoxCleanup = attachInfoBox(playerHorseNameEl, player, career.playerSilks);
+      // Your own horse: ceilings shown as bands. Rivals elsewhere show none.
+      const infoBoxCleanup = attachInfoBox(playerHorseNameEl, player, career.playerSilks, true);
 
       const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
       const hintText = bar.querySelector<HTMLDivElement>('.rb-callout')!;

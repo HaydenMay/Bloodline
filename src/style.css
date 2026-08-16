@@ -6513,3 +6513,142 @@ body {
   border-left-color: var(--line);
   background: var(--bg);
 }
+
+/* ============================================================================
+   Shared stat rows — grades primary, numbers on tap, potential as a band
+   ========================================================================== */
+
+.current-stats-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stats-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr auto auto;
+  grid-template-areas: 'name bar grade num';
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--font);
+  text-align: left;
+  transition: border-color 0.15s ease;
+}
+
+.stat-row:hover {
+  border-color: var(--accent-border);
+}
+
+.stat-row-name {
+  grid-area: name;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.stat-row-bar {
+  grid-area: bar;
+  position: relative;
+  height: 8px;
+  background: var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* The ghost fill is how far the ceiling is; the solid one is the stat today.
+   The gap between them closing IS the narrowing range (DESIGN.md 2). */
+.stat-row-ceiling,
+.ib-ceiling {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent-faint);
+  border-right: 1px dashed var(--accent-medium);
+}
+
+.stat-row-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+  border-radius: 4px;
+}
+
+.stat-row-grade {
+  grid-area: grade;
+  font-weight: 800;
+  font-size: 0.95rem;
+  min-width: 1.1rem;
+  text-align: center;
+}
+
+.grade-S { color: #f2c14e; }
+.grade-A { color: var(--ok); }
+.grade-B { color: var(--text); }
+.grade-C { color: var(--muted); }
+.grade-D { color: var(--warning); }
+
+/* Numbers stay out of the way until asked for. */
+.stat-row-num {
+  grid-area: num;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-width: 2ch;
+  text-align: right;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.stat-row.revealed .stat-row-num {
+  opacity: 1;
+}
+
+.stat-row-room {
+  grid-area: room;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* The band only earns its own line once there is something notable to say. */
+.stat-row:has(.stat-row-room) {
+  grid-template-columns: 5.5rem 1fr auto auto;
+  grid-template-areas:
+    'name bar grade num'
+    'room room room room';
+  row-gap: 2px;
+}
+
+.room-close { color: var(--accent); }
+.room-maxed { color: var(--muted); opacity: 0.7; }
+
+.ib-room {
+  font-size: 10px;
+  color: var(--muted);
+  font-style: italic;
+  margin: -2px 0 4px 0;
+  padding-left: 4.6rem;
+}
+
+.ib-bar {
+  position: relative;
+}
