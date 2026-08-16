@@ -5598,14 +5598,14 @@ body {
   padding: 20px;
 }
 
-.staff-container,
-.consumables-container,
 /* `display: flex` above outranks the browser's own [hidden] rule, so hiding the
    screen to show the dossier over it silently did nothing. */
 .raceday-screen[hidden] {
   display: none;
 }
 
+.staff-container,
+.consumables-container,
 .raceday-container,
 .dossier-container {
   width: 100%;
