@@ -13,8 +13,8 @@ Two nested loops. The inner one is a horse's career. The outer one is your stabl
 never resets.
 
 ```
-NEW HORSE  →  TRAIN  →  RACE  →  (~12 races)  →  RETIRE
-    ↑                                              ↓
+NEW HORSE  →  TRAIN  →  RACE  →  (18–20 races)  →  RETIRE
+    ↑                                               ↓
     └────────  BREED / fresh line  ←────  winnings → STABLE (permanent)
 ```
 
@@ -24,6 +24,32 @@ stronger platform than run 1. That is the roguelike spine.
 
 At retirement you always get three choices: **race the foal you just bred**, **breed again**,
 or **start a brand-new line**. ✅
+
+### Breeding is the intended path ✅
+
+The three choices are **not equals**. Breeding from your own stock — ideally from a Hall of Fame
+horse — is the path the game is built around, and a fresh unrelated horse is the fallback, not a
+parallel strategy.
+
+|  | Bred foal | Fresh unrelated horse |
+|---|---|---|
+| **Inheritance budget** | Full — parents' careers, plus any Hall of Fame bonus | None. Generation 1 |
+| **Traits & coat** | Inherited, with recessives and surprises | Rolled from the starter pool |
+| **Stable scaling** | Yes | Yes — the yard's investment still shows |
+| **Pedigree** | Extends the line | Starts a new root |
+
+A fresh horse is **never a dead end**: it still benefits from everything the stable has built, so
+a player who wants to roll the dice can, and the horse will be competitive for its generation. It
+simply does not inherit, so its ceiling is the one a first-generation horse has.
+
+This is what keeps the family tree **deep rather than wide**. Nothing forbids starting over —
+but the compounding lives in the line, so the tree the archive draws is a few long lineages with
+the occasional new root, not a field of orphans.
+
+**Why Hall of Fame horses in particular.** They are free breeding partners forever (§10), and they
+carry a bonus into the budget. Enshrining a horse is therefore not a trophy — it is the single most
+valuable thing a career can produce, because it permanently raises the floor of every horse
+descended from it.
 
 ---
 
@@ -438,7 +464,10 @@ the genetic rules with their own mutation chance — so a rare trait is pure del
 out of the pool.
 
 ### Partners, access & age ✅
-- **Your own Hall of Fame horses are free, forever**
+- **Your own Hall of Fame horses are free, forever** — and carry a budget bonus, which is what
+  makes enshrining one the most valuable outcome a career has (§1)
+- **Every horse you retire enters your bloodstock**, Hall of Fame or not. A horse leaves the
+  racetrack; it never leaves the yard. Retiring is what stocks the stud, so no run is ever wasted
 - **Reputation** unlocks higher-calibre outside partners
 - **Age is the only breeding limit.** Retired horses keep ageing and eventually become ineligible.
   No arbitrary caps, no cooldowns — and it means rerolling burns your best sire's remaining years,
@@ -578,8 +607,15 @@ Separate music and SFX toggles in the menu.
 
 ### Starter selection ✅
 Six horses, **guaranteed archetype spread** — all four running styles covered, mixed distance
-aptitudes, no duplicated traits. Every playthrough offers a legible choice. The pool gains rarer
-traits and higher potential as your stable grows.
+aptitudes, no duplicated traits. Every playthrough offers a legible choice.
+
+**The pool scales with the stable, not past it.** Rarer traits and higher potential appear as the
+yard grows, so a fresh line is always worth racing — but a starter is generation 1 and inherits
+nothing, so it never matches what a good line produces (§1). The scaling exists to stop a new root
+feeling like a punishment, not to make it an alternative to breeding.
+
+Once bloodstock exists, starter selection is reached through **"start a brand-new line"** at
+retirement rather than being the default way to get a horse.
 
 ### Onboarding ✅
 **Learn by playing.** The energy bar's shifting safe zone teaches pacing, the form guide teaches
