@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { BASE_PURSES, getPrizeMoney, getPrizeShare, getPurse } from './purse.js';
+import {
+  BASE_PURSES,
+  PRIZE_SHARES,
+  STARTER_ALLOWANCE_SHARE,
+  getPrizeMoney,
+  getPrizeShare,
+  getPurse,
+} from './purse.js';
 
 describe('purses', () => {
   it('pays more the higher the division', () => {
@@ -46,16 +53,35 @@ describe('purses', () => {
 });
 
 describe('prize money', () => {
-  it('pays down the placings', () => {
-    expect(getPrizeShare(1)).toBeGreaterThan(getPrizeShare(2));
-    expect(getPrizeShare(2)).toBeGreaterThan(getPrizeShare(3));
-    expect(getPrizeShare(3)).toBeGreaterThan(getPrizeShare(4));
+  it('pays down the placings, every place worth less than the one above', () => {
+    for (let position = 2; position <= PRIZE_SHARES.length; position++) {
+      expect(getPrizeShare(position)).toBeLessThan(getPrizeShare(position - 1));
+    }
+  });
+
+  it('shares out the whole purse across the placed runners', () => {
+    const total = PRIZE_SHARES.reduce((a, b) => a + b, 0);
+    expect(total).toBeCloseTo(1, 5);
+  });
+
+  /**
+   * The old ladder paid 4th and everything behind it a flat 10%, so running
+   * last in an Open race collected $2,000 and a bad day cost nothing.
+   */
+  it('drops the unplaced to a token starter’s allowance', () => {
+    expect(getPrizeShare(7)).toBe(STARTER_ALLOWANCE_SHARE);
+    expect(getPrizeShare(12)).toBe(STARTER_ALLOWANCE_SHARE);
+    expect(getPrizeShare(7)).toBeLessThan(getPrizeShare(6) / 2);
+  });
+
+  it('still pays something for turning up', () => {
+    expect(getPrizeMoney('open', 8, 0.5)).toBeGreaterThan(0);
   });
 
   it('is the share of the purse for that race', () => {
     const purse = getPurse('stakes', 0.8);
     expect(getPrizeMoney('stakes', 1, 0.8)).toBe(Math.round(purse * 0.5));
-    expect(getPrizeMoney('stakes', 3, 0.8)).toBe(Math.round(purse * 0.15));
+    expect(getPrizeMoney('stakes', 3, 0.8)).toBe(Math.round(purse * 0.12));
   });
 
   /** A win in a hard race must beat a win in an easy one, or difficulty is a tax. */

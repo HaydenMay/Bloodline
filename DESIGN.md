@@ -585,10 +585,32 @@ race. This is where player agency enters an otherwise random inheritance.
 ## 11. The Stable
 
 ### Currencies ✅
-- **Cash** — from purses (paid down to 3rd). Buys facilities, cosmetics, stud fees, staff.
+- **Cash** — from purses. Buys facilities, cosmetics, stud fees, staff.
 - **Reputation** — from wins and titles. Unlocks elite sires, divisions, rarer starters.
 
 Separating them means a lucky payday can't buy prestige you haven't earned.
+
+### Purses ✅
+
+A race's purse is its **division base** — Maiden $5k, Novice $10k, Open $20k, Stakes $50k,
+Championship $100k — times the calendar's **difficulty** rating, spanning ×0.6 at the softest to
+×1.4 at the toughest.
+
+Difficulty is not decoration: it decides which rivals turn up. The division is ranked by rating and
+a selection window slides with the difficulty, so a five-bar race draws the division's best. That
+is the risk; the bigger purse is the reward. **Betting odds need no adjustment for it** — they are
+priced off the player's rating share of the field actually faced, so a harder field lengthens them
+by itself.
+
+Paid down to sixth, modelled on how real racing distributes:
+
+| 1st | 2nd | 3rd | 4th | 5th | 6th | Every other runner |
+|---|---|---|---|---|---|---|
+| 50% | 22% | 12% | 8% | 5% | 3% | 1% starter's allowance |
+
+The allowance mirrors the small payment real tracks fund for turning up, separately from the
+advertised purse. An earlier ladder paid 4th *and everything behind it* a flat 10%, which meant
+running last of eight in an Open race collected $2,000 and a bad day cost nothing.
 
 ### Facilities ✅
 Seven, five levels each: `Training Track` · `Hill Course` · `Swimming Pool` · `Veterinary Wing` ·

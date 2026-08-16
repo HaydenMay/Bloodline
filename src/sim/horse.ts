@@ -123,17 +123,38 @@ export function rollMoment(rng: Rng, style: RunningStyle): Moment {
 }
 
 /**
- * Traits: 2-4, with a third and fourth becoming likelier as legacy rises, so
- * generations of breeding work pay off visibly at the moment a foal is born.
+ * How much inherited legacy it takes to max out the extra-trait bonus.
+ *
+ * Calibrated to the current (exponential) legacy scale. The old figure was 200,
+ * set when a whole career was worth a few hundred points — on today's numbers
+ * any established yard saturated it immediately.
  */
-export function rollTraits(rng: Rng, legacy = 0, pool: TraitId[] = RACING_TRAIT_IDS): TraitId[] {
+const TRAIT_BONUS_SATURATION = 1200;
+
+/**
+ * Traits: 2-4, with a third and fourth becoming likelier as *inherited* legacy
+ * rises, so generations of breeding work pay off visibly when a foal is born.
+ *
+ * `legacy` is what the horse inherits from its parents, not what its yard has
+ * banked. A starter inherits nothing however famous the stable is — it is
+ * generation 1 by definition (§1) — so it always takes the starter branch. It
+ * used to be handed the stable's whole archived prestige, which put fresh
+ * starters on the bred-horse curve and made four traits a common opening hand
+ * rather than the reward for a bloodline.
+ */
+export function rollTraits(
+  rng: Rng,
+  legacy = 0,
+  pool: TraitId[] = RACING_TRAIT_IDS,
+  opts: { starter?: boolean } = {},
+): TraitId[] {
   let count = 2;
-  if (legacy === 0) {
-    // Starters: 0.5% chance of a very rare 3rd trait.
+  if (opts.starter || legacy <= 0) {
+    // Starters: 0.5% chance of a very rare 3rd trait. Never a 4th.
     if (rng.chance(0.005)) count = 3;
   } else {
     // Bred horses: scale up from 22% base, up to 45% bonus at high legacy.
-    const bonus = Math.min(0.45, legacy / 200);
+    const bonus = Math.min(0.45, legacy / TRAIT_BONUS_SATURATION);
     if (rng.chance(0.22 + bonus)) count = 3;
     if (count === 3 && rng.chance(0.06 + bonus * 0.4)) count = 4;
   }
@@ -247,7 +268,9 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     style,
     moment,
     preferredDistance: rollPreferredDistance(rng, opts.distanceCentre),
-    traits: rollTraits(rng, opts.legacy ?? 0),
+    traits: rollTraits(rng, opts.legacy ?? 0, RACING_TRAIT_IDS, {
+      starter: opts.starter === true,
+    }),
     condition: opts.starter ? 70 : clamp100(rng.range(58, 88)),
     morale: 60,
     division,

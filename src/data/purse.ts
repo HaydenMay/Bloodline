@@ -44,12 +44,28 @@ export function getPurse(division: string, difficulty = 0.5): number {
   return Math.round((base * multiplier) / 100) * 100;
 }
 
+/**
+ * Share of the purse paid down the placings, 1st to 6th.
+ *
+ * Modelled on how real racing actually pays: the UK distributes to the first
+ * six, US purses commonly to the first five at roughly 60/20/11/6/3. The old
+ * ladder paid 4th *and everything behind it* a flat 10%, so finishing last of
+ * eight in an Open race collected $2,000 and a bad run cost nothing.
+ */
+export const PRIZE_SHARES = [0.5, 0.22, 0.12, 0.08, 0.05, 0.03];
+
+/**
+ * What every other runner collects, win or lose.
+ *
+ * Real tracks fund a small starter's allowance separately from the advertised
+ * purse — a few hundred dollars for turning up. It keeps a bad day from being a
+ * total loss without making the back half of the field worth racing for.
+ */
+export const STARTER_ALLOWANCE_SHARE = 0.01;
+
 /** Share of the purse paid for a finishing position. */
 export function getPrizeShare(finishingPosition: number): number {
-  if (finishingPosition === 1) return 0.5;
-  if (finishingPosition === 2) return 0.25;
-  if (finishingPosition === 3) return 0.15;
-  return 0.1;
+  return PRIZE_SHARES[finishingPosition - 1] ?? STARTER_ALLOWANCE_SHARE;
 }
 
 /** What a given finishing position actually pays. */
