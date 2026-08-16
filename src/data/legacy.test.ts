@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   HALL_OF_FAME_THRESHOLD,
-  PROMOTION_BONUS,
+  getPromotionBonus,
   applyRaceToHorseLegacy,
   calculateRaceLegacyChange,
   createHorseLegacy,
@@ -75,9 +75,42 @@ describe('applyRaceToHorseLegacy', () => {
     const plain = createHorseLegacy(0);
     const promoted = createHorseLegacy(0);
     applyRaceToHorseLegacy(plain, 1, 'novice');
-    const swing = applyRaceToHorseLegacy(promoted, 1, 'novice', { promoted: true });
-    expect(swing.bonus).toBe(PROMOTION_BONUS);
-    expect(promoted.points - plain.points).toBe(PROMOTION_BONUS);
+    const swing = applyRaceToHorseLegacy(promoted, 1, 'novice', {
+      promoted: true,
+      newDivisionLevel: 2,
+    });
+    expect(swing.bonus).toBe(getPromotionBonus(2));
+    expect(promoted.points - plain.points).toBe(getPromotionBonus(2));
+  });
+
+  it('pays more for each rung climbed', () => {
+    // A flat bonus made stepping into Championship worth no more than
+    // stepping out of Maiden.
+    for (let level = 2; level <= 4; level++) {
+      expect(getPromotionBonus(level)).toBeGreaterThan(getPromotionBonus(level - 1));
+    }
+    expect(getPromotionBonus(1)).toBe(25);
+    expect(getPromotionBonus(4)).toBe(100);
+  });
+
+  /** Failing a qualifier is its own outcome; docking points punishes twice. */
+  it('never docks legacy for a bad finish in a qualifier', () => {
+    const legacy = createHorseLegacy(200);
+    const swing = applyRaceToHorseLegacy(legacy, 8, 'stakes', { qualifier: true });
+    expect(swing.raceDelta).toBe(0);
+    expect(legacy.points).toBe(200);
+  });
+
+  it('still pays a good finish in a qualifier', () => {
+    const legacy = createHorseLegacy(0);
+    const swing = applyRaceToHorseLegacy(legacy, 1, 'stakes', { qualifier: true });
+    expect(swing.raceDelta).toBeGreaterThan(0);
+  });
+
+  it('still docks a bad finish in an ordinary race', () => {
+    const legacy = createHorseLegacy(200);
+    applyRaceToHorseLegacy(legacy, 8, 'stakes');
+    expect(legacy.points).toBeLessThan(200);
   });
 
   it('remembers the peak even after a slump', () => {

@@ -135,8 +135,20 @@ const FINISH_POINTS: Record<number, number> = {
   7: -3,
 };
 
-/** Reaching a new division is worth far more than any single result. */
-export const PROMOTION_BONUS = 75;
+/**
+ * Reaching a new division, by the division reached.
+ *
+ * Escalating rather than flat: each rung is harder won than the last, and a
+ * flat bonus made the step into Championship worth no more than the step out of
+ * Maiden. Indexed by the new division level, so 1 (Novice) pays 25 and
+ * 4 (Championship) pays 100.
+ */
+export const PROMOTION_BONUSES = [0, 25, 50, 75, 100];
+
+export function getPromotionBonus(newDivisionLevel: number): number {
+  return PROMOTION_BONUSES[Math.max(0, Math.min(4, newDivisionLevel))] ?? 0;
+}
+
 /** Dropping a division costs something, but never a promotion's worth. */
 export const DEMOTION_PENALTY = -25;
 
@@ -184,11 +196,25 @@ export function applyRaceToHorseLegacy(
   legacy: HorseLegacy,
   finishingPosition: number,
   division: string,
-  options: { promoted?: boolean; demoted?: boolean } = {},
+  options: {
+    promoted?: boolean;
+    demoted?: boolean;
+    /** New division level, for the escalating promotion bonus. */
+    newDivisionLevel?: number;
+    /**
+     * A promotion or demotion qualifier. These are one-off races against a
+     * division you do not belong to yet, so a bad finish costs no legacy —
+     * failing the test is its own outcome, and docking points on top would
+     * punish a horse twice for reaching far enough to be tested.
+     */
+    qualifier?: boolean;
+  } = {},
 ): { raceDelta: number; bonus: number; total: number; inducted: boolean } {
-  const raceDelta = calculateRaceLegacyChange(finishingPosition, division);
+  const rawDelta = calculateRaceLegacyChange(finishingPosition, division);
+  const raceDelta = options.qualifier ? Math.max(0, rawDelta) : rawDelta;
+
   let bonus = 0;
-  if (options.promoted) bonus += PROMOTION_BONUS;
+  if (options.promoted) bonus += getPromotionBonus(options.newDivisionLevel ?? 0);
   if (options.demoted) bonus += DEMOTION_PENALTY;
 
   // A slump can erase a horse's standing but never push it into the negative.

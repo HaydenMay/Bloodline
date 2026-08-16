@@ -1445,6 +1445,9 @@ function startRaceWithHorse(
           {
             promoted: divisionLevelAfter > divisionLevelBefore,
             demoted: divisionLevelAfter < divisionLevelBefore,
+            newDivisionLevel: divisionLevelAfter,
+            // A qualifier is a one-off against a division you are not in yet.
+            qualifier: isPromotionRace || isDemotionRace,
           },
         );
 
