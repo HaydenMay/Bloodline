@@ -2,6 +2,7 @@ import type { Career } from './career.js';
 import { getStableLegacyPoints, getTier } from '../data/legacy.js';
 import { getForm, getSpirit } from '../sim/upkeep.js';
 import { getCareerStage, getRetirementAdvice } from '../sim/growth.js';
+import { getNextReputationUnlock } from '../data/reputation.js';
 
 export interface StableHubCallbacks {
   onTraining: () => void;
@@ -45,6 +46,10 @@ export function mountStableHub(
   const stablePoints = getStableLegacyPoints(career.stable.legacy, career.horseLegacy);
   const stableTier = getTier(stablePoints);
 
+  // A bare "Reputation 0" says nothing about why the player should want more.
+  // Naming the next wall turns it from a mystery number into a target.
+  const nextUnlock = getNextReputationUnlock(career.stable.reputation, career.stable.staff);
+
   // Direction of the horse's last result, so the hub reads as a live arc.
   const history = career.horseLegacy.history;
   const previous = history.length > 1 ? history[history.length - 2]! : null;
@@ -65,10 +70,16 @@ export function mountStableHub(
         <div class="status-item">
           <span class="status-label">Cash</span>
           <span class="status-value">$${career.stable.cash.toLocaleString()}</span>
+          <span class="status-note">Facilities, staff and supplies</span>
         </div>
         <div class="status-item">
           <span class="status-label">Reputation</span>
           <span class="status-value">${career.stable.reputation}</span>
+          <span class="status-note">${
+            nextUnlock
+              ? `Next: ${nextUnlock.what} at ${nextUnlock.at}`
+              : 'Every hire and supply unlocked'
+          }</span>
         </div>
       </div>
 
