@@ -71,12 +71,15 @@ export interface Stable {
   dossier: RivalDossier;
   settings: SaveSettings;
   facilities: Record<string, number>; // facility id -> level (0-5)
-  /** Farm-wide prestige. Gates facility upgrades. */
+  /**
+   * Farm-wide prestige, and the yard's only gate: facility tiers, staff levels
+   * and the supplies catalogue all read it. A separate `reputation` score used
+   * to gate the last two — a second lifetime counter earned from race results,
+   * which is what this already is.
+   */
   legacy: StableLegacy;
   /** The yard's wallet. Carries between horses. */
   cash: number;
-  /** Standing in the sport. Caps how good your staff can become. */
-  reputation: number;
   staff: StaffRoster;
   /** item id -> quantity held */
   consumables: Record<string, number>;
@@ -158,7 +161,6 @@ function looksLikeStable(value: unknown): boolean {
   const s = value as Partial<Stable>;
   return (
     typeof s.cash === 'number' &&
-    typeof s.reputation === 'number' &&
     typeof s.facilities === 'object' &&
     s.facilities !== null
   );
@@ -198,7 +200,6 @@ export function createStable(): Stable {
     },
     legacy: createStableLegacy(),
     cash: STARTING_CASH,
-    reputation: 0,
     staff: createStaffRoster(),
     consumables: {},
     careersCompleted: 0,
@@ -220,7 +221,8 @@ function normaliseStable(stable: Stable): Stable {
   if (!stable.dossier) stable.dossier = {};
   if (!stable.settings) stable.settings = { autopilotEnabled: false };
   if (typeof stable.cash !== 'number') stable.cash = STARTING_CASH;
-  if (typeof stable.reputation !== 'number') stable.reputation = 0;
+  // Prestige replaced it as the single gate; drop it so it cannot be read again.
+  delete (stable as unknown as { reputation?: number }).reputation;
   if (typeof stable.careersCompleted !== 'number') stable.careersCompleted = 0;
   if (!Array.isArray(stable.bloodstock)) stable.bloodstock = [];
   if (!Array.isArray(stable.world)) stable.world = [];
@@ -360,18 +362,15 @@ export function loadCareer(): Career | null {
     delete (career as unknown as { legacy?: unknown }).legacy;
     rescaleHorseLegacy(career.horseLegacy);
 
-    // Cash and reputation used to live on the career, which meant they died
-    // with the horse. Move them onto the yard, where they belong.
+    // Cash used to live on the career, which meant it died with the horse.
+    // Move it onto the yard, where it belongs.
     const legacyStats = career.stats as unknown as { cash?: number; reputation?: number };
     normaliseStable(career.stable);
     if (typeof legacyStats.cash === 'number') {
       career.stable.cash = legacyStats.cash;
       delete legacyStats.cash;
     }
-    if (typeof legacyStats.reputation === 'number') {
-      career.stable.reputation = legacyStats.reputation;
-      delete legacyStats.reputation;
-    }
+    delete legacyStats.reputation;
 
     // A stable saved separately is the newer record — prefer it, but keep the
     // career's own copy of the world so an in-flight race still finds its field.

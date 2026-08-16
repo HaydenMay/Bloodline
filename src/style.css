@@ -4294,8 +4294,8 @@ body {
   gap: 8px;
 }
 
-/* Says what the number above it is for. Cash and reputation are both bare
-   integers otherwise, and reputation in particular gives no clue why a player
+/* Says what the number above it is for. Cash and prestige are both bare
+   integers otherwise, and prestige in particular gives no clue why a player
    should want more of it. */
 .status-note {
   font-size: 0.7rem;

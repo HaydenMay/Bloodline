@@ -15,7 +15,6 @@ export interface SlotInfo {
   stableName: string;
   savedAt: string;
   cash: number;
-  reputation: number;
 }
 
 const isBrowser = (): boolean => typeof localStorage !== 'undefined';
@@ -60,7 +59,6 @@ export function listSlots(): (SlotInfo | null)[] {
         stableName: data.stableName,
         savedAt: envelope?.savedAt ?? '',
         cash: data.cash,
-        reputation: data.reputation,
       };
     } catch {
       return null;

@@ -13,7 +13,7 @@ import {
   checkStaffUpgrade,
   createStaffRoster,
   getJockeySkill,
-  getReputationRequired,
+  getPrestigeRequired,
   getStaffUpgradeCost,
   getTrainerBonus,
 } from './staff.js';
@@ -107,13 +107,10 @@ describe('staff', () => {
     expect(getTrainerBonus(roster.trainer.level)).toBe(0);
   });
 
-  it('gates a promotion on reputation before cash', () => {
-    // Rich but unknown: the wall is reputation, and saying "get money" would lie.
-    const check = checkStaffUpgrade(1, 10_000_000, 0);
-    const needed = getReputationRequired(2);
-    if (needed > 0) {
-      expect(check.blockedBy).toBe('reputation');
-    }
+  /** A rich unknown yard is blocked by standing; saying "get money" would lie. */
+  it('gates a promotion on prestige before cash', () => {
+    const check = checkStaffUpgrade(2, 10_000_000, 0);
+    expect(check.blockedBy).toBe('prestige');
 
     const broke = checkStaffUpgrade(3, 0, 10_000);
     expect(broke.blockedBy).toBe('cash');
@@ -124,7 +121,7 @@ describe('staff', () => {
     const check = checkStaffUpgrade(
       level,
       getStaffUpgradeCost(level + 1),
-      getReputationRequired(level + 1),
+      getPrestigeRequired(level + 1),
     );
     expect(check.canUpgrade).toBe(true);
   });
@@ -141,9 +138,9 @@ describe('staff', () => {
     expect(getJockeySkill(MAX_STAFF_LEVEL)).toBeGreaterThan(getJockeySkill(1));
   });
 
-  it('makes both reputation and cash climb with level', () => {
+  it('makes both prestige and cash climb with level', () => {
     for (let l = 3; l <= MAX_STAFF_LEVEL; l++) {
-      expect(getReputationRequired(l)).toBeGreaterThan(getReputationRequired(l - 1));
+      expect(getPrestigeRequired(l)).toBeGreaterThan(getPrestigeRequired(l - 1));
       expect(getStaffUpgradeCost(l)).toBeGreaterThan(getStaffUpgradeCost(l - 1));
     }
   });
@@ -152,8 +149,8 @@ describe('staff', () => {
 describe('consumables', () => {
   it('hides items the yard has no standing to buy', () => {
     const early = consumableCatalogue(0);
-    expect(early.some(({ item, unlocked }) => item.reputationRequired > 0 && unlocked)).toBe(false);
-    expect(consumableCatalogue(500).every((e) => e.unlocked)).toBe(true);
+    expect(early.some(({ item, unlocked }) => item.prestigeRequired > 0 && unlocked)).toBe(false);
+    expect(consumableCatalogue(5000).every((e) => e.unlocked)).toBe(true);
   });
 
   it('applies an upkeep item to the horse itself', () => {

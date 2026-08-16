@@ -17,8 +17,8 @@ export interface Consumable {
   description: string;
   kind: ConsumableKind;
   cost: number;
-  /** Reputation needed before a supplier will sell to you. */
-  reputationRequired: number;
+  /** Stable prestige needed before a supplier will sell to you. */
+  prestigeRequired: number;
   effectLabel: string;
   /** Mutates the horse it is given. Race-day items receive a throwaway copy. */
   apply: (horse: Horse) => void;
@@ -34,7 +34,7 @@ export const CONSUMABLES: Record<string, Consumable> = {
     description: 'A warm feed after hard work. Settles a tired horse.',
     kind: 'upkeep',
     cost: 800,
-    reputationRequired: 0,
+    prestigeRequired: 0,
     effectLabel: '+15 condition',
     apply: (h) => {
       h.condition = clamp(h.condition + 15);
@@ -47,7 +47,7 @@ export const CONSUMABLES: Record<string, Consumable> = {
     description: 'Replaces what a hard race takes out.',
     kind: 'upkeep',
     cost: 1400,
-    reputationRequired: 0,
+    prestigeRequired: 0,
     effectLabel: '+25 condition',
     apply: (h) => {
       h.condition = clamp(h.condition + 25);
@@ -60,7 +60,7 @@ export const CONSUMABLES: Record<string, Consumable> = {
     description: 'A day in the field doing nothing at all.',
     kind: 'upkeep',
     cost: 600,
-    reputationRequired: 0,
+    prestigeRequired: 0,
     effectLabel: '+20 morale',
     apply: (h) => {
       h.morale = clamp(h.morale + 20);
@@ -73,7 +73,7 @@ export const CONSUMABLES: Record<string, Consumable> = {
     description: 'A physio session between races.',
     kind: 'upkeep',
     cost: 2200,
-    reputationRequired: 25,
+    prestigeRequired: 150,
     effectLabel: '+20 condition and +10 morale',
     apply: (h) => {
       h.condition = clamp(h.condition + 20);
@@ -87,7 +87,7 @@ export const CONSUMABLES: Record<string, Consumable> = {
     description: 'Narrows the view. A distracted horse keeps its mind on the job.',
     kind: 'raceDay',
     cost: 1800,
-    reputationRequired: 0,
+    prestigeRequired: 0,
     effectLabel: '+6 temper for one race',
     apply: (h) => {
       h.stats.temper = clamp(h.stats.temper + 6);
@@ -100,7 +100,7 @@ export const CONSUMABLES: Record<string, Consumable> = {
     description: 'A fast piece of work days before the race.',
     kind: 'raceDay',
     cost: 2600,
-    reputationRequired: 40,
+    prestigeRequired: 300,
     effectLabel: '+5 speed and +5 burst for one race',
     apply: (h) => {
       h.stats.speed = clamp(h.stats.speed + 5);
@@ -114,7 +114,7 @@ export const CONSUMABLES: Record<string, Consumable> = {
     description: 'Weeks of aerobic base, cashed in on the day.',
     kind: 'raceDay',
     cost: 2600,
-    reputationRequired: 40,
+    prestigeRequired: 300,
     effectLabel: '+7 stamina for one race',
     apply: (h) => {
       h.stats.stamina = clamp(h.stats.stamina + 7);
@@ -127,7 +127,7 @@ export const CONSUMABLES: Record<string, Consumable> = {
     description: 'The jockey walks the track and studies the field.',
     kind: 'raceDay',
     cost: 4000,
-    reputationRequired: 120,
+    prestigeRequired: 900,
     effectLabel: '+8 grit and +4 consistency for one race',
     apply: (h) => {
       h.stats.grit = clamp(h.stats.grit + 8);
@@ -137,17 +137,17 @@ export const CONSUMABLES: Record<string, Consumable> = {
 };
 
 /** Items the yard's standing allows it to buy. */
-export function availableConsumables(reputation: number): Consumable[] {
-  return Object.values(CONSUMABLES).filter((c) => reputation >= c.reputationRequired);
+export function availableConsumables(prestige: number): Consumable[] {
+  return Object.values(CONSUMABLES).filter((c) => prestige >= c.prestigeRequired);
 }
 
 /** Everything, with a flag for whether it is purchasable yet. */
 export function consumableCatalogue(
-  reputation: number,
+  prestige: number,
 ): Array<{ item: Consumable; unlocked: boolean }> {
   return Object.values(CONSUMABLES)
-    .sort((a, b) => a.reputationRequired - b.reputationRequired || a.cost - b.cost)
-    .map((item) => ({ item, unlocked: reputation >= item.reputationRequired }));
+    .sort((a, b) => a.prestigeRequired - b.prestigeRequired || a.cost - b.cost)
+    .map((item) => ({ item, unlocked: prestige >= item.prestigeRequired }));
 }
 
 /** Total held across every item, for the hub badge. */

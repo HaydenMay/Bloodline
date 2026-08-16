@@ -604,24 +604,31 @@ race. This is where player agency enters an otherwise random inheritance.
 ## 11. The Stable
 
 ### Currencies ✅
-- **Cash** — from purses. Buys facilities, cosmetics, stud fees, staff.
-- **Reputation** — from race results: 5 for a win, 3 for second, 2 for third, 1 for turning up.
-  Gates **staff levels** and the **supplies catalogue** today. Elite sires wait on breeding (§10);
-  divisions are gated by division points, not reputation.
 
-Separating them means a lucky payday can't buy prestige you haven't earned.
+**Two numbers, and only two**, because a third was indistinguishable from one of them:
 
-Reputation is the harder of the two walls and the easier one to misread, so the hub names the next
-thing it opens rather than showing a bare number — "Next: Sports Massage at 25". A currency whose
-purpose the player has to infer is a currency they ignore.
+| | Earned by | What it does |
+|---|---|---|
+| **Cash** | Purses and winning bets | What you **spend** — facilities, staff, supplies, stud fees |
+| **Prestige** | Banked legacy from every horse, plus the current one's score | What you're **allowed** to spend it on — facility tiers, staff levels, the supplies catalogue |
 
-**Three numbers, three jobs**, and they are deliberately not interchangeable:
+Separating them means a lucky payday can't buy standing you haven't earned.
 
-| | Earned by | Spends on | Can it fall? |
-|---|---|---|---|
-| **Cash** | Purses and winning bets | Facilities, staff, supplies | Yes — you spend it |
-| **Reputation** | Race results | Permission to hire and buy | No |
-| **Legacy** | Race results, weighted by division | Facility tiers, the Hall of Fame | The active horse's share can |
+**Reputation was cut.** It was a third counter gating staff and supplies, earned from race results
+at 5 for a win, 3 for a second, 2 for a third. Prestige is also earned from race results, also
+accumulates for the life of the yard, and also never falls below what past horses banked — so the
+two were the same number with different arithmetic, and no player could articulate the difference.
+
+A horse-based version was considered and rejected for the same reason: reputation earned by the
+current horse and reset with it is *horse legacy*, minus the division weighting.
+
+The remaining distinction is real: **prestige belongs to the yard, legacy belongs to the horse.**
+A jockey signs with the stable and stays through every horse, so the stable's standing gates the
+hire. The Hall of Fame judges the horse, so its own legacy decides that.
+
+Because prestige is now the only gate, the hub names the next thing it opens rather than showing a
+bare number — "Unlocks Head Trainer level 8 at 1,800". A currency whose purpose the player has to
+infer is a currency they ignore.
 
 ### Purses ✅
 

@@ -20,6 +20,16 @@ const migrations: Record<number, Migration> = {
       autopilotEnabled: false,
     },
   }),
+  /**
+   * Reputation is gone. It gated staff levels and the supplies catalogue, which
+   * stable prestige now does on its own — the two were separate lifetime
+   * counters earned from the same race results.
+   */
+  2: (data) => {
+    const next = { ...data };
+    delete next.reputation;
+    return next;
+  },
 };
 
 export class SaveTooNewError extends Error {

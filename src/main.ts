@@ -117,33 +117,25 @@ function buildField(seed: string): { field: Horse[]; playerId: string } {
 }
 
 /**
- * Calculate race earnings and reputation gain based on division and finishing position.
- * Prize distribution: 1st=50%, 2nd=25%, 3rd=15%, 4th+=10%
+ * What a race pays out. Prize shares live in data/purse.ts.
+ *
+ * Standing is not settled here: a result's effect on the yard's prestige comes
+ * from the horse's own legacy, which already weights it by division.
  */
 function calculateRaceRewards(
   division: string,
   finishingPosition: number,
-  fieldSize: number,
   facilities: Record<string, number> = {},
   /** The calendar's 0-1 difficulty rating for this race. */
   difficulty = 0.5,
-): { earnings: number; reputation: number } {
-  let reputationGain = 1;
-  if (finishingPosition === 1) reputationGain = 5;
-  else if (finishingPosition === 2) reputationGain = 3;
-  else if (finishingPosition === 3) reputationGain = 2;
-
+): { earnings: number } {
   // Administration takes a cut of the paperwork off your hands and a bigger
   // share of the purse home with it.
   const earnings = Math.round(
     getPrizeMoney(division, finishingPosition, difficulty) * getPrizeMultiplier(facilities),
   );
 
-  // Scale reputation by field size (tighter races = more competitive)
-  const competitionMultiplier = Math.max(1, fieldSize / 12);
-  const scaledReputation = Math.round(reputationGain * competitionMultiplier);
-
-  return { earnings, reputation: scaledReputation };
+  return { earnings };
 }
 
 function startRace(seed: string): void {
@@ -349,7 +341,6 @@ function generateRandomCareer(): Career {
       ...createStable(),
       world: [],
       cash: totalEarnings + 5000,
-      reputation: wins * 2,
     },
     horseLegacy: createHorseLegacy(wins * 12),
     createdAt: Date.now() - Math.random() * 100000000,
@@ -532,7 +523,7 @@ function showCareerRecap(career: Career): void {
               ? `${career.horse.name} retires on top, banking ${value.base} prestige plus a ${value.bonus} bonus.`
               : `${career.horse.name} retires having banked ${banked} prestige, down from a peak of ${career.horseLegacy.peak}.`,
           `It joins your bloodstock — ${stable.bloodstock.length} horse${stable.bloodstock.length === 1 ? '' : 's'} in the yard now.`,
-          `Facilities, staff, ${'$' + stable.cash.toLocaleString()} in cash and ${stable.reputation} reputation all carry over.`,
+          `Facilities, staff, ${'$' + stable.cash.toLocaleString()} in cash and every point of prestige all carry over.`,
         ],
         hint: 'Your next horse starts from everything this one built.',
         tone: 'positive',
@@ -1296,10 +1287,9 @@ function startRaceWithHorse(
 
         // Update player horse records and division progression
         const playerFinishingPosition = playerIndex + 1;
-        const { earnings, reputation } = calculateRaceRewards(
+        const { earnings } = calculateRaceRewards(
           player.division,
           playerFinishingPosition,
-          placings.length,
           updatedCareer.stable.facilities,
           raceHype,
         );
@@ -1313,7 +1303,6 @@ function startRaceWithHorse(
 
         updatedCareer.stats.totalEarnings += earnings;
         updatedCareer.stable.cash += earnings;
-        updatedCareer.stable.reputation += reputation;
 
         // Settle any bet. The stake already left the wallet at race day, so
         // only the return comes back here.

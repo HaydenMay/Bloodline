@@ -1,6 +1,7 @@
 import type { Career } from './career.js';
 import { CONSUMABLES, consumableCatalogue } from '../data/consumables.js';
 import { saveCareer } from './career.js';
+import { getStableLegacyPoints } from '../data/legacy.js';
 import { showNotice } from './noticeModal.js';
 
 export function mountConsumablesScreen(
@@ -13,7 +14,9 @@ export function mountConsumablesScreen(
 
   const stable = career.stable;
   const horse = career.horse;
-  const catalogue = consumableCatalogue(stable.reputation);
+  // Suppliers sell to the yard, so the yard's standing decides the catalogue.
+  const prestige = getStableLegacyPoints(stable.legacy, career.horseLegacy);
+  const catalogue = consumableCatalogue(prestige);
 
   const owned = Object.entries(stable.consumables).filter(([, n]) => n > 0);
 
@@ -93,7 +96,7 @@ export function mountConsumablesScreen(
                                  data-buy="${item.id}" ${affordable ? '' : 'disabled'}>
                            ${affordable ? `Buy — $${item.cost.toLocaleString()}` : `Needs $${item.cost.toLocaleString()}`}
                          </button>`
-                      : `<div class="shop-locked">Unlocks at ${item.reputationRequired} reputation</div>`
+                      : `<div class="shop-locked">Unlocks at ${item.prestigeRequired.toLocaleString()} prestige</div>`
                   }
                 </div>
               `;

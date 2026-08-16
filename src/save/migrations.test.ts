@@ -21,11 +21,26 @@ describe('migrate', () => {
   });
 });
 
+/** Reputation was a second lifetime counter; stable prestige is the only gate now. */
+describe('dropping reputation', () => {
+  it('strips it from a save written while it still existed', () => {
+    const old = { ...createStable('Ashford Park', 'seed-1234'), reputation: 42 };
+    const migrated = migrate(old, 2) as Record<string, unknown>;
+    expect(migrated.reputation).toBeUndefined();
+    expect(migrated.cash).toBe(old.cash);
+    expect(migrated.stableName).toBe('Ashford Park');
+  });
+
+  it('leaves a save that never had it alone', () => {
+    const fresh = createStable('Ashford Park', 'seed-1234');
+    expect(migrate(fresh, 2)).toEqual(fresh);
+  });
+});
+
 describe('export / import round-trip', () => {
   it('survives a round trip intact', () => {
     const original = createStable('Ashford Park', 'seed-1234');
     original.cash = 5000;
-    original.reputation = 42;
 
     const restored = importFromString(exportToString(original));
 

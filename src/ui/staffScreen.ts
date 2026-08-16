@@ -8,6 +8,7 @@ import {
   getTrainerBonus,
 } from '../data/staff.js';
 import { saveCareer } from './career.js';
+import { getStableLegacyPoints } from '../data/legacy.js';
 import { showNotice } from './noticeModal.js';
 
 /** What the next level buys, so the player can see the step before paying. */
@@ -29,6 +30,9 @@ export function mountStaffScreen(
 
   const stable = career.stable;
   const roles: StaffRole[] = ['trainer', 'jockey'];
+  // Staff are hired by the yard and stay hired, so the yard's own standing is
+  // what decides who will sign for it.
+  const prestige = getStableLegacyPoints(stable.legacy, career.horseLegacy);
 
   root.innerHTML = `
     <div class="staff-container">
@@ -38,7 +42,7 @@ export function mountStaffScreen(
         <div style="width: 80px;"></div>
       </div>
 
-      <p class="subtitle">Cash pays your staff. Reputation decides who will work for you.</p>
+      <p class="subtitle">Cash pays your staff. Your yard's prestige decides who will sign for it.</p>
 
       <div class="staff-currencies">
         <div class="currency-chip">
@@ -46,8 +50,8 @@ export function mountStaffScreen(
           <span class="currency-value">$${stable.cash.toLocaleString()}</span>
         </div>
         <div class="currency-chip">
-          <span class="currency-label">Reputation</span>
-          <span class="currency-value">${stable.reputation}</span>
+          <span class="currency-label">Prestige</span>
+          <span class="currency-value">${prestige.toLocaleString()}</span>
         </div>
       </div>
 
@@ -56,12 +60,12 @@ export function mountStaffScreen(
           .map((role) => {
             const def = STAFF[role];
             const level = stable.staff[role].level;
-            const check = checkStaffUpgrade(level, stable.cash, stable.reputation);
+            const check = checkStaffUpgrade(level, stable.cash, prestige);
 
             let buttonLabel = `Promote — $${check.cost.toLocaleString()}`;
             if (check.blockedBy === 'max') buttonLabel = 'Fully Developed';
-            else if (check.blockedBy === 'reputation')
-              buttonLabel = `Needs ${check.reputationRequired} reputation`;
+            else if (check.blockedBy === 'prestige')
+              buttonLabel = `Needs ${check.prestigeRequired.toLocaleString()} prestige`;
             else if (check.blockedBy === 'cash') buttonLabel = `Needs $${check.cost.toLocaleString()}`;
 
             return `
@@ -94,8 +98,8 @@ export function mountStaffScreen(
                            <span class="next-value">${nextLevelPreview(role, level)}</span>
                          </div>
                          ${
-                           check.blockedBy === 'reputation'
-                             ? `<p class="staff-locked">Reputation ${stable.reputation} / ${check.reputationRequired} — win races to be taken seriously.</p>`
+                           check.blockedBy === 'prestige'
+                             ? `<p class="staff-locked">Prestige ${prestige.toLocaleString()} / ${check.prestigeRequired.toLocaleString()} — win races to be taken seriously.</p>`
                              : ''
                          }
                          <button class="upgrade-button ${check.canUpgrade ? '' : 'disabled'}"
@@ -124,7 +128,7 @@ export function mountStaffScreen(
       if (!role) return;
 
       const level = stable.staff[role].level;
-      const check = checkStaffUpgrade(level, stable.cash, stable.reputation);
+      const check = checkStaffUpgrade(level, stable.cash, prestige);
       if (!check.canUpgrade) return;
 
       stable.cash -= check.cost;

@@ -49,7 +49,6 @@ describe('the stable outlives the horse', () => {
   it('carries facilities, staff, cash and prestige into the next career', () => {
     const first = createNewCareer(horse('First'), DEFAULTS.playerSilksDefault, createStable());
     first.stable.cash = 250_000;
-    first.stable.reputation = 140;
     first.stable.facilities.barn = 3;
     first.stable.staff.trainer.level = 4;
     first.stable.consumables.bran_mash = 2;
@@ -60,7 +59,6 @@ describe('the stable outlives the horse', () => {
 
     const second = createNewCareer(horse('Second'), DEFAULTS.playerSilksDefault);
     expect(second.stable.cash).toBe(250_000);
-    expect(second.stable.reputation).toBe(140);
     expect(second.stable.facilities.barn).toBe(3);
     expect(second.stable.staff.trainer.level).toBe(4);
     expect(second.stable.consumables.bran_mash).toBe(2);
@@ -174,21 +172,32 @@ describe('the stable outlives the horse', () => {
 });
 
 describe('migrating older saves', () => {
-  it('moves cash and reputation off the career and onto the yard', () => {
-    // A save written before the split, with the currencies on career.stats.
+  it('moves cash off the career and onto the yard', () => {
+    // A save written before the split, with the currency on career.stats.
     const career = createNewCareer(horse(), DEFAULTS.playerSilksDefault, createStable());
     const raw = JSON.parse(JSON.stringify({ version: 1, data: career }));
     raw.data.stats.cash = 61_000;
-    raw.data.stats.reputation = 33;
     delete raw.data.stable.cash;
-    delete raw.data.stable.reputation;
     localStorage.setItem('bloodline_career', JSON.stringify(raw));
     localStorage.removeItem('bloodline_stable');
 
     const loaded = loadCareer()!;
     expect(loaded.stable.cash).toBe(61_000);
-    expect(loaded.stable.reputation).toBe(33);
     expect((loaded.stats as unknown as { cash?: number }).cash).toBeUndefined();
+  });
+
+  /** Reputation was replaced by prestige; a save carrying it must not keep it. */
+  it('drops reputation from a save written before prestige became the gate', () => {
+    const career = createNewCareer(horse(), DEFAULTS.playerSilksDefault, createStable());
+    const raw = JSON.parse(JSON.stringify({ version: 1, data: career }));
+    raw.data.stable.reputation = 140;
+    raw.data.stats.reputation = 33;
+    localStorage.setItem('bloodline_career', JSON.stringify(raw));
+    localStorage.removeItem('bloodline_stable');
+
+    const loaded = loadCareer()!;
+    expect((loaded.stable as unknown as { reputation?: number }).reputation).toBeUndefined();
+    expect((loaded.stats as unknown as { reputation?: number }).reputation).toBeUndefined();
   });
 
   it('fills in staff and consumables missing from an older stable', () => {

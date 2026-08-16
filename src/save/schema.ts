@@ -15,7 +15,7 @@
 import { DEFAULTS } from '../data/colors.js';
 
 /** Bump this whenever the shape of StableSave changes. */
-export const CURRENT_VERSION = 2;
+export const CURRENT_VERSION = 3;
 
 export const SLOT_COUNT = 3;
 
@@ -44,7 +44,6 @@ export interface StableSave {
   createdAt: string;
 
   cash: number;
-  reputation: number;
 
   settings: SaveSettings;
 
@@ -85,6 +84,5 @@ export const createStable = (stableName: string, seed: string): StableSave => ({
   stableColours: DEFAULTS.stableColorsDefault,
   createdAt: new Date().toISOString(),
   cash: 0,
-  reputation: 0,
   settings: defaultSettings(),
 });
