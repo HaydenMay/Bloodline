@@ -91,6 +91,44 @@ early and everything after it is texture on top.
 
 **Deliverable: the loop closes.** Retire, breed, race the foal.
 
+### ⚠️ Stage 1 follow-up — bloodlines converge toward bland
+
+**Do this first.** `sim/breeding.ts` is built and correct on averages, but a three-generation trace
+through the real generator shows every line flattening. Columns are SPD / STA / BRS / GRT / TMP / CON.
+
+```
+GEN 1  Brash Tide (starter)   36  92  63  71  60  67    avg 64.8   spread 56
+GEN 2  budget 1190            54  87  71  76  65  73    avg 71.0   spread 33
+GEN 3  budget 1430            62  86  81  81  73  71    avg 75.7   spread 24
+```
+
+| Line | Gen 1 | Gen 2 | Gen 3 |
+|---|---|---|---|
+| A | 33 | 19 | 14 |
+| B | 56 | 33 | 24 |
+| C | 32 | 23 | 17 |
+
+The average climbs as designed, and a line's *character* does carry — Brash Tide is a stamina
+freak with no speed, and three generations on it still is. But the spread halves every generation.
+Extrapolated, generation six breeds 85/85/85/85/85/85: no specialists, no shape, every horse an
+identical all-rounder.
+
+**Cause.** Plain regression to the mean. Each foal centres on the mid-parent, and averaging two
+horses always narrows spread. `MAX_SPREAD` is 14, while starters naturally spread 30–56, so the
+variance term cannot come close to counteracting it.
+
+**Why it matters.** The progression currently runs backwards. It should start roughly uniform and
+grow *more* distinctive as a player breeds deliberately for a shape; instead it starts varied and
+converges on bland. It also quietly undoes §10's central trade — if every line ends up the same
+shape, choosing an outcross over a tight line stops meaning anything.
+
+**Fix.** Raise the variance so an outcross can genuinely throw a specialist, and likely scale it by
+how unlike each other the parents are rather than using a flat constant. Then **re-run the same
+three-generation trace** and confirm the spread column holds or widens. Do not trust the arithmetic
+on this one — the two bugs already found in this module (a line maxing out by generation four, and
+clamping silently destroying points) both passed every unit test and were only visible by replaying
+generations.
+
 ### Stage 2 — Partners, the cash sink, and stud influence
 - **Stud fees priced on what you are buying** — the partner's banked legacy *and* its potential
   grades, so you pay for the foal you can actually expect rather than for a reputation
