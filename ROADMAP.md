@@ -341,8 +341,34 @@ chance applies to traits and aptitude? How fast does relatedness narrow variance
 favourite line viable for "many generations", which needs a number. What does a rejected foal sell
 for, and how long before it turns up on a racecard?
 
-**Stage 4** — Does the tree render every horse, or collapse rejected foals until asked? What is the
-performance ceiling once a yard is fifty horses deep?
+**Stage 4** — ✅ Partly answered, and the question was pointing at the wrong thing.
+
+**Storage is not the wall.** A horse record is 657 bytes and a bloodstock entry 845, so fifty horses
+is 41 KB, a thousand is 825 KB, and five thousand is 4 MB against a browser budget near 5. The tree
+could hold a thousand horses without noticing.
+
+**Nor is the yard growing.** Bloodstock grows by exactly one horse per career, and stud influence —
+the thing that sounds like it should breed hundreds of descendants — creates **no horses at all**. It
+pays prestige and nothing else, deliberately (Stage 2). Fifty careers is fifty horses.
+
+**The growth risk is real but it arrives with two specific features**, neither built:
+
+- **Rejected foals sold into the world** (Stage 3's remaining bullet). One per rejection, bounded by
+  how often a player rerolls.
+- **Rival yards breeding to your stallions for real**, if stud influence ever stops being abstract.
+  This is the dangerous one: it compounds, because those foals breed too.
+
+**The levers, for when either lands:**
+
+| Lever | Does |
+|---|---|
+| **Promote on appearance** | Record an outside descendant as a *count* only, and create a real horse the first time it actually turns up on a racecard against you. §10's promised payoff — "pass on a colt and watch him win a Championship in three years" — needs a handful of real horses, not a population |
+| **A book limit** | Real stallions cover a book a season. Cap outside foals per stallion per career, so growth stays linear rather than compounding |
+| **Collapse by default** | Render your direct line in full and fold side branches behind a click. This is a rendering decision, and rendering is the actual ceiling — five hundred portrait cards with connecting lines is a browser problem long before storage is |
+
+The original question — "does the tree render every horse, or collapse rejected foals until asked?" —
+now has an answer: **keep everything, render almost nothing by default.** Storage is cheap and the
+archive is the point of the game; drawing is what needs the discipline.
 
 **Stage 5** — How large is the development pool, and does it scale with anything? What can points
 buy beyond stats — aptitude nudges and latent traits are named in §10, and both change what the
@@ -430,6 +456,29 @@ of each pull without touching the fact that the machine always pays.
 That may be the engine being more deterministic than intended, and it is likely related to the
 margins issue below. The odds curve should be fixed either way, but if the determinism is itself
 wrong, both want looking at together.
+
+### Retiring a horse early buys stud years
+
+The world clock advances `YEARS_PER_CAREER` (4) every time a horse retires, whatever its career was.
+That is the anti-reroll brake §10 asks for — "rerolling burns your best sire's remaining years, so the
+reroll grind eats the thing it depends on" — and it works: a foal dumped after one season costs a
+sire exactly the same four years as a full campaign, so a stallion is worth about five foals however
+they are spent.
+
+The seam is on the other side. A horse *joins* the stud at whatever age it retired, so retiring at
+three rather than five leaves it more years:
+
+| Retired at | Stud life |
+|---|---|
+| 3 | 4.6 foals' worth |
+| 4 | 4.4 |
+| 5 | 4.2 |
+
+About half a foal, and self-limiting today because retiring early guts the banked legacy that sets
+every future foal's quality — you would trade a fraction of a foal for a worse foal every time. Worth
+watching rather than fixing: if the economy ever makes early retirement cheap, this becomes a real
+strategy. The fiction is also loose in the same place, since a two-race career jumps the calendar
+four years. Any fix has to keep the anti-reroll brake, which is the harder half.
 
 ### Winning margins are too wide
 
