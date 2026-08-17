@@ -6738,6 +6738,17 @@ body {
   border-radius: 4px;
 }
 
+/* A projected range: where a foal could land, rather than where a horse is.
+   Drawn as a floating band so its WIDTH is the reading — a wide outcross is
+   visibly a wider bet than a tight line (DESIGN.md 10). */
+.stat-row-span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--accent-faint), var(--accent));
+  border-radius: 4px;
+}
+
 .stat-row-grade {
   grid-area: grade;
   font-weight: 800;
@@ -6797,4 +6808,141 @@ body {
 
 .ib-bar {
   position: relative;
+}
+
+/* ---------------------------------------------------------------------------
+   Breeding — the pairing screen (DESIGN.md 10)
+
+   Two lists and a projection. The foal's bands are the only numbers on the
+   page: no relatedness rating, no budget, nothing to learn before deciding.
+   --------------------------------------------------------------------------- */
+
+.breeding-screen {
+  width: 100%;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg);
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.breeding-container {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: slideUp 0.4s ease-out;
+}
+
+.breeding-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.breeding-top-bar h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text);
+  flex: 1;
+  text-align: center;
+}
+
+.breeding-section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.breeding-section h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.breeding-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.breeding-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.stud-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.stud-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-align: left;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.stud-card:hover {
+  border-color: var(--accent-border);
+}
+
+.stud-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-faint);
+}
+
+.stud-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.stud-card-name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stud-card-badge {
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.stud-card-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.stud-card-note {
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.stud-card-traits {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-style: italic;
 }

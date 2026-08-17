@@ -88,12 +88,37 @@ early and everything after it is texture on top.
 - ✅ Floor from the parents, budget from achievement, variance from pairing diversity
 - ✅ First-cross bonus, rolled once per pairing so rerolling cannot farm it
 - ✅ The generational trace, `npm run bloodline` — see the follow-up below
-- ⬜ Pairing screen showing **projected potential ranges and nothing else** (§10)
-- ⬜ New careers start from a foal or from a yearling
+- ✅ Pairing screen showing **projected potential ranges and nothing else** (§10)
+- ✅ New careers start from a foal or from a yearling
 
-**Deliverable: the loop closes.** Retire, breed, race the foal. *The simulation half is done and
-measured; nothing in the game imports it yet, so the loop does not close until the pairing screen
-and the foal-start career land.*
+**Deliverable: the loop closes.** ✅ Retire, breed, race the foal.
+
+Retirement now ends at a crossroads rather than the main menu: breed from your bloodstock, buy a
+yearling, or start a brand-new line. §13's rule that starter selection is reached *through* "start a
+brand-new line" holds from the moment a yard has anything at stud — including from the main menu, so
+quitting after a retirement cannot skip past your own bloodline.
+
+Three pieces carry it:
+
+| Piece | What it does |
+|---|---|
+| `ui/studBook.ts` | Who a yard can breed to, how often a pair has bred, and what a pairing projects. DOM-free; it lives in `ui/` only because `Stable` does |
+| `ui/breedingScreen.ts` | The pairing screen. Reachable mid-career from the hub as a **browse** — you cannot breed a foal while a horse is in training, because there is only ever one career at a time |
+| `ui/yearlingScreen.ts` | The sale ring, priced off prestige. A bought horse is generation 1 and inherits nothing |
+
+**Outside studs come from the world, not from a fresh roll** — the constraint the trace turned up
+below, honoured from the start. Partners are horses already racing in your world, gated by prestige
+(§10's higher-calibre partners, which reputation used to unlock). They have records and shapes of
+their own, and Stage 4's tree will be able to point at them.
+
+Two bugs worth recording, both found by driving the real screens rather than by tests:
+
+- **A mare picked first was recorded as the sire.** `breed` writes `sireId` from whichever partner it
+  is handed first, and the screen lists your own horse first whatever its sex. Lineage is the one
+  thing that cannot be corrected later, so `breedFoal` now settles sire and dam by gender.
+- **Every projection read "D to S".** Drawing the full min-to-max of the sample made every pairing
+  span the whole scale — true, and useless. The band now trims the tails, so a tight line and a wild
+  outcross look as different as they are.
 
 ### ✅ Stage 1 follow-up — bloodlines converged toward bland
 
@@ -355,7 +380,7 @@ Elite 1,500 / Champion 3,500 / Legend 7,500) are untouched pending the same work
 | 3 · Full career | ~3–4 | ✅ Complete |
 | 4 · The stable | ~2–3 | ✅ Complete |
 | 4.5 · Re-balance & physics | ~2–3 | ✅ Complete |
-| 5 · Breeding | ~3–4 | 🚧 **IN PROGRESS** — Stage 1's simulation built, traced and corrected; the pairing screen and foal-start career are next |
+| 5 · Breeding | ~3–4 | 🚧 **IN PROGRESS** — Stage 1 complete and the loop closes; Stage 2 (partners, stud fees, stud influence) is next |
 | 6 · Polish | ~3+ | ⏳ After Phase 5 |
 | **Total estimate** | **~20–25** | |
 

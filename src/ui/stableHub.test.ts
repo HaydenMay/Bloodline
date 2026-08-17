@@ -50,6 +50,7 @@ function callbacks(onRetire: () => void): StableHubCallbacks {
     onConsumables: noop,
     onDossier: noop,
     onLegacy: noop,
+    onBreeding: noop,
     onRest: noop,
     onRetire,
   };

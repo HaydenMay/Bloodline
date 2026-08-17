@@ -33,6 +33,18 @@ export const STAT_KEYS: readonly StatKey[] = [
   'consistency',
 ] as const;
 
+/**
+ * A range on the same 0-100 scale a stat uses.
+ *
+ * §2 shows a horse's potential as a range that narrows rather than a number,
+ * and §10's pairing screen shows a foal's projected potential the same way. One
+ * shape, so both render through the same row and cannot drift apart.
+ */
+export interface StatBand {
+  low: number;
+  high: number;
+}
+
 /** Letter grades, shown in UI; tap reveals the number (DESIGN.md §3). */
 export type Grade = 'S' | 'A' | 'B' | 'C' | 'D';
 

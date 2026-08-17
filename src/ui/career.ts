@@ -93,6 +93,15 @@ export interface Stable {
    * and it is why taking on a new horse can never end a bloodline.
    */
   bloodstock: RetiredHorse[];
+  /**
+   * Foals produced per pairing, keyed by `pairingKey`.
+   *
+   * The first-cross bonus tapers with each repeat of the same pair, so the
+   * count has to outlive the horse being campaigned — the pairing is a fact
+   * about two animals in the yard, not about one career (ROADMAP.md, "What
+   * Stage 1 must record even though it does not use it").
+   */
+  pairings: Record<string, number>;
 }
 
 /** A horse that has finished racing and is now part of the yard's stock. */
@@ -204,6 +213,7 @@ export function createStable(): Stable {
     consumables: {},
     careersCompleted: 0,
     bloodstock: [],
+    pairings: {},
   };
 }
 
@@ -225,6 +235,9 @@ function normaliseStable(stable: Stable): Stable {
   delete (stable as unknown as { reputation?: number }).reputation;
   if (typeof stable.careersCompleted !== 'number') stable.careersCompleted = 0;
   if (!Array.isArray(stable.bloodstock)) stable.bloodstock = [];
+  // Yards saved before breeding existed have no pairing history, which is the
+  // same thing as never having bred: every pairing reads as a first cross.
+  if (!stable.pairings || typeof stable.pairings !== 'object') stable.pairings = {};
   if (!Array.isArray(stable.world)) stable.world = [];
   return stable;
 }

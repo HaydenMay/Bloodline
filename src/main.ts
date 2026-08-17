@@ -12,6 +12,10 @@ import { mountSilksDemo } from './ui/silksDemo.js';
 import { mountRoadmap } from './ui/roadmap.js';
 import { mountMainMenu, type MainMenuCallbacks } from './ui/mainMenu.js';
 import { mountStarterSelection } from './ui/starterSelection.js';
+import { mountBreedingScreen } from './ui/breedingScreen.js';
+import { mountYearlingScreen } from './ui/yearlingScreen.js';
+import { yearlingPrice } from './data/yearling.js';
+import { breedingStock, partnersFor } from './ui/studBook.js';
 import { mountResultsScreen } from './ui/resultsScreen.js';
 import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
@@ -51,6 +55,7 @@ import {
   importSave,
   takeRecoveryNotice,
   type Career,
+  type Stable,
 } from './ui/career.js';
 import { saveFileName } from './save/durability.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
@@ -496,7 +501,7 @@ function showCareerRecap(career: Career): void {
       </div>
 
       <div class="recap-actions">
-        <button class="btn btn-primary" id="new-game-btn">Start New Game</button>
+        <button class="btn btn-primary" id="new-game-btn">Continue the Yard</button>
       </div>
     </div>
   `;
@@ -530,18 +535,21 @@ function showCareerRecap(career: Career): void {
         buttonLabel: 'Continue',
       },
       () => {
-        // Show unlock popup if this was a full 20-race career
+        // Show unlock popup if this was a full 20-race career, then ask where
+        // the next horse comes from. The silks stay with the yard rather than
+        // the horse, so the next one runs in the same colours.
+        const next = (): void => showNextHorse(stable, career.playerSilks);
         if (career.stats.racesCompleted >= 20) {
-          showSkipRaceUnlock();
+          showSkipRaceUnlock(next);
         } else {
-          showMainMenu();
+          next();
         }
       },
     );
   });
 }
 
-function showSkipRaceUnlock(): void {
+function showSkipRaceUnlock(onDone: () => void = showMainMenu): void {
   unlockSkipRace();
 
   showNotice(
@@ -556,8 +564,113 @@ function showSkipRaceUnlock(): void {
       tone: 'positive',
       buttonLabel: 'Got it',
     },
-    showMainMenu,
+    onDone,
   );
+}
+
+/**
+ * Where the next horse comes from (DESIGN.md §10, §13).
+ *
+ * Once a yard has bloodstock, breeding is the intended route and starter
+ * selection stops being the default way to get a horse — §13 puts it behind
+ * "start a brand-new line". All three routes stay open, because a line that has
+ * gone bad needs a way out that is not starting the whole yard again.
+ */
+function showNextHorse(stable: Stable, playerSilks: Silks): void {
+  const canBreed = breedingStock(stable).some(
+    (entry) => partnersFor(stable, entry.horse).length > 0,
+  );
+  const price = yearlingPrice(stable.legacy.archivedPoints);
+
+  const actions: NoticeOptions['actions'] = [];
+
+  if (canBreed) {
+    actions.push({
+      label: 'Breed From Your Bloodstock',
+      onSelect: () => showBreeding(stable, playerSilks),
+    });
+  }
+
+  actions.push({
+    label: `Buy a Yearling · $${price.toLocaleString()}`,
+    variant: canBreed ? 'secondary' : 'primary',
+    onSelect: () => showYearlings(stable, playerSilks),
+  });
+
+  actions.push({
+    label: 'Start a Brand-New Line',
+    variant: 'secondary',
+    onSelect: () => showStarterSelection(),
+  });
+
+  showNotice(app, {
+    icon: '🐴',
+    title: 'The Next Horse',
+    lines: [
+      canBreed
+        ? `Your yard holds ${stable.bloodstock.length} horse${stable.bloodstock.length === 1 ? '' : 's'} at stud. What it produces next is the point of everything the last one did.`
+        : 'Nothing in your yard can be bred yet. Buy a yearling, or start a fresh line.',
+    ],
+    hint: 'A bred foal inherits its parents. A bought or fresh horse inherits nothing.',
+    tone: 'neutral',
+    actions,
+  });
+}
+
+/**
+ * Taking on a new horse, from wherever the player asked.
+ *
+ * A yard with bloodstock is offered the crossroads; a yard with none goes
+ * straight to starter selection, because "breed, buy or start a line" is not a
+ * choice when two of the three are empty. This is what stops a player who quit
+ * after retiring from coming back to a menu that silently skips their
+ * bloodline (§13: once bloodstock exists, starter selection is reached through
+ * "start a brand-new line").
+ */
+function nextHorseRoute(stable: Stable | null, playerSilks: Silks): void {
+  if (stable && stable.bloodstock.length > 0) {
+    showNextHorse(stable, playerSilks);
+    return;
+  }
+  showStarterSelection();
+}
+
+function showBreeding(stable: Stable, playerSilks: Silks): void {
+  teardown?.();
+  app.innerHTML = '';
+  teardown = mountBreedingScreen(app, {
+    stable,
+    onBred: (foal, yard) => {
+      showNotice(
+        app,
+        {
+          icon: '🧬',
+          title: `${foal.name} is born`,
+          lines: [
+            `A ${foal.gender === 'stallion' ? 'colt' : 'filly'} by ${
+              stable.bloodstock.find((entry) => entry.horse.id === foal.sireId)?.horse.name ??
+              'an outside sire'
+            }, generation ${foal.generation ?? 2} of your line.`,
+            'It debuts at two, well short of what it will become. What it carries is its parents.',
+          ],
+          tone: 'positive',
+          buttonLabel: 'Take It Into Training',
+        },
+        () => startCareer(foal, playerSilks, yard),
+      );
+    },
+    onBack: () => showNextHorse(stable, playerSilks),
+  });
+}
+
+function showYearlings(stable: Stable, playerSilks: Silks): void {
+  teardown?.();
+  app.innerHTML = '';
+  teardown = mountYearlingScreen(app, {
+    stable,
+    onBuy: (horse, yard) => startCareer(horse, playerSilks, yard),
+    onBack: () => showNextHorse(stable, playerSilks),
+  });
 }
 
 function showMainMenu(): void {
@@ -586,9 +699,9 @@ function showMainMenu(): void {
             {
               label: 'Retire & Start New',
               onSelect: () => {
-                retireCurrentHorse(savedCareer);
+                const yard = retireCurrentHorse(savedCareer);
                 teardownMenu();
-                showStarterSelection();
+                nextHorseRoute(yard, savedCareer.playerSilks);
               },
             },
           ],
@@ -596,7 +709,7 @@ function showMainMenu(): void {
         return;
       }
       teardownMenu();
-      showStarterSelection();
+      nextHorseRoute(loadStable(), DEFAULTS.playerSilksDefault);
     },
     onExport: () => {
       const blob = new Blob([exportSave()], { type: 'application/json' });
@@ -730,9 +843,16 @@ function showStarterSelection(): void {
   );
 }
 
-function startCareer(starterHorse: Horse, playerSilks: Silks): void {
-  // Create new career with selected starter
-  const career = createNewCareer(starterHorse, playerSilks);
+/**
+ * Puts a horse into training, whether it was bred, bought or chosen.
+ *
+ * The yard is passed through when the caller already holds it — breeding and
+ * buying both mutate it (a pairing recorded, cash spent) and that copy is the
+ * current one. Starter selection has no yard in hand and lets `createNewCareer`
+ * load it.
+ */
+function startCareer(horse: Horse, playerSilks: Silks, stable?: Stable): void {
+  const career = createNewCareer(horse, playerSilks, stable);
   saveCareer(career);
   showStableHub(career);
 }
@@ -837,6 +957,18 @@ function showStableHub(career: Career): void {
       teardown?.();
       app.innerHTML = '';
       teardown = mountLegacyScreen(app, career, () => showStableHub(career));
+    },
+    onBreeding: () => {
+      teardown?.();
+      app.innerHTML = '';
+      // Mid-career, so this is the stud book to read rather than act on: the
+      // foal is bred the day this horse retires, when there is a place for it.
+      teardown = mountBreedingScreen(app, {
+        stable: career.stable,
+        mode: 'browse',
+        onBred: () => {},
+        onBack: () => showStableHub(career),
+      });
     },
     onRetire: () => {
       const value = getRetirementValue(career.horseLegacy, career.careerEndedByInjury === true);

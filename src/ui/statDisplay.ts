@@ -1,4 +1,4 @@
-import { STAT_KEYS, toGrade, type Horse, type StatKey } from '../sim/types.js';
+import { STAT_KEYS, toGrade, type Horse, type StatBand, type StatKey } from '../sim/types.js';
 
 /**
  * The one way stats are shown.
@@ -94,6 +94,46 @@ export function renderStatRows(horse: Horse, options: StatRowOptions = {}): stri
         <span class="stat-row-grade grade-${grade}">${grade}</span>
         <span class="stat-row-num">${value}</span>
         ${band ? `<span class="stat-row-room room-${band.id}">${band.label}</span>` : ''}
+      </button>`;
+  }).join('');
+}
+
+/**
+ * The same six rows, but showing a *range* rather than a value.
+ *
+ * §10's pairing screen shows "a preview of the foal's projected potential
+ * ranges — and nothing else": no relatedness rating, no percentage, no concept
+ * to learn. A wide outcross simply draws wider bands than a tight line, so the
+ * mechanic is read off the picture.
+ *
+ * Deliberately the same markup as `renderStatRows`, so `attachStatReveal` makes
+ * these tappable too and the grade-first, numbers-on-request pattern holds on
+ * the one screen where a player is comparing possibilities rather than facts.
+ */
+export function renderRangeRows(
+  ranges: Record<StatKey, StatBand>,
+  options: { revealNumbers?: boolean } = {},
+): string {
+  const { revealNumbers = false } = options;
+
+  return STAT_KEYS.map((key) => {
+    const low = Math.round(ranges[key].low);
+    const high = Math.round(ranges[key].high);
+    const lowGrade = toGrade(low);
+    const highGrade = toGrade(high);
+    const settled = lowGrade === highGrade;
+
+    return `
+      <button class="stat-row${revealNumbers ? ' revealed' : ''}" data-stat="${key}"
+              aria-label="${STAT_LABELS[key]} projected ${lowGrade} to ${highGrade}">
+        <span class="stat-row-name">${STAT_LABELS[key]}</span>
+        <span class="stat-row-bar">
+          <i class="stat-row-span" style="left:${low}%;width:${Math.max(1, high - low)}%"></i>
+        </span>
+        <span class="stat-row-grade${settled ? ` grade-${lowGrade}` : ''}">${
+          settled ? lowGrade : `${lowGrade}–${highGrade}`
+        }</span>
+        <span class="stat-row-num">${low}–${high}</span>
       </button>`;
   }).join('');
 }

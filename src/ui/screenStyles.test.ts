@@ -33,6 +33,7 @@ const CONTAINERS = [
   '.consumables-container',
   '.raceday-container',
   '.dossier-container',
+  '.breeding-container',
 ];
 
 describe('full-page screen containers', () => {

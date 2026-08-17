@@ -12,6 +12,11 @@ export interface StableHubCallbacks {
   onConsumables: () => void;
   onDossier: () => void;
   onLegacy: () => void;
+  /**
+   * The stud book. Mid-career it is a browse — you cannot breed a foal while a
+   * horse is in training, because there is only ever one career at a time.
+   */
+  onBreeding: () => void;
   /** Skip the week to recover — and the only way to work off an injury. */
   onRest: () => void;
   /** End this horse's career on the player's terms. */
@@ -202,6 +207,13 @@ export function mountStableHub(
             <div class="nav-label">Legacy</div>
             <div class="nav-desc">View achievements</div>
           </button>
+          <button class="nav-button" id="nav-breeding" data-action="breeding">
+            <div class="nav-icon">🧬</div>
+            <div class="nav-label">Breeding</div>
+            <div class="nav-desc">${
+              career.stable.bloodstock?.length ? 'Plan the next foal' : 'Retire a horse to begin'
+            }</div>
+          </button>
         </div>
       </div>
 
@@ -226,6 +238,7 @@ export function mountStableHub(
   const consumablesBtn = root.querySelector('#nav-consumables');
   const dossierBtn = root.querySelector('#nav-dossier');
   const legacyBtn = root.querySelector('#nav-legacy');
+  const breedingBtn = root.querySelector('#nav-breeding');
   const restBtn = root.querySelector('#nav-rest');
   // Two of these when the trainer is prompting — the callout by the horse and
   // the quiet link at the foot. Both retire.
@@ -238,6 +251,7 @@ export function mountStableHub(
   consumablesBtn?.addEventListener('click', callbacks.onConsumables);
   dossierBtn?.addEventListener('click', callbacks.onDossier);
   legacyBtn?.addEventListener('click', callbacks.onLegacy);
+  breedingBtn?.addEventListener('click', callbacks.onBreeding);
   restBtn?.addEventListener('click', callbacks.onRest);
   retireBtns.forEach((btn) => btn.addEventListener('click', callbacks.onRetire));
 
