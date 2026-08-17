@@ -109,4 +109,18 @@ export interface Horse {
   coat: string;
   /** 0-100 jockey skill for AI horses; the player's jockey is stable-wide. */
   jockeySkill: number;
+
+  /*
+   * Lineage. Written when a foal is bred, read by linebreeding (Stage 3) and
+   * the pedigree archive (Stage 4).
+   *
+   * These are recorded from the first foal onward even though nothing consumes
+   * them yet, because they are facts about a moment that cannot be recovered
+   * afterwards: a tree can only show ancestry that was written down at the
+   * time. Absent on starters and on the living world, which have no parents.
+   */
+  sireId?: string;
+  damId?: string;
+  /** 1 for a starter or an outside horse; a foal is one past its best parent. */
+  generation?: number;
 }
