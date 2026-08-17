@@ -591,6 +591,13 @@ or raced back to your first starter, plus a trait and gene inheritance map.
 
 This is the story layer, and it's the title of the game. First-class screen, not a submenu.
 
+*Build note (Phase 5 complete): everything the tree reads is already recorded and cannot be
+reconstructed later — `sireId`, `damId` and `generation` on every foal since Stage 1, coat genotypes
+since Stage 3 so the gene map has real alleles, and foals sold into the world keep their full
+ancestry. `pedigreeOf()` in `ui/studBook.ts` walks it, `genotypeOf()` in `sim/coat.ts` reads the
+genes. Measured: a horse is 657 bytes, so a thousand-horse tree is 825 KB — storage is not the
+constraint, drawing is.*
+
 ### Pairing UI ✅
 **Show the outcome, not the theory.**
 

@@ -11,7 +11,21 @@
 
 ## Folder Breakdown
 
-### `/src/sim/` — The Race Engine
+### `/src/sim/` — Pure Simulation
+**The one architectural rule:** `sim/` and `data/` must never import from `render/`, `ui/` or
+`save/`, and must never touch the DOM. Lint enforces it. This is what lets the measurement tools run
+the whole simulation headlessly.
+
+**Beyond the race engine:**
+- **`breeding.ts`** — the inheritance budget. Two retired careers become a foal: a floor from the
+  parents, a budget from what they banked, and variance from how unrelated they are. Also
+  `relatedness` (Wright's coefficient, two generations) and the breeding-age taper
+- **`coat.ts`** — real coat genetics. Five loci expressing the eight coats, so a recessive can hide
+  for generations
+- **`growth.ts`** — training gains, ceilings, and the age arc
+- **`injury.ts`**, **`upkeep.ts`**, **`division.ts`** — the rest of a career's mechanics
+
+### The race engine
 **What it does:** Simulates horse racing. One tick = one frame of the race.
 
 **Key files:**
@@ -69,9 +83,31 @@ Player/AI Input → Engine reads it → Rider applies it → Horse speed updated
 ---
 
 ### `/src/ui/` — User Interface
-**What it does:** Creates interactive UI and handles user input.
+**What it does:** Screens, menus and the state that outlives a race.
 
-**Key files:**
+**The career and the yard:**
+- **`career.ts`** — `Career` and `Stable`, and everything that saves them. The yard outlives every
+  horse: cash, facilities, staff, prestige, and `bloodstock` (every horse ever retired). Retiring a
+  horse banks its legacy, ages the stud book four years, and pays stud influence
+- **`stableHub.ts`** — the between-races hub for the horse in training
+- **`trainingScreen.ts`**, **`raceCalendar.ts`**, **`raceDayScreen.ts`** — the career loop
+- **`legacyScreen.ts`**, **`dossierScreen.ts`**, **`rivalDossierScreen.ts`** — the records
+- **`facilitiesScreen.ts`**, **`staffScreen.ts`**, **`consumablesScreen.ts`** — spending
+
+**Breeding (Phase 5):**
+- **`studBook.ts`** — the layer between the yard and `sim/breeding.ts`: who can be bred to, how often
+  a pair has bred, what a pairing projects, selling a foal into the world. **DOM-free**; it lives in
+  `ui/` only because the `Stable` type does. `pedigreeOf(stable)` is how anything walks a pedigree
+- **`breedingScreen.ts`** — the pairing screen. Projected potential ranges and nothing else (§10)
+- **`foalDevelopmentScreen.ts`** — the foal's first year: set a rearing plan, see what the year did
+- **`yearlingScreen.ts`** — the sale ring, for buying instead of breeding
+
+**Shared pieces:**
+- **`statDisplay.ts`** — the one way stats are shown. Grades first, numbers on tap (§3). Also renders
+  *ranges*, which is what the pairing screen's projections use
+- **`noticeModal.ts`** — every modal in the game. Notices, choices, prompts
+- **`badgeLoader.ts`** — tinted portrait badges. What a pedigree tree's cards will want
+
 - **`raceScreen.ts`** — Main race screen component
   - Owns the render loop and game state
   - Handles player input (taps, holds, keyboard)
@@ -106,19 +142,33 @@ Player/AI Input → Engine reads it → Rider applies it → Horse speed updated
 - **`index.ts`** — Game constants:
   - FIELD_SIZE (how many horses per race)
   - RUNNING_STYLES (front-runner, stalker, mid-pack, closer)
-  - STAT_KEYS (speed, stamina, burst, grit, temper, consistency)
+  - COAT_IDS (the eight coats, which the genetics in `sim/coat.ts` express)
+
+- **`legacy.ts`** — the prestige economy. A horse's legacy rises and falls with results; retiring
+  banks it to the yard. Exponential by division, so the ladder is what a career is worth
+- **`purse.ts`** — what a race pays, by division and difficulty
+- **`facilities.ts`**, **`staff.ts`**, **`consumables.ts`** — the yard's spending and its effects
+- **`wagering.ts`** — backing your own horse. ⚠️ The odds are known-broken; see ongoing-decisions.md
+- **`studFee.ts`**, **`foalSale.ts`**, **`foalDevelopment.ts`** — Phase 5's economics: what an outside
+  stud costs, what a rejected foal fetches, and what a foal's first year is worth
 
 ---
 
 ### `/src/main.ts` — Entry Point
-**What it does:** Bootstraps the app.
+**What it does:** Bootstraps the app and owns the screen flow. It is large; navigate it by function
+name rather than reading top to bottom.
 
-**Flow:**
-1. Checks URL params (`?preview` = horse preview, `?silks-demo` = color picker)
-2. Generates a random field of horses
-3. Picks one as player
-4. Launches race screen
-5. Handles "New race" button for restarting
+**The career loop:**
+1. Main menu → continue a career, take a new horse, or open the Bloodstock door
+2. Stable hub → training, race calendar, facilities, staff, supplies, records
+3. Race day → items and a bet, then the race, then the result
+4. Retirement → banks legacy, ages the stud book, pays stud influence
+
+**Taking on a new horse** (`nextHorseRoute` → `showNextHorse`) is a crossroads once the yard has
+bloodstock: **breed** (`showBreeding`), **buy a yearling** (`showYearlings`), or **start a brand-new
+line** (`showStarterSelection`). A bred foal passes through `showFoalDevelopment` before racing.
+
+**Demo routes** still exist behind URL params (`?preview`, `?silks-demo`).
 
 ---
 
@@ -181,6 +231,22 @@ Draw function reads snapshot → Renders horses, HUD, results
     ↓
 Display on screen
 ```
+
+---
+
+## The measurement tools
+
+Balance work here is done by **measuring, never by reasoning about the code** — every real defect
+this project has shipped passed the unit tests and was visible only by running the thing many times.
+
+| Command | Answers |
+|---|---|
+| `npm run harness` | Is a race believable? Invariants plus style balance |
+| `npm run bloodline` | Is a bloodline believable? Real careers, bred across generations |
+| `npm run odds` | Is the betting market honest? Implied against actual win rates |
+| `npm run probe` | Why did *this* race happen? A tick-by-tick trace |
+
+README.md documents all of them. Start narrow, widen with env vars once something looks wrong.
 
 ---
 

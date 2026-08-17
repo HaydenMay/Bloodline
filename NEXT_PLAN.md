@@ -1,137 +1,151 @@
-# Bloodline Next Phase Plan
+# Next: Phase 6 — The Archive
 
-## Phase Completed ✓
-**Visual Polish & Color System** — All colors consolidated to single source of truth
-- Centralized color definitions (40+ UI variants, horse details, environment)
-- Updated all canvas rendering (race screen, track, horse, UI screens)
-- Extended CSS variables for consistent theming
-- Default color definitions for backward compatibility
+The pedigree tree. **This is the mechanic the game is named after**, and it was broken out of Phase 5
+into a phase of its own so it gets a session with the context to do it properly rather than the tail
+of one.
 
----
-
-## Phase Next: Screen Transitions & Visual Flow
-
-### 1. **Race Intro Screen** (Priority)
-Create a loading/intro screen that plays before the race starts, replacing the immediate jump from calendar→race.
-
-**Features:**
-- Fade-in animation for race name
-- Display race details: distance, going, field size, prize
-- Optional: Brief horse profile or silks preview
-- Smooth transition to race controls
-
-**Implementation:**
-- New component: `mountRaceIntro()` in `src/ui/raceIntro.ts`
-- Add to race flow before `mountRaceScreen()`
-- Reuse centralized UI colors for consistency
-- Use canvas or CSS transitions for fade effects
-
-**Files to modify:**
-- `src/main.ts` — add intro before race screen in both demo and career flows
-- New file: `src/ui/raceIntro.ts`
-
-**Timeline:** Low complexity, 1-2 hours
+Read this, then [ROADMAP.md](ROADMAP.md) Phase 6, then [DESIGN.md](DESIGN.md) §10 "The archive".
+[ongoing-decisions.md](ongoing-decisions.md) holds 26 parked judgement calls — **do not start on those
+now**, they are deliberately deferred, but check it before deciding anything that looks like a balance
+question.
 
 ---
 
-### 2. **Idle Horse Animation on Training Screen** (High Priority)
-Add a relaxed, looping horse animation to the training screen to break static layout.
+## Where things stand
 
-**Design Options:**
-- **Option A**: Walk/stand cycle — horse paces slowly side-to-side or shifts weight
-- **Option B**: Fidget cycle — tail sway, ears rotate, head bob
-- **Option C**: Both — walk + fidget combined
+**Phase 5 is complete.** Breeding works end to end: retire a horse, breed it, race the foal.
 
-**Implementation:**
-- Add canvas element to training screen
-- Use existing horse rig with low-intensity pose
-- Procedural animation loop (no frame-based keyframes)
-- Keep lightweight — doesn't block training UI
+| Stage | What landed |
+|---|---|
+| 1 | The inheritance budget, the pairing screen, foal-or-yearling careers |
+| 1 follow-up | Bloodlines stopped converging toward bland |
+| 2 | Stud fees, retired horses ageing out, stud influence paying prestige |
+| 3 | Real coat genetics, trait and aptitude mutation, linebreeding, rejected foals sold into the world |
+| 4 | The foal's first year — a rearing plan that resolves, not a spend screen |
 
-**Files to modify:**
-- `src/ui/trainingScreen.ts` — add canvas and animation loop
-- Reuse `drawHorse()` from `src/render/horse.ts`
-
-**Timeline:** 1-2 hours depending on animation complexity
+`npm run check` is green: 28 test files, 461 tests, lint and build clean.
 
 ---
 
-### 3. **Visual Hierarchy & Polish** (Medium Priority)
-Refine UI spacing, typography, and visual feedback across key screens.
+## What already exists to build the tree on
 
-**Focus areas:**
-- **Training Screen**: Better separation of stats, actions, and animation
-- **Race Results**: Clearer placement of recap vs. placings
-- **Career Summary**: Balance data density with readability
-- **Starter Carousel**: Enhance stat block clarity and contrast
+**None of this can be reconstructed after the fact**, which is why it was written down from the first
+foal onward. It is all there waiting.
 
-**Implementation:**
-- CSS refinements in `src/style.css`
-- Adjust padding, margins, font sizes
-- Use UI color variables for emphasis/hierarchy
-- Test on mobile (42m width constraint)
+### The data
 
-**Timeline:** 2-3 hours, iterative
+| Field | On what | Since |
+|---|---|---|
+| `sireId`, `damId` | every bred foal | Stage 1 |
+| `generation` | every bred foal (1 for a starter or outside horse) | Stage 1 |
+| `coatGenotype` | every bred foal — five loci, real alleles | Stage 3 |
+| `stable.bloodstock` | every horse you ever retired, with its full career record | Phase 4 |
+| `stable.world` | rivals, **including foals you sold**, ancestry intact | Stage 3 |
+| `stable.pairings` | how many foals each pair produced | Stage 1 |
 
----
+### The helpers
 
-## Phase After: Horse Sprites & Content (Deferred)
+- **`pedigreeOf(stable)`** in `src/ui/studBook.ts` — returns `(id) => Horse | undefined`, indexing
+  bloodstock and world together. This is how the tree walks upward. A horse in neither is one the yard
+  never had anything to do with.
+- **`relatedness(sire, dam, pedigree)`** in `src/sim/breeding.ts` — Wright's coefficient over two
+  generations. Useful for the tree's "how related are these two" readouts.
+- **`genotypeOf(horse)`** in `src/sim/coat.ts` — the horse's five loci, deriving a plausible genotype
+  for any horse born before Stage 3. **This is what makes a gene inheritance map possible**: you can
+  show which ancestor carried the chestnut that surfaced four generations later.
+- **`createBadgeElement()`** in `src/ui/badgeLoader.ts` — the portrait component, already used by
+  starter selection. Takes a coat and silks and gives you a tinted badge.
+  [SHIELD_BADGE_IMPLEMENTATION.md](SHIELD_BADGE_IMPLEMENTATION.md) is the design note for exactly
+  this use — "pedigree trees, retired-horse archives".
 
-### 4. **Expand Horse Sprite Usage** (Low Priority)
-Add animated horse sprites to training screen preview and other UI locations.
+### What a card can show
 
-- Training screen: Show player's horse animated during training
-- Career summary: Display horse sprite alongside recap
-- Results screen: Show finishers' sprites in results visualization
-
-**Rationale**: Deferred because:
-- Sprites already work in race and starter screens
-- Foundation for reuse is solid
-- Not critical for core gameplay loop
-- Can be batched with future content updates
-
----
-
-## Technical Debt & Maintenance
-
-### Quick Wins (1-2 hours each)
-- [ ] Add default focus/keyboard navigation to race controls
-- [ ] Test audio integration (audio not yet present in codebase)
-- [ ] Verify mobile viewport constraints across all screens
-- [ ] Check accessibility: color contrast ratios, screen reader hints
-
-### Medium Tasks (2-4 hours)
-- [ ] Add loading spinners for sprite decode delay
-- [ ] Implement screen shake during dramatic race moments
-- [ ] Add pause/resume for long races
-- [ ] Cache sprite sheet in IndexedDB for offline play
+`RetiredHorse` carries `legacyPeak`, `legacyBanked`, `retirementReason`, `wins`, `starts`,
+`earnings`, `hallOfFame`, `retiredByInjury`, `careerNumber`. A detail card has everything it needs
+without adding a field.
 
 ---
 
-## Recommended Sequence
+## What to build
 
-**Week 1:**
-1. Race intro screen + fade transition
-2. Idle horse animation on training screen
-3. Test both in demo and career flows
+DESIGN.md §10: *"A **CK3-style family tree** — portrait cards on generational rows, connecting lines,
+click any ancestor for a detail card with stats, traits and win-loss record. Records every horse
+you've bred or raced back to your first starter, plus a trait and gene inheritance map. This is the
+story layer, and it's the title of the game. **First-class screen, not a submenu.**"*
 
-**Week 2:**
-1. Visual hierarchy polish (CSS refinements)
-2. Mobile testing across all new screens
-3. Accessibility pass (contrast, keyboard nav)
+Slice it so each step leaves something worth looking at:
 
-**Week 3+:**
-1. Horse sprite expansion (if time permits)
-2. Advanced animations (screen shake, transitions)
-3. Content: more race types, training strategies
+### Step 1 — The tree, drawn
+
+Generational rows, portrait cards, connecting lines. Start from the yard's living head — the horse
+currently in training, or the newest retiree if there is none — and walk up through `pedigreeOf`.
+
+**The rendering decision is already made, and it is the important one: keep everything, render almost
+nothing.** Storage is not the constraint (657 bytes a horse, so a thousand is 825 KB against a
+browser budget near 5 MB). Drawing five hundred portrait cards is. Direct line in full, side branches
+folded behind a click.
+
+### Step 2 — The detail card
+
+Click any ancestor. Stats, traits, record, what it banked, whether it made the Hall of Fame, and how
+it came to the yard — bred, bought, a starter, or an outside stud you paid a fee to.
+
+### Step 3 — The inheritance map
+
+Where a line's speed came from, and which ancestor carried a recessive. The coat genotypes make the
+colour half literal — you can trace an `e` allele back through the horses that carried it unseen.
+
+### Step 4 — Procedural naming
+
+With the dedupe and quality safeguards. `createNameGenerator(rng, used)` in `src/data/names.ts`
+already dedupes against a registry; what §10 asks for beyond that is the quality bar.
 
 ---
 
-## Success Criteria
+## Decisions to make before building
 
-- ✓ Race intro plays smoothly before every race
-- ✓ Training screen horse animation loops without stuttering
-- ✓ All new screens follow color system and visual hierarchy
-- ✓ Mobile layout holds at 42m width (no horizontal scroll)
-- ✓ Zero color hardcoding outside dev-only features
-- ✓ Feature works in both demo (?test-race) and career flows
+Ask the user rather than defaulting into these. They have been consistently good calls to put in
+front of him, and he answers fast.
+
+1. **Where does the tree live?** §10 says first-class screen, not a submenu. The main menu carries a
+   **Bloodstock** door already; the tree could join it, replace it, or absorb it.
+2. **What is the tree rooted on?** The living horse looking up, or the founding starter looking down?
+   CK3 does both; picking one for the default matters.
+3. **How much folds by default?** Direct line only, or direct line plus one generation of siblings?
+4. **Do sold foals appear inline or behind a toggle?** They are family, and §10 promises you may watch
+   one win a Championship — but they are also the branch most likely to sprawl.
+5. **Canvas or DOM?** The badges are canvas; the cards and lines could be either. DOM is easier to
+   make accessible and to click; canvas scales better past a few hundred nodes.
+
+---
+
+## How this project works
+
+Read this bit even if you skim the rest. It is why the last four stages landed cleanly.
+
+- **Measure, do not reason.** Every real defect this project has shipped passed the unit tests and was
+  only visible by running the thing many times and reading numbers. `npm run bloodline`,
+  `npm run odds` and `npm run harness` exist for exactly that; the README documents what each answers.
+- **Drive the real screens in a browser.** Chromium is at
+  `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Seed `localStorage` with a yard, click
+  through, and screenshot. Bugs found this way in Phase 5 that no test caught: a mare recorded as the
+  sire, every projection reading "D to S", stat bars auto-placing onto phantom grid rows, and a
+  summary line that read like an arithmetic error.
+- **`npm run check` before every push** — lint, typecheck, 461 tests.
+- **`src/sim/` never imports from `ui/`, `render/` or `save/`.** Lint enforces it. `studBook.ts` lives
+  in `ui/` only because the `Stable` type does; it is DOM-free.
+- **Write the comment that explains *why*.** The codebase's comments carry the reasoning behind
+  decisions, including the ones that were wrong first. That history is why a later session can tell a
+  deliberate choice from an accident.
+
+---
+
+## What not to do
+
+- **Do not start on [ongoing-decisions.md](ongoing-decisions.md).** Twenty-six parked items, several
+  interacting — the betting fix changes the economy, which changes stud fees, which changes whether
+  the Hall of Fame bar is reachable. They get decided together, after the Archive.
+- **Do not re-tune breeding.** The constants in `sim/breeding.ts` were measured over eight
+  generations, not guessed. `npm run bloodline` is the only thing that should ever move them.
+- **Do not add fields to `Horse` for the tree.** Everything it needs is recorded. If something seems
+  missing, check `pedigreeOf` and `genotypeOf` first.
