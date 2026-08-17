@@ -13,6 +13,7 @@ import { mountRoadmap } from './ui/roadmap.js';
 import { mountMainMenu, type MainMenuCallbacks } from './ui/mainMenu.js';
 import { mountStarterSelection } from './ui/starterSelection.js';
 import { mountBreedingScreen } from './ui/breedingScreen.js';
+import { mountArchiveScreen } from './ui/archiveScreen.js';
 import { mountYearlingScreen } from './ui/yearlingScreen.js';
 import { yearlingPrice } from './data/yearling.js';
 import { breedingStock, partnersFor, sellFoal } from './ui/studBook.js';
@@ -729,23 +730,44 @@ function showFoalDevelopment(foal: Horse, stable: Stable, playerSilks: Silks): v
 }
 
 /**
- * The stud book from the main menu.
+ * The Archive, reached from the main menu's Bloodstock door.
  *
- * Browsing only while a horse is in training: a foal bred then would have
- * nowhere to go, since there is one career at a time. With the yard between
- * horses it is the real thing, and breeding here starts the foal's career the
- * same way the retirement crossroads does.
+ * DESIGN.md 10: "first-class screen, not a submenu" — so this is what that
+ * door opens onto now, rooted on the horse in training (or the newest
+ * retiree, between careers), with the stud book reachable from inside it
+ * rather than the other way round.
  */
-function showBloodstock(): void {
+function showArchive(): void {
   const stable = loadStable();
   if (!stable) {
     showMainMenu();
     return;
   }
   const inTraining = loadCareer();
-  showBreeding(stable, inTraining?.playerSilks ?? DEFAULTS.playerSilksDefault, {
-    mode: inTraining ? 'browse' : 'breed',
+  const playerSilks = inTraining?.playerSilks ?? DEFAULTS.playerSilksDefault;
+  const root = inTraining?.horse ?? stable.bloodstock[stable.bloodstock.length - 1]?.horse;
+
+  const openBreeding = (): void => {
+    showBreeding(stable, playerSilks, {
+      mode: inTraining ? 'browse' : 'breed',
+      onBack: () => showArchive(),
+    });
+  };
+
+  if (!root) {
+    // The door only appears once there is bloodstock, but guard anyway.
+    openBreeding();
+    return;
+  }
+
+  teardown?.();
+  app.innerHTML = '';
+  teardown = mountArchiveScreen(app, {
+    stable,
+    root,
+    playerSilks: inTraining?.playerSilks,
     onBack: () => showMainMenu(),
+    onBreed: openBreeding,
   });
 }
 
@@ -799,7 +821,7 @@ function showMainMenu(): void {
     },
     onBloodstock: () => {
       teardownMenu();
-      showBloodstock();
+      showArchive();
     },
     onExport: () => {
       const blob = new Blob([exportSave()], { type: 'application/json' });

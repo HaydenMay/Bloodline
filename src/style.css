@@ -7050,3 +7050,286 @@ body {
 
 .dev-good { color: var(--ok); }
 .dev-bad { color: var(--warning); }
+
+/* ---------------------------------------------------------------------------
+   The Archive — the pedigree tree (DESIGN.md 10, Phase 6 Step 1-2)
+   --------------------------------------------------------------------------- */
+
+.archive-screen {
+  width: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.archive-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+}
+
+.archive-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.archive-top-bar h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text);
+  flex: 1;
+  text-align: center;
+}
+
+.archive-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.archive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.archive-toggle-nested {
+  color: var(--muted);
+  padding-left: 8px;
+  border-left: 2px solid var(--line);
+}
+
+/* Same `[hidden]`-vs-class specificity tie as `.archive-detail` above. */
+.archive-toggle[hidden] {
+  display: none;
+}
+
+.archive-controls .menu-link {
+  margin-left: auto;
+}
+
+.archive-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.archive-canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 48px;
+  padding: 32px;
+  width: max-content;
+  min-width: 100%;
+}
+
+.archive-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.archive-line {
+  stroke: var(--accent-border);
+  stroke-width: 2;
+}
+
+.archive-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 40px;
+}
+
+.archive-cluster {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 12px;
+}
+
+.archive-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 96px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-align: center;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.archive-card:hover {
+  border-color: var(--accent-border);
+}
+
+.archive-card-root {
+  border-color: var(--accent);
+  background: var(--accent-faint);
+}
+
+.archive-card-sibling {
+  width: 76px;
+  opacity: 0.75;
+}
+
+.archive-card-badge {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  image-rendering: crisp-edges;
+}
+
+.archive-card-sibling .archive-card-badge {
+  width: 44px;
+  height: 44px;
+}
+
+.archive-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.archive-card-name {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archive-card-meta {
+  font-size: 0.64rem;
+  color: var(--muted);
+}
+
+.archive-card-hof {
+  font-size: 0.64rem;
+  color: var(--accent);
+}
+
+.archive-detail {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 50;
+  padding: 20px;
+}
+
+/* `[hidden]` and `.archive-detail` share specificity; without this the class
+   rule's `display: flex` would win regardless of the attribute (the mistake
+   screenStyles.test.ts guards the full-page screens against). */
+.archive-detail[hidden] {
+  display: none;
+}
+
+.archive-detail-panel {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85dvh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+  animation: slideUp 0.25s ease-out;
+}
+
+.archive-detail-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.archive-detail-head {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.archive-detail-badge {
+  width: 88px;
+  height: 88px;
+  flex: none;
+  object-fit: contain;
+  image-rendering: crisp-edges;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.archive-detail-head h3 {
+  margin: 0 0 4px;
+  color: var(--text);
+}
+
+.archive-detail-meta,
+.archive-detail-status {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.archive-detail-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.archive-detail-section h4 {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.archive-detail-section p {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  color: var(--text);
+}

@@ -34,7 +34,40 @@ const CONTAINERS = [
   '.raceday-container',
   '.dossier-container',
   '.breeding-container',
+  '.archive-container',
 ];
+
+/**
+ * Elements toggled with the native `hidden` attribute rather than a state
+ * class. Found live: `.archive-detail { display: flex }` and
+ * `.archive-toggle { display: flex }` share specificity with the UA's
+ * `[hidden] { display: none }`, and an author rule at equal specificity beats
+ * the UA stylesheet regardless of `hidden` being set — so both elements
+ * stayed visible (and, for the detail overlay, kept eating clicks) until a
+ * matching `<selector>[hidden] { display: none }` rule was added for each.
+ */
+const HIDDEN_TOGGLED = ['.archive-detail', '.archive-toggle'];
+
+describe('elements toggled via the `hidden` attribute', () => {
+  it('has a matching [hidden] override wherever the bare class sets display', () => {
+    for (const selector of HIDDEN_TOGGLED) {
+      const setsDisplay = rules().some(
+        ({ selector: sel, body }) =>
+          sel.split(',').some((s) => s.trim() === selector) && /display:/.test(body),
+      );
+      if (!setsDisplay) continue;
+
+      const overridden = rules().some(
+        ({ selector: sel, body }) =>
+          sel.split(',').some((s) => s.trim() === `${selector}[hidden]`) &&
+          /display:\s*none/.test(body),
+      );
+      expect(overridden, `${selector} sets display but has no ${selector}[hidden] { display: none }`).toBe(
+        true,
+      );
+    }
+  });
+});
 
 describe('full-page screen containers', () => {
   it('is never hidden by an unconditional display:none', () => {

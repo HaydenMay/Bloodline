@@ -14,12 +14,13 @@ export interface MainMenuCallbacks {
   /** Receives the text of a save file the player chose. */
   onImport?: (text: string) => void;
   /**
-   * The stud book, opened straight from the menu.
+   * The Archive — the pedigree tree — opened straight from the menu.
    *
-   * The pairing screen is reachable through "New Horse" already, but only as
-   * one branch of a decision. A yard's bloodstock is worth looking at on its
-   * own — which mare to keep, which cross is coming — so it gets a door of its
-   * own rather than living behind a choice the player may not want to make yet.
+   * DESIGN.md 10: "first-class screen, not a submenu." The stud book is
+   * reachable through "New Horse" already, but only as one branch of a
+   * decision; a yard's bloodstock is worth looking at on its own — which
+   * ancestor carried a line's speed, which mare to breed next — so it gets a
+   * door of its own, with breeding itself reachable from inside it.
    */
   onBloodstock?: () => void;
   /** Whether the yard has anything at stud, which is what earns that door. */
@@ -44,7 +45,7 @@ export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbac
         <button class="btn btn-primary" id="new-game-btn">${callbacks.hasStable ? 'New Horse' : 'Start Your Stable'}</button>
         ${
           callbacks.hasBloodstock
-            ? '<button class="btn btn-secondary" id="bloodstock-btn">Bloodstock</button>'
+            ? '<button class="btn btn-secondary" id="bloodstock-btn">The Archive</button>'
             : ''
         }
       </div>

@@ -71,10 +71,41 @@ Four stages, all on `main`. `npm run check` green: 28 test files, 461 tests.
 inheritance (DESIGN.md §2) and the Stud Farm's "+10% breeding potential" (`getBreedingBonus`, written
 in Phase 4 and read by nothing until foal development used it). Worth assuming there are others.
 
-**Next: Phase 6 — the Archive.** The pedigree tree, broken out of Phase 5 at the user's request
-because it is the mechanic the game is named after and deserves its own session.
-[NEXT_PLAN.md](NEXT_PLAN.md) has the build plan, what already exists to build on, and five decisions
-to put in front of the user before starting.
+### Phase 6 — The Archive · in progress
+
+Step 1 (the tree, drawn) and a lightweight Step 2 (the detail card) are on `main`. Five decisions were
+put to the user first, per [NEXT_PLAN.md](NEXT_PLAN.md): the Archive **replaces the Bloodstock door**
+on the main menu (breeding now reached from inside it), roots on the **living horse looking up** with
+a **jump-to-top** scroll control, folds to **direct line only** by default with a setting for **every
+foal in a generation** and a nested toggle for **foals sold to rivals**, and renders in **DOM**, not
+canvas.
+
+- **`src/ui/archiveTree.ts`** — DOM-free: `buildAncestry` walks the pedigree from a root horse via
+  `pedigreeOf`, stopping a branch where a parent is unrecorded rather than padding out a binary tree;
+  `rowsOf` flattens it into generational rows in standard pedigree-chart order (paternal side before
+  maternal) for free, from a full-subtree-before-next-subtree walk. `siblingsOf` and `isSoldFoal` back
+  the two settings. 14 tests.
+- **`src/ui/archiveScreen.ts`** — the screen. Oldest generation renders first (top of the page), root
+  last (bottom) — "jump to top" is a scroll position, not a re-rooted tree, because a pedigree has no
+  single founder once outside studs enter a line. Connecting lines are an SVG overlay, positions
+  measured relative to the scrolling canvas's own box so they stay correct without a scroll listener.
+  Clicking any card opens a detail overlay (badge, record, legacy, traits, stats via
+  `renderStatRows`) without re-rendering the tree behind it, so toggling siblings preserves scroll
+  position and opening a card doesn't cost a re-layout.
+- **Found live, not by a test:** `.archive-detail { display: flex }` and `.archive-toggle { display:
+  flex }` share CSS specificity with the browser's own `[hidden] { display: none }`, and an author
+  rule at equal specificity wins regardless of the `hidden` attribute — so the detail overlay stayed
+  visible and ate clicks even while `hidden`. Fixed with an explicit `<selector>[hidden] { display:
+  none }` for each, and a new test in `screenStyles.test.ts` that would have caught it, following the
+  pattern that file's own header comment already documents for a sibling class of mistake.
+- Verified by seeding a real three-generation stable (via `sim/breeding.ts`'s `breed`, not hand-built
+  fixtures) and driving it in Chromium: tree renders, lines connect the right cards, both toggles
+  work, jump-to-top scrolls, the detail card opens and closes, and the round trip through the stud
+  book and back to the main menu leaves no console errors.
+
+**Not yet built:** Step 3 (the trait/gene inheritance map — which ancestor carried a recessive) and
+Step 4 (procedural naming quality bar). Both are still open, along with anything about the detail
+card's presentation that wants a second look once there's real bloodstock to browse.
 
 **How this user works:** he plays the game and brings back real observations, which have been more
 valuable than anything derived from the code — the betting exploit, the foal development rework, and

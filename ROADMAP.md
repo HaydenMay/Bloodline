@@ -437,7 +437,13 @@ Elite 1,500 / Champion 3,500 / Legend 7,500) are untouched pending the same work
 ---
 
 ## Phase 6 — The Archive
-**Open-ended** · 🚀 **NEXT** · *the title of the game*
+**Open-ended** · 🚧 **IN PROGRESS** · *the title of the game*
+
+Step 1 (the tree, drawn) and a lightweight Step 2 (the detail card) are on `main`, DOM-rendered,
+rooted on the living horse looking up, direct line only by default with settings for siblings and
+sold foals. Step 3 (the trait/gene inheritance map) and Step 4 (procedural naming) are still open.
+See AI_INSTRUCTIONS.md's Session Log for the shape of what landed and NEXT_PLAN.md for the five
+decisions it was built against.
 
 Broken out of Phase 5 into a phase of its own, because it is not texture on top of breeding — it is
 the thing breeding exists to produce, and the mechanic the game is named after. It deserves a full

@@ -102,20 +102,20 @@ already dedupes against a registry; what §10 asks for beyond that is the qualit
 
 ---
 
-## Decisions to make before building
+## Decisions — answered 2026-08-17
 
-Ask the user rather than defaulting into these. They have been consistently good calls to put in
-front of him, and he answers fast.
-
-1. **Where does the tree live?** §10 says first-class screen, not a submenu. The main menu carries a
-   **Bloodstock** door already; the tree could join it, replace it, or absorb it.
-2. **What is the tree rooted on?** The living horse looking up, or the founding starter looking down?
-   CK3 does both; picking one for the default matters.
-3. **How much folds by default?** Direct line only, or direct line plus one generation of siblings?
-4. **Do sold foals appear inline or behind a toggle?** They are family, and §10 promises you may watch
-   one win a Championship — but they are also the branch most likely to sprawl.
-5. **Canvas or DOM?** The badges are canvas; the cards and lines could be either. DOM is easier to
-   make accessible and to click; canvas scales better past a few hundred nodes.
+1. **Where does the tree live?** The Archive **replaces the Bloodstock door** on the main menu.
+   Breeding (the stud book) is reached from inside the Archive, not the other way round.
+2. **What is the tree rooted on?** The **living horse, looking up** (or the newest retiree if none is
+   in training). A **"jump to top"** control scrolls the view to the earliest generation currently
+   rendered, rather than re-rooting the data — a horse's ancestry has no single founder once outside
+   studs enter a line, so "top" is a row on the canvas, not a horse.
+3. **How much folds by default?** **Direct line only.** A setting reveals the rest of each ancestor's
+   generation — the siblings and other foals a pairing produced — beside the direct-line card.
+4. **Do sold foals appear inline or behind a toggle?** **Behind a toggle**, nested under the siblings
+   setting: switch on siblings first, then sold foals can be shown within them.
+5. **Canvas or DOM?** **DOM**, to start. Cards are HTML, lines are SVG/CSS. Revisit if node counts
+   ever make it the bottleneck — direct-line-only folding was chosen partly to keep that far off.
 
 ---
 
