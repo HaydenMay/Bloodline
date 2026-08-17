@@ -6,6 +6,9 @@ See [HISTORY.md](HISTORY.md) for a detailed record of design iterations and less
 
 See [NEXT_PLAN.md](NEXT_PLAN.md) for the active working roadmap for upcoming work.
 
+See [ongoing-decisions.md](ongoing-decisions.md) for the open judgement calls parked until Phase 5
+lands — raised in play or turned up by measurement, deliberately not acted on yet.
+
 ---
 
 ## Phase 0 — Foundation ✅ COMPLETE
