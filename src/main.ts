@@ -635,11 +635,16 @@ function nextHorseRoute(stable: Stable | null, playerSilks: Silks): void {
   showStarterSelection();
 }
 
-function showBreeding(stable: Stable, playerSilks: Silks): void {
+function showBreeding(
+  stable: Stable,
+  playerSilks: Silks,
+  options: { onBack?: () => void; mode?: 'breed' | 'browse' } = {},
+): void {
   teardown?.();
   app.innerHTML = '';
   teardown = mountBreedingScreen(app, {
     stable,
+    mode: options.mode ?? 'breed',
     onBred: (foal, yard) => {
       showNotice(
         app,
@@ -659,7 +664,28 @@ function showBreeding(stable: Stable, playerSilks: Silks): void {
         () => startCareer(foal, playerSilks, yard),
       );
     },
-    onBack: () => showNextHorse(stable, playerSilks),
+    onBack: options.onBack ?? (() => showNextHorse(stable, playerSilks)),
+  });
+}
+
+/**
+ * The stud book from the main menu.
+ *
+ * Browsing only while a horse is in training: a foal bred then would have
+ * nowhere to go, since there is one career at a time. With the yard between
+ * horses it is the real thing, and breeding here starts the foal's career the
+ * same way the retirement crossroads does.
+ */
+function showBloodstock(): void {
+  const stable = loadStable();
+  if (!stable) {
+    showMainMenu();
+    return;
+  }
+  const inTraining = loadCareer();
+  showBreeding(stable, inTraining?.playerSilks ?? DEFAULTS.playerSilksDefault, {
+    mode: inTraining ? 'browse' : 'breed',
+    onBack: () => showMainMenu(),
   });
 }
 
@@ -710,6 +736,10 @@ function showMainMenu(): void {
       }
       teardownMenu();
       nextHorseRoute(loadStable(), DEFAULTS.playerSilksDefault);
+    },
+    onBloodstock: () => {
+      teardownMenu();
+      showBloodstock();
     },
     onExport: () => {
       const blob = new Blob([exportSave()], { type: 'application/json' });
@@ -807,7 +837,10 @@ function showMainMenu(): void {
     }),
   };
 
-  callbacks.hasStable = !!(savedCareer?.stable ?? loadStable());
+  const yard = savedCareer?.stable ?? loadStable();
+  callbacks.hasStable = !!yard;
+  // The door only appears once there is something behind it.
+  callbacks.hasBloodstock = (yard?.bloodstock?.length ?? 0) > 0;
 
   const teardownMenu = mountMainMenu(app, callbacks);
 
@@ -957,18 +990,6 @@ function showStableHub(career: Career): void {
       teardown?.();
       app.innerHTML = '';
       teardown = mountLegacyScreen(app, career, () => showStableHub(career));
-    },
-    onBreeding: () => {
-      teardown?.();
-      app.innerHTML = '';
-      // Mid-career, so this is the stud book to read rather than act on: the
-      // foal is bred the day this horse retires, when there is a place for it.
-      teardown = mountBreedingScreen(app, {
-        stable: career.stable,
-        mode: 'browse',
-        onBred: () => {},
-        onBack: () => showStableHub(career),
-      });
     },
     onRetire: () => {
       const value = getRetirementValue(career.horseLegacy, career.careerEndedByInjury === true);

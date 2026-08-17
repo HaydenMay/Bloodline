@@ -13,6 +13,17 @@ export interface MainMenuCallbacks {
   onExport?: () => void;
   /** Receives the text of a save file the player chose. */
   onImport?: (text: string) => void;
+  /**
+   * The stud book, opened straight from the menu.
+   *
+   * The pairing screen is reachable through "New Horse" already, but only as
+   * one branch of a decision. A yard's bloodstock is worth looking at on its
+   * own — which mare to keep, which cross is coming — so it gets a door of its
+   * own rather than living behind a choice the player may not want to make yet.
+   */
+  onBloodstock?: () => void;
+  /** Whether the yard has anything at stud, which is what earns that door. */
+  hasBloodstock?: boolean;
   /** Wipes the yard and starts over. Guarded behind a confirmation. */
   onResetStable?: () => void;
   /** Whether a yard already exists, which changes what the buttons mean. */
@@ -31,6 +42,11 @@ export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbac
       <div class="main-menu-actions">
         ${callbacks.onContinue ? '<button class="btn btn-primary" id="continue-btn">Continue Career</button>' : ''}
         <button class="btn btn-primary" id="new-game-btn">${callbacks.hasStable ? 'New Horse' : 'Start Your Stable'}</button>
+        ${
+          callbacks.hasBloodstock
+            ? '<button class="btn btn-secondary" id="bloodstock-btn">Bloodstock</button>'
+            : ''
+        }
       </div>
       ${
         callbacks.hasStable
@@ -65,6 +81,10 @@ export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbac
 
   const newGameBtn = menu.querySelector<HTMLButtonElement>('#new-game-btn')!;
   newGameBtn.addEventListener('click', callbacks.onNewGame);
+
+  menu.querySelector<HTMLButtonElement>('#bloodstock-btn')?.addEventListener('click', () => {
+    callbacks.onBloodstock?.();
+  });
 
   menu.querySelector<HTMLButtonElement>('#export-btn')!.addEventListener('click', () => {
     callbacks.onExport?.();
