@@ -312,6 +312,96 @@ describe('distributing a budget into potential', () => {
   });
 });
 
+/**
+ * DESIGN.md §2: "complementary — not vertical — inheritance. Neither is
+ * stronger." Mares transmit Stamina and Temper more reliably, stallions Speed
+ * and Burst, and Grit and Consistency belong to neither.
+ */
+describe('what each sex passes on', () => {
+  const fast = { ...stats(70), speed: 90, burst: 90, stamina: 50, temper: 50 };
+  const stayer = { ...stats(70), speed: 50, burst: 50, stamina: 90, temper: 90 };
+
+  /** Mean foal, over enough rolls that the systematic part is what is left. */
+  function average(sirePotential: Stats, damPotential: Stats, tag: string): Stats {
+    const sire = horse({ id: 'sire', gender: 'stallion', potential: sirePotential });
+    const dam = horse({ id: 'dam', gender: 'mare', potential: damPotential });
+
+    const sum = {} as Stats;
+    for (const key of STAT_KEYS) sum[key] = 0;
+    const runs = 600;
+    for (let i = 0; i < runs; i++) {
+      const foal = distributePotential(createRng(`${tag}-${i}`), sire, dam, 1000, 0);
+      for (const key of STAT_KEYS) sum[key] += foal[key];
+    }
+    for (const key of STAT_KEYS) sum[key] /= runs;
+    return sum;
+  }
+
+  const fastSire = average(fast, stayer, 'fast-sire');
+  const fastDam = average(stayer, fast, 'fast-dam');
+
+  it('carries speed and burst down the stallion', () => {
+    expect(fastSire.speed).toBeGreaterThan(fastDam.speed);
+    expect(fastSire.burst).toBeGreaterThan(fastDam.burst);
+  });
+
+  it('carries stamina and temper down the mare', () => {
+    // The staying parent is the DAM in the first pairing, so stamina is higher
+    // there for the same reason speed is: each sex passed on its own.
+    expect(fastSire.stamina).toBeGreaterThan(fastDam.stamina);
+    expect(fastSire.temper).toBeGreaterThan(fastDam.temper);
+  });
+
+  /**
+   * The defect this measurement caught. Biasing the *roll* meant a systematic
+   * lean on four stats was paid for out of the two without one, so every
+   * well-matched pairing quietly drained Grit and Consistency — compounding
+   * every generation, invisible in any single foal.
+   */
+  it('does not pay for the gendered stats out of the ungendered ones', () => {
+    expect(Math.abs(fastSire.grit - fastDam.grit)).toBeLessThan(3);
+    expect(Math.abs(fastSire.consistency - fastDam.consistency)).toBeLessThan(3);
+    // And neither pairing pushes them below the mid-parent they came from.
+    expect(fastSire.grit).toBeGreaterThan(69);
+    expect(fastDam.grit).toBeGreaterThan(69);
+  });
+
+  /**
+   * §2 says neither sex is stronger, and matching them well is a real skill —
+   * but it must stay a nudge. At the first weights tried, a well-matched
+   * pairing gained eight points of average potential, more than a whole
+   * generation of breeding, which would have made this a bigger lever than the
+   * careers that feed the budget.
+   */
+  it('rewards a well-matched pairing without outweighing the budget', () => {
+    const mean = (s: Stats): number =>
+      STAT_KEYS.reduce((sum, key) => sum + s[key], 0) / STAT_KEYS.length;
+    const edge = mean(fastSire) - mean(fastDam);
+    expect(edge).toBeGreaterThan(0);
+    expect(edge).toBeLessThan(6);
+  });
+
+  /**
+   * The pairing screen lists the player's own horse first whatever its sex,
+   * while `breedFoal` hands them over sire-first. If the sexes were read from
+   * the argument order rather than from the horses, the preview would show a
+   * foal shaped like the opposite of the one the player actually gets.
+   *
+   * Distributional rather than exact: the tilt multiplies a signed gap, so
+   * swapping the arguments mirrors an individual roll while leaving the
+   * distribution — which is what the preview samples — identical.
+   */
+  it('reads the sexes off the horses, not off the argument order', () => {
+    const backwards = average(stayer, fast, 'fast-sire-swapped');
+    const swappedProperly = average(fast, stayer, 'fast-sire');
+
+    // `average` always builds a stallion first, so compare against the run
+    // where the fast horse is the stallion either way.
+    expect(Math.abs(swappedProperly.speed - fastSire.speed)).toBeLessThan(0.01);
+    expect(backwards.speed).toBeLessThan(fastSire.speed);
+  });
+});
+
 describe('shape: which parent a stat came from', () => {
   /** A stamina horse with no speed, and its mirror image. */
   const stayer = horse({

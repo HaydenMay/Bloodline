@@ -22,7 +22,7 @@
  */
 
 import type { Rng } from './rng.js';
-import type { Horse, Stats } from './types.js';
+import type { Horse, StatKey, Stats } from './types.js';
 import { STAT_KEYS } from './types.js';
 import { rollTraits } from './horse.js';
 import { genotypeOf, expressCoat, inheritCoat } from './coat.js';
@@ -267,6 +267,49 @@ export const MAX_SPREAD = 26;
  */
 export const PARENT_TILT = 2.3;
 
+/**
+ * How much of each stat comes from the sire rather than the dam (DESIGN.md §2).
+ *
+ * "Stallions and mares, with **complementary — not vertical — inheritance**.
+ * Neither is stronger." Mares transmit Stamina and Temper more reliably,
+ * stallions Speed and Burst, and Grit and Consistency belong to neither, so
+ * they split evenly — a horse needs somewhere that is simply itself.
+ *
+ * This is a weight on the **mid-parent**, not a nudge to the roll. A foal's
+ * speed starts nearer its sire's figure and its stamina nearer its dam's, and
+ * everything downstream — the tilt, the roll, the floor — works from there.
+ *
+ * The first attempt biased the *tilt* instead, and measuring it showed why that
+ * cannot work: the offsets are zero-sum, so a systematic lean on four stats was
+ * paid for out of the two without one. Every well-matched pairing quietly
+ * drained Grit and Consistency, generation after generation. The bias has to
+ * live where the parents' own numbers are combined, not in the part that is
+ * deliberately made to cancel.
+ *
+ * **This does mean a well-matched pairing produces a slightly better foal**, not
+ * merely a differently-shaped one — a fast stallion over a staying mare beats
+ * the same two horses the other way round. That is the intent of §2 (the gender
+ * of your best horse should matter) and it is a deliberate, bounded exception to
+ * §10's "the budget sets the total".
+ *
+ * The weight is small on purpose, and was measured down to it. At 0.65/0.35 a
+ * well-matched pairing of two extreme opposites gained eight points of average
+ * potential — more than a whole generation of breeding progress, which would
+ * have made gender-matching a bigger lever than the careers feeding the budget.
+ * At 0.58/0.42 it is worth about two: half a generation, visible over a
+ * bloodline, never the thing that decides one.
+ */
+export const GENDER_WEIGHT = 0.08;
+
+export const SIRE_SHARE: Record<StatKey, number> = {
+  speed: 0.5 + GENDER_WEIGHT,
+  burst: 0.5 + GENDER_WEIGHT,
+  stamina: 0.5 - GENDER_WEIGHT,
+  temper: 0.5 - GENDER_WEIGHT,
+  grit: 0.5,
+  consistency: 0.5,
+};
+
 const clamp = (v: number, lo: number, hi: number): number =>
   Math.max(lo, Math.min(hi, v));
 
@@ -280,7 +323,9 @@ const clamp = (v: number, lo: number, hi: number): number =>
  * Two things decide the shape, and they answer different questions:
  *
  *   - **The tilt** — which parent each stat came from. This is what carries a
- *     family's character, and what stops a line averaging itself flat.
+ *     family's character, and what stops a line averaging itself flat. It leans
+ *     with the parents' sexes, per §2: speed and burst toward the sire, stamina
+ *     and temper toward the dam.
  *   - **The roll** — fresh variance the pairing did not inherit from either
  *     side, scaled by how unrelated the pair is. This is what lets an outcross
  *     throw a specialist neither parent was.
@@ -292,6 +337,12 @@ export function distributePotential(
   budget: number,
   related: number,
 ): Stats {
+  // Which side of the pairing is actually the stallion. `breed` orders them by
+  // gender, but this is called directly by the pairing preview and by the
+  // trace, so it settles the question itself rather than trusting the argument
+  // order — a preview that assumed wrong would show a foal shaped like the
+  // opposite of the one the player would get.
+  const swapped = sire.gender === 'mare';
   const spread = MAX_SPREAD * (1 - clamp(related, 0, 1));
 
   const midParent = {} as Stats;
@@ -302,7 +353,10 @@ export function distributePotential(
   for (const key of STAT_KEYS) {
     const sireSide = sire.potential?.[key] ?? 50;
     const damSide = dam.potential?.[key] ?? 50;
-    const mid = (sireSide + damSide) / 2;
+    const share = swapped ? 1 - SIRE_SHARE[key] : SIRE_SHARE[key];
+    // Weighted rather than halved: each parent counts for more on the stats its
+    // sex transmits best (§2).
+    const mid = sireSide * share + damSide * (1 - share);
     midParent[key] = mid;
     gap[key] = (sireSide - damSide) / 2;
     floor[key] = mid * FLOOR_SHARE;
