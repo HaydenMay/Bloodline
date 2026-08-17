@@ -54,6 +54,7 @@ import {
   exportSave,
   importSave,
   takeRecoveryNotice,
+  takeStudInfluence,
   type Career,
   type Stable,
 } from './ui/career.js';
@@ -515,6 +516,10 @@ function showCareerRecap(career: Career): void {
     const value = getRetirementValue(career.horseLegacy, career.careerEndedByInjury === true);
     const stable = retireCurrentHorse(career);
     const banked = value.banked;
+    // What the yard's stallions earned while this horse was racing. Paid in
+    // prestige, never cash — a bloodline spreading through the league is
+    // influence, not income.
+    const influence = takeStudInfluence();
 
     showNotice(
       app,
@@ -528,6 +533,11 @@ function showCareerRecap(career: Career): void {
               ? `${career.horse.name} retires on top, banking ${value.base} prestige plus a ${value.bonus} bonus.`
               : `${career.horse.name} retires having banked ${banked} prestige, down from a peak of ${career.horseLegacy.peak}.`,
           `It joins your bloodstock — ${stable.bloodstock.length} horse${stable.bloodstock.length === 1 ? '' : 's'} in the yard now.`,
+          ...(influence > 0
+            ? [
+                `Rival yards bred to your Hall of Fame stallions while you were racing, earning ${influence} prestige.`,
+              ]
+            : []),
           `Facilities, staff, ${'$' + stable.cash.toLocaleString()} in cash and every point of prestige all carry over.`,
         ],
         hint: 'Your next horse starts from everything this one built.',

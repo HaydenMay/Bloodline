@@ -25,9 +25,36 @@ import {
   rescaleStableLegacy,
   seedLegacyFromRecord,
 } from '../data/legacy.js';
+import { fertility } from '../sim/breeding.js';
 
 /** What a brand-new yard opens with. */
 export const STARTING_CASH = 10000;
+
+/**
+ * Years the world moves on each time a horse's career ends.
+ *
+ * A horse races from two to five, so campaigning one advances the calendar
+ * about four years — which is what turns §10's breeding lifespan into something
+ * a player feels. A stallion retired at five breeds at 5, 9, 13, 17 and 21:
+ * four foals at full strength and a fading fifth.
+ */
+export const YEARS_PER_CAREER = 4;
+
+/**
+ * Share of a Hall of Fame horse's banked legacy paid back as prestige each
+ * career, for rival yards breeding to it.
+ *
+ * ROADMAP.md: stud influence pays **prestige, never cash**. Two income faucets
+ * against a fixed set of sinks inflates the economy, and cash is already the
+ * currency that runs out of things to buy — but what a yard genuinely earns
+ * when its bloodline spreads through the league is *influence*, which is what
+ * prestige measures.
+ *
+ * At 8%, a horse that banked 1,000 pays 80 a career and about 320 across its
+ * stud life. Enough to matter against the prestige walls, not enough to become
+ * the fastest route up them — and it fades with the age taper, so it ends.
+ */
+export const STUD_INFLUENCE_SHARE = 0.08;
 
 /** This horse's record. Reset when a new horse is campaigned. */
 export interface CareerStats {
@@ -190,6 +217,21 @@ export function takeRecoveryNotice(): string | null {
   return notice;
 }
 
+/**
+ * Prestige the yard's stallions earned while the last career was running.
+ *
+ * Reported the same way a save recovery is, rather than by changing what
+ * `retireCurrentHorse` returns: every caller of that function wants the yard,
+ * and only the retirement screen cares what the stud book paid.
+ */
+let lastStudInfluence = 0;
+
+export function takeStudInfluence(): number {
+  const earned = lastStudInfluence;
+  lastStudInfluence = 0;
+  return earned;
+}
+
 export function createStable(): Stable {
   const rng = createRng(`stable-${Date.now()}`);
   const names = createNameGenerator(rng);
@@ -293,14 +335,42 @@ export function saveCareer(career: Career): void {
 }
 
 /**
+ * What the yard's stallions earned while you were racing.
+ *
+ * Only Hall of Fame horses pay, which is the point: §1 makes enshrining a horse
+ * the most valuable thing a career can produce, and this is the part that keeps
+ * paying long after the horse has stopped running.
+ */
+export function studInfluence(stable: Stable): number {
+  return stable.bloodstock.reduce((total, entry) => {
+    if (!entry.hallOfFame) return total;
+    const share = entry.legacyBanked * STUD_INFLUENCE_SHARE * fertility(entry.horse.age);
+    return total + Math.round(Math.max(0, share));
+  }, 0);
+}
+
+/**
  * Ends the current horse's career and banks what it earned the yard.
  *
  * The horse's legacy converts into permanent stable prestige here — while it
  * was racing its score could still fall, but once the career is over what it
  * achieved is locked in and the next horse starts on top of it.
+ *
+ * The world also moves on: every horse already at stud ages by a career's worth
+ * of years, and the ones your rivals have been breeding to pay their influence
+ * back as prestige.
  */
 export function retireCurrentHorse(career: Career): Stable {
   const stable = career.stable;
+
+  // Paid before the new retiree joins, because it earned nothing at stud while
+  // it was still racing — and aged before the payment, so a sire past its years
+  // stops earning at the same moment it stops breeding.
+  for (const entry of stable.bloodstock) {
+    entry.horse.age += YEARS_PER_CAREER;
+  }
+  lastStudInfluence = studInfluence(stable);
+  stable.legacy.archivedPoints += lastStudInfluence;
 
   // Banks what the horse is worth now, not what it was worth at its best —
   // §8's gamble only exists if running one into the ground actually costs

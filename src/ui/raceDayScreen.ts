@@ -59,7 +59,9 @@ export function mountRaceDayScreen(
     .map(([id, count]) => ({ item: CONSUMABLES[id]!, count }));
 
   const betOptions = getBetOptions(horse, field);
-  const stakes = getStakeOptions(stable.cash);
+  // Tied to the purse: a bet should be proportional to the race it rides on,
+  // or a Maiden becomes the most profitable division in the game.
+  const stakes = getStakeOptions(stable.cash, race.purse);
 
   const selectedItems = new Set<string>();
   let betType: BetType | null = null;

@@ -11,6 +11,7 @@ import {
   type BreedingResult,
 } from '../sim/breeding.js';
 import { getTierFromPoints, seedLegacyFromRecord } from '../data/legacy.js';
+import { studFee } from '../data/studFee.js';
 import { createNameGenerator } from '../data/names.js';
 import type { Division } from '../data/index.js';
 import type { RetiredHorse, Stable } from './career.js';
@@ -64,6 +65,8 @@ export interface PartnerOption {
   timesBred: number;
   /** Its class, for the list. Outside studs are known by nothing else. */
   division: Division;
+  /** Cash to breed to it. Always zero for a horse you own (§10). */
+  fee: number;
 }
 
 /** Turns one of your retirees into a breeding partner. */
@@ -120,6 +123,14 @@ export function outsideStuds(stable: Stable, mine: Horse, limit = 6): BreedingPa
         DIVISION_RANK.indexOf(b.division) - DIVISION_RANK.indexOf(a.division) ||
         a.id.localeCompare(b.id),
     )
+    // Two per class rather than the best six outright. Fees climb steeply with
+    // quality, so a list of nothing but the best horses a yard can *reach*
+    // would price a yard out of breeding at exactly the moment its own line has
+    // dead-ended — which is the one thing outside studs exist to prevent.
+    .filter((horse, _i, all) => {
+      const sameClass = all.filter((other) => other.division === horse.division);
+      return sameClass.indexOf(horse) < 2;
+    })
     .slice(0, limit)
     .map((horse) => ({
       horse,
@@ -146,6 +157,9 @@ export function partnersFor(stable: Stable, mine: Horse): PartnerOption[] {
       source: 'bloodstock' as const,
       timesBred: timesBred(stable, mine, entry.horse),
       division: entry.horse.division,
+      // §10: your own horses are free, forever, Hall of Fame or not. Breeding
+      // inside your own yard is the intended path and never costs cash.
+      fee: 0,
     }));
 
   const outside: PartnerOption[] = outsideStuds(stable, mine).map((partner) => ({
@@ -153,6 +167,7 @@ export function partnersFor(stable: Stable, mine: Horse): PartnerOption[] {
     source: 'outside' as const,
     timesBred: timesBred(stable, mine, partner.horse),
     division: partner.horse.division,
+    fee: studFee(partner.horse, partner.legacyBanked),
   }));
 
   return [...own, ...outside];
@@ -239,10 +254,17 @@ export function projectFoal(
  * shop for. Repeating the pairing is allowed and simply costs the first-cross
  * bonus a little more of itself.
  */
+/**
+ * Breeds the pairing and charges the yard for it.
+ *
+ * The fee is taken here rather than by the screen so that no path can breed a
+ * foal without paying — the same reason the pairing count is recorded here.
+ */
 export function breedFoal(
   stable: Stable,
   mine: BreedingPartner,
   partner: BreedingPartner,
+  fee = 0,
 ): BreedingResult {
   const repeats = timesBred(stable, mine.horse, partner.horse);
   const key = pairingKey(mine.horse, partner.horse);
@@ -268,5 +290,6 @@ export function breedFoal(
 
   const result = breed(rng, sire, dam, names.next(), repeats);
   recordPairing(stable, mine.horse, partner.horse);
+  stable.cash -= Math.max(0, fee);
   return result;
 }

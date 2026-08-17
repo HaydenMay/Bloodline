@@ -198,14 +198,48 @@ left rather than adding a flat band — which is a change to gen-1 starters too,
 decision and not a quiet patch.
 
 ### Stage 2 — Partners, the cash sink, and stud influence
-- **Stud fees priced on what you are buying** — the partner's banked legacy *and* its potential
+
+- ✅ **Stud fees priced on what you are buying** — the partner's banked legacy *and* its potential
   grades, so you pay for the foal you can actually expect rather than for a reputation
-- Own Hall of Fame horses free forever, and carrying **+25% of that parent's contribution** to the
-  budget (§10's worked example: +50 on a ~200 base)
-- Retired horses keep ageing into ineligibility
-- **Partners are bloodstock, never a fresh roll** — a stud generated from a division band flattens
+- ✅ Own horses free forever, Hall of Fame or not, and an enshrined parent still carries
+  **+25% of its contribution** to the budget (§10's worked example: +50 on a ~200 base)
+- ✅ Retired horses keep ageing into ineligibility
+- ✅ **Partners are bloodstock, never a fresh roll** — a stud generated from a division band flattens
   any line that breeds to it, measured in the Stage 1 follow-up above
-- **Stud influence pays prestige, never cash** — see below
+- ✅ **Stud influence pays prestige, never cash** — see below
+
+#### What a stud costs
+
+`data/studFee.ts`. Two terms, both things the foal actually inherits: banked legacy at $100 a point,
+plus a **squared** premium on potential above 50. Squared because the scarcity is at the top — the
+gap between a 90 and a 95 sire is worth far more than the gap between a 60 and a 65, and a linear
+price makes the best horses in the world a rounding error on a good season. Measured against real
+generated studs:
+
+| Class | Avg potential | Banked | Median fee |
+|---|---|---|---|
+| Maiden | 53.4 | 0 | $300 |
+| Novice | 68.5 | 60 | $14,400 |
+| Open | 78.7 | 150 | $35,500 |
+| Stakes | 90.2 | 300 | $70,700 |
+| Championship | 97.7 | 525 | $110,500 |
+
+**Deliberately steep**, because cash is the currency with the least to spend on and purses plus
+wagering fill it faster than facilities drain it. It costs nothing to breed inside your own yard, so
+a steep fee prices the escape hatch without ever taxing the intended path (§1).
+
+The one thing this must not do is close the escape hatch when it is needed. The stud list therefore
+offers **two horses per class** rather than the best six a yard can reach — otherwise a yard whose
+own line has just dead-ended would be shown nothing but studs it cannot afford, at exactly the
+moment outside partners exist to help.
+
+#### The fee that was already there: wagering
+
+Raised while pricing this. `getStakeOptions` offered up to **$10,000 in every division**, including a
+Maiden race with a $5,000 purse — so backing your own horse paid multiples of winning, in the
+division where the fields are weakest and your own horse is easiest to read. Stakes are now capped at
+**25% of the race's purse**: $1,250 in a Maiden, the full $10,000 in a Championship. A bet should be
+proportional to the race it rides on.
 
 #### Breeding lifespan: 4 full foals per horse
 
@@ -295,9 +329,12 @@ birth too, even though nothing reads it until Stage 3.
 
 Not decided yet. Listed so they are answered deliberately at the time rather than defaulted into.
 
-**Stage 2** — Settled above, except: how much prestige does one outside mare bred to your stallion
-actually pay, and is it per pairing or per career? Too generous and it becomes the fastest route up
-the ladder; too little and enshrining a horse loses half its point.
+**Stage 2** — ✅ Answered. Stud influence pays **per career, at 8% of what the horse banked**, scaled
+by the age taper so it fades and then stops. A horse that banked 1,000 pays 80 a career and about
+320 across its stud life — enough to matter against walls at 400 and 1,500, not enough to become the
+fastest route up them, and it ends rather than accruing forever. Per career rather than per pairing
+because a career *is* the unit the world moves in: four years, one horse, one advance of the clock.
+Simulating individual rival pairings needs rival breeding, which is Stage 3's job.
 
 **Stage 3** — Which coat loci ship (base black/bay/chestnut plus how many modifiers)? What mutation
 chance applies to traits and aptitude? How fast does relatedness narrow variance — §10 wants a
@@ -380,7 +417,7 @@ Elite 1,500 / Champion 3,500 / Legend 7,500) are untouched pending the same work
 | 3 · Full career | ~3–4 | ✅ Complete |
 | 4 · The stable | ~2–3 | ✅ Complete |
 | 4.5 · Re-balance & physics | ~2–3 | ✅ Complete |
-| 5 · Breeding | ~3–4 | 🚧 **IN PROGRESS** — Stage 1 complete and the loop closes; Stage 2 (partners, stud fees, stud influence) is next |
+| 5 · Breeding | ~3–4 | 🚧 **IN PROGRESS** — Stages 1 and 2 complete; Stage 3 (genetics texture) is next |
 | 6 · Polish | ~3+ | ⏳ After Phase 5 |
 | **Total estimate** | **~20–25** | |
 

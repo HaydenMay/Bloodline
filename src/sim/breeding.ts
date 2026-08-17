@@ -50,10 +50,19 @@ export interface BreedingPartner {
  */
 export const HALL_OF_FAME_BONUS = 0.25;
 
-/** A parent's contribution to the budget. */
+/**
+ * A parent's contribution to the budget.
+ *
+ * Scaled by how much of its stud life the horse has left. §10's table gives a
+ * full contribution to 17, a taper to 21 and nothing at 22 — and the taper has
+ * to reach the *budget*, not just eligibility, or a sire visibly running out of
+ * years would breed exactly as well at twenty as at five and the warning the
+ * taper exists to give would be cosmetic.
+ */
 export function partnerContribution(partner: BreedingPartner): number {
   const base = Math.max(0, partner.legacyBanked);
-  return Math.round(base * (partner.hallOfFame ? 1 + HALL_OF_FAME_BONUS : 1));
+  const enshrined = partner.hallOfFame ? 1 + HALL_OF_FAME_BONUS : 1;
+  return Math.round(base * enshrined * fertility(partner.horse.age));
 }
 
 /* ---------------------------------------------------------------------------

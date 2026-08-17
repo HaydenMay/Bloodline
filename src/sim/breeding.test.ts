@@ -77,6 +77,22 @@ describe('what a parent contributes', () => {
   it('never goes negative on a horse that banked nothing', () => {
     expect(partnerContribution(partner({}, -50))).toBe(0);
   });
+
+  /**
+   * §10's taper has to reach the budget, not just eligibility. A sire running
+   * out of years is meant to be a warning a player can act on; if a twenty-year
+   * old bred exactly as well as a five-year-old, the taper would be decoration.
+   */
+  it('fades with the years a sire has left', () => {
+    const prime = partnerContribution(partner({ age: 10 }, 600));
+    const fading = partnerContribution(partner({ age: BREEDING_PRIME_AGE + 2 }, 600));
+    const done = partnerContribution(partner({ age: BREEDING_MAX_AGE }, 600));
+
+    expect(prime).toBe(600);
+    expect(fading).toBeLessThan(prime);
+    expect(fading).toBeGreaterThan(0);
+    expect(done).toBe(0);
+  });
 });
 
 describe('the first-cross bonus', () => {

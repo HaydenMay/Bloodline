@@ -63,10 +63,12 @@ function describe(horse: Horse): string {
 /** One selectable horse: yours or a rival's. */
 function renderCard(
   horse: Horse,
-  opts: { selected: boolean; note: string; badge?: string },
+  opts: { selected: boolean; note: string; badge?: string; fee?: string; barred?: boolean },
 ): string {
   return `
-    <button type="button" class="stud-card${opts.selected ? ' selected' : ''}" data-id="${horse.id}">
+    <button type="button" class="stud-card${opts.selected ? ' selected' : ''}${
+      opts.barred ? ' barred' : ''
+    }" data-id="${horse.id}">
       <span class="stud-card-head">
         <span class="stud-card-name">${horse.name}</span>
         ${opts.badge ? `<span class="stud-card-badge">${opts.badge}</span>` : ''}
@@ -74,6 +76,7 @@ function renderCard(
       <span class="stud-card-meta">${horse.gender === 'stallion' ? 'Stallion' : 'Mare'} · ${horse.age}yo · ${titleCase(horse.division)}</span>
       <span class="stud-card-note">${opts.note}</span>
       <span class="stud-card-traits">${describe(horse)}</span>
+      ${opts.fee ? `<span class="stud-card-fee">${opts.fee}</span>` : ''}
     </button>`;
 }
 
@@ -147,7 +150,7 @@ export function mountBreedingScreen(
           </section>
 
           <section class="breeding-section">
-            <h3>Partner</h3>
+            <h3>Partner · your yard holds $${stable.cash.toLocaleString()}</h3>
             ${
               options.length === 0
                 ? `<p class="breeding-empty">Nothing available to pair with this horse.</p>`
@@ -163,6 +166,11 @@ export function mountBreedingScreen(
                            ...(option.source === 'bloodstock'
                              ? { badge: 'Your yard' }
                              : { badge: 'Outside' }),
+                           fee:
+                             option.fee === 0
+                               ? 'Free — your own'
+                               : `$${option.fee.toLocaleString()}`,
+                           barred: option.fee > stable.cash,
                          }),
                        )
                        .join('')}
@@ -178,7 +186,15 @@ export function mountBreedingScreen(
                    <p class="breeding-hint">Where this pairing usually lands. Tap for numbers.</p>
                    ${
                      mode === 'breed'
-                       ? `<button class="btn btn-primary" id="breed-btn">Breed ${mine!.horse.name} &amp; ${chosen!.partner.horse.name}</button>`
+                       ? `<button class="btn btn-primary" id="breed-btn"${
+                           chosen!.fee > stable.cash ? ' disabled' : ''
+                         }>${
+                           chosen!.fee > stable.cash
+                             ? `Fee is $${chosen!.fee.toLocaleString()} — your yard holds $${stable.cash.toLocaleString()}`
+                             : `Breed ${mine!.horse.name} &amp; ${chosen!.partner.horse.name}${
+                                 chosen!.fee > 0 ? ` — $${chosen!.fee.toLocaleString()}` : ''
+                               }`
+                         }</button>`
                        : `<p class="breeding-empty">You have a horse in training. This pairing is
                             yours to make the day that career ends.</p>`
                    }`
@@ -211,9 +227,9 @@ export function mountBreedingScreen(
     if (projectionEl) detachReveal = attachStatReveal(projectionEl);
 
     on(root.querySelector('#breed-btn'), 'click', () => {
-      if (!mine || !chosen) return;
+      if (!mine || !chosen || chosen.fee > stable.cash) return;
       const partner: BreedingPartner = chosen.partner;
-      const { foal } = breedFoal(stable, toPartner(mine), partner);
+      const { foal } = breedFoal(stable, toPartner(mine), partner, chosen.fee);
       onBred(foal, stable);
     });
   }

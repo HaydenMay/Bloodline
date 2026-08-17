@@ -6946,3 +6946,21 @@ body {
   color: var(--muted);
   font-style: italic;
 }
+
+/* The stud fee. Your own horses read "Free" — breeding inside your own yard is
+   the intended path and never costs cash (DESIGN.md 10). */
+.stud-card-fee {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Priced out rather than unavailable: the horse is real and the fee is real,
+   you simply cannot cover it yet. */
+.stud-card.barred {
+  opacity: 0.55;
+}
+
+.stud-card.barred .stud-card-fee {
+  color: var(--warning);
+}

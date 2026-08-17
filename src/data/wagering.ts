@@ -91,9 +91,36 @@ export function getBetOptions(player: Horse, field: Horse[]): BetOption[] {
   ];
 }
 
-/** Stake sizes offered, filtered to what the yard can actually cover. */
-export function getStakeOptions(cash: number): number[] {
-  return [500, 1000, 2500, 5000, 10000].filter((stake) => stake <= cash);
+/**
+ * The most a yard may stake, as a share of the race's own purse.
+ *
+ * The stake ladder used to run to $10,000 in every division, which meant a
+ * Maiden race with a $5,000 purse could be worth $25,000 to a player who backed
+ * themselves — betting outpaid winning, in the division where the fields are
+ * weakest and the player's own horse is easiest to read. Tying the ceiling to
+ * the purse keeps a bet proportional to the race it is attached to: real money
+ * in a Championship, pocket change in a Maiden.
+ */
+export const MAX_STAKE_SHARE = 0.25;
+
+/**
+ * Stake sizes offered, filtered to what the yard can cover and what the race is
+ * worth.
+ *
+ * `purse` is optional so older callers still work, but a race that knows its
+ * own purse should always pass it.
+ */
+export function getStakeOptions(cash: number, purse?: number): number[] {
+  const ceiling = purse === undefined ? Infinity : purse * MAX_STAKE_SHARE;
+  const affordable = [500, 1000, 2500, 5000, 10000].filter(
+    (stake) => stake <= cash && stake <= ceiling,
+  );
+  // A yard that can afford something should always be offered something, even
+  // in a Maiden where a quarter of the purse is below the smallest chip.
+  if (affordable.length === 0 && cash >= 100 && ceiling >= 100) {
+    return [Math.min(500, Math.floor(Math.min(cash, ceiling) / 100) * 100)];
+  }
+  return affordable;
 }
 
 export function settleBet(
