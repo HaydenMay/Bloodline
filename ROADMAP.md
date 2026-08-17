@@ -83,51 +83,94 @@ Sliced into stages that each leave the game playable, because "the loop closes" 
 early and everything after it is texture on top.
 
 ### Stage 1 — The budget and the foal
-- `sim/breeding.ts`: retired career → inheritance budget → distributed foal
-- Floor from the parents, budget from achievement, variance from pairing diversity
-- First-cross bonus, rolled once per pairing so rerolling cannot farm it
-- Pairing screen showing **projected potential ranges and nothing else** (§10)
-- New careers start from a foal or from a yearling
 
-**Deliverable: the loop closes.** Retire, breed, race the foal.
+- ✅ `sim/breeding.ts`: retired career → inheritance budget → distributed foal
+- ✅ Floor from the parents, budget from achievement, variance from pairing diversity
+- ✅ First-cross bonus, rolled once per pairing so rerolling cannot farm it
+- ✅ The generational trace, `npm run bloodline` — see the follow-up below
+- ⬜ Pairing screen showing **projected potential ranges and nothing else** (§10)
+- ⬜ New careers start from a foal or from a yearling
 
-### ⚠️ Stage 1 follow-up — bloodlines converge toward bland
+**Deliverable: the loop closes.** Retire, breed, race the foal. *The simulation half is done and
+measured; nothing in the game imports it yet, so the loop does not close until the pairing screen
+and the foal-start career land.*
 
-**Do this first.** `sim/breeding.ts` is built and correct on averages, but a three-generation trace
-through the real generator shows every line flattening. Columns are SPD / STA / BRS / GRT / TMP / CON.
+### ✅ Stage 1 follow-up — bloodlines converged toward bland
+
+**Fixed.** Every line was flattening: the spread between a horse's best and worst potential halved
+each generation (56 → 33 → 24 on the sharpest line traced), so generation six would have bred a flat
+85 across all six stats. No specialists, no shape, every horse identical.
+
+**Cause, confirmed by measurement.** Two terms, not one.
+
+- **Regression to the mean.** Each foal was built at the mid-parent of every stat, and averaging two
+  horses always narrows — a foal assembled that way is blander than both its parents by construction.
+- **A variance term an order of magnitude too small.** `rng.normal(mean, spread)` takes a
+  *half-range*, not a standard deviation: `MAX_SPREAD = 14` was an sd of **4**, against a natural
+  starter spread of 30–56. The roll could not begin to counteract the averaging.
+
+**Fix.** Two constants and one new term in `distributePotential`:
+
+- **`PARENT_TILT`** — each stat now leans toward one parent or the other instead of landing at their
+  midpoint, so a foal can take its sire's stamina and its dam's speed, and occasionally more of
+  either than either parent had. This is what carries a family's character, and it needs no
+  diversity coefficient of its own: it multiplies the *gap between the parents*, which is already
+  small for two closely related horses. §10's inbreeding penalty now falls out of the pairing rather
+  than being bolted on as a rule.
+- **`MAX_SPREAD` 14 → 26**, with the half-range documented at the constant so it is not misread a
+  third time.
+
+Both offsets stay zero-sum, so the budget still buys exactly what it bought before — this changes
+the shape of a foal, never its total.
+
+### The bloodline trace — `npm run bloodline`
+
+The measurement is now a committed tool rather than a one-off, because the arithmetic on this module
+has been wrong twice and both times the unit tests passed. It campaigns a starter through real
+races, banks real legacy, breeds it, and races the foal, for as many generations as asked. Three
+partner regimes, because they fail differently and the module has to hold up in all three.
+
+40 yards, 8 generations, 18 starts a career:
 
 ```
-GEN 1  Brash Tide (starter)   36  92  63  71  60  67    avg 64.8   spread 56
-GEN 2  budget 1190            54  87  71  76  65  73    avg 71.0   spread 33
-GEN 3  budget 1430            62  86  81  81  73  71    avg 75.7   spread 24
+              spread gen 1 → gen 8    carry    roll     verdict
+  rival        36.7 → 46.1  (+26%)     0.00     7.3     HOLDS
+  outside      36.7 → 17.4  (-53%)     0.13     6.6     CONVERGES
+  own          36.7 → 44.5  (+21%)     0.52     4.3     HOLDS
 ```
 
-| Line | Gen 1 | Gen 2 | Gen 3 |
+**spread** is the gap between a horse's best and worst potential. **carry** is how much of the
+founder's shape a descendant still has, as a correlation against its generation-1 ancestor.
+**roll** is how much the same pairing varies from foal to foal — §10's boom-or-bust.
+
+Reading it: an ordinary outcross now grows *more* distinctive down the generations rather than less,
+which is the direction the progression was supposed to run. A line bred back into itself keeps its
+founder's character (carry 0.52 against 0.00) and pays for it with a roll barely half as wide —
+which is exactly §10's trade, safe and dull against boom-or-bust, now visible in a number.
+
+### ⚠️ What the trace found next — outside studs cannot be rolled fresh
+
+**Do this first when Stage 2 starts.** The `outside` regime still converges, and it is not the
+breeding maths. A stud rolled from `generateHorse` at the class a good line has reached comes out
+shapeless:
+
+| Division rolled at | Avg potential | Spread | Stats pinned at 100 |
 |---|---|---|---|
-| A | 33 | 19 | 14 |
-| B | 56 | 33 | 24 |
-| C | 32 | 23 | 17 |
+| open | 78.6 | 28.8 | 2% |
+| stakes | 88.2 | 24.1 | 22% |
+| championship | 94.9 | 15.1 | **51%** |
 
-The average climbs as designed, and a line's *character* does carry — Brash Tide is a stamina
-freak with no speed, and three generations on it still is. But the spread halves every generation.
-Extrapolated, generation six breeds 85/85/85/85/85/85: no specialists, no shape, every horse an
-identical all-rounder.
+`rollPotential` adds a flat +8–45 headroom whatever the horse already is, so at the top of the
+ladder it simply clamps at 100. Breeding to that drags a line to a 93 average by generation eight
+and flattens it there — the "line maxes out by generation four" bug returning through a different
+door, and no variance term can survive being averaged with a partner that is 100/100/100/95/100/93.
 
-**Cause.** Plain regression to the mean. Each foal centres on the mid-parent, and averaging two
-horses always narrows spread. `MAX_SPREAD` is 14, while starters naturally spread 30–56, so the
-variance term cannot come close to counteracting it.
-
-**Why it matters.** The progression currently runs backwards. It should start roughly uniform and
-grow *more* distinctive as a player breeds deliberately for a shape; instead it starts varied and
-converges on bland. It also quietly undoes §10's central trade — if every line ends up the same
-shape, choosing an outcross over a tight line stops meaning anything.
-
-**Fix.** Raise the variance so an outcross can genuinely throw a specialist, and likely scale it by
-how unlike each other the parents are rather than using a flat constant. Then **re-run the same
-three-generation trace** and confirm the spread column holds or widens. Do not trust the arithmetic
-on this one — the two bugs already found in this module (a line maxing out by generation four, and
-clamping silently destroying points) both passed every unit test and were only visible by replaying
-generations.
+**The decision this forces:** outside partners must be *bloodstock* — horses that were bred, raced
+and retired in the world, which is what the `rival` regime traces and what Stage 3's rejected foals
+are already meant to seed. Rolling a partner fresh from a division band is the thing not to do. If a
+generated stud is ever needed as a fallback, `rollPotential` has to scale its headroom by the room
+left rather than adding a flat band — which is a change to gen-1 starters too, so it is a deliberate
+decision and not a quiet patch.
 
 ### Stage 2 — Partners, the cash sink, and stud influence
 - **Stud fees priced on what you are buying** — the partner's banked legacy *and* its potential
@@ -135,6 +178,8 @@ generations.
 - Own Hall of Fame horses free forever, and carrying **+25% of that parent's contribution** to the
   budget (§10's worked example: +50 on a ~200 base)
 - Retired horses keep ageing into ineligibility
+- **Partners are bloodstock, never a fresh roll** — a stud generated from a division band flattens
+  any line that breeds to it, measured in the Stage 1 follow-up above
 - **Stud influence pays prestige, never cash** — see below
 
 #### Breeding lifespan: 4 full foals per horse
@@ -241,12 +286,34 @@ performance ceiling once a yard is fifty horses deep?
 buy beyond stats — aptitude nudges and latent traits are named in §10, and both change what the
 foal *is* rather than how big its numbers are.
 
-### To measure once Stage 1 lands
-What a gen-3 and gen-5 horse actually banks. Two open numbers depend on it and neither should be
-touched before: whether the Hall of Fame at 1,000 is reachable, and whether the prestige walls
-(Novice 0 / Professional 400 / Elite 1,500 / Champion 3,500 / Legend 7,500) need moving out.
-Current estimates assume every horse banks what a generation-1 horse banks, which is exactly what
-breeding is built to falsify.
+### ✅ Measured once Stage 1 landed
+
+What a gen-3 and gen-5 horse actually banks, from `npm run bloodline` (40 yards, 18-start careers,
+ordinary outcrossing):
+
+| Generation | Avg potential | Banked | Peak legacy | Reached the Hall of Fame |
+|---|---|---|---|---|
+| 1 | 61.5 | 392 | 352 | 0% |
+| 3 | 68.4 | 435 | 377 | 0% |
+| 5 | 74.2 | 475 | 411 | 0% |
+| 8 | 80.8 | 578 | 495 | 0% |
+
+**The Hall of Fame at 1,000 is not reachable by breeding alone**, and that is the open number this
+was waiting on. A horse climbing from Maiden spends most of a career in divisions that pay little —
+legacy is exponential in division, so the ladder itself is the ceiling, not the horse. Even a
+generation-eight animal averaging 81 potential peaks near 495. The bar is doing its job of sitting
+above gen-1 reach (§8), but nothing currently gets a horse over it, which matters because
+`HALL_OF_FAME_BONUS` is the payoff that makes enshrinement the best thing a career can produce (§1).
+
+Where the slack probably is, in the order worth trying: a foal debuting above Maiden so its career
+is spent in divisions that pay, and the promotion race, which the trace does not run. **Do not move
+the 1,000 bar until those two are tested** — lowering the bar to meet an unfinished career shape
+would be tuning against a measurement we know is short.
+
+Caveats on the numbers above: the trace trains every stat evenly rather than to a plan, does not
+pick its races, and skips promotion races (it applies the same points ladder without the gate).
+All three make it a floor rather than a forecast. Prestige walls (Novice 0 / Professional 400 /
+Elite 1,500 / Champion 3,500 / Legend 7,500) are untouched pending the same work.
 
 ---
 
@@ -288,7 +355,7 @@ breeding is built to falsify.
 | 3 · Full career | ~3–4 | ✅ Complete |
 | 4 · The stable | ~2–3 | ✅ Complete |
 | 4.5 · Re-balance & physics | ~2–3 | ✅ Complete |
-| 5 · Breeding | ~3–4 | 🚀 **NEXT** — planned and sliced, Stage 1 ready to build |
+| 5 · Breeding | ~3–4 | 🚧 **IN PROGRESS** — Stage 1's simulation built, traced and corrected; the pairing screen and foal-start career are next |
 | 6 · Polish | ~3+ | ⏳ After Phase 5 |
 | **Total estimate** | **~20–25** | |
 

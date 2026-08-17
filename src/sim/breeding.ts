@@ -179,8 +179,36 @@ export function generationGain(budget: number, midParentAverage: number): number
 /** Share of the mid-parent potential a foal is guaranteed, whatever the roll. */
 export const FLOOR_SHARE = 0.6;
 
-/** Spread of the distribution roll, at maximum diversity. */
-export const MAX_SPREAD = 14;
+/**
+ * Spread of the fresh distribution roll, at maximum diversity.
+ *
+ * A **half-range, not a standard deviation**: `rng.normal` sums four uniforms,
+ * so a spread of 26 rolls inside ±26 with an sd near 7.5. The first cut read
+ * this number as an sd and set it to 14 — an sd of 4, against a natural starter
+ * spread of 30 to 56. Averaging two parents narrowed a line far faster than
+ * that could widen it, so every bloodline flattened toward an identical
+ * all-rounder (ROADMAP.md, Stage 1 follow-up).
+ */
+export const MAX_SPREAD = 26;
+
+/**
+ * How far past a parent a foal can lean on one stat, as a multiple of the gap
+ * between the two parents. Also a half-range.
+ *
+ * **This is the term that stops regression to the mean.** A foal built at the
+ * mid-parent of every stat is blander than its parents by construction —
+ * averaging always narrows — so a line assembled that way loses its shape no
+ * matter how wide the fresh roll is. Leaning per stat instead lets a foal take
+ * its sire's stamina and its dam's speed, and now and then more of either than
+ * either parent had.
+ *
+ * It needs no diversity term of its own, which is the point of expressing it
+ * this way: two closely related horses are alike, so the gap it multiplies is
+ * already small. A line bred back into itself therefore rolls narrower because
+ * there is less to lean toward — §10's inbreeding penalty, falling out of the
+ * pairing rather than bolted on as a rule.
+ */
+export const PARENT_TILT = 2.3;
 
 const clamp = (v: number, lo: number, hi: number): number =>
   Math.max(lo, Math.min(hi, v));
@@ -191,6 +219,14 @@ const clamp = (v: number, lo: number, hi: number): number =>
  * The **total** is set by the budget; **diversity** decides only how evenly it
  * lands. A wide roll therefore produces §10's "bust": lopsided, never weak —
  * brilliant in one stat, floor-level in another, with the same points in it.
+ *
+ * Two things decide the shape, and they answer different questions:
+ *
+ *   - **The tilt** — which parent each stat came from. This is what carries a
+ *     family's character, and what stops a line averaging itself flat.
+ *   - **The roll** — fresh variance the pairing did not inherit from either
+ *     side, scaled by how unrelated the pair is. This is what lets an outcross
+ *     throw a specialist neither parent was.
  */
 export function distributePotential(
   rng: Rng,
@@ -203,19 +239,26 @@ export function distributePotential(
 
   const midParent = {} as Stats;
   const floor = {} as Stats;
+  /** Half the gap between the parents on each stat — what the tilt leans on. */
+  const gap = {} as Stats;
   let midTotal = 0;
   for (const key of STAT_KEYS) {
-    const mid = ((sire.potential?.[key] ?? 50) + (dam.potential?.[key] ?? 50)) / 2;
+    const sireSide = sire.potential?.[key] ?? 50;
+    const damSide = dam.potential?.[key] ?? 50;
+    const mid = (sireSide + damSide) / 2;
     midParent[key] = mid;
+    gap[key] = (sireSide - damSide) / 2;
     floor[key] = mid * FLOOR_SHARE;
     midTotal += mid;
   }
 
   const gain = generationGain(budget, midTotal / STAT_KEYS.length);
 
-  // Offsets are made zero-sum, so diversity moves points between stats without
+  // Offsets are made zero-sum, so shape moves points between stats without
   // ever changing how many there are.
-  const offsets = STAT_KEYS.map(() => rng.normal(0, spread));
+  const offsets = STAT_KEYS.map(
+    (key) => rng.normal(0, PARENT_TILT) * gap[key] + rng.normal(0, spread),
+  );
   const mean = offsets.reduce((a, b) => a + b, 0) / offsets.length;
 
   const raw = {} as Stats;

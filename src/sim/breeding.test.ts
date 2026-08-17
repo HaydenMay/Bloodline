@@ -255,6 +255,129 @@ describe('distributing a budget into potential', () => {
   });
 });
 
+describe('shape: which parent a stat came from', () => {
+  /** A stamina horse with no speed, and its mirror image. */
+  const stayer = horse({
+    id: 'stayer',
+    potential: { ...stats(70), speed: 40, stamina: 95 },
+  });
+  const sprinter = horse({
+    id: 'sprinter',
+    gender: 'mare',
+    potential: { ...stats(70), speed: 95, stamina: 40 },
+  });
+
+  /**
+   * The bug this whole term exists to stop. A foal built at the mid-parent of
+   * every stat is blander than both its parents by construction, so a line bred
+   * that way loses its shape however wide the fresh roll is.
+   */
+  it('does not pin a foal to the midpoint of two unlike parents', () => {
+    let nearMid = 0;
+    const runs = 300;
+    for (let i = 0; i < runs; i++) {
+      const p = distributePotential(createRng(`mid-${i}`), stayer, sprinter, 900, 0);
+      // Mid-parent speed is 67.5, plus whatever the generation adds.
+      if (Math.abs(p.speed - 72) <= 5) nearMid++;
+    }
+    expect(nearMid / runs).toBeLessThan(0.4);
+  });
+
+  it('can throw a foal that takes after one parent on a stat', () => {
+    let tookAfterStayer = 0;
+    let tookAfterSprinter = 0;
+    for (let i = 0; i < 300; i++) {
+      const p = distributePotential(createRng(`lean-${i}`), stayer, sprinter, 900, 0);
+      if (p.speed <= 55) tookAfterStayer++;
+      if (p.speed >= 90) tookAfterSprinter++;
+    }
+    expect(tookAfterStayer).toBeGreaterThan(0);
+    expect(tookAfterSprinter).toBeGreaterThan(0);
+  });
+
+  /**
+   * §10 asks diversity to control variance. Two horses being unlike each other
+   * IS the diversity that matters, so it has to move the roll on its own —
+   * without it, "outcross" only means "not siblings on paper".
+   */
+  it('rolls wider for unlike parents than for two of the same horse', () => {
+    const width = (a: Horse, b: Horse, tag: string): number => {
+      const speeds = Array.from({ length: 200 }, (_, i) =>
+        distributePotential(createRng(`${tag}-${i}`), a, b, 900, 0).speed,
+      );
+      const m = speeds.reduce((x, y) => x + y, 0) / speeds.length;
+      return Math.sqrt(speeds.reduce((s, x) => s + (x - m) ** 2, 0) / speeds.length);
+    };
+
+    const alike = horse({ id: 'alike', gender: 'mare', potential: stats(70) });
+    expect(width(stayer, sprinter, 'unlike')).toBeGreaterThan(
+      width(horse({ id: 'plain' }), alike, 'alike') + 2,
+    );
+  });
+});
+
+/**
+ * The test that was missing.
+ *
+ * Both bugs this module has shipped — a line pinning every stat at 100 by
+ * generation four, and clamping silently destroying points — passed every
+ * single-pairing test in this file. A foal is an input to the next foal, so the
+ * only way to see a term that compounds is to replay generations. `npm run
+ * bloodline` does this properly, through real careers; this is the cheap
+ * version that runs on every commit.
+ */
+describe('a line across generations', () => {
+  const spread = (s: Stats): number => {
+    const v = STAT_KEYS.map((k) => s[k]);
+    return Math.max(...v) - Math.min(...v);
+  };
+
+  /** A rival yard's retiree: a real horse with a shape of its own. */
+  function rival(seed: string): Horse {
+    const rng = createRng(seed);
+    const potential = {} as Stats;
+    for (const key of STAT_KEYS) {
+      potential[key] = Math.max(25, Math.min(95, Math.round(rng.normal(62, 60))));
+    }
+    return horse({ id: `rival-${seed}`, gender: 'mare', potential });
+  }
+
+  /** Breeds one line for N generations and reports the spread at each. */
+  function traceLine(seed: string, generations: number): number[] {
+    const rng = createRng(seed);
+    let current = rival(`${seed}-founder`);
+    current = { ...current, id: 'founder', gender: 'stallion' };
+
+    const spreads = [spread(current.potential)];
+    for (let gen = 1; gen < generations; gen++) {
+      const partner = rival(`${seed}-p${gen}`);
+      const potential = distributePotential(rng, current, partner, 1100, 0);
+      current = { ...current, id: `g${gen}`, potential };
+      spreads.push(spread(potential));
+    }
+    return spreads;
+  }
+
+  it('does not flatten into an identical all-rounder', () => {
+    const generations = 6;
+    const lines = Array.from({ length: 30 }, (_, i) => traceLine(`line-${i}`, generations));
+    const at = (gen: number): number =>
+      lines.reduce((sum, l) => sum + l[gen]!, 0) / lines.length;
+
+    // The measured failure: 56 -> 33 -> 24, halving every generation, with
+    // generation six extrapolating to a flat 85 across all six stats.
+    expect(at(generations - 1)).toBeGreaterThan(at(0) * 0.8);
+  });
+
+  it('never lets a line run away to a flat 100 either', () => {
+    const generations = 8;
+    const lines = Array.from({ length: 20 }, (_, i) => traceLine(`runaway-${i}`, generations));
+    for (const line of lines) {
+      expect(line[generations - 1]).toBeGreaterThan(5);
+    }
+  });
+});
+
 describe('breeding a foal', () => {
   const sire = partner({ id: 'sire', traits: ['grinder'] }, 620, true);
   const dam = partner(
