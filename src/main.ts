@@ -17,6 +17,7 @@ import { mountYearlingScreen } from './ui/yearlingScreen.js';
 import { yearlingPrice } from './data/yearling.js';
 import { breedingStock, partnersFor, sellFoal } from './ui/studBook.js';
 import { foalSalePrice } from './data/foalSale.js';
+import { mountFoalDevelopment } from './ui/foalDevelopmentScreen.js';
 import { mountResultsScreen } from './ui/resultsScreen.js';
 import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
@@ -678,7 +679,7 @@ function showBreeding(
         actions: [
           {
             label: 'Take It Into Training',
-            onSelect: () => startCareer(foal, playerSilks, yard),
+            onSelect: () => showFoalDevelopment(foal, yard, playerSilks),
           },
           {
             label: `Pass — sell for $${price.toLocaleString()}`,
@@ -707,6 +708,23 @@ function showBreeding(
       });
     },
     onBack: options.onBack ?? (() => showNextHorse(stable, playerSilks)),
+  });
+}
+
+/**
+ * The year in the paddock, between a foal being kept and its first race.
+ *
+ * §10's one place for player agency in an otherwise random inheritance — and
+ * skippable, which the screen offers as a first-class button rather than an
+ * escape.
+ */
+function showFoalDevelopment(foal: Horse, stable: Stable, playerSilks: Silks): void {
+  teardown?.();
+  app.innerHTML = '';
+  teardown = mountFoalDevelopment(app, {
+    foal,
+    stable,
+    onDone: (developed) => startCareer(developed, playerSilks, stable),
   });
 }
 

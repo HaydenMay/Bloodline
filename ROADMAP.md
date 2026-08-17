@@ -79,7 +79,7 @@ All known defects and tuning passes listed in this phase are **documented in [HI
 
 ---
 
-## Phase 5 — Breeding
+## Phase 5 — Breeding ✅ COMPLETE
 **~3–4 sessions** · *the payoff*
 
 Sliced into stages that each leave the game playable, because "the loop closes" is worth having
@@ -292,12 +292,38 @@ two legacy tracks would rebuild that problem with new names. One prestige score,
 - Grandparents, linebreeding, and gradual inbreeding narrowing
 - Rejected foals sold, and released into the world as rivals
 
-### Stage 4 — The archive
-- **CK3-style pedigree tree.** First-class screen, not a submenu
-- Procedural naming with the dedupe and quality safeguards
+### Stage 4 — Foal development
 
-### Stage 5 — Foal development
-- The EV-style allocation pass
+- ✅ The EV-style allocation pass
+
+**A year in the paddock**, between keeping a foal and racing it: a pool of points spent on what it
+starts with, where it wants to run, or coaxing out a trait its parents carried and it did not show.
+§10's one place where player agency enters an otherwise random inheritance — and **skippable**, with
+the skip a first-class button rather than something hidden, because §10 wants anyone who came to race
+to be able to race.
+
+**Points never raise a ceiling.** Everything here moves the foal's *starting* figures, its trip and
+its traits. Potential belongs to the inheritance budget, and a development phase that could inflate
+it would be a second and much easier budget that made the first one pointless. Every stepper stops at
+the ceiling the foal was born with.
+
+| Buy | Cost |
+|---|---|
+| +1 on a starting stat, up to +8 on any one | 1 point |
+| Move the whole preferred trip 25 m | 1 point |
+| Coax out a latent trait | 10 points |
+
+**The pool answers the open question by making an old promise real.** 24 points as standard, scaled
+by the **Stud Farm** — the facility that has advertised "+10% breeding potential" since Phase 4 with
+`getBreedingBonus` written, banked and read by nothing. A level-3 farm gives 31 points, a level-5
+farm 36. Tying it to the yard rather than to the foal's own quality was deliberate: scaling it by the
+budget would have handed the best-bred foals the most agency as well, which is the opposite of what
+this phase is for.
+
+Latent traits are only ever what the parents carried and the foal missed. A foal cannot be coaxed
+into something no ancestor had — that is what mutation is for, and mutation happens at birth, free.
+
+**Phase 5 is complete.**
 
 ### Decisions taken before building
 
@@ -344,7 +370,7 @@ chance applies to traits and aptitude? How fast does relatedness narrow variance
 favourite line viable for "many generations", which needs a number. What does a rejected foal sell
 for, and how long before it turns up on a racecard?
 
-**Stage 4** — ✅ Partly answered, and the question was pointing at the wrong thing.
+**The Archive (now Phase 6)** — ✅ Partly answered, and the question was pointing at the wrong thing.
 
 **Storage is not the wall.** A horse record is 657 bytes and a bloodstock entry 845, so fifty horses
 is 41 KB, a thousand is 825 KB, and five thousand is 4 MB against a browser budget near 5. The tree
@@ -373,9 +399,11 @@ The original question — "does the tree render every horse, or collapse rejecte
 now has an answer: **keep everything, render almost nothing by default.** Storage is cheap and the
 archive is the point of the game; drawing is what needs the discipline.
 
-**Stage 5** — How large is the development pool, and does it scale with anything? What can points
-buy beyond stats — aptitude nudges and latent traits are named in §10, and both change what the
-foal *is* rather than how big its numbers are.
+**Foal development** — ✅ Answered. The pool is 24 points, scaled by the Stud Farm rather than by the
+foal's own quality, so a yard that invested in raising foals raises them better without handing the
+best-bred foals the most agency too. Points buy starting stats (capped at the ceiling the foal was
+born with), 25 m steps of preferred trip, and latent traits at 10 apiece — the three buys §10 names,
+and none of them touches potential.
 
 ### ✅ Measured once Stage 1 landed
 
@@ -408,7 +436,35 @@ Elite 1,500 / Champion 3,500 / Legend 7,500) are untouched pending the same work
 
 ---
 
-## Phase 6 — Polish
+## Phase 6 — The Archive
+**Open-ended** · 🚀 **NEXT** · *the title of the game*
+
+Broken out of Phase 5 into a phase of its own, because it is not texture on top of breeding — it is
+the thing breeding exists to produce, and the mechanic the game is named after. It deserves a full
+session with the context to do it properly rather than the tail of one.
+
+- **CK3-style pedigree tree.** A first-class screen, not a submenu: portrait cards on generational
+  rows, connecting lines, click any ancestor for a detail card with stats, traits and record
+- **A trait and gene inheritance map** — where a line's speed came from, which ancestor carried the
+  chestnut that surfaced four generations later
+- **Procedural naming**, with the dedupe and quality safeguards
+- Records every horse bred or raced back to the first starter, plus the foals sold into the world
+
+**What is already in place for it.** Every foal since Stage 1 has recorded `sireId`, `damId` and
+`generation`; Stage 3 added the coat genotype, so the gene map has real alleles to draw. `pedigreeOf`
+indexes bloodstock and world together, and a foal sold into the world keeps its whole ancestry, so
+the tree can reach every horse a line ever produced. None of that can be reconstructed after the
+fact, which is why it was written down from the first foal.
+
+**The scale answer, measured.** Storage is not the constraint — a horse is 657 bytes, so a thousand
+of them is 825 KB against a browser budget near 5 MB. Drawing five hundred portrait cards is.
+Direction: **keep everything, render almost nothing by default** — the direct line in full, side
+branches folded until asked for. See [ongoing-decisions.md](ongoing-decisions.md) for the growth
+levers if rivals ever breed to your stallions for real.
+
+---
+
+## Phase 7 — Polish
 **~3+ sessions, open-ended**
 
 - Full race-day soundscape and stable ambience
@@ -505,9 +561,10 @@ four years. Any fix has to keep the anti-reroll brake, which is the harder half.
 | 3 · Full career | ~3–4 | ✅ Complete |
 | 4 · The stable | ~2–3 | ✅ Complete |
 | 4.5 · Re-balance & physics | ~2–3 | ✅ Complete |
-| 5 · Breeding | ~3–4 | 🚧 **IN PROGRESS** — Stages 1 and 2 complete; Stage 3 (genetics texture) is next |
-| 6 · Polish | ~3+ | ⏳ After Phase 5 |
-| **Total estimate** | **~20–25** | |
+| 5 · Breeding | ~3–4 | ✅ Complete — budget and foal, partners and fees, genetics texture, foal development |
+| 6 · The Archive | open-ended | 🚀 **NEXT** — the pedigree tree, broken out of Phase 5 to get a session of its own |
+| 7 · Polish | ~3+ | ⏳ After the Archive |
+| **Total estimate** | **~22–28** | |
 
 ---
 

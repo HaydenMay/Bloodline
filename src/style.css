@@ -6964,3 +6964,79 @@ body {
 .stud-card.barred .stud-card-fee {
   color: var(--warning);
 }
+
+/* ---------------------------------------------------------------------------
+   Foal development — the year in the paddock (DESIGN.md 10)
+   --------------------------------------------------------------------------- */
+
+.dev-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dev-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr auto 4.5rem auto;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The bar and grade are borrowed from the stat rows, which place them by named
+   grid areas. Those names mean nothing in this grid, so they have to be handed
+   back to normal column order or they auto-place onto rows of their own. */
+.dev-row .stat-row-bar,
+.dev-row .stat-row-grade {
+  grid-area: auto;
+}
+
+.dev-name {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.dev-value {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--text);
+  text-align: right;
+}
+
+.dev-value em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+.dev-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.dev-step {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dev-step:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.dev-step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.dev-aptitude {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
