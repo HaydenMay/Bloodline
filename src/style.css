@@ -7040,3 +7040,13 @@ body {
   justify-content: space-between;
   gap: 12px;
 }
+
+/* The year's headline: what went unusually right, or unusually wrong. */
+.dev-event {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.dev-good { color: var(--ok); }
+.dev-bad { color: var(--warning); }
