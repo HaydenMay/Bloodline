@@ -39,14 +39,16 @@ const CONTAINERS = [
 
 /**
  * Elements toggled with the native `hidden` attribute rather than a state
- * class. Found live: `.archive-detail { display: flex }` and
- * `.archive-toggle { display: flex }` share specificity with the UA's
+ * class. Found live twice: `.archive-detail` and `.archive-toggle` set
+ * `display: flex`, and later `.stat-rows` (shared by every stat block in the
+ * game) set `display: flex` too — each shares specificity with the UA's
  * `[hidden] { display: none }`, and an author rule at equal specificity beats
- * the UA stylesheet regardless of `hidden` being set — so both elements
- * stayed visible (and, for the detail overlay, kept eating clicks) until a
- * matching `<selector>[hidden] { display: none }` rule was added for each.
+ * the UA stylesheet regardless of `hidden` being set. The detail overlay kept
+ * eating clicks while hidden; the attributes toggle on the Archive's detail
+ * card stayed visibly open no matter what its button said. Each needed a
+ * matching `<selector>[hidden] { display: none }` rule.
  */
-const HIDDEN_TOGGLED = ['.archive-detail', '.archive-toggle'];
+const HIDDEN_TOGGLED = ['.archive-detail', '.archive-toggle', '.stat-rows'];
 
 describe('elements toggled via the `hidden` attribute', () => {
   it('has a matching [hidden] override wherever the bare class sets display', () => {

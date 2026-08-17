@@ -766,6 +766,7 @@ function showArchive(): void {
     stable,
     root,
     playerSilks: inTraining?.playerSilks,
+    rootLegacyPoints: inTraining?.horseLegacy?.points,
     onBack: () => showMainMenu(),
     onBreed: openBreeding,
   });

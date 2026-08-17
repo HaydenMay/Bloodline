@@ -5,6 +5,9 @@ import { createBadgeElement } from './badgeLoader.js';
 import { TRAITS } from '../data/traits.js';
 import { attachStatReveal, renderStatRows } from './statDisplay.js';
 import { pedigreeOf } from './studBook.js';
+import { peakDivision } from '../sim/division.js';
+import { createSurface, startLoop } from '../render/canvas.js';
+import { drawFrame, loadFrameSequence } from '../render/frameAnimation.js';
 import {
   allKnownHorses,
   buildAncestry,
@@ -37,6 +40,12 @@ export interface ArchiveOptions {
   root: Horse;
   /** The active career's silks, worn by the root card if it is the living horse. */
   playerSilks?: Silks | undefined;
+  /**
+   * The living root's current legacy score. Retired horses read their own
+   * `legacyBanked`; the horse still in training has no bloodstock entry to
+   * read one from, so its `Career`'s own tally is threaded through instead.
+   */
+  rootLegacyPoints?: number | undefined;
   onBack: () => void;
   /** Reaches the stud book from inside the Archive, where breeding now lives. */
   onBreed?: () => void;
@@ -68,7 +77,7 @@ function statusOf(horse: Horse, stable: Stable, isLivingRoot: boolean): string {
 }
 
 export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptions): () => void {
-  const { stable, root, playerSilks, onBack, onBreed } = options;
+  const { stable, root, playerSilks, rootLegacyPoints, onBack, onBreed } = options;
 
   const el = document.createElement('div');
   el.className = 'archive-screen';
@@ -131,6 +140,7 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
   const detailBody = el.querySelector<HTMLElement>('#archive-detail-body')!;
 
   let detachReveal: (() => void) | undefined;
+  let stopIdlePreview: (() => void) | undefined;
 
   function buildCard(horse: Horse, opts: { path: string; isRoot: boolean; isSibling: boolean }): HTMLButtonElement {
     const button = document.createElement('button');
@@ -203,13 +213,16 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
   }
 
   /**
-   * Straight lines from each ancestor's card to the child it belongs to.
+   * A curved line from each ancestor's card down to the child it belongs to.
    *
    * Positions are measured relative to `canvasEl`'s own box rather than the
    * viewport, so they stay correct across scroll without recomputing on every
-   * scroll event — the card and the canvas move together.
+   * scroll event — the card and the canvas move together. Each path carries
+   * the two paths it connects as data attributes, so hovering a card can find
+   * every line on its route back to the root without re-walking the tree.
    */
   function drawLines(): void {
+    const SVG_NS = 'http://www.w3.org/2000/svg';
     const canvasBox = canvasEl.getBoundingClientRect();
     linesEl.setAttribute('width', String(canvasEl.scrollWidth));
     linesEl.setAttribute('height', String(canvasEl.scrollHeight));
@@ -233,13 +246,19 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
           if (!parentNode) continue;
           const parent = centerOf(parentNode.path);
           if (parent) {
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', String(parent.x));
-            line.setAttribute('y1', String(parent.bottom));
-            line.setAttribute('x2', String(child.x));
-            line.setAttribute('y2', String(child.top));
-            line.setAttribute('class', 'archive-line');
-            linesEl.appendChild(line);
+            // A vertical bezier: control points sit at the row midpoint, at
+            // each end's own x, so the curve eases out of one card and into
+            // the next rather than crossing them at a hard angle.
+            const midY = (parent.bottom + child.top) / 2;
+            const path = document.createElementNS(SVG_NS, 'path');
+            path.setAttribute(
+              'd',
+              `M ${parent.x} ${parent.bottom} C ${parent.x} ${midY}, ${child.x} ${midY}, ${child.x} ${child.top}`,
+            );
+            path.setAttribute('class', 'archive-line');
+            path.dataset.parent = parentNode.path;
+            path.dataset.child = node.path;
+            linesEl.appendChild(path);
           }
           walk(parentNode);
         }
@@ -251,8 +270,78 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
     walk(tree);
   }
 
+  /** Every path on the route from a card back to the root, root-first. */
+  function ancestryChain(basePath: string): string[] {
+    const chain: string[] = [];
+    for (let i = 1; i <= basePath.length; i++) chain.push(basePath.slice(0, i));
+    return chain;
+  }
+
+  /**
+   * Hovering a card highlights its own route to the root and dims everything
+   * else — the direct-line-in-full chart is dense once siblings are on, and
+   * this is how you follow one animal's line through it without counting rows.
+   */
+  function highlightRoute(hoveredPath: string | undefined): void {
+    canvasEl.classList.toggle('archive-hovering', !!hoveredPath);
+    if (!hoveredPath) return;
+
+    const basePath = hoveredPath.split('-sib-')[0]!;
+    const onRoute = new Set(ancestryChain(basePath));
+    onRoute.add(hoveredPath); // the hovered card itself, sibling or not
+
+    canvasEl.querySelectorAll<HTMLElement>('.archive-card').forEach((card) => {
+      card.classList.toggle('archive-card-highlight', onRoute.has(card.dataset.path ?? ''));
+    });
+    linesEl.querySelectorAll<SVGPathElement>('.archive-line').forEach((line) => {
+      const onIt = onRoute.has(line.dataset.parent ?? '') && onRoute.has(line.dataset.child ?? '');
+      line.classList.toggle('archive-line-highlight', onIt);
+    });
+  }
+
+  /**
+   * The idle animation, the same spritesheet and tinting `trainingScreen.ts`
+   * uses for its own horse preview — scaled down to fit a card corner instead
+   * of a full panel. Only one detail card is open at a time, so this is at
+   * most one animation loop running.
+   */
+  function mountIdlePreview(host: HTMLElement, horse: Horse): () => void {
+    const surface = createSurface(host);
+    let stopped = false;
+    let stopLoop: (() => void) | undefined;
+
+    void loadFrameSequence('southwest-idle', 9).then((sequence) => {
+      if (stopped) return;
+      let time = 0;
+      const loop = startLoop(
+        30,
+        () => {
+          time += 1 / 30;
+        },
+        () => {
+          const { ctx, width, height } = surface;
+          ctx.fillStyle = '#0e1218';
+          ctx.fillRect(0, 0, width, height);
+          drawFrame(ctx, width / 2, height * 0.92, sequence, {
+            phase: (time * 0.1) % 1,
+            scale: width / 100,
+            scheme: { coat: horse.coat, silks: silksFor(horse, root, playerSilks) },
+          });
+        },
+      );
+      stopLoop = () => loop.stop();
+    });
+
+    return () => {
+      stopped = true;
+      stopLoop?.();
+      surface.destroy();
+    };
+  }
+
   function openDetail(horse: Horse): void {
     detachReveal?.();
+    stopIdlePreview?.();
 
     const isLivingRoot = horse.id === root.id && !retiredRecordOf(root, stable);
     const traits = horse.traits
@@ -260,66 +349,67 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
       .filter(Boolean)
       .join(' · ');
     const retired = retiredRecordOf(horse, stable);
+    const legacy = retired ? retired.legacyBanked : isLivingRoot ? rootLegacyPoints : undefined;
+    const top3 = horse.wins + horse.places + horse.shows;
 
     detailBody.innerHTML = '';
 
     const head = document.createElement('div');
     head.className = 'archive-detail-head';
-    head.appendChild(
-      createBadgeElement(
-        horse.coat,
-        silksFor(horse, root, playerSilks),
-        badgeCache,
-        horse.id,
-        'archive-detail-badge',
-        `${horse.name} badge`,
-      ),
-    );
-    const headInfo = document.createElement('div');
-    headInfo.innerHTML = `
+
+    const heading = document.createElement('div');
+    heading.className = 'archive-detail-heading';
+    heading.innerHTML = `
       <h3>${horse.name}</h3>
+      ${legacy !== undefined ? `<p class="archive-detail-legacy">Legacy ${legacy}</p>` : ''}
       <p class="archive-detail-meta">
         ${genderLabel(horse)} · ${horse.age}yo · ${titleCase(horse.division)} · Generation ${horse.generation ?? 1}
       </p>
       <p class="archive-detail-status">${statusOf(horse, stable, isLivingRoot)}</p>
+      ${traits ? `<p class="archive-detail-traits">${traits}</p>` : ''}
     `;
-    head.appendChild(headInfo);
+    head.appendChild(heading);
+
+    const preview = document.createElement('div');
+    preview.className = 'archive-detail-preview';
+    head.appendChild(preview);
     detailBody.appendChild(head);
+    stopIdlePreview = mountIdlePreview(preview, horse);
 
     const record = document.createElement('div');
-    record.className = 'archive-detail-section';
+    record.className = 'archive-detail-section archive-detail-record';
     record.innerHTML = `
-      <h4>Record</h4>
-      <p>${horse.wins} wins · ${horse.places} places · ${horse.shows} shows from ${horse.starts} starts</p>
-      ${
-        retired
-          ? `<p>Legacy banked ${retired.legacyBanked} (peaked at ${retired.legacyPeak}) · $${retired.earnings.toLocaleString()} earned</p>`
-          : ''
-      }
+      <div><b>${horse.wins}</b><span>Wins</span></div>
+      <div><b>${top3}</b><span>Top 3</span></div>
+      <div><b>${titleCase(peakDivision(horse))}</b><span>Peaked in</span></div>
     `;
     detailBody.appendChild(record);
 
-    if (traits) {
-      const traitsSection = document.createElement('div');
-      traitsSection.className = 'archive-detail-section';
-      traitsSection.innerHTML = `<h4>Traits</h4><p>${traits}</p>`;
-      detailBody.appendChild(traitsSection);
-    }
-
-    const statsSection = document.createElement('div');
-    statsSection.className = 'archive-detail-section';
-    statsSection.innerHTML = `
-      <h4>Stats</h4>
-      <div class="stat-rows">${renderStatRows(horse, { revealNumbers: false, showPotential: isLivingRoot })}</div>
+    const attrsSection = document.createElement('div');
+    attrsSection.className = 'archive-detail-section';
+    attrsSection.innerHTML = `
+      <button type="button" class="archive-attrs-toggle" id="archive-attrs-toggle">Show attributes ▾</button>
+      <div class="stat-rows" id="archive-attrs-rows" hidden>
+        ${renderStatRows(horse, { revealNumbers: false, showPotential: isLivingRoot })}
+      </div>
     `;
-    detailBody.appendChild(statsSection);
-    detachReveal = attachStatReveal(statsSection);
+    detailBody.appendChild(attrsSection);
+
+    const attrsRows = attrsSection.querySelector<HTMLElement>('#archive-attrs-rows')!;
+    const attrsToggle = attrsSection.querySelector<HTMLButtonElement>('#archive-attrs-toggle')!;
+    attrsToggle.addEventListener('click', () => {
+      const showing = !attrsRows.hidden;
+      attrsRows.hidden = showing;
+      attrsToggle.textContent = showing ? 'Show attributes ▾' : 'Hide attributes ▴';
+    });
+    detachReveal = attachStatReveal(attrsRows);
 
     detailEl.hidden = false;
   }
 
   function closeDetail(): void {
     detachReveal?.();
+    stopIdlePreview?.();
     detailEl.hidden = true;
   }
 
@@ -340,13 +430,22 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
 
     cardListeners.splice(0).forEach((off) => off());
     canvasEl.querySelectorAll<HTMLButtonElement>('.archive-card').forEach((card) => {
-      const handler = (): void => {
+      const clickHandler = (): void => {
         const horse =
           known.find((h) => h.id === card.dataset.id) ?? (card.dataset.id === root.id ? root : undefined);
         if (horse) openDetail(horse);
       };
-      card.addEventListener('click', handler);
-      cardListeners.push(() => card.removeEventListener('click', handler));
+      const enterHandler = (): void => highlightRoute(card.dataset.path);
+      const leaveHandler = (): void => highlightRoute(undefined);
+
+      card.addEventListener('click', clickHandler);
+      card.addEventListener('pointerenter', enterHandler);
+      card.addEventListener('pointerleave', leaveHandler);
+      cardListeners.push(() => {
+        card.removeEventListener('click', clickHandler);
+        card.removeEventListener('pointerenter', enterHandler);
+        card.removeEventListener('pointerleave', leaveHandler);
+      });
     });
   }
 
@@ -375,6 +474,7 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
 
   return () => {
     detachReveal?.();
+    stopIdlePreview?.();
     cardListeners.splice(0).forEach((off) => off());
     listeners.splice(0).forEach((off) => off());
     el.remove();

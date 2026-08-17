@@ -107,6 +107,13 @@ export interface Horse {
   divisionLevel: number;
   /** Points accumulated toward promotion/demotion in current division */
   divisionPoints: number;
+  /**
+   * The highest `divisionLevel` ever reached, promotion only — demotion never
+   * lowers it. Absent on a horse that has never been promoted, whose current
+   * level is already its peak; `sim/division.ts`'s `peakDivision` reads it with
+   * that fallback, so nothing needs backfilling on old saves.
+   */
+  peakDivisionLevel?: number;
   /** Won championship division race (triggers victory scene once) */
   isChampion?: boolean;
   /** Base stats for AI horses. For player, use regular stats field. */

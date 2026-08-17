@@ -4,6 +4,7 @@ import type { Division } from '../data/index.js';
 import {
   finalizeDemotion,
   finalizePromotion,
+  peakDivision,
   updateAIDivisionProgression,
 } from './division.js';
 
@@ -96,5 +97,39 @@ describe('division name stays in step with division level', () => {
       expect(horse.divisionLevel).toBe(level);
       expect(horse.division).toBe(LEVELS[level]);
     }
+  });
+});
+
+describe('peakDivision', () => {
+  it('is the current division for a horse that has never been promoted', () => {
+    expect(peakDivision(horseAt('open'))).toBe('open');
+  });
+
+  it('survives a demotion — a horse that reached stakes stays "peaked in stakes"', () => {
+    const horse = horseAt('stakes', -3);
+    finalizeDemotion(horse, 7);
+    expect(horse.division).toBe('open');
+    // The horse's own peakDivisionLevel was never set (it climbed before this
+    // field existed) — this is the exact case the fallback in the archive card
+    // exists for, and it's a real gap: without a recorded peak, "peaked in"
+    // reads as the demoted division, not the true best.
+    expect(peakDivision(horse)).toBe('open');
+  });
+
+  it('holds the peak once a promotion has recorded it, even after a later demotion', () => {
+    const horse = horseAt('novice', 5);
+    finalizePromotion(horse, 1); // -> open, peak recorded
+    expect(horse.peakDivisionLevel).toBe(2);
+
+    horse.divisionPoints = -3;
+    finalizeDemotion(horse, 7); // -> novice
+    expect(horse.division).toBe('novice');
+    expect(peakDivision(horse)).toBe('open');
+  });
+
+  it('tracks AI promotions the same way', () => {
+    const horse = horseAt('novice', 4);
+    updateAIDivisionProgression(horse, 1); // +3 -> 7, promotes to open
+    expect(peakDivision(horse)).toBe('open');
   });
 });

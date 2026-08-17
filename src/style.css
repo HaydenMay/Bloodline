@@ -6684,6 +6684,13 @@ body {
   gap: 6px;
 }
 
+/* Same `[hidden]`-vs-class specificity tie as `.archive-detail` — the
+   Archive's attributes toggle is the first place `.stat-rows` itself gets
+   hidden/shown, and without this override it stayed visible regardless. */
+.stat-rows[hidden] {
+  display: none;
+}
+
 .stat-row {
   display: grid;
   grid-template-columns: 5.5rem 1fr auto auto;
@@ -7150,8 +7157,32 @@ body {
 }
 
 .archive-line {
+  fill: none;
   stroke: var(--accent-border);
   stroke-width: 2;
+  transition: stroke-opacity 0.15s ease, stroke 0.15s ease;
+}
+
+/* Hovering a card mutes everything not on its route back to the root — the
+   direct-line-in-full chart is dense once siblings are on, and this is how
+   you trace one animal through it without counting rows. */
+.archive-hovering .archive-card {
+  opacity: 0.3;
+  transition: opacity 0.15s ease;
+}
+
+.archive-hovering .archive-card-highlight {
+  opacity: 1;
+}
+
+.archive-hovering .archive-line {
+  stroke-opacity: 0.25;
+}
+
+.archive-hovering .archive-line-highlight {
+  stroke: var(--accent);
+  stroke-opacity: 1;
+  stroke-width: 2.5;
 }
 
 .archive-row {
@@ -7288,23 +7319,37 @@ body {
 .archive-detail-head {
   display: flex;
   gap: 16px;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
-.archive-detail-badge {
-  width: 88px;
-  height: 88px;
+.archive-detail-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The idle horse, same spritesheet as the training screen's preview, tucked
+   into the card's corner instead of filling a panel. */
+.archive-detail-preview {
   flex: none;
-  object-fit: contain;
-  image-rendering: crisp-edges;
+  width: 110px;
+  height: 110px;
+  border-radius: 10px;
+  overflow: hidden;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 8px;
 }
 
-.archive-detail-head h3 {
+.archive-detail-heading h3 {
   margin: 0 0 4px;
   color: var(--text);
+}
+
+.archive-detail-legacy {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
 }
 
 .archive-detail-meta,
@@ -7314,22 +7359,65 @@ body {
   color: var(--muted);
 }
 
+.archive-detail-traits {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--muted);
+}
+
 .archive-detail-section {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
 
-.archive-detail-section h4 {
-  margin: 0 0 6px;
-  font-size: 0.78rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+/* Wins · Top 3 · Peaked in, at a glance — the record a career amounted to,
+   ahead of the attributes that produced it. */
+.archive-detail-record {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  text-align: center;
 }
 
-.archive-detail-section p {
-  margin: 0 0 4px;
-  font-size: 0.85rem;
+.archive-detail-record div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.archive-detail-record b {
+  font-size: 1.3rem;
   color: var(--text);
+}
+
+.archive-detail-record span {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.archive-attrs-toggle {
+  width: 100%;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.archive-attrs-toggle:hover {
+  border-color: var(--accent-border);
+  color: var(--text);
+}
+
+.archive-attrs-toggle + .stat-rows {
+  margin-top: 10px;
 }

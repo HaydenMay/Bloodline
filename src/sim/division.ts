@@ -27,6 +27,16 @@ function syncDivision(horse: Horse): void {
   horse.division = getDivisionFromLevel(horse.divisionLevel);
 }
 
+/** Record a new high before a promotion can be followed by a later demotion. */
+function trackPeak(horse: Horse): void {
+  horse.peakDivisionLevel = Math.max(horse.peakDivisionLevel ?? 0, horse.divisionLevel);
+}
+
+/** The best division this horse has ever raced in — the archive's "peaked in". */
+export function peakDivision(horse: Horse): Division {
+  return getDivisionFromLevel(Math.max(horse.peakDivisionLevel ?? 0, horse.divisionLevel));
+}
+
 export function calculateDivisionPoints(finishingPosition: number): number {
   if (finishingPosition === 1) return 3;
   if (finishingPosition === 2 || finishingPosition === 3) return 1;
@@ -115,6 +125,7 @@ export function finalizePromotion(horse: Horse, finishingPosition: number): void
       horse.divisionLevel += 1;
       horse.divisionPoints = 0;
       syncDivision(horse);
+      trackPeak(horse);
     }
   }
   // 5th-8th: Stay, reset to 2
@@ -158,6 +169,7 @@ export function updateAIDivisionProgression(
     horse.divisionLevel += 1;
     horse.divisionPoints = 0;
     syncDivision(horse);
+    trackPeak(horse);
   }
 
   // Check for AI demotion
