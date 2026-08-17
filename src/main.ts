@@ -15,7 +15,8 @@ import { mountStarterSelection } from './ui/starterSelection.js';
 import { mountBreedingScreen } from './ui/breedingScreen.js';
 import { mountYearlingScreen } from './ui/yearlingScreen.js';
 import { yearlingPrice } from './data/yearling.js';
-import { breedingStock, partnersFor } from './ui/studBook.js';
+import { breedingStock, partnersFor, sellFoal } from './ui/studBook.js';
+import { foalSalePrice } from './data/foalSale.js';
 import { mountResultsScreen } from './ui/resultsScreen.js';
 import { mountTrainingScreen } from './ui/trainingScreen.js';
 import { mountRaceCalendar, type RaceOption } from './ui/raceCalendar.js';
@@ -46,6 +47,7 @@ import { getJockeySkill, getTrainerBonus } from './data/staff.js';
 import {
   loadCareer,
   saveCareer,
+  saveStable,
   createNewCareer,
   createStable,
   retireCurrentHorse,
@@ -656,23 +658,53 @@ function showBreeding(
     stable,
     mode: options.mode ?? 'breed',
     onBred: (foal, yard) => {
-      showNotice(
-        app,
-        {
-          icon: '🧬',
-          title: `${foal.name} is born`,
-          lines: [
-            `A ${foal.gender === 'stallion' ? 'colt' : 'filly'} by ${
-              stable.bloodstock.find((entry) => entry.horse.id === foal.sireId)?.horse.name ??
-              'an outside sire'
-            }, generation ${foal.generation ?? 2} of your line.`,
-            'It debuts at two, well short of what it will become. What it carries is its parents.',
-          ],
-          tone: 'positive',
-          buttonLabel: 'Take It Into Training',
-        },
-        () => startCareer(foal, playerSilks, yard),
-      );
+      // §10's keep-or-sell. The projected ranges were the decision; this is the
+      // horse those ranges actually produced, and passing on it is a real
+      // option rather than a consolation — a foal you turn down is sold and
+      // turned loose in the world carrying your bloodline's name.
+      const price = foalSalePrice(foal);
+      showNotice(app, {
+        icon: '🧬',
+        title: `${foal.name} is born`,
+        lines: [
+          `A ${foal.gender === 'stallion' ? 'colt' : 'filly'} by ${
+            stable.bloodstock.find((entry) => entry.horse.id === foal.sireId)?.horse.name ??
+            'an outside sire'
+          }, generation ${foal.generation ?? 2} of your line.`,
+          'It debuts at two, well short of what it will become. What it carries is its parents.',
+        ],
+        hint: `Passing costs a covering season — every horse at stud ages a year.`,
+        tone: 'positive',
+        actions: [
+          {
+            label: 'Take It Into Training',
+            onSelect: () => startCareer(foal, playerSilks, yard),
+          },
+          {
+            label: `Pass — sell for $${price.toLocaleString()}`,
+            variant: 'secondary',
+            onSelect: () => {
+              const sale = sellFoal(yard, foal);
+              saveStable(yard);
+              showNotice(
+                app,
+                {
+                  icon: '🐎',
+                  title: `${foal.name} is sold`,
+                  lines: [
+                    `$${sale.price.toLocaleString()} for a foal you will not campaign.`,
+                    `It joins the racing world carrying your bloodline. You may line up against it — and it can be bred back to, years from now.`,
+                  ],
+                  hint: 'Your horses at stud are a year older for the covering.',
+                  tone: 'neutral',
+                  buttonLabel: 'Back to the Stud Book',
+                },
+                () => showBreeding(stable, playerSilks, options),
+              );
+            },
+          },
+        ],
+      });
     },
     onBack: options.onBack ?? (() => showNextHorse(stable, playerSilks)),
   });

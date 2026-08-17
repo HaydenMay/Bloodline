@@ -13,6 +13,7 @@ import {
 } from '../sim/breeding.js';
 import { getTierFromPoints, seedLegacyFromRecord } from '../data/legacy.js';
 import { studFee } from '../data/studFee.js';
+import { REJECTION_YEARS, foalSalePrice, releaseAsRival } from '../data/foalSale.js';
 import { createNameGenerator } from '../data/names.js';
 import type { Division } from '../data/index.js';
 import type { RetiredHorse, Stable } from './career.js';
@@ -312,4 +313,40 @@ export function breedFoal(
   recordPairing(stable, mine.horse, partner.horse);
   stable.cash -= Math.max(0, fee);
   return result;
+}
+
+/* ---------------------------------------------------------------------------
+   Passing on a foal
+   ------------------------------------------------------------------------ */
+
+export interface FoalSale {
+  /** Cash the yard took for it. */
+  price: number;
+  /** The horse as the world will meet it — grown, and still carrying its ancestry. */
+  released: Horse;
+}
+
+/**
+ * Sells a foal you have decided not to campaign, and turns it loose in the world.
+ *
+ * Three things happen, and the second is the one that matters. The yard takes
+ * the cash. **The horse joins the world carrying your bloodline** — same sire,
+ * same dam, same generation, same coat genes — so it can turn up on a racecard
+ * against you, be bred back to years later, and hang off your family tree where
+ * it belongs. And every horse at stud ages a year, because the covering season
+ * that produced this foal was spent whether you kept it or not.
+ *
+ * That last part is §10's brake, and it is what stops this being an income
+ * stream: a player who rejects foal after foal is spending the stud life of the
+ * horses that make the foals.
+ */
+export function sellFoal(stable: Stable, foal: Horse): FoalSale {
+  const price = foalSalePrice(foal);
+  const released = releaseAsRival(foal);
+
+  stable.cash += price;
+  stable.world = [...(stable.world ?? []), released];
+  for (const entry of stable.bloodstock) entry.horse.age += REJECTION_YEARS;
+
+  return { price, released };
 }
