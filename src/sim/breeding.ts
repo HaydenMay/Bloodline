@@ -15,14 +15,18 @@
  *                  never the total — a wide roll is boom-or-bust, a tight line
  *                  is safe and dull, and neither is better on average.
  *
- * Stage 1 of Phase 5: parents only. Grandparents, linebreeding, coat genetics
- * and trait mutation arrive in Stage 3 (see ROADMAP.md).
+ * Stage 3 added the texture: real coat genetics, traits and distance aptitude
+ * inheriting separately with their own mutation chance, and relatedness that
+ * reads grandparents so linebreeding compounds instead of vanishing the moment
+ * the shared parents drop out of view.
  */
 
 import type { Rng } from './rng.js';
 import type { Horse, Stats } from './types.js';
 import { STAT_KEYS } from './types.js';
 import { rollTraits } from './horse.js';
+import { genotypeOf, expressCoat, inheritCoat } from './coat.js';
+import { RACING_TRAIT_IDS, type TraitId } from '../data/traits.js';
 
 /* ---------------------------------------------------------------------------
    What a parent brings
@@ -91,28 +95,71 @@ export function heterosisBonus(baseBudget: number, timesBred: number): number {
    Relatedness
    ------------------------------------------------------------------------ */
 
+/** Looks a horse up by id, so a pedigree can be walked. */
+export type Pedigree = (id: string) => Horse | undefined;
+
+/** How many generations back relatedness looks. §10: parents and grandparents. */
+export const PEDIGREE_DEPTH = 2;
+
+/**
+ * Every ancestor within `PEDIGREE_DEPTH`, and how many steps away each one is.
+ *
+ * A horse can appear twice at different depths — that is linebreeding, and the
+ * nearest path is the one that counts, so the shortest distance wins.
+ */
+function ancestors(horse: Horse, pedigree: Pedigree | undefined, depth = PEDIGREE_DEPTH): Map<string, number> {
+  const found = new Map<string, number>();
+
+  const walk = (id: string | undefined, steps: number): void => {
+    if (!id || steps > depth) return;
+    const known = found.get(id);
+    if (known === undefined || steps < known) found.set(id, steps);
+    // Without a pedigree to read, the parents' own ids are still known facts —
+    // the walk simply cannot go deeper.
+    const parent = pedigree?.(id);
+    if (!parent) return;
+    walk(parent.sireId, steps + 1);
+    walk(parent.damId, steps + 1);
+  };
+
+  // A horse is its own ancestor, at no distance at all. Without this the walk
+  // cannot see a horse bred to its own grandchild: the grandchild carries the
+  // grandparent's id, but the grandparent's own set is empty, so the two share
+  // nothing and read as strangers. It also makes the parent-to-foal case fall
+  // out of the arithmetic — 0.5^(0+1) — rather than needing a rule of its own.
+  found.set(horse.id, 0);
+  walk(horse.sireId, 1);
+  walk(horse.damId, 1);
+  return found;
+}
+
 /**
  * How closely two horses are related, 0 (unrelated) to 1.
  *
- * Parents only, for now. Grandparents and deeper linebreeding are Stage 3, and
- * this is the function they extend — everything downstream reads the number,
- * not the pedigree.
+ * Wright's coefficient over the ancestors both sides share: each common
+ * ancestor contributes `(1/2)^(n+m)`, where n and m are its distance from each
+ * parent. That reproduces the numbers Stage 1 hardcoded — a parent bred to its
+ * own foal is 0.5, full siblings 0.5, half siblings 0.25 — and keeps going where
+ * they stopped: grandparent to grandchild is 0.25, first cousins 0.125, and a
+ * line bred back into itself compounds rather than reading as unrelated the
+ * moment the shared parents drop out of view.
+ *
+ * `pedigree` is how it reaches past the parents. Without one it degrades to what
+ * Stage 1 did, which is what the world's horses — who have no recorded ancestry
+ * at all — will always get.
  */
-export function relatedness(sire: Horse, dam: Horse): number {
-  const parentOf = (a: Horse, b: Horse): boolean =>
-    b.sireId === a.id || b.damId === a.id;
+export function relatedness(sire: Horse, dam: Horse, pedigree?: Pedigree): number {
+  const sireSide = ancestors(sire, pedigree);
+  const damSide = ancestors(dam, pedigree);
 
-  if (parentOf(sire, dam) || parentOf(dam, sire)) return 0.5;
+  let total = 0;
+  for (const [id, steps] of sireSide) {
+    const other = damSide.get(id);
+    if (other === undefined) continue;
+    total += 0.5 ** (steps + other);
+  }
 
-  const shared = [
-    sire.sireId && sire.sireId === dam.sireId,
-    sire.damId && sire.damId === dam.damId,
-  ].filter(Boolean).length;
-
-  // Full siblings share both parents; half siblings one.
-  if (shared === 2) return 0.5;
-  if (shared === 1) return 0.25;
-  return 0;
+  return Math.min(1, total);
 }
 
 /* ---------------------------------------------------------------------------
@@ -133,6 +180,7 @@ export function calculateBudget(
   sire: BreedingPartner,
   dam: BreedingPartner,
   timesBred = 0,
+  pedigree?: Pedigree,
 ): InheritanceBudget {
   const base = partnerContribution(sire) + partnerContribution(dam);
   const bonus = heterosisBonus(base, timesBred);
@@ -140,7 +188,7 @@ export function calculateBudget(
     base,
     bonus,
     total: base + bonus,
-    relatedness: relatedness(sire.horse, dam.horse),
+    relatedness: relatedness(sire.horse, dam.horse, pedigree),
   };
 }
 
@@ -326,6 +374,30 @@ function redistribute(raw: Stats, floor: Stats): Stats {
 const DEBUT_SHARE_MIN = 0.3;
 const DEBUT_SHARE_MAX = 0.42;
 
+/**
+ * Chance a foal shows a trait neither parent carried.
+ *
+ * §10: "Traits and distance aptitude inherit separately through the genetic
+ * rules with their own mutation chance — so a rare trait is pure delight, never
+ * paid for out of the pool." Roughly one foal in twelve, which is rare enough
+ * to feel like a gift and common enough that a long line visibly picks things
+ * up over generations rather than being stuck with its founders' hand.
+ */
+export const TRAIT_MUTATION_CHANCE = 0.08;
+
+/**
+ * Chance a foal's preferred trip jumps well outside its parents' range.
+ *
+ * Aptitude already drifts by up to 100 m either way every generation, which
+ * moves a line slowly. This is the other thing: the sprinter out of two
+ * stayers. Without it a bloodline is locked to the distance its founder
+ * happened to want, and the trip a horse wants is half of what it is.
+ */
+export const APTITUDE_MUTATION_CHANCE = 0.08;
+
+/** How far a mutated aptitude can jump, in metres. */
+export const APTITUDE_MUTATION_RANGE = 450;
+
 export interface BreedingResult {
   foal: Horse;
   budget: InheritanceBudget;
@@ -343,8 +415,9 @@ export function breed(
   dam: BreedingPartner,
   name: string,
   timesBred = 0,
+  pedigree?: Pedigree,
 ): BreedingResult {
-  const budget = calculateBudget(sire, dam, timesBred);
+  const budget = calculateBudget(sire, dam, timesBred, pedigree);
   const potential = distributePotential(
     rng,
     sire.horse,
@@ -358,15 +431,32 @@ export function breed(
     stats[key] = Math.round(potential[key] * rng.range(DEBUT_SHARE_MIN, DEBUT_SHARE_MAX));
   }
 
+  const foalGenotype = inheritCoat(rng, genotypeOf(sire.horse), genotypeOf(dam.horse));
+
   // Traits come from the parents, and are never paid for out of the budget
   // (§10) — a rare trait is delight, not something the foal was charged for.
-  // Mutation, which lets a foal show a trait neither parent had, is Stage 3.
   const parentTraits = [...new Set([...sire.horse.traits, ...dam.horse.traits])];
-  const traits = rollTraits(rng, budget.total, parentTraits);
+  const pool: TraitId[] = [...parentTraits];
+  // The mutation: one slot in the pool comes from the whole trait list instead,
+  // so a foal can show something neither parent had. Added to the pool rather
+  // than to the foal, so it competes for a place like any inherited trait and
+  // the count itself is still decided by inherited legacy.
+  if (rng.chance(TRAIT_MUTATION_CHANCE)) {
+    const novel = rng.pick(RACING_TRAIT_IDS);
+    if (!pool.includes(novel)) pool.push(novel);
+  }
+  const traits = rollTraits(rng, budget.total, pool);
 
+  // Aptitude drifts every generation and occasionally jumps: the sprinter out
+  // of two stayers. The jump is rolled once and applied to both ends, so a
+  // mutated foal moves its whole range rather than being stretched into a horse
+  // that wants everything.
+  const jump = rng.chance(APTITUDE_MUTATION_CHANCE)
+    ? rng.range(-APTITUDE_MUTATION_RANGE, APTITUDE_MUTATION_RANGE)
+    : 0;
   const inheritDistance = (key: 'min' | 'max'): number => {
     const mid = (sire.horse.preferredDistance[key] + dam.horse.preferredDistance[key]) / 2;
-    return Math.round((mid + rng.range(-100, 100)) / 25) * 25;
+    return Math.round(Math.max(400, mid + jump + rng.range(-100, 100)) / 25) * 25;
   };
   const min = inheritDistance('min');
   const max = inheritDistance('max');
@@ -391,11 +481,12 @@ export function breed(
     wins: 0,
     places: 0,
     shows: 0,
-    // Stage 3 replaces this with real dominant/recessive inheritance. Until
-    // then a foal simply takes a parent's coat, and no hidden allele is
-    // invented — a fake genotype now would be worse than none, because Stage 3
-    // would inherit its mistakes for three generations.
-    coat: rng.chance(0.5) ? sire.horse.coat : dam.horse.coat,
+    // Real dominant/recessive inheritance (§10). The foal draws one allele from
+    // each parent at every locus, and its colour is whatever those express — so
+    // two bays carrying red can throw a chestnut, and the gene that did it was
+    // on record the whole time.
+    coat: expressCoat(foalGenotype),
+    coatGenotype: foalGenotype,
     jockeySkill: 60,
 
     // Lineage. Nothing reads these until Stages 3 and 4, but they are facts

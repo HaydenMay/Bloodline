@@ -1,5 +1,6 @@
 import type { Division, Moment, RunningStyle } from '../data/index.js';
 import type { TraitId } from '../data/traits.js';
+import type { CoatGenotype } from './coat.js';
 
 /**
  * The six stats (DESIGN.md §2). All 0-100.
@@ -119,6 +120,17 @@ export interface Horse {
 
   /** Colour genetics live here from Phase 5; visual only. */
   coat: string;
+  /**
+   * The genes behind `coat`, rather than only the colour it shows.
+   *
+   * §10 promises a recessive that "can hide for three generations and then
+   * surprise you", which is possible only if the hidden allele was written down
+   * all along. Absent on horses generated before Stage 3 and on every rival in
+   * the world — `genotypeOf` derives a plausible one from the colour, seeded off
+   * the horse's own id so its unseen half never changes between one look and
+   * the next.
+   */
+  coatGenotype?: CoatGenotype;
   /** 0-100 jockey skill for AI horses; the player's jockey is stable-wide. */
   jockeySkill: number;
 

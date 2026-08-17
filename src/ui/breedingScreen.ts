@@ -7,6 +7,7 @@ import {
   breedFoal,
   breedingStock,
   partnersFor,
+  pedigreeOf,
   projectFoal,
   timesBred,
   toPartner,
@@ -116,7 +117,7 @@ export function mountBreedingScreen(
 
     const projection =
       mine && chosen
-        ? projectFoal(toPartner(mine), chosen.partner, chosen.timesBred)
+        ? projectFoal(toPartner(mine), chosen.partner, chosen.timesBred, pedigreeOf(stable))
         : null;
 
     root.innerHTML = `

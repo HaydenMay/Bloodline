@@ -154,6 +154,47 @@ describe('relatedness', () => {
   it('does not treat two parentless horses as related', () => {
     expect(relatedness(horse({ id: 'a' }), horse({ id: 'b' }))).toBe(0);
   });
+
+  /**
+   * Stage 3's whole point: linebreeding has to compound rather than vanishing
+   * the moment the shared parents drop out of view. Without a pedigree to walk,
+   * two grandchildren of the same stallion read as complete strangers.
+   */
+  describe('reading past the parents', () => {
+    const founder = horse({ id: 'founder' });
+    const sonA = horse({ id: 'sonA', sireId: 'founder', damId: 'mareA' });
+    const sonB = horse({ id: 'sonB', sireId: 'founder', damId: 'mareB' });
+    const grandA = horse({ id: 'grandA', sireId: 'sonA', damId: 'outsideA' });
+    const grandB = horse({ id: 'grandB', gender: 'mare', sireId: 'sonB', damId: 'outsideB' });
+
+    const yard = new Map(
+      [founder, sonA, sonB, grandA, grandB].map((h) => [h.id, h] as const),
+    );
+    const pedigree = (id: string): Horse | undefined => yard.get(id);
+
+    it('sees two grandchildren of the same stallion as related', () => {
+      expect(relatedness(grandA, grandB, pedigree)).toBeGreaterThan(0);
+      // And blind to it without the pedigree, which is the Stage 1 behaviour.
+      expect(relatedness(grandA, grandB)).toBe(0);
+    });
+
+    it('rates a closer relation above a more distant one', () => {
+      const cousins = relatedness(grandA, grandB, pedigree);
+      const halfSiblings = relatedness(sonA, { ...sonB, gender: 'mare' }, pedigree);
+      expect(halfSiblings).toBeGreaterThan(cousins);
+      expect(cousins).toBeGreaterThan(0);
+    });
+
+    it('still reads a grandparent bred to its grandchild as close family', () => {
+      expect(relatedness(founder, grandB, pedigree)).toBeGreaterThan(0.2);
+    });
+
+    it('never exceeds one, however many times an ancestor appears', () => {
+      const doubled = horse({ id: 'doubled', sireId: 'founder', damId: 'founder' });
+      expect(relatedness(doubled, { ...doubled, id: 'other', gender: 'mare' }, pedigree))
+        .toBeLessThanOrEqual(1);
+    });
+  });
 });
 
 describe('what a generation adds', () => {
@@ -433,12 +474,43 @@ describe('breeding a foal', () => {
   });
 
   /** §10: traits inherit separately and are never paid for out of the budget. */
-  it('takes its traits from its parents', () => {
+  it('takes its traits from its parents nearly all of the time', () => {
     const parentTraits = new Set(['grinder', 'ironLungs']);
-    for (let i = 0; i < 40; i++) {
+    let inherited = 0;
+    let mutated = 0;
+
+    for (let i = 0; i < 400; i++) {
       const { foal } = breed(createRng(`traits-${i}`), sire, dam, 'T');
-      for (const trait of foal.traits) expect(parentTraits.has(trait)).toBe(true);
+      if (foal.traits.every((trait) => parentTraits.has(trait))) inherited++;
+      else mutated++;
     }
+
+    // The pedigree is what carries traits; mutation is the exception that keeps
+    // a long line from being stuck with its founders' hand forever.
+    expect(inherited / 400).toBeGreaterThan(0.85);
+    expect(mutated).toBeGreaterThan(0);
+  });
+
+  /**
+   * §10: "a rare trait is pure delight, never paid for out of the pool." A
+   * mutation must not cost the foal anything — it competes for a trait slot
+   * like an inherited one, and the budget never sees it.
+   */
+  it('does not charge the budget for a mutated trait', () => {
+    const withMutation: number[] = [];
+    const without: number[] = [];
+
+    for (let i = 0; i < 200; i++) {
+      const { foal, budget } = breed(createRng(`cost-${i}`), sire, dam, 'T');
+      const novel = foal.traits.some(
+        (trait) => !sire.horse.traits.includes(trait) && !dam.horse.traits.includes(trait),
+      );
+      (novel ? withMutation : without).push(total(foal.potential) + budget.total);
+    }
+
+    expect(withMutation.length).toBeGreaterThan(0);
+    const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(Math.abs(mean(withMutation) - mean(without))).toBeLessThan(30);
   });
 
   it('reports the budget it actually spent', () => {

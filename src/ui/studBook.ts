@@ -9,6 +9,7 @@ import {
   pairingKey,
   type BreedingPartner,
   type BreedingResult,
+  type Pedigree,
 } from '../sim/breeding.js';
 import { getTierFromPoints, seedLegacyFromRecord } from '../data/legacy.js';
 import { studFee } from '../data/studFee.js';
@@ -67,6 +68,21 @@ export interface PartnerOption {
   division: Division;
   /** Cash to breed to it. Always zero for a horse you own (§10). */
   fee: number;
+}
+
+/**
+ * Looks up any horse the yard knows about, so relatedness can walk a pedigree.
+ *
+ * Grandparents only count if they can be found. Bloodstock holds everything you
+ * retired and the world holds the rivals you bred to, which between them cover
+ * every ancestor a foal of yours can have — a horse from neither is one this
+ * yard never had anything to do with, and reads as unrelated because it is.
+ */
+export function pedigreeOf(stable: Stable): Pedigree {
+  const index = new Map<string, Horse>();
+  for (const entry of stable.bloodstock) index.set(entry.horse.id, entry.horse);
+  for (const horse of stable.world ?? []) index.set(horse.id, horse);
+  return (id: string) => index.get(id);
 }
 
 /** Turns one of your retirees into a breeding partner. */
@@ -217,8 +233,9 @@ export function projectFoal(
   sire: BreedingPartner,
   dam: BreedingPartner,
   repeats = 0,
+  pedigree?: Pedigree,
 ): FoalProjection {
-  const budget = calculateBudget(sire, dam, repeats);
+  const budget = calculateBudget(sire, dam, repeats, pedigree);
   const key = pairingKey(sire.horse, dam.horse);
 
   const rolls = Array.from({ length: PROJECTION_SAMPLES }, (_, i) =>
@@ -288,7 +305,10 @@ export function breedFoal(
   ];
   const names = createNameGenerator(rng, used);
 
-  const result = breed(rng, sire, dam, names.next(), repeats);
+  // The pedigree is what lets relatedness see past the parents, so a line bred
+  // back into itself keeps narrowing instead of reading as an outcross the
+  // moment the shared parents drop out of view.
+  const result = breed(rng, sire, dam, names.next(), repeats, pedigreeOf(stable));
   recordPairing(stable, mine.horse, partner.horse);
   stable.cash -= Math.max(0, fee);
   return result;

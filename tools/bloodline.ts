@@ -16,6 +16,7 @@ import {
   distributePotential,
   type BreedingPartner,
   type InheritanceBudget,
+  type Pedigree,
 } from '../src/sim/breeding.js';
 import type { RaceEntrant } from '../src/sim/race/types.js';
 
@@ -269,6 +270,8 @@ interface GenerationRecord {
 interface Yard {
   rng: Rng;
   names: NameGenerator;
+  /** Every horse this line has produced, so relatedness can read grandparents. */
+  archive: Map<string, Horse>;
   /** The horse currently in training. */
   horse: Horse;
   founder: Stats;
@@ -290,7 +293,14 @@ function traceWorld(mode: PartnerMode): Yard[] {
     // Generation 1 is a starter, by definition (§1): it inherits nothing.
     const horse = generateHorse(rng, names, { division: 'maiden', age: 2, starter: true });
     horse.generation = 1;
-    return { rng, names, horse, founder: { ...horse.potential }, records: [] };
+    return {
+      rng,
+      names,
+      horse,
+      founder: { ...horse.potential },
+      records: [],
+      archive: new Map([[horse.id, horse]]),
+    };
   });
 
   for (let gen = 1; gen <= GENS; gen++) {
@@ -336,7 +346,10 @@ function traceWorld(mode: PartnerMode): Yard[] {
       const yard = yards[i]!;
       const mine = yard.retired!;
       const partner = choosePartner(mode, yard, yards[(i + 1) % yards.length]!);
-      const { foal, budget } = breed(yard.rng, mine, partner, yard.names.next());
+      const lookup: Pedigree = (id) =>
+        yard.archive.get(id) ?? yards.find((y) => y.archive.has(id))?.archive.get(id);
+      const { foal, budget } = breed(yard.rng, mine, partner, yard.names.next(), 0, lookup);
+      yard.archive.set(foal.id, foal);
       const record = yard.records[yard.records.length - 1]!;
       record.budget = budget.total;
       record.roll = rollWidth(mine.horse, partner.horse, budget, `${mode}-${i}-${gen}`);
