@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { STAT_KEYS, type Horse, type Stats } from '../sim/types.js';
 import { pairingKey } from '../sim/breeding.js';
+import { seedLegacyFromRecord } from '../data/legacy.js';
 import { createStable, type RetiredHorse, type Stable } from './career.js';
 import {
   breedFoal,
@@ -155,15 +156,26 @@ describe('who a yard can breed to', () => {
     expect(legend.some((d) => d === 'stakes' || d === 'championship')).toBe(true);
   });
 
+  /**
+   * An outside stud never raced for you, so its class stands in for the career
+   * you did not watch. A Maiden-class horse genuinely stands in for nothing —
+   * `seedLegacyFromRecord` scores it zero — so the contract is that the figure
+   * matches its class, not that every stud carries one.
+   */
   it('prices an outside stud off its class, since it never raced for you', () => {
     const stable = createStable();
     stable.legacy.archivedPoints = 9000;
     const studs = outsideStuds(stable, horse({ id: 'mine' }), 8);
+
     expect(studs.length).toBeGreaterThan(0);
     for (const stud of studs) {
-      expect(stud.legacyBanked).toBeGreaterThan(0);
+      expect(stud.legacyBanked).toBe(
+        seedLegacyFromRecord(stud.horse.wins ?? 0, 0, stud.horse.division),
+      );
       expect(stud.hallOfFame).toBe(false);
     }
+    // And a yard this well known is reaching horses with a record behind them.
+    expect(studs.some((stud) => stud.legacyBanked > 0)).toBe(true);
   });
 });
 

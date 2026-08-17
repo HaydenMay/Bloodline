@@ -395,6 +395,42 @@ Elite 1,500 / Champion 3,500 / Legend 7,500) are untouched pending the same work
 
 ## Known issues
 
+### ⚠️ The betting market is a money printer
+
+**Deferred until Phase 5 lands, then fixed.** Found in play — backing a dominant Maiden horse
+returned several times the stake, every time — and confirmed by `npm run odds`, 400 races a row:
+
+```
+                                    implied   actual    odds    EV on $1,000
+maiden   player 45 vs rivals 26        20%     100%     4.38x      +$3,371
+maiden   player 60 vs rivals 26        25%     100%     3.49x      +$2,494
+open     player 65 vs rivals 52        16%      97%     5.68x      +$4,520
+champ    player 95 vs rivals 81        15%      99%     5.96x      +$4,870
+```
+
+A horse that wins **every race** is priced at 3.5x, paying +250% a bet with no risk at all.
+
+**Cause — structural, not a bad constant.** `winProbability` prices a horse on its *share* of the
+field's total rating. In an eight-horse field an equal horse is 12.5%, and implying 50% would take a
+rating equal to all seven rivals combined, so an implied chance much above 30% is unreachable however
+dominant the horse is. The engine meanwhile is steeply non-linear: a 19-point stat edge wins 100% of
+the time. **Linear share against a steep reality.**
+
+**Fix.** Price off the rating *difference* between the horse and its field, through a curve fitted to
+the win rates `npm run odds` measures, rather than off share of the total. `rateHorse` is the right
+input and already exists — it is shared with race-day field selection so the difficulty rating and
+the market price the same number — but it currently ignores distance aptitude, running style, traits
+and jockey skill, all of which the engine weighs heavily. A horse well suited to the trip is
+therefore underpriced twice over.
+
+**Partly mitigated already:** stakes are capped at 25% of the purse (Stage 2), which limits the size
+of each pull without touching the fact that the machine always pays.
+
+**Second finding, to look at with it:** a 13-point stat edge winning 97% of races is very absolute.
+That may be the engine being more deterministic than intended, and it is likely related to the
+margins issue below. The odds curve should be fixed either way, but if the determinism is itself
+wrong, both want looking at together.
+
 ### Winning margins are too wide
 
 **Currently ~3.7L between first and second**, down from 4.1L. Real racing is decided by 1–3, and 5+ is a rout. The tail is the bigger problem (60L instead of 74.7L, but still wide).

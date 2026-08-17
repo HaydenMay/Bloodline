@@ -48,6 +48,28 @@ npm run dev:host     # exposes on the local network, for phone testing
 | `npm run harness` | Headless balance harness |
 | `npm run check` | Lint + build + test, everything CI runs |
 
+### The measurement tools
+
+Balance work on this project is done by measuring, never by reasoning about the
+code — every real defect it has shipped passed the unit tests and was visible
+only by running the thing many times and reading the numbers. These are the
+instruments. They are read-only: none of them touch a save.
+
+| Command | Answers |
+|---|---|
+| `npm run harness` | **Is a race believable?** Gate 1. Invariants that must never fail (determinism, speed ceiling, energy bounds) plus style and moment win-rate balance, over ~1,200 races. Nothing reconnects to the UI until this passes |
+| `npm run bloodline` | **Is a bloodline believable?** Campaigns a starter through real careers, breeds it, races the foal, for as many generations as asked — across three partner regimes. Read the `spread` column: a line should grow more distinctive down the generations, not flatten into an identical all-rounder |
+| `npm run odds` | **Is the betting market honest?** Implied win probability against the rate the race engine actually produces. `implied ≈ actual` and a slightly negative EV is a fair market; a positive EV column is a money printer |
+| `npm run probe` | **Why did *this* race happen?** A tick-by-tick trace of a single race — pace, tank, charges, rank. A diagnostic rather than a gate, because every real bug here was found by tracing one race rather than reasoning about aggregates |
+| `npm run sweep` | Parameter sweeps across the race constants |
+| `npm run margin-profile` | Winning-margin distribution, for the "margins are too wide" work |
+| `npm run ride-probe` | The rider AI's decisions in isolation |
+| `npm run check-art` | Sprite and material-key validation |
+
+Most take environment variables to widen the sample — `RACES=1200 npm run odds`,
+`LINES=40 GENS=8 npm run bloodline`. Start narrow, widen once something looks
+wrong.
+
 ---
 
 ## Architecture
