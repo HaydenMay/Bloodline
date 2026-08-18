@@ -79,6 +79,35 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
   // that: every one of the six stats now has at least one genuinely
   // zero-downside path, smaller than the trade-off tier by design — safe and
   // modest is the trade against big and risky, not a trap.
+  //
+  // Pair coverage, found in play: "Deep Sea [Sand] Gallops and Hill Repeats
+  // give the same attributes." They didn't, quite, but they were both
+  // Grit+Stamina — and with only 15 possible stat pairs against the 15
+  // trade-off sessions that gain two stats at once, five pairs were tripled
+  // or doubled up while six were never used at all (Speed+Grit, Speed+Temper,
+  // Stamina+Temper, Burst+Grit, Burst+Consistency, Grit+Temper — the last
+  // already covered by `stableChores`, but only as a zero-downside session,
+  // never as a real trade-off). `gallopsWork`, `hillRepeats`, `breezing`,
+  // `tempoWork`, `jumpingDrills` and `groundwork` are the duplicate half of
+  // each doubled-up pair, remapped one-for-one onto the six gaps so every
+  // pair is covered exactly once. Kept each session's name and, where it
+  // still fit, its description and traitPool — Hill Repeats as Burst+Grit and
+  // Jumping Drills as Burst+Consistency read at least as true to the name as
+  // the pairs they replace.
+  //
+  // This also fixed a second, independent problem the same remap uncovered:
+  // weighted by measured race leverage (Speed ~76, Burst ~16.5, Stamina
+  // ~11.3, Temper ~10.5, Grit ~9.3, Consistency ~2.8 — see `npm run
+  // stat-leverage`), four sessions whose only downside was Speed were net
+  // NEGATIVE for actual race performance despite a "net +4" card: trading
+  // away the single highest-leverage stat for gains on much cheaper ones is
+  // a bad trade even when the raw numbers read as fair. `swimming` had the
+  // same flaw (Speed -2) without even changing pairs. Every downside in this
+  // file now lands on Burst, Grit, Stamina or Consistency — cheap enough that
+  // no session actively costs races, while Consistency (the single cheapest
+  // stat, and previously never anyone's downside) now backs two of them
+  // (`breezing`, `groundwork`) at a bigger -2 so the card still reads as a
+  // real trade rather than a free lunch.
   gatePractice: {
     id: 'gatePractice',
     name: 'Gate Practice',
@@ -90,7 +119,7 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
     id: 'gallopsWork',
     name: 'Gallops Work',
     description: 'Long, steady miles — stamina built the unglamorous way.',
-    statEffects: { stamina: 3, grit: 2, speed: -1 },
+    statEffects: { stamina: 3, temper: 2, burst: -1 },
     traitPool: ['cruiser', 'relentless'],
   },
   recovery: {
@@ -118,7 +147,7 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
     id: 'swimming',
     name: 'Swimming',
     description: 'Intensive cardiovascular conditioning.',
-    statEffects: { stamina: 4, burst: 2, speed: -2 },
+    statEffects: { stamina: 4, burst: 2, grit: -2 },
     traitPool: ['ironLungs', 'quickRecovery'],
   },
   sprintWork: {
@@ -132,28 +161,28 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
     id: 'hillRepeats',
     name: 'Hill Repeats',
     description: 'Grueling uphill intervals.',
-    statEffects: { grit: 3, stamina: 2, speed: -1 },
+    statEffects: { burst: 3, grit: 2, stamina: -1 },
     traitPool: ['grinder', 'bulldozer'],
   },
   breezing: {
     id: 'breezing',
     name: 'Breezing',
-    description: 'Half-speed gallop conditioning.',
-    statEffects: { speed: 2, burst: 1, stamina: -1 },
+    description: 'Half-speed gallop, asked to find another gear late.',
+    statEffects: { speed: 3, grit: 2, consistency: -2 },
     traitPool: ['turnOfFoot', 'relentless'],
   },
   tempoWork: {
     id: 'tempoWork',
     name: 'Tempo Work',
-    description: 'Sustained effort training.',
-    statEffects: { stamina: 2, burst: 1, grit: -1 },
-    traitPool: ['cruiser', 'ironLungs'],
+    description: 'Controlled race-pace work, drilled for composure.',
+    statEffects: { speed: 3, temper: 2, burst: -1 },
+    traitPool: ['fastGate', 'alert'],
   },
   jumpingDrills: {
     id: 'jumpingDrills',
     name: 'Jumping Drills',
     description: 'Agility and coordination work.',
-    statEffects: { burst: 2, temper: 1, speed: -1 },
+    statEffects: { burst: 3, consistency: 2, grit: -1 },
     traitPool: ['alert', 'coiled'],
   },
   intervalTraining: {
@@ -181,7 +210,7 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
     id: 'groundwork',
     name: 'Groundwork',
     description: 'Patient handling on the ground. Nothing is asked at pace.',
-    statEffects: { temper: 4, consistency: 1, speed: -1 },
+    statEffects: { temper: 3, grit: 2, consistency: -2 },
     traitPool: ['tractable', 'professional'],
   },
   deepSand: {

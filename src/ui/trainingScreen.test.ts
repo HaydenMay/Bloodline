@@ -95,6 +95,57 @@ describe('the training table', () => {
       expect(gains.length).toBeGreaterThan(0);
     }
   });
+
+  /**
+   * Found in play: "Deep Sea [Sand] Gallops and Hill Repeats give the same
+   * attributes." Both trained Grit+Stamina — one of five pairs doubled or
+   * tripled up while six of the fifteen possible two-stat pairs went unused.
+   * Every trade-off session's pair must now be unique across the table, so
+   * this exact duplication can't quietly creep back in.
+   *
+   * Scoped to sessions with a downside: the zero-downside "safe tier"
+   * (`crossTraining`, `stableChores`, `routineWork`) is a deliberately
+   * different category that already overlaps a trade-off session's pair
+   * elsewhere by design (`routineWork` and `schooling` both touch
+   * Consistency+Temper) — a safe and a risky path to the same pair is the
+   * intended shape, not the bug this guards against.
+   */
+  it('never repeats a two-stat gain pairing across trade-off sessions', () => {
+    const seen = new Map<string, string>();
+    for (const session of sessions) {
+      const hasDownside = Object.values(session.statEffects).some((effect) => (effect ?? 0) < 0);
+      if (!hasDownside) continue;
+      const gains = Object.entries(session.statEffects)
+        .filter(([, effect]) => (effect ?? 0) > 0)
+        .map(([stat]) => stat)
+        .sort();
+      if (gains.length !== 2) continue; // three-stat spreads don't compete for a pair
+      const key = gains.join('+');
+      const clashing = seen.get(key);
+      expect(clashing, `${session.id} duplicates ${clashing}'s ${key} gain pair`).toBeUndefined();
+      seen.set(key, session.id);
+    }
+  });
+
+  /**
+   * Every downside used to be able to land on any stat regardless of how much
+   * that stat actually swings a race — four sessions traded away Speed (by
+   * far the highest-leverage stat, `npm run stat-leverage`) for gains on much
+   * cheaper ones, making them net-negative for actual race performance
+   * despite a "net positive" card. Speed and Temper are expensive enough to
+   * give up that a downside there needs a real justification; this locks in
+   * that no session's downside sits on Speed at all any more.
+   */
+  it('never costs Speed as a downside', () => {
+    for (const session of sessions) {
+      expect(session.statEffects.speed ?? 0).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('gives Consistency a real downside somewhere, not just gains', () => {
+    const costsConsistency = sessions.some((session) => (session.statEffects.consistency ?? 0) < 0);
+    expect(costsConsistency).toBe(true);
+  });
 });
 
 /**
