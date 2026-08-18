@@ -1548,6 +1548,13 @@ function startRaceWithHorse(
         } else {
           updatedCareer.stats.losses += 1;
         }
+        // Every rival in the loop above gets places/shows recorded on the same
+        // index; the player horse never did, so `horse.places`/`horse.shows`
+        // sat frozen at 0 for the one horse a player could actually check —
+        // invisible until the Archive's "Top 3" became the first place in the
+        // game to read them back for your own horse.
+        if (playerIndex === 1 || playerIndex === 2) updatedCareer.horse.places += 1;
+        if (playerIndex === 3) updatedCareer.horse.shows += 1;
 
         updatedCareer.stats.totalEarnings += earnings;
         updatedCareer.stable.cash += earnings;
