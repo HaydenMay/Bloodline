@@ -930,8 +930,11 @@ function showMainMenu(): void {
 
   const yard = savedCareer?.stable ?? loadStable();
   callbacks.hasStable = !!yard;
-  // The door only appears once there is something behind it.
-  callbacks.hasBloodstock = (yard?.bloodstock?.length ?? 0) > 0;
+  // The door only appears once there is something behind it — which is true
+  // the moment a horse exists at all, not only once one has been retired. A
+  // first-ever horse still in training has no bloodstock yet, but it is
+  // itself a one-node tree worth opening.
+  callbacks.hasBloodstock = (yard?.bloodstock?.length ?? 0) > 0 || !!savedCareer;
 
   const teardownMenu = mountMainMenu(app, callbacks);
 

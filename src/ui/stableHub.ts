@@ -160,6 +160,18 @@ export function mountStableHub(
         </div>
       </div>
 
+      <!-- The pedigree tree — the mechanic the game is named after
+           (DESIGN.md 10), so it gets a banner of its own rather than folding
+           into the nav grid as one tile the same size as Consumables. -->
+      <button class="hub-archive-banner" id="nav-archive">
+        <span class="archive-banner-icon">📜</span>
+        <span class="archive-banner-text">
+          <span class="archive-banner-title">The Archive</span>
+          <span class="archive-banner-sub">Trace ${horse.name}'s bloodline</span>
+        </span>
+        <span class="archive-banner-arrow">→</span>
+      </button>
+
       <!-- Navigation Grid -->
       <div class="hub-navigation">
         <h3>What's Next?</h3>
@@ -203,11 +215,6 @@ export function mountStableHub(
             <div class="nav-icon">⭐</div>
             <div class="nav-label">Legacy</div>
             <div class="nav-desc">View achievements</div>
-          </button>
-          <button class="nav-button" id="nav-archive" data-action="archive">
-            <div class="nav-icon">📜</div>
-            <div class="nav-label">Archive</div>
-            <div class="nav-desc">Family tree</div>
           </button>
         </div>
       </div>

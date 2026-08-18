@@ -4836,6 +4836,65 @@ body {
 }
 
 /*
+ * The Archive's door from the hub. Deliberately louder than a nav-grid tile —
+ * DESIGN.md 10 calls the pedigree tree "the title of the game", and a button
+ * the same size as Consumables undersold that.
+ */
+.hub-archive-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent-faint) 60%, transparent 100%);
+  border: 1.5px solid var(--accent);
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  text-align: left;
+  color: var(--text);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hub-archive-banner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.archive-banner-icon {
+  flex: none;
+  font-size: 2rem;
+}
+
+.archive-banner-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.archive-banner-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+
+.archive-banner-sub {
+  font-size: 0.82rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archive-banner-arrow {
+  flex: none;
+  font-size: 1.3rem;
+  color: var(--accent);
+}
+
+/*
  * Narrow screens stack the banner deliberately rather than leaving it to wrap.
  *
  * Wrapping made the layout depend on how long the tier name happened to be:
