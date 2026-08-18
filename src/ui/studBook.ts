@@ -152,9 +152,15 @@ export function outsideStuds(stable: Stable, mine: Horse, limit = 6): BreedingPa
     .map((horse) => ({
       horse,
       // An outside stud never raced for you, so there is no banked legacy of
-      // yours to read. Its class stands in for the career you did not watch —
+      // yours to read. The career you did not watch stands in for it, through
       // the same conversion a save written before legacy existed uses.
-      legacyBanked: seedLegacyFromRecord(horse.wins ?? 0, 0, horse.division),
+      //
+      // Earnings used to be passed as a hard 0 and wins were always 0 too,
+      // because nothing recorded a rival's results outside your own races — so
+      // two of this function's three terms were dead and an outside stud was
+      // worth precisely its division. `sim/worldRacing.ts` now gives the world
+      // real form, and this reads it.
+      legacyBanked: seedLegacyFromRecord(horse.wins ?? 0, horse.earnings ?? 0, horse.division),
       hallOfFame: false,
     }));
 }

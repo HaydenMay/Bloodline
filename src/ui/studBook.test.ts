@@ -157,12 +157,17 @@ describe('who a yard can breed to', () => {
   });
 
   /**
-   * An outside stud never raced for you, so its class stands in for the career
-   * you did not watch. A Maiden-class horse genuinely stands in for nothing —
-   * `seedLegacyFromRecord` scores it zero — so the contract is that the figure
-   * matches its class, not that every stud carries one.
+   * An outside stud never raced for you, so the career you did not watch stands
+   * in for banked legacy — its **record and its class together**, through
+   * `seedLegacyFromRecord`.
+   *
+   * This used to pass a hard `0` for earnings, and nothing recorded a rival's
+   * wins either, so two of that function's three terms were always dead and
+   * every stud of a division was worth exactly the same. `sim/worldRacing.ts`
+   * and `generateHorse`'s prior record fixed the inputs; this is the contract
+   * that they are actually read.
    */
-  it('prices an outside stud off its class, since it never raced for you', () => {
+  it('prices an outside stud off the career it actually had', () => {
     const stable = createStable();
     stable.legacy.archivedPoints = 9000;
     const studs = outsideStuds(stable, horse({ id: 'mine' }), 8);
@@ -170,12 +175,26 @@ describe('who a yard can breed to', () => {
     expect(studs.length).toBeGreaterThan(0);
     for (const stud of studs) {
       expect(stud.legacyBanked).toBe(
-        seedLegacyFromRecord(stud.horse.wins ?? 0, 0, stud.horse.division),
+        seedLegacyFromRecord(stud.horse.wins ?? 0, stud.horse.earnings ?? 0, stud.horse.division),
       );
       expect(stud.hallOfFame).toBe(false);
     }
     // And a yard this well known is reaching horses with a record behind them.
     expect(studs.some((stud) => stud.legacyBanked > 0)).toBe(true);
+  });
+
+  /**
+   * The defect that prompted the change, as a test: a screen full of outside
+   * studs all reading the same figure told a player nothing, and sent them
+   * choosing on stud fee instead.
+   */
+  it('does not price every stud of a division identically', () => {
+    const stable = createStable();
+    stable.legacy.archivedPoints = 9000;
+    const studs = outsideStuds(stable, horse({ id: 'mine' }), 8);
+    const figures = new Set(studs.map((stud) => stud.legacyBanked));
+
+    expect(figures.size).toBeGreaterThan(1);
   });
 });
 

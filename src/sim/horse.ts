@@ -17,6 +17,7 @@ import {
   DIST_WIDTH_MIN,
 } from './race/constants.js';
 import { RACING_TRAIT_IDS, TRAITS, type TraitId } from '../data/traits.js';
+import { getPurse, PRIZE_SHARES } from '../data/purse.js';
 import type { NameGenerator } from '../data/names.js';
 
 
@@ -83,6 +84,59 @@ function rollPotential(rng: Rng, stats: Stats, generosity = 1): Stats {
     out[key] = clamp100(stats[key] + headroom);
   }
   return out;
+}
+
+/**
+ * How often a horse of each class wins, roughly.
+ *
+ * A Maiden horse is by definition one that has not won; the small figure is the
+ * few that have just broken their duck and not yet moved up. Everything above
+ * it has won its way there.
+ */
+const STRIKE_RATE_BY_DIVISION: Record<string, number> = {
+  maiden: 0.04,
+  novice: 0.12,
+  open: 0.18,
+  stakes: 0.24,
+  championship: 0.3,
+};
+
+/**
+ * The career a world horse has already had when you first meet it.
+ *
+ * It used to be `starts: rng.int(0, 14), wins: 0` — a rival arrived having run
+ * up to fourteen times and won nothing, every single time, and since nothing
+ * else recorded a rival's results either it stayed that way for good. The
+ * breeding screen made it visible: a list of outside studs all reading "0 wins
+ * from 12 starts", which is not a field of racehorses, it is a field of
+ * maidens.
+ *
+ * A horse in a division has, by being there, won its way in. Better divisions
+ * imply a better strike rate, so the class it races in sets how often it won —
+ * which is the same reasoning `seedLegacyFromRecord` already uses to value a
+ * horse it has no other record for.
+ */
+function priorRecord(
+  rng: Rng,
+  starter: boolean,
+  division: Division,
+): Pick<Horse, 'starts' | 'wins' | 'places' | 'shows' | 'earnings'> {
+  // A starter is a horse's first day. Nothing has happened to it yet.
+  if (starter) return { starts: 0, wins: 0, places: 0, shows: 0, earnings: 0 };
+
+  const starts = rng.int(0, 14);
+  if (starts === 0) return { starts, wins: 0, places: 0, shows: 0, earnings: 0 };
+
+  const strikeRate = STRIKE_RATE_BY_DIVISION[division] ?? 0.12;
+  const wins = Math.min(starts, Math.round(starts * rng.range(strikeRate * 0.4, strikeRate * 1.6)));
+  // Placed far more often than won, which is what an ordinary career looks like.
+  const places = Math.min(starts - wins, Math.round((starts - wins) * rng.range(0.15, 0.45)));
+  const shows = Math.min(starts - wins - places, Math.round((starts - wins - places) * rng.range(0.1, 0.3)));
+
+  const purse = getPurse(division, 0.5);
+  const earnings = Math.round(purse * (wins * PRIZE_SHARES[0]! + places * PRIZE_SHARES[1]! + shows * PRIZE_SHARES[3]!));
+
+  return { starts, wins, places, shows, earnings };
 }
 
 /**
@@ -280,10 +334,7 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     division,
     divisionLevel,
     divisionPoints: 0,
-    starts: opts.starter ? 0 : rng.int(0, 14),
-    wins: 0,
-    places: 0,
-    shows: 0,
+    ...priorRecord(rng, opts.starter === true, division),
     coat: rng.pick(COAT_IDS),
     jockeySkill: clamp100(rng.range(jockeyBand.jockey[0], jockeyBand.jockey[1])),
   };

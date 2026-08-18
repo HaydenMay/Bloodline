@@ -696,7 +696,7 @@ assuming there are others" was correct at a scale nobody had counted. It wants a
 wants code: implement the 31, cut the catalogue down to what is real, or stage them — but a horse
 card that lists five traits and means two is lying to the player about the thing traits are for.
 
-### Outside studs are priced on class alone, because rivals almost never record a win
+### ✅ Outside studs were priced on class alone, because rivals never recorded a win
 
 **Found by driving the breeding screen** with a seeded world: every outside stud on offer showed
 **0 wins** — 0 from 9, 0 from 4, 0 from 12, 0 from 14, 0 from 13.
@@ -714,6 +714,58 @@ division says. Two horses of the same class are interchangeable however differen
 Related to "the world never ages" in ongoing-decisions.md, and probably wants fixing with it: a
 world that neither ages nor accumulates form is a world where outside horses have no history to
 read.
+
+**Fixed.** Three inputs were broken and all three are now recorded:
+
+- `generateHorse` gave a world horse `starts: rng.int(0, 14)` and `wins: 0`, so every rival arrived
+  having run up to fourteen times and won nothing. It now rolls a plausible prior record from its
+  division's strike rate, plus the prize money that record implies.
+- `sim/worldRacing.ts` (new) races the rest of the world whenever the player races — within
+  divisions, off `rateHorse` with upset noise rather than the full engine, recording starts, wins,
+  placings, prize money, and feeding `updateAIDivisionProgression` so the world promotes and demotes
+  on its own.
+- `outsideStuds` passes the real earnings to `seedLegacyFromRecord` instead of a hard `0`.
+
+Measured over a world of 70:
+
+```
+                    winners    avg record          legacy min/med/max   distinct
+at creation          37/70    1.0 w / 6.5 st          0 /  76 / 582        29
+after one career     67/70    3.6 w / 24.5 st         0 / 323 / 714        44
+after four careers   70/70   11.4 w / 77.4 st        17 / 574 / 1050       57
+```
+
+Before: 0 winners ever, and every stud of a division worth the same figure.
+
+**One thing to watch, and it belongs to "the world never ages".** World horses neither age nor
+retire, so this accumulates without bound — 77 starts after four careers, and a top legacy of 1,050
+against a Hall of Fame bar of 1,000. The inheritance budget's saturation absorbs most of it
+(`GAIN_HALF_POINT` is 900, so doubling a budget from 733 to 1,566 moves one generation's gain from
+about 5.4 points to 7.6, not double), which is why this ships as-is rather than with an arbitrary
+cap bolted on. But the real fix is the world turning over, and this makes that item matter more than
+it did.
+
+### Burst is worth seven times what Speed is
+
+**Found in play** — a front-runner clear of the field 70 m into a 1400 m race, having fired no
+kicks, winning by five to ten lengths without being asked a question.
+
+The cause is two constants that were never compared:
+
+```
+SPEED_STAT_SPAN  = 0.08   Speed 0 → 100 moves cruise speed by 8%
+BURST_ACCEL_SPAN = 0.6    Burst 0 → 100 moves acceleration by 60%
+```
+
+A horse on Burst 98 against a field averaging 65 accelerates about **18% harder** out of the gate.
+The same horse's Speed of 63 buys it roughly **1%** more cruise than a 60-Speed rival. So the race
+is settled in the first seconds by the stat that should govern the first seconds, and Speed — the
+stat a flat race ought to turn on — is very nearly decorative.
+
+That is worth holding next to the margins item. The margins may not be a noise problem at all: if
+one stat decides the race before the field has reached cruise, a wide margin is the *correct* output
+of a badly weighted input. **Do not tune margins before deciding whether these two spans are
+right** — otherwise the noise gets cut to hide a weighting error, and both end up wrong.
 
 ### The race calendar rerolls its options when you back out of a race
 

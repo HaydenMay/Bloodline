@@ -43,6 +43,7 @@ import {
 import { mountFacilitiesScreen } from './ui/facilitiesScreen.js';
 import { getPrizeMultiplier, getTrainingMultiplier } from './data/facilities.js';
 import { applyRaceUpkeep, applyRestWeek } from './sim/upkeep.js';
+import { runWorldMeeting } from './sim/worldRacing.js';
 import { advanceSeasonIfDue, describeStatChanges } from './sim/growth.js';
 import { applyInjury, isCareerEnding, rollForInjury } from './sim/injury.js';
 import { getJockeySkill, getTrainerBonus } from './data/staff.js';
@@ -1532,6 +1533,17 @@ function startRaceWithHorse(
             if (playerIndex !== -1 && playerIndex < i) entry.beaten += 1;
           }
         }
+
+        // The rest of the world raced this week too. Without this, a rival only
+        // ever has a record from meeting YOU — and since a good player wins
+        // most of their own races, that left every horse in the world on zero
+        // wins forever, which in turn left every outside stud priced on its
+        // division alone (sim/worldRacing.ts).
+        runWorldMeeting(
+          createRng(`world-${player.id}-${updatedCareer.horse.starts}-${updatedCareer.week}`),
+          updatedCareer.stable.world,
+          new Set(placings.map((p) => p.id)),
+        );
 
         // Update player horse records and division progression
         const playerFinishingPosition = playerIndex + 1;

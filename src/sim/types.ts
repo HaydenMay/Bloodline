@@ -124,6 +124,16 @@ export interface Horse {
   wins: number;
   places: number;
   shows: number;
+  /**
+   * Prize money this horse has won, for horses the player does not own.
+   *
+   * The player's own earnings live on the career, not the horse. This exists so
+   * a rival has a career worth reading: `seedLegacyFromRecord` weighs earnings
+   * alongside wins and class, and until `sim/worldRacing.ts` started recording
+   * them the term was always zero for every horse in the world. Optional, so
+   * saves written before it need no migration.
+   */
+  earnings?: number;
 
   /** Colour genetics live here from Phase 5; visual only. */
   coat: string;

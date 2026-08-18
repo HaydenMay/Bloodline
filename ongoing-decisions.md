@@ -170,7 +170,12 @@ Hayden's**, and none of them should be acted on by an agent.
   when one actually appears on a racecard against you. This is what stops the tree growing
   exponentially once rivals breed to your stallions for real.
 - **The world never ages** — rival horses stay two to five forever and are never replaced, so outside
-  studs are eternally available and the racing population never turns over.
+  studs are eternally available and the racing population never turns over. **This got more
+  pressing.** Now that `sim/worldRacing.ts` gives rivals real form, a world that never turns over
+  accumulates it without limit: measured at 77 starts a horse after four careers, with a top legacy
+  of 1,050 against a Hall of Fame bar of 1,000. The budget's own saturation absorbs most of the
+  effect for now, but the honest fix is horses ageing out and being replaced, not a cap on the
+  number.
 - **Rejected foals: price and timing** — what one sells for, and how long before it turns up on a
   racecard carrying your bloodline's name. The keep-or-sell decision is settled; the numbers are not.
 
