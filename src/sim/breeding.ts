@@ -526,7 +526,18 @@ export function breed(
     moment: rng.chance(0.5) ? sire.horse.moment : dam.horse.moment,
     preferredDistance: { min: Math.min(min, max), max: Math.max(min, max) },
     traits,
-    condition: 70,
+    // A foal arrives at its first season fully wound up. Condition is a gauge
+    // you fill by resting and empty by racing (§5) — not something a horse is
+    // born with more or less of, which is why it is not inherited and never
+    // will be. Nothing between here and the racecourse touches it, so setting
+    // it at birth is the same as setting it the day the horse is ready to run.
+    //
+    // 100 rather than the old flat 70 because the yard's ceiling is what should
+    // decide how well a horse is kept, not an arbitrary starting handicap: a
+    // fresh horse is fresh, and then `restToward` only ever recovers, so from
+    // its first race onward the animal falls toward the equilibrium the
+    // player's facilities actually support.
+    condition: 100,
     morale: 60,
     division: 'maiden',
     divisionLevel: 0,

@@ -46,8 +46,10 @@ ones worth trusting most.
 - **Gender weighting at 0.58/0.42** — worth about three points of average potential on the most
   extreme pairing imaginable, far less on a normal one. Measured down from a much stronger first
   attempt; now needs to be felt.
-- **"Mares transmit condition" (DESIGN.md §2)** — never built. Condition is not inherited at all
-  today; every foal is born at a flat 70. This needs a new mechanic rather than a weighting.
+- ~~**"Mares transmit condition" (DESIGN.md §2)**~~ — **decided: not building it.** Condition is not
+  a thing a horse has more or less of, it is a gauge you fill by resting and empty by racing, so
+  there is nothing there to inherit. Struck from §2, and every horse now starts its first season at
+  100 instead of a flat 70. What *did* come out of looking at it is below, under Condition and form.
 - **"Stallions transmit raw potential" (DESIGN.md §2)** — never built, and as written it would make
   stallions vertically stronger, contradicting the same paragraph's "neither is stronger". May simply
   be a drafting slip.
@@ -56,6 +58,24 @@ ones worth trusting most.
 - **`rollPotential` is wrong at the top of the ladder** — a freshly generated Championship horse
   averages 94.9 potential with half its stats pinned at 100. Sidestepped by drawing studs from the
   world instead, but the generator is still wrong and starters read from it too.
+
+## Condition and form
+
+Found while answering the item above, not previously written down anywhere.
+
+- **Condition barely does anything** — `CONDITION_MIN_FACTOR` 0.985 to 1.0, so a jaded horse is
+  **1.5% slower** than the same horse at its peak, in an engine where a 13-point stat edge wins 97%
+  of races. Five labels from "Could not be better in itself" to "Thoroughly over-raced" describe one
+  and a half percent. Its only real teeth are injury risk (`injury.ts`: under 30 doubles a
+  breakdown). Raising its weight is noise, so it interacts with the margins item above — but it may
+  also be part of why the engine reads as more deterministic than intended, since nothing except raw
+  stats is allowed to weigh much. Measure both with `npm run harness` rather than arguing it.
+- **"Form" means two unrelated things in the code** — `getForm` in `sim/upkeep.ts` is the label on
+  condition (Peak / In Form / Steady / Off Form / Jaded), while `form` in `race/engine.ts` is the
+  per-race luck roll scaled by Temper. Same word, no relationship. One of them wants renaming.
+- **Form is surfaced in exactly one place** — `ui/stableHub.ts`. Not on race day, not on the
+  dossier, not in the archive. If peaking a horse for the right race is meant to be a skill (§5),
+  the player currently cannot see it anywhere they would use it.
 
 ## The clock, and rerolling
 

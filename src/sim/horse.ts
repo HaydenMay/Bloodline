@@ -271,7 +271,11 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     traits: rollTraits(rng, opts.legacy ?? 0, RACING_TRAIT_IDS, {
       starter: opts.starter === true,
     }),
-    condition: opts.starter ? 70 : clamp100(rng.range(58, 88)),
+    // A starter is a fresh horse on its first day, same as a foal out of the
+    // stud (`sim/breeding.ts`) — both begin fully wound up and fall toward
+    // whatever equilibrium the yard's facilities support. Rivals keep a spread
+    // because they are animals already in the middle of their own campaigns.
+    condition: opts.starter ? 100 : clamp100(rng.range(58, 88)),
     morale: 60,
     division,
     divisionLevel,

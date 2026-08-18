@@ -152,9 +152,16 @@ Session-to-trait mapping lives in [TRAITS.md](TRAITS.md).
 ### Gender ✅
 Stallions and mares, with **complementary — not vertical — inheritance**. Neither is stronger.
 
-- **Mares** transmit Stamina, Temper and condition more reliably
+- **Mares** transmit Stamina and Temper more reliably
 - **Stallions** transmit Speed, Burst and raw potential more reliably
 - **Traits and distance aptitude inherit evenly from both**, plus a mutation chance
+
+**Condition was cut from this list, deliberately.** An earlier draft had mares transmitting it, and
+it was never built. Looked at properly, it cannot be: condition is not a property a horse *has* more
+or less of, it is a gauge you fill by resting and empty by racing (§5). Every horse now begins its
+first season at 100 and falls toward whatever equilibrium the yard's facilities support, so what
+decides how well a horse is kept is the stable the player built — not an accident of its parentage.
+Inheriting it would also have been vertically strong, which this paragraph forbids two lines up.
 
 Both retire into the stable permanently and both breed until age retires them. The starter
 choice becomes "what kind of bloodline am I founding?" — a real decision with no wrong answer.

@@ -541,6 +541,16 @@ describe('breeding a foal', () => {
     expect(foal.starts).toBe(0);
   });
 
+  // Condition is a gauge, not an inherited property (DESIGN.md §2). Every foal
+  // arrives fully wound up whatever its parents were, and what happens to it
+  // from there is the yard's job, not its breeding.
+  it('arrives at full condition regardless of its parents', () => {
+    const tired = partner({ id: 'tired', condition: 12 }, 620, true);
+    const fresh = partner({ id: 'fresh', gender: 'mare', condition: 96 }, 480);
+    expect(breed(createRng('cond-1'), sire, dam, 'A').foal.condition).toBe(100);
+    expect(breed(createRng('cond-2'), tired, fresh, 'B').foal.condition).toBe(100);
+  });
+
   it('records both parents and its generation', () => {
     const { foal } = breed(createRng('foal-2'), sire, dam, 'Second');
     expect(foal.sireId).toBe('sire');
