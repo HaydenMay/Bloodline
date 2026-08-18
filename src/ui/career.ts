@@ -31,14 +31,25 @@ import { fertility } from '../sim/breeding.js';
 export const STARTING_CASH = 10000;
 
 /**
- * Years the world moves on each time a horse's career ends.
+ * The age a retiring horse is treated as having "waited to" before the rest
+ * of the yard's bloodstock ages on. Used as `BREEDING_ADVANCE_AGE -
+ * career.horse.age` (floored at 0) rather than a flat number per retirement.
  *
- * A horse races from two to five, so campaigning one advances the calendar
- * about four years — which is what turns §10's breeding lifespan into something
- * a player feels. A stallion retired at five breeds at 5, 9, 13, 17 and 21:
- * four foals at full strength and a fading fifth.
+ * Replaces a flat `YEARS_PER_CAREER = 4` applied on every retirement
+ * regardless of how old the retiring horse actually was — which charged the
+ * same clock cost whether a horse raced a full, natural career to 5 or was
+ * cut short at 2 the moment its stats disappointed. Found in play: "if you
+ * race for 4 years and then retire it, you get a 2 year advancement" was the
+ * player's own read of what felt right, checked against the numbers here —
+ * a horse retired at debut age (2) still ages the rest of the yard the full
+ * 4 years (matching the old flat cost, so the deterrent against a fast
+ * reroll-and-retire cycle is exactly as strong as it always was), while one
+ * played out to its natural peak (5) only costs 1. Racing well past that —
+ * age is no longer clamped (growth.ts) — costs the rest of the yard nothing
+ * at all once the retiring horse is older than this constant itself; a
+ * horse retired at 8 does not make anyone else's studs *younger*.
  */
-export const YEARS_PER_CAREER = 4;
+export const BREEDING_ADVANCE_AGE = 6;
 
 /**
  * Share of a Hall of Fame horse's banked legacy paid back as prestige each
@@ -364,9 +375,9 @@ export function studInfluence(stable: Stable): number {
  * was racing its score could still fall, but once the career is over what it
  * achieved is locked in and the next horse starts on top of it.
  *
- * The world also moves on: every horse already at stud ages by a career's worth
- * of years, and the ones your rivals have been breeding to pay their influence
- * back as prestige.
+ * The world also moves on: every horse already at stud ages by however long
+ * this retirement took (BREEDING_ADVANCE_AGE), and the ones your rivals have
+ * been breeding to pay their influence back as prestige.
  */
 export function retireCurrentHorse(career: Career): Stable {
   const stable = career.stable;
@@ -374,8 +385,9 @@ export function retireCurrentHorse(career: Career): Stable {
   // Paid before the new retiree joins, because it earned nothing at stud while
   // it was still racing — and aged before the payment, so a sire past its years
   // stops earning at the same moment it stops breeding.
+  const worldAdvance = Math.max(0, BREEDING_ADVANCE_AGE - career.horse.age);
   for (const entry of stable.bloodstock) {
-    entry.horse.age += YEARS_PER_CAREER;
+    entry.horse.age += worldAdvance;
   }
   lastStudInfluence = studInfluence(stable);
   stable.legacy.archivedPoints += lastStudInfluence;

@@ -1945,9 +1945,10 @@ function startRaceWithHorse(
             // ROADMAP.md's Phase 3 audit had already flagged and claimed
             // fixed, but the hard cutoff was still here — found in play when
             // a 19-1 championship-winning horse was retired without being
-            // asked. Age itself already caps at FINAL_AGE (growth.ts), so
-            // racing on past 20 starts just holds at the fully-declined
-            // stat line rather than eroding further.
+            // asked. Age no longer caps at FINAL_AGE either (growth.ts) —
+            // racing on past 20 starts keeps ageing and eroding the horse
+            // every season, so "just keep going" is a real, escalating
+            // gamble rather than a free plateau.
             if (updatedCareer.careerEndedByInjury) {
               showCareerRecap(updatedCareer);
             } else {

@@ -115,10 +115,18 @@ describe('age and the decline arc', () => {
     expect(h.age).toBe(3);
   });
 
-  it('never ages past the final racing year', () => {
+  /**
+   * Age used to clamp at FINAL_AGE, so a horse raced indefinitely never got
+   * any older — and, since erosion only fires on an actual transition,
+   * never declined any further either. Retirement is always the player's
+   * choice now (no forced cutoff), so an unclamped age is what keeps racing
+   * an old horse a real, escalating gamble rather than a free ceiling.
+   */
+  it('keeps ageing past the final racing year if the horse keeps racing', () => {
     const h = horse({ age: DEBUT_AGE });
     advanceSeasonIfDue(h, 100);
-    expect(h.age).toBe(FINAL_AGE);
+    expect(h.age).toBe(DEBUT_AGE + Math.floor(100 / RACES_PER_SEASON));
+    expect(h.age).toBeGreaterThan(FINAL_AGE);
   });
 
   it('costs nothing before the peak', () => {
@@ -150,6 +158,26 @@ describe('age and the decline arc', () => {
     advanceSeasonIfDue(h, RACES_PER_SEASON * 3);
     // A cliff would make the retirement decision obvious; §8 wants a judgement.
     expect(h.stats.speed).toBeGreaterThan(70);
+  });
+
+  /**
+   * Erosion used to hit exactly once — the 4->5 transition — because age
+   * clamped there and nothing after it ever counted as a new transition.
+   * Racing on past 5 now keeps compounding the same per-season loss every
+   * season, one call at a time (as the game actually calls this, once per
+   * race-completion check), not a single big jump from one huge racesCompleted.
+   */
+  it('keeps eroding stats every season a horse races on past its final year', () => {
+    const h = horse({ age: PEAK_AGE, stats: { ...horse().stats, speed: 80 } });
+    advanceSeasonIfDue(h, RACES_PER_SEASON * 3); // seasonsElapsed 3 -> age 5, first erosion
+    const afterFirst = h.stats.speed;
+    advanceSeasonIfDue(h, RACES_PER_SEASON * 4); // seasonsElapsed 4 -> age 6, second erosion
+    const afterSecond = h.stats.speed;
+    expect(h.age).toBe(6);
+    expect(afterSecond).toBeLessThan(afterFirst);
+    advanceSeasonIfDue(h, RACES_PER_SEASON * 5); // seasonsElapsed 5 -> age 7, third erosion
+    expect(h.age).toBe(7);
+    expect(h.stats.speed).toBeLessThan(afterSecond);
   });
 });
 

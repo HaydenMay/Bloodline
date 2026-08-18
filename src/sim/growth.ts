@@ -190,10 +190,22 @@ export interface AgeingResult {
 /**
  * Advances the horse a season if it has run enough races, and applies whatever
  * that costs it. Returns what happened so the UI can report a birthday.
+ *
+ * Age used to clamp at `FINAL_AGE` — once a horse reached 5 it stayed 5
+ * forever, no matter how many more races it ran, and `applyAgeing`'s erosion
+ * (which only fires on an actual transition) had already happened for the
+ * last time. That made "one more season" a bet with a floor: retirement was
+ * forced at 20 starts anyway, so nobody outran the clamp far enough to
+ * notice. Now that retirement is always the player's call, an unclamped age
+ * is what keeps racing a horse well past its prime a real, escalating
+ * gamble instead of a free lunch — decline keeps compounding every season
+ * for as long as the horse keeps racing. `FINAL_AGE` remains meaningful as
+ * where the trainer's advice (`getRetirementAdvice`) gets most insistent; it
+ * is no longer a ceiling on the number itself.
  */
 export function advanceSeasonIfDue(horse: Horse, racesCompleted: number): AgeingResult {
   const seasonsElapsed = Math.floor(racesCompleted / RACES_PER_SEASON);
-  const targetAge = Math.min(FINAL_AGE, DEBUT_AGE + seasonsElapsed);
+  const targetAge = DEBUT_AGE + seasonsElapsed;
 
   if (targetAge <= horse.age) {
     return { aged: false, newAge: horse.age, stage: getCareerStage(horse.age), changes: {} };

@@ -7,7 +7,7 @@ import { studFee } from '../data/studFee.js';
 import { getStakeOptions, MAX_STAKE_SHARE } from '../data/wagering.js';
 import {
   STUD_INFLUENCE_SHARE,
-  YEARS_PER_CAREER,
+  BREEDING_ADVANCE_AGE,
   createNewCareer,
   createStable,
   loadStable,
@@ -53,9 +53,9 @@ function horse(name: string, gender: 'stallion' | 'mare', age = 5): Horse {
   };
 }
 
-function retire(name: string, gender: 'stallion' | 'mare', peak = 400): Stable {
+function retire(name: string, gender: 'stallion' | 'mare', peak = 400, age = 5): Stable {
   const career = createNewCareer(
-    horse(name, gender),
+    horse(name, gender, age),
     DEFAULTS.playerSilksDefault,
     loadStable() ?? createStable('studLife-1'),
   );
@@ -72,24 +72,42 @@ beforeEach(() => {
 });
 
 describe('retired horses age', () => {
-  it('advances every horse at stud by a career when one ends', () => {
+  /**
+   * The bump is BREEDING_ADVANCE_AGE - the retiring horse's own age, floored
+   * at 0, not a flat number: a horse retired at its natural peak (5) barely
+   * costs the rest of the yard anything (6-5=1), while one retired at debut
+   * age still costs the full 4 (6-2=4) — matching what the old flat constant
+   * always charged for the fast reroll-and-retire case specifically.
+   */
+  it('advances every horse at stud by BREEDING_ADVANCE_AGE minus the retiring horse\'s age', () => {
     retire('Brash Tide', 'stallion');
     const first = loadStable()!.bloodstock[0]!;
     expect(first.horse.age).toBe(5);
 
-    retire('Storm Lantern', 'mare');
+    retire('Storm Lantern', 'mare'); // retires at age 5 -> bump of 1
     const aged = loadStable()!.bloodstock.find((e) => e.horse.name === 'Brash Tide')!;
-    expect(aged.horse.age).toBe(5 + YEARS_PER_CAREER);
+    expect(aged.horse.age).toBe(5 + (BREEDING_ADVANCE_AGE - 5));
+  });
+
+  it('never ages the rest of the yard backwards for a horse retired past BREEDING_ADVANCE_AGE', () => {
+    retire('Brash Tide', 'stallion');
+    retire('Storm Lantern', 'mare', 400, 9); // well past BREEDING_ADVANCE_AGE
+    const untouched = loadStable()!.bloodstock.find((e) => e.horse.name === 'Brash Tide')!;
+    expect(untouched.horse.age).toBe(5);
   });
 
   /**
    * §10's whole breeding lifespan: a horse retired at five breeds at 5, 9, 13,
    * 17 and 21, then never again. Without ageing it would breed forever, which
    * removes the pressure that makes a yard keep retiring new horses into stud.
+   * Fillers retire young (debut age) here specifically to hit the full
+   * BREEDING_ADVANCE_AGE bump each time, same as the old flat constant did —
+   * a yard that instead plays every filler out to a full career ages its
+   * older studs far more slowly, which is the intended trade-off, not a bug.
    */
   it('eventually ages a sire out of the stud book entirely', () => {
     retire('Old Guard', 'stallion');
-    for (let career = 0; career < 5; career++) retire(`Filler ${career}`, 'mare');
+    for (let career = 0; career < 5; career++) retire(`Filler ${career}`, 'mare', 400, 2);
 
     const veteran = loadStable()!.bloodstock.find((e) => e.horse.name === 'Old Guard')!;
     expect(veteran.horse.age).toBeGreaterThanOrEqual(BREEDING_MAX_AGE);
@@ -133,10 +151,16 @@ describe('stud influence', () => {
     expect(loadStable()!.cash).toBe(cashBefore);
   });
 
-  /** It fades with the taper, so the faucet closes rather than running forever. */
+  /**
+   * It fades with the taper, so the faucet closes rather than running
+   * forever. Fillers retire young (age 2) to hit the full
+   * BREEDING_ADVANCE_AGE bump each time, same as `YEARS_PER_CAREER` always
+   * did — a yard playing every filler out to a full career ages Immortal
+   * out far more slowly, which is now the intended trade-off.
+   */
   it('stops once the horse is past breeding age', () => {
     retire('Immortal', 'stallion', 1200);
-    for (let career = 0; career < 5; career++) retire(`Filler ${career}`, 'mare', 100);
+    for (let career = 0; career < 5; career++) retire(`Filler ${career}`, 'mare', 100, 2);
     expect(studInfluence(loadStable()!)).toBe(0);
   });
 });
