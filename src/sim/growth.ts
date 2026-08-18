@@ -55,7 +55,7 @@ export const MIDPACK_TRAINING_BONUS = 0.15;
  * lever this size measured down once already, after an earlier attempt made
  * it bigger than the thing it was meant to support.
  */
-export const MIDPACK_GENEROSITY = 1.12;
+export const MIDPACK_GENEROSITY = 1.04;
 
 /** Racing ages. A horse debuts at 2 and is retired by the end of 5. */
 export const DEBUT_AGE = 2;
