@@ -41,7 +41,7 @@ import {
   getRetirementValue,
 } from './data/legacy.js';
 import { mountFacilitiesScreen } from './ui/facilitiesScreen.js';
-import { getPrizeMultiplier, getTrainingMultiplier } from './data/facilities.js';
+import { getDownsideRelief, getPrizeMultiplier, getTrainingMultiplier } from './data/facilities.js';
 import { applyRaceUpkeep, applyRestWeek } from './sim/upkeep.js';
 import { runWorldMeeting } from './sim/worldRacing.js';
 import { advanceSeasonIfDue, describeStatChanges, MIDPACK_TRAINING_BONUS } from './sim/growth.js';
@@ -1172,6 +1172,8 @@ function showTrainingScreen(career: Career): void {
     (1 + getTrainerBonus(career.stable.staff.trainer.level)) *
     (career.horse.style === 'midPack' ? 1 + MIDPACK_TRAINING_BONUS : 1);
 
+  const downsideRelief = getDownsideRelief(career.stable.facilities);
+
   teardown = mountTrainingScreen(
     app,
     career.horse,
@@ -1182,6 +1184,7 @@ function showTrainingScreen(career: Career): void {
       showStableHub(updatedCareer);
     },
     gainMultiplier,
+    downsideRelief,
   );
 }
 

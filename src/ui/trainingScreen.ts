@@ -35,29 +35,50 @@ export type StatEffects = TrainingSession['statEffects'];
  * used to compute this separately: the card showed the unscaled figure while the
  * session applied the scaled one, so a card promising +1 stamina handed back +3.
  */
-export function scaleTrainingEffects(effects: StatEffects, multiplier: number): StatEffects {
+export function scaleTrainingEffects(
+  effects: StatEffects,
+  multiplier: number,
+  /** Training Grounds' downside relief, 0 (full cost) to 1 (no downside at all). */
+  downsideRelief = 0,
+): StatEffects {
   const scaled: StatEffects = { ...effects };
-  if (multiplier === 1) return scaled;
 
   for (const key of Object.keys(scaled) as Array<keyof StatEffects>) {
     const change = scaled[key];
-    if (change !== undefined && change > 0) scaled[key] = Math.round(change * multiplier);
+    if (change === undefined) continue;
+    if (change > 0) {
+      if (multiplier !== 1) scaled[key] = Math.round(change * multiplier);
+    } else if (change < 0 && downsideRelief > 0) {
+      scaled[key] = Math.round(change * (1 - downsideRelief));
+    }
   }
   return scaled;
 }
 
 export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
-  // Four sessions rebuilt from an audit (ROADMAP.md): the original five here
+  // Sessions rebuilt from an audit (ROADMAP.md): the original five here
   // predated every trade-off session below them and had fallen well behind —
   // net +2/+3 with no downside, against a +4 ceiling everywhere else, so an
   // experienced player had no reason to ever pick them. `restDay` was worse
   // than that: strictly dominated by `routineWork`, which gives everything it
   // gives plus Consistency for the same zero cost. Cut outright.
   //
-  // The other four are rebuilt to the same net +4, real-trade-off shape as the
-  // rest of the roster. Two are rethemed onto Consistency, which had only two
-  // sessions treating it as the main event against three-to-five for every
-  // other stat — added late, per DESIGN.md's own history, and never caught up.
+  // Gate Practice, Gallops Work and Recovery are rebuilt to the same net +4,
+  // real-trade-off shape as the rest of the roster. Two of them are rethemed
+  // onto Consistency, which had only two sessions treating it as the main
+  // event against three-to-five for every other stat — added late, per
+  // DESIGN.md's own history, and never caught up.
+  //
+  // Cross Training keeps its old, gentle, zero-downside shape rather than
+  // joining the trade-off tier — found in play: a trade-off session goes net
+  // NEGATIVE the instant its gain stats hit their exact ceiling, because a
+  // loss is never softened by `applyTrainedStat` the way a gain is. Cutting
+  // four of the five old safe sessions down to one (`routineWork`) left a
+  // horse nearing full development with no way to safely top off Speed,
+  // Burst or Grit. Cross Training and `stableChores` (below) are what restore
+  // that: every one of the six stats now has at least one genuinely
+  // zero-downside path, smaller than the trade-off tier by design — safe and
+  // modest is the trade against big and risky, not a trap.
   gatePractice: {
     id: 'gatePractice',
     name: 'Gate Practice',
@@ -82,9 +103,16 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
   crossTraining: {
     id: 'crossTraining',
     name: 'Cross Training',
-    description: 'A little of everything, at the cost of specialising in nothing.',
-    statEffects: { speed: 2, stamina: 2, burst: 2, grit: -2 },
+    description: 'A gentle spread across the board. Small, safe, no cost.',
+    statEffects: { speed: 1, stamina: 1, burst: 1 },
     traitPool: ['professional', 'tractable'],
+  },
+  stableChores: {
+    id: 'stableChores',
+    name: 'Stable Chores',
+    description: 'Mucking out, leading, grooming. Unglamorous, and nothing risked.',
+    statEffects: { grit: 2, temper: 1 },
+    traitPool: ['grinder', 'bulldozer'],
   },
   swimming: {
     id: 'swimming',
@@ -189,6 +217,8 @@ export function mountTrainingScreen(
    * 1 is a bare yard with a novice trainer.
    */
   gainMultiplier = 1,
+  /** Training Grounds' downside relief, 0 (full cost) to 1 (no downside at all). */
+  downsideRelief = 0,
 ): () => void {
   const root = document.createElement('div');
   root.className = 'training-screen';
@@ -245,7 +275,7 @@ export function mountTrainingScreen(
             <h4>${session.name}</h4>
             <p class="training-desc">${session.description}</p>
             <div class="training-stats">
-              ${Object.entries(scaleTrainingEffects(session.statEffects, totalMultiplier))
+              ${Object.entries(scaleTrainingEffects(session.statEffects, totalMultiplier, downsideRelief))
                 .map(([stat, effect]) => {
                   const sign = effect > 0 ? '+' : '';
                   const color = effect > 0 ? 'positive' : 'negative';
@@ -345,7 +375,7 @@ export function mountTrainingScreen(
         }
       }
 
-      statChanges = scaleTrainingEffects(statChanges, totalMultiplier);
+      statChanges = scaleTrainingEffects(statChanges, totalMultiplier, downsideRelief);
 
       // Apply the session against the horse's hidden ceilings. applyTrainedStat
       // mutates, so work on a copy. The result screen diffs old against new, so

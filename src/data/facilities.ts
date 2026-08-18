@@ -36,8 +36,11 @@ export const FACILITIES: Record<string, Facility> = {
     name: 'Training Grounds',
     description: 'Training facilities and equipment',
     baseIcon: '🏋️',
-    benefit: '+1 stat point per training',
-    effectAt: (l) => (l === 0 ? 'Not built' : `+${l * 10}% stat gain from every session`),
+    benefit: '+1 stat point per training, less risk on every session',
+    effectAt: (l) =>
+      l === 0
+        ? 'Not built'
+        : `+${l * 10}% stat gain, ${l * 20}% less downside from every session${l === 5 ? ' (no downside at all)' : ''}`,
     baseCost: 7500,
   },
   medical: {
@@ -164,6 +167,21 @@ const lvl = (facilities: Record<string, number>, id: string): number =>
 /** Training Grounds: multiplies the stat gain from every session. */
 export function getTrainingMultiplier(facilities: Record<string, number>): number {
   return 1 + lvl(facilities, 'training') * 0.1;
+}
+
+/**
+ * Training Grounds: how much of a trade-off session's downside survives.
+ *
+ * 0 at level 0 (the full cost lands), fading to nothing at level 5 — a fully
+ * built Training Grounds trains a horse with no downside at all. This is what
+ * makes a maxed facility a genuine unlock rather than one more multiplier: a
+ * horse close to its ceiling has real trade-off sessions turning back into
+ * safe ones as the yard around it finishes growing, which is also the answer
+ * to "facilities cost a lot for very little" (ongoing-decisions.md) — the top
+ * level of this one removes a whole category of risk, not a few percent.
+ */
+export function getDownsideRelief(facilities: Record<string, number>): number {
+  return lvl(facilities, 'training') / 5;
 }
 
 /** Administration: multiplies prize money. */
