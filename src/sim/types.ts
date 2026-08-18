@@ -46,11 +46,19 @@ export interface StatBand {
   high: number;
 }
 
-/** Letter grades, shown in UI; tap reveals the number (DESIGN.md §3). */
-export type Grade = 'S' | 'A' | 'B' | 'C' | 'D';
+/**
+ * Letter grades, shown in UI; tap reveals the number (DESIGN.md §3).
+ *
+ * Top tier is 'X', not the more conventional 'S' — found in play: a horse
+ * grading A on Speed and S on both Stamina and Burst (the STAT_KEYS display
+ * order) spelled itself out in three big letters on the info box. 'X' cannot
+ * repeat into anything similar next to 'A', 'B', 'C' or 'D' in any order the
+ * six stats can land in.
+ */
+export type Grade = 'X' | 'A' | 'B' | 'C' | 'D';
 
 export function toGrade(value: number): Grade {
-  if (value >= 90) return 'S';
+  if (value >= 90) return 'X';
   if (value >= 75) return 'A';
   if (value >= 58) return 'B';
   if (value >= 40) return 'C';

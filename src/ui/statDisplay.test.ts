@@ -109,7 +109,7 @@ describe('stat rows', () => {
   it('leads with the grade', () => {
     root.innerHTML = renderStatRows(horse({ stats: { ...horse().stats, speed: 92 } }));
     const speedRow = root.querySelector('[data-stat="speed"]')!;
-    expect(speedRow.querySelector('.stat-row-grade')!.textContent).toBe('S');
+    expect(speedRow.querySelector('.stat-row-grade')!.textContent).toBe('X');
   });
 
   it('omits potential entirely when asked, for rivals', () => {

@@ -6829,7 +6829,7 @@ body {
   text-align: center;
 }
 
-.grade-S { color: #f2c14e; }
+.grade-X { color: #f2c14e; }
 .grade-A { color: var(--ok); }
 .grade-B { color: var(--text); }
 .grade-C { color: var(--muted); }
