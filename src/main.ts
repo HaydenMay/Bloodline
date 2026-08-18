@@ -44,7 +44,7 @@ import { mountFacilitiesScreen } from './ui/facilitiesScreen.js';
 import { getPrizeMultiplier, getTrainingMultiplier } from './data/facilities.js';
 import { applyRaceUpkeep, applyRestWeek } from './sim/upkeep.js';
 import { runWorldMeeting } from './sim/worldRacing.js';
-import { advanceSeasonIfDue, describeStatChanges } from './sim/growth.js';
+import { advanceSeasonIfDue, describeStatChanges, MIDPACK_TRAINING_BONUS } from './sim/growth.js';
 import { applyInjury, isCareerEnding, rollForInjury } from './sim/injury.js';
 import { getJockeySkill, getTrainerBonus } from './data/staff.js';
 import {
@@ -1164,10 +1164,13 @@ function showTrainingScreen(career: Career): void {
   app.innerHTML = '';
 
   // The grounds and the head trainer stack: a well-built yard with a good
-  // trainer gets substantially more out of the same week's work.
+  // trainer gets substantially more out of the same week's work. Mid-pack
+  // stacks a third factor on top — its whole identity is winning on trained
+  // stats rather than a race-day bonus (sim/growth.ts).
   const gainMultiplier =
     getTrainingMultiplier(career.stable.facilities) *
-    (1 + getTrainerBonus(career.stable.staff.trainer.level));
+    (1 + getTrainerBonus(career.stable.staff.trainer.level)) *
+    (career.horse.style === 'midPack' ? 1 + MIDPACK_TRAINING_BONUS : 1);
 
   teardown = mountTrainingScreen(
     app,
@@ -1791,8 +1794,19 @@ function startRaceWithHorse(
           teardownResults();
 
           // Check for championship victory
+          //
+          // Must read the division the race was actually RUN in, not the
+          // horse's current division. `player` and `updatedCareer.horse` are
+          // the same object, and a Stakes -> Championship PROMOTION race
+          // mutates `.division` to 'championship' via `finalizePromotion`
+          // earlier in this same handler — so checking the live value here
+          // fired this screen the instant a horse was promoted INTO
+          // Championship, off a race that was run and won in Stakes. Found in
+          // play: "I raced the promotion race from stakes to champion and it
+          // gave it to me. It's supposed to be after you climb the ladder in
+          // Championship one last time, you get the championship race."
           const playerWon = playerIndex === 0;
-          const isChampionship = player.division === 'championship';
+          const isChampionship = racedDivision === 'championship';
           const notYetChampion = !updatedCareer.horse.isChampion;
 
           if (playerWon && isChampionship && notYetChampion) {

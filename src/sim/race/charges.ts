@@ -147,14 +147,8 @@ function bump(t: number, centre: number, width: number): number {
  * a player may spend their charges as they see fit, well or badly, still holds
  * — this only decides what they get for it.
  */
-export function kickWindowBonus(moment: Moment, ownProgress: number, style?: string): number {
+export function kickWindowBonus(moment: Moment, ownProgress: number): number {
   const shape = WINDOW_SHAPE[moment];
-  if (style === 'midPack') {
-    // Mid-pack gets flat bonus with no diminishing returns outside window
-    // Baseline 33% + moment peak 45% = 78% at moment (vs 75% for others)
-    const baseline = 0.33;
-    return baseline + WINDOW_PEAK_LIFT * bump(ownProgress, shape.centre, shape.width);
-  }
   return KICK_OUT_OF_WINDOW + WINDOW_PEAK_LIFT * bump(ownProgress, shape.centre, shape.width);
 }
 

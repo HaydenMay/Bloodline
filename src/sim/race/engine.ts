@@ -89,6 +89,8 @@ import {
   FRONT_RUNNER_EXPONENT_RELIEF,
   FRONT_RUNNER_RANK_LIMIT,
   FRONT_RUNNER_PRESS_TOLERANCE,
+  CLOSER_BEHIND_KICK_BONUS,
+  STALKER_DRAFT_MULT,
   TRAIT_GATE_RUSHER_EARLY,
   TRAIT_GATE_RUSHER_PAYBACK,
   TRAIT_IRON_LUNGS_RECOVER,
@@ -308,9 +310,18 @@ function tankModsFor(horse: Horse): TankModifiers {
   // supposed to mean.
   let exponentRelief = 0;
   if (horse.traits.includes('cruiser')) exponentRelief += TRAIT_CRUISER_EXPONENT_RELIEF;
+  // Drafting itself is already earned live — `r.drafting` only turns on while
+  // a horse is genuinely tucked in behind a rival (`updatePack`, below) — so a
+  // style-specific AMOUNT is safe to set once here, unlike the front-runner
+  // relief above: it can never fire before the positional check already has.
+  // This is what makes a stalker's read "settle mid-field, slingshot off the
+  // draft" a real mechanical edge rather than a description with nothing
+  // behind it.
+  let draftMult = horse.traits.includes('quickRecovery') ? TRAIT_QUICK_RECOVERY_DRAFT : 1;
+  if (horse.style === 'stalker') draftMult *= STALKER_DRAFT_MULT;
   return {
     recoverMult,
-    draftMult: horse.traits.includes('quickRecovery') ? TRAIT_QUICK_RECOVERY_DRAFT : 1,
+    draftMult,
     exponentRelief,
     // What Grit owns: how far a horse falls apart once the tank is gone.
     fatigueRelief: GRIT_FATIGUE_RELIEF * (horse.stats.grit / 100),
@@ -411,11 +422,23 @@ function makeRunner(
 // The kick (REBUILD.md §8)
 // ---------------------------------------------------------------------------
 
-function kickStrengthFor(horse: Horse): number {
+/**
+ * A closer's own edge: real punch on the kick that is actually trying to make
+ * up ground, not a fixed style trait.
+ *
+ * `behind` means genuinely off the front at the moment the kick is thrown —
+ * "after losing their spot and falling behind," in the words that asked for
+ * it. R2 still governs: this only ever makes the shared ceiling easier to
+ * reach (the `Math.min(KICK_MAX_BONUS, ...)` clamp downstream is untouched),
+ * never raises where it is.
+ */
+function kickStrengthFor(horse: Horse, behind = false): number {
+  const closerBonus = horse.style === 'closer' && behind ? CLOSER_BEHIND_KICK_BONUS : 0;
   return clamp01(
     KICK_GRIT_WEIGHT * (horse.stats.grit / 100) +
       KICK_BURST_WEIGHT * (horse.stats.burst / 100) +
-      KICK_JOCKEY_WEIGHT * (horse.jockeySkill / 100),
+      KICK_JOCKEY_WEIGHT * (horse.jockeySkill / 100) +
+      closerBonus,
   );
 }
 
@@ -594,7 +617,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
       // that horse's window. A late horse's window is narrow and fierce, an
       // early horse's broad and mild, and the two are worth the same over a
       // race. Outside it entirely a kick still works, just poorly.
-      r.kickStrength = kickStrengthFor(r.horse) * kickWindowBonus(r.horse.moment, ownProgress, r.horse.style);
+      r.kickStrength = kickStrengthFor(r.horse, r.rank > 1) * kickWindowBonus(r.horse.moment, ownProgress);
       r.kicksFired += 1;
 
       // A player tap brings the next planned kick FORWARD; the AI's own

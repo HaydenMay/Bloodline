@@ -18,6 +18,7 @@ import {
 } from './race/constants.js';
 import { RACING_TRAIT_IDS, TRAITS, type TraitId } from '../data/traits.js';
 import { getPurse, PRIZE_SHARES } from '../data/purse.js';
+import { MIDPACK_GENEROSITY } from './growth.js';
 import type { NameGenerator } from '../data/names.js';
 
 
@@ -318,7 +319,15 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     gender: opts.gender ?? (rng.chance(0.5) ? 'stallion' : 'mare'),
     age: opts.age ?? rng.int(2, 5),
     stats: displayStats,
-    potential: rollPotential(rng, displayStats, opts.starter ? 1.35 : 1),
+    // Mid-pack's own edge stacks with a starter's own bonus rather than
+    // replacing it — a mid-pack starter is rarer and better rewarded than an
+    // ordinary one becoming mid-pack later would be, same as any other style
+    // combination.
+    potential: rollPotential(
+      rng,
+      displayStats,
+      (opts.starter ? 1.35 : 1) * (style === 'midPack' ? MIDPACK_GENEROSITY : 1),
+    ),
     style,
     moment,
     preferredDistance: rollPreferredDistance(rng, opts.distanceCentre),

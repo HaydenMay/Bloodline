@@ -744,6 +744,29 @@ export const TRAIT_CRUISER_EXPONENT_RELIEF = 2;
  */
 export const FRONT_RUNNER_EXPONENT_RELIEF = 11;
 
+/**
+ * A stalker's own edge: more out of every draft than a generic horse gets.
+ *
+ * Drafting itself (`DRAFT_RECOVER_BONUS`) is positional and identical for
+ * every style — earned live, every tick, by actually being tucked in behind a
+ * rival. This multiplies what a stalker specifically gets from that same,
+ * already-earned position, which is what makes "settle mid-field, save
+ * something for the turn" a real mechanical identity rather than a
+ * description with nothing behind it. Same shape as the quick-recovery
+ * trait's own draft multiplier (`TRAIT_QUICK_RECOVERY_DRAFT`, 2.0) — this is
+ * smaller because it is every stalker's baseline, not a rare trait roll.
+ */
+export const STALKER_DRAFT_MULT = 1.3;
+
+/**
+ * Kick-strength weight added to a closer's kick while it is genuinely behind
+ * (`horse.style === 'closer' && rank > 1`) — the effort of actually pulling a
+ * placing back, not a flat trait. `KICK_GRIT_WEIGHT + KICK_BURST_WEIGHT +
+ * KICK_JOCKEY_WEIGHT` already sum to 1.0, so this is a meaningful addition
+ * without guaranteeing the shared ceiling on its own.
+ */
+export const CLOSER_BEHIND_KICK_BONUS = 0.09;
+
 /** How many places count as "up front" for `FRONT_RUNNER_EXPONENT_RELIEF`. */
 export const FRONT_RUNNER_RANK_LIMIT = 2;
 

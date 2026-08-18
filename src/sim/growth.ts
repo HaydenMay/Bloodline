@@ -21,6 +21,42 @@ export const STAT_KEYS: StatKey[] = [
   'consistency',
 ];
 
+/**
+ * Mid-pack's own edge: bigger training gains, nothing else.
+ *
+ * Front-runner, stalker and closer each earn something ON RACE DAY — a
+ * front-runner's effort-cost relief while genuinely clear, a stalker's draft
+ * bonus, a closer's late push (`race/engine.ts`, `race/constants.ts`).
+ * Mid-pack is the generalist and has no equivalent: no easy lead, no draft
+ * edge, no late lift. Its identity is that a player who trains it hard gets
+ * more back for the work than they would with any other style — "winning via
+ * stats, not bonuses," in the words that asked for it.
+ *
+ * A fresh mid-pack horse is therefore identical to any other style at birth.
+ * That is deliberate, not a gap: the whole point is that there is nothing to
+ * see until a player actually invests in it.
+ */
+export const MIDPACK_TRAINING_BONUS = 0.15;
+
+/**
+ * Mid-pack's SECOND edge, and the one that actually lasts.
+ *
+ * Measured before this existed: a horse reaches within 3 points of its
+ * ceiling in about 40 weeks of training and sits dead on it by 80 — well
+ * inside a single ~18-20 start career. Training-gain speed alone is
+ * therefore worth something for the first third of a career and **nothing at
+ * all** for the rest, once every horse of every style has converged on
+ * whatever ceiling it happened to roll. A generalist whose only edge
+ * evaporates is not winning on stats, it is winning on nothing.
+ *
+ * A higher potential ceiling is what survives that convergence — it is where
+ * the horse ends up once training is done, not how fast it gets there. Small
+ * on purpose, same reasoning as the gender weight in `sim/breeding.ts`: a
+ * lever this size measured down once already, after an earlier attempt made
+ * it bigger than the thing it was meant to support.
+ */
+export const MIDPACK_GENEROSITY = 1.12;
+
 /** Racing ages. A horse debuts at 2 and is retired by the end of 5. */
 export const DEBUT_AGE = 2;
 export const PEAK_AGE = 4;

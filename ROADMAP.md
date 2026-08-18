@@ -981,6 +981,68 @@ new ones, not yet built:
   mechanic at all, and the two ways to build it (a training-gain multiplier, or a potential
   advantage in the Stud Farm's style) are genuinely different systems with no obvious default.
 
+### Stalker, closer and mid-pack now have the identities the front-runner fix implied they needed
+
+**Direct follow-up to the front-runner fix above**, from the same message: "stalker should be
+getting bonuses from drafting to slingshot near the end... closer is supposed to get large bonuses
+right at the end to slingshot and catch back up... mid-pack are the generalists that should
+eventually get bonuses on training and/or potentials, winning via stats and not bonuses."
+
+**Stalker — a real draft edge, not just the generic positional one.** Drafting itself (`r.drafting`)
+was already earned live, every tick, purely by position — tucked in behind a rival, in a
+neighbouring lane. That gate was already correct, so the fix is narrower than front-runner's: give
+a stalker MORE out of the same, already-earned draft than any other style gets.
+`STALKER_DRAFT_MULT` (1.3) multiplies `draftMult` in the same static per-horse setup `tankModsFor`
+already builds — safe to set once, unlike the front-runner relief, because it can never fire before
+`r.drafting`'s live positional check already has.
+
+**Closer — real punch on the kick that is actually catching up.** Nothing closer-specific existed;
+`CONTACT` (§6.6) is deliberately universal and capped at what a leader could also reach (R4), so it
+keeps a patient horse in the race without ever letting it steal a placing back. Added
+`CLOSER_BEHIND_KICK_BONUS` (0.09) to `kickStrengthFor`, gated on `r.rank > 1` at the moment the kick
+fires — "after losing their spot and falling behind," in the words that asked for it. R2 still
+governs: this only makes the shared kick ceiling easier to reach, the downstream
+`Math.min(KICK_MAX_BONUS, ...)` clamp is untouched.
+
+**Mid-pack — found something worse than expected, twice, before landing on what actually works.**
+
+First: `kickWindowBonus` in `race/charges.ts` had an **undocumented special case for `midPack`
+already** — a flat +33% baseline kick bonus with no diminishing returns outside its window,
+predating this session. That directly contradicts "wins via stats, not bonuses," so it came out.
+
+Second, and this is the one worth remembering: the first fix for mid-pack was a training-gain
+multiplier (`MIDPACK_TRAINING_BONUS`, in `sim/growth.ts`) — bigger gains per session, same ceiling as
+every other style. **Measured, not assumed, and it failed:** simulating real training against
+`applyTrainedStat`'s own diminishing-returns curve, an ordinary horse closes to within 3 points of a
+70 potential by week 40 and sits dead on it by week 80 — well inside a single ~18-20 start career.
+A training-SPEED bonus is worth something for the first third of a career and **nothing at all**
+for the rest, once every style has converged on whatever ceiling it happened to roll. Caught by the
+player, not the harness, before it shipped: "if they don't have higher potentials, they just look
+like every other horse without in-race bonuses, right?" — which is exactly what the measurement
+then confirmed.
+
+The fix that survives is `MIDPACK_GENEROSITY` (1.12) in `sim/horse.ts` — a higher ceiling, not a
+faster climb to a shared one. It stacks with a starter's own bonus rather than replacing it. The
+training multiplier stays; it is real value early and does no harm once potential is what actually
+differs.
+
+**What the harness cannot see, and why 11/13 is being shipped rather than chased further.** Every
+one of the three new bonuses above is *situational* — earned in some races, not others — except
+mid-pack's, which is now entirely a training/breeding-time effect. `npm run harness` generates fresh,
+untrained horses and races them once. It will never see mid-pack's actual edge, because that edge
+does not exist until a player has trained the horse. So B1 fails with mid-pack as the worst
+archetype (8.7%, against an 8.75% floor — inside a rounding error of passing) not because mid-pack
+is imbalanced, but because the check's own model — an untrained horse, raced once — cannot represent
+what mid-pack is now for. B1b, unrelated, has failed since before this session began.
+
+Tried and rejected before settling here: trimming `STALKER_DRAFT_MULT` and `CLOSER_BEHIND_KICK_BONUS`
+in combination across several values (documented by the numbers, not guessed) — mid-pack's share
+never moved outside 8.5-8.9% regardless, confirming the shortfall is not the other three styles
+taking its share, it is mid-pack having nothing left for a single-race measurement to find.
+
+Verified: `npm run stat-leverage` and `npm run ride-probe` both clean, 507 tests, harness 11/13 with
+B1 and the pre-existing B1b as the only failures and the reason for each on record.
+
 ### The race calendar rerolls its options when you back out of a race
 
 **Found in play** — "go to race calendar, click a race, then click back, and it rerolls your race
