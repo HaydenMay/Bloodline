@@ -5311,6 +5311,17 @@ body {
   font-weight: 600;
 }
 
+/* Quieter than .results-legacy — flavour, not a result worth its own colour. */
+.results-calendar {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
 /* Where the stable's prestige comes from */
 .legacy-breakdown {
   display: grid;

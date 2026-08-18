@@ -6,7 +6,8 @@ import {
   DEBUT_AGE,
   FINAL_AGE,
   PEAK_AGE,
-  RACES_PER_SEASON,
+  RACE_RECOVERY_WEEKS,
+  WEEKS_PER_SEASON,
   advanceSeasonIfDue,
   applyTrainedStat,
   getAgeTrainingFactor,
@@ -111,9 +112,25 @@ describe('age and the decline arc', () => {
 
   it('ages a horse a year per season of racing', () => {
     const h = horse({ age: DEBUT_AGE });
-    expect(advanceSeasonIfDue(h, RACES_PER_SEASON - 1).aged).toBe(false);
-    expect(advanceSeasonIfDue(h, RACES_PER_SEASON).aged).toBe(true);
+    expect(advanceSeasonIfDue(h, WEEKS_PER_SEASON - 1).aged).toBe(false);
+    expect(advanceSeasonIfDue(h, WEEKS_PER_SEASON).aged).toBe(true);
     expect(h.age).toBe(3);
+  });
+
+  /**
+   * The whole point of switching the clock from racesCompleted to elapsed
+   * weeks: found in play, a season keyed to exactly 5 races x
+   * RACE_RECOVERY_WEEKS with no slack meant ANY resting between races
+   * (ordinary play — condition recovery, a minor injury) pushed a season
+   * under 5 races, quietly shrinking the whole career below DESIGN.md's
+   * 18-20 start target. WEEKS_PER_SEASON=26 leaves real headroom: racing
+   * back-to-back fits comfortably more than 5 races in a season, so resting
+   * some between races still lands close to (or above) the original target
+   * rather than falling short of it by default.
+   */
+  it('fits more than 5 back-to-back races in a season, leaving room for rest weeks', () => {
+    const racesPerSeasonWithNoRest = Math.floor(WEEKS_PER_SEASON / RACE_RECOVERY_WEEKS);
+    expect(racesPerSeasonWithNoRest).toBeGreaterThan(5);
   });
 
   /**
@@ -125,22 +142,22 @@ describe('age and the decline arc', () => {
    */
   it('keeps ageing past the final racing year if the horse keeps racing', () => {
     const h = horse({ age: DEBUT_AGE });
-    advanceSeasonIfDue(h, 100);
-    expect(h.age).toBe(DEBUT_AGE + Math.floor(100 / RACES_PER_SEASON));
+    advanceSeasonIfDue(h, 300);
+    expect(h.age).toBe(DEBUT_AGE + Math.floor(300 / WEEKS_PER_SEASON));
     expect(h.age).toBeGreaterThan(FINAL_AGE);
   });
 
   it('costs nothing before the peak', () => {
     const h = horse({ age: DEBUT_AGE });
     const before = { ...h.stats };
-    advanceSeasonIfDue(h, RACES_PER_SEASON);
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON);
     expect(h.stats).toEqual(before);
   });
 
   it('erodes speed and burst first once past the peak', () => {
     const h = horse({ age: PEAK_AGE });
     const before = { ...h.stats };
-    advanceSeasonIfDue(h, RACES_PER_SEASON * 3);
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON * 3);
     expect(h.stats.speed).toBeLessThan(before.speed);
     expect(h.stats.burst).toBeLessThan(before.burst);
     // The sharp end dulls before the engine does.
@@ -150,13 +167,13 @@ describe('age and the decline arc', () => {
   it('erodes potential with the stat, so decline cannot be trained back off', () => {
     const h = horse({ age: PEAK_AGE });
     const before = h.potential.burst;
-    advanceSeasonIfDue(h, RACES_PER_SEASON * 3);
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON * 3);
     expect(h.potential.burst).toBeLessThan(before);
   });
 
   it('is gradual enough that a declining horse can still win', () => {
     const h = horse({ age: PEAK_AGE, stats: { ...horse().stats, speed: 80 } });
-    advanceSeasonIfDue(h, RACES_PER_SEASON * 3);
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON * 3);
     // A cliff would make the retirement decision obvious; §8 wants a judgement.
     expect(h.stats.speed).toBeGreaterThan(70);
   });
@@ -170,20 +187,20 @@ describe('age and the decline arc', () => {
    */
   it('keeps eroding stats every season a horse races on past its final year', () => {
     const h = horse({ age: PEAK_AGE, stats: { ...horse().stats, speed: 80 } });
-    advanceSeasonIfDue(h, RACES_PER_SEASON * 3); // seasonsElapsed 3 -> age 5, first erosion
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON * 3); // seasonsElapsed 3 -> age 5, first erosion
     const afterFirst = h.stats.speed;
-    advanceSeasonIfDue(h, RACES_PER_SEASON * 4); // seasonsElapsed 4 -> age 6, second erosion
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON * 4); // seasonsElapsed 4 -> age 6, second erosion
     const afterSecond = h.stats.speed;
     expect(h.age).toBe(6);
     expect(afterSecond).toBeLessThan(afterFirst);
-    advanceSeasonIfDue(h, RACES_PER_SEASON * 5); // seasonsElapsed 5 -> age 7, third erosion
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON * 5); // seasonsElapsed 5 -> age 7, third erosion
     expect(h.age).toBe(7);
     expect(h.stats.speed).toBeLessThan(afterSecond);
   });
 
   it('applies the unchanged flat loss for the transition into FINAL_AGE itself', () => {
     const h = horse({ age: PEAK_AGE, stats: { ...horse().stats, speed: 80 } });
-    advanceSeasonIfDue(h, RACES_PER_SEASON * 3); // -> age 5, extraYears 0
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON * 3); // -> age 5, extraYears 0
     // Base loss for speed is 4 (growth.ts); growth^0 === 1, so this transition
     // is byte-identical to every horse's pre-existing 4->5 birthday.
     expect(h.stats.speed).toBe(76);
@@ -191,9 +208,9 @@ describe('age and the decline arc', () => {
 
   it('compounds erosion by AGE_EROSION_GROWTH per extra year past FINAL_AGE', () => {
     const h = horse({ age: PEAK_AGE, stats: { ...horse().stats, speed: 80 } });
-    advanceSeasonIfDue(h, RACES_PER_SEASON * 3); // -> age 5, extraYears 0
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON * 3); // -> age 5, extraYears 0
     const lossAt5 = 80 - h.stats.speed;
-    advanceSeasonIfDue(h, RACES_PER_SEASON * 4); // -> age 6, extraYears 1
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON * 4); // -> age 6, extraYears 1
     const speedAt6 = h.stats.speed;
     const lossAt6 = 76 - speedAt6;
     // Rounded to the nearest point, so an exact ratio isn't guaranteed, but it
@@ -205,9 +222,9 @@ describe('age and the decline arc', () => {
 
   it('erodes potential by the same accelerating amount, so training cannot recover it', () => {
     const h = horse({ age: PEAK_AGE, potential: { ...horse().potential, speed: 95 } });
-    advanceSeasonIfDue(h, RACES_PER_SEASON * 3); // -> age 5
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON * 3); // -> age 5
     const potentialAt5 = h.potential.speed;
-    advanceSeasonIfDue(h, RACES_PER_SEASON * 4); // -> age 6
+    advanceSeasonIfDue(h, WEEKS_PER_SEASON * 4); // -> age 6
     const lostAt5 = 95 - potentialAt5;
     const lostAt6 = potentialAt5 - h.potential.speed;
     expect(lostAt6).toBeGreaterThan(lostAt5);

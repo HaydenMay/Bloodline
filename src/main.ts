@@ -44,7 +44,12 @@ import { mountFacilitiesScreen } from './ui/facilitiesScreen.js';
 import { getDownsideRelief, getPrizeMultiplier, getTrainingMultiplier } from './data/facilities.js';
 import { applyRaceUpkeep, applyRestWeek } from './sim/upkeep.js';
 import { ageWorld, runWorldMeeting } from './sim/worldRacing.js';
-import { advanceSeasonIfDue, describeStatChanges, MIDPACK_TRAINING_BONUS } from './sim/growth.js';
+import {
+  advanceSeasonIfDue,
+  describeStatChanges,
+  MIDPACK_TRAINING_BONUS,
+  RACE_RECOVERY_WEEKS,
+} from './sim/growth.js';
 import { applyInjury, isCareerEnding, rollForInjury } from './sim/injury.js';
 import { getJockeySkill, getTrainerBonus } from './data/staff.js';
 import {
@@ -1813,13 +1818,20 @@ function startRaceWithHorse(
 
         updatedCareer.stats.racesCompleted += 1;
 
+        // The calendar is the real clock now, not the race counter — found
+        // in play: "I always thought it was actually the week count." A
+        // race costs RACE_RECOVERY_WEEKS recovering before the next card;
+        // rest weeks (main.ts's restWeek) cost their own week the same as
+        // always. Advanced before the ageing check below, so this race's
+        // recovery counts toward it landing on a birthday, same as
+        // racesCompleted already did.
+        const weekBeforeRace = updatedCareer.week;
+        updatedCareer.week += RACE_RECOVERY_WEEKS;
+
         // A season may turn on this race. Past the peak that costs the horse
         // something, which is what makes retiring a judgement rather than a
         // race counter.
-        const ageing = advanceSeasonIfDue(
-          updatedCareer.horse,
-          updatedCareer.stats.racesCompleted,
-        );
+        const ageing = advanceSeasonIfDue(updatedCareer.horse, updatedCareer.week);
         if (ageing.aged) updatedCareer.season = updatedCareer.horse.age - 1;
 
         // Did the horse come home sound? Risk rises with tiredness and age, and
@@ -1877,7 +1889,8 @@ function startRaceWithHorse(
               tone: ageing.stage === 'declining' ? ('setback' as const) : ('positive' as const),
             }
           : null;
-        updatedCareer.week += 1;
+        // week already advanced above (RACE_RECOVERY_WEEKS), ahead of the
+        // ageing check it feeds.
         updatedCareer.raceSelected = false; // Clear race selection for next week
         updatedCareer.trainingDoneThisWeek = false; // Reset training flag for next week
         saveCareer(updatedCareer);
@@ -1977,7 +1990,7 @@ function startRaceWithHorse(
           raceDelta: legacySwing.raceDelta,
           bonus: legacySwing.bonus,
           total: legacySwing.total,
-        });
+        }, { weekBefore: weekBeforeRace, weekAfter: updatedCareer.week });
 
         // Stack any notices over the results, so the player reads the outcome
         // with the finishing order already behind it.

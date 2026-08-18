@@ -10,6 +10,17 @@ export interface LegacySwing {
   total: number;
 }
 
+/**
+ * How far the calendar just moved. Surfaced here — found in play, the
+ * player assumed the week count already drove ageing and was surprised it
+ * didn't; RACE_RECOVERY_WEEKS (main.ts) makes it actually true, and a race
+ * is the one moment worth saying so, rather than a notice on every result.
+ */
+export interface CalendarAdvance {
+  weekBefore: number;
+  weekAfter: number;
+}
+
 export function mountResultsScreen(
   container: HTMLElement,
   placings: RunnerSnapshot[],
@@ -18,6 +29,7 @@ export function mountResultsScreen(
   field?: Horse[],
   silksMap?: Map<string, Silks>,
   legacySwing?: LegacySwing,
+  calendarAdvance?: CalendarAdvance,
 ): () => void {
   const root = document.createElement('div');
   root.className = 'results-screen';
@@ -48,6 +60,15 @@ export function mountResultsScreen(
           <span class="legacy-swing-delta">${signed(swingTotal)}</span>
           ${legacySwing.bonus !== 0 ? `<span class="legacy-swing-bonus">(${signed(legacySwing.raceDelta)} result, ${signed(legacySwing.bonus)} division)</span>` : ''}
           <span class="legacy-swing-total">${legacySwing.total} pts</span>
+        </div>
+      `
+          : ''
+      }
+      ${
+        calendarAdvance
+          ? `
+        <div class="results-calendar">
+          🗓️ Week ${calendarAdvance.weekBefore} → ${calendarAdvance.weekAfter} — a few weeks to recover before the next card.
         </div>
       `
           : ''

@@ -196,11 +196,47 @@ export function applyAgeing(horse: Horse, newAge: number): Partial<Stats> {
 }
 
 /**
- * Races per season, used to decide when a birthday falls.
+ * Races per season for a rival — `sim/worldRacing.ts`'s `ageWorld` ticks a
+ * rival's own birthday off its start count, since a rival can start racing
+ * at any age from 2 to 5 and has no calendar of its own to anchor a
+ * week-based clock to. The player's own horse uses `WEEKS_PER_SEASON`
+ * below instead (see `advanceSeasonIfDue`).
  *
  * §8 wants 18-20 starts across ages 2-5 — roughly five runs a year.
  */
 export const RACES_PER_SEASON = 5;
+
+/**
+ * Weeks added to the calendar after a race — "a couple weeks" recovering
+ * before the next card, not a literal week-to-week simulation.
+ */
+export const RACE_RECOVERY_WEEKS = 3;
+
+/**
+ * Elapsed weeks before the player's own horse has a birthday.
+ *
+ * Found in play: the player assumed the calendar's own week count already
+ * drove ageing ("I always thought it was actually the week count") — it
+ * never did; `advanceSeasonIfDue` used to key entirely off
+ * `racesCompleted`, so resting between races was free in ageing terms no
+ * matter how many weeks it burned. This is what makes the calendar the
+ * real clock instead: a birthday now needs both racing (`RACE_RECOVERY_WEEKS`
+ * per start) and any voluntary rest weeks between starts (1 each,
+ * unchanged) to add up.
+ *
+ * 26 — half a real-life year — rather than a tighter number tuned to
+ * exactly reproduce 5 races per season with zero rest: that would have made
+ * ANY resting push a season under 5 races, quietly shrinking the career
+ * below DESIGN.md's 18-20 start target the moment a player used the
+ * mechanic (condition recovery, a minor injury) the game already expects
+ * them to use. At 26, racing back-to-back with no rest fits ~8-9 races in a
+ * season; resting once between every race (RACE_RECOVERY_WEEKS + 1 = 4
+ * weeks/cycle) lands closer to 6-7; even two rest weeks a cycle still clears
+ * 5. Racing on past that just stretches a season longer in wall-clock terms
+ * rather than being penalised — career length is not capped any more
+ * either (main.ts), so there is nothing to protect by keeping this tight.
+ */
+export const WEEKS_PER_SEASON = 26;
 
 export interface AgeingResult {
   aged: boolean;
@@ -210,8 +246,15 @@ export interface AgeingResult {
 }
 
 /**
- * Advances the horse a season if it has run enough races, and applies whatever
- * that costs it. Returns what happened so the UI can report a birthday.
+ * Advances the horse a season if enough weeks have passed on the calendar,
+ * and applies whatever that costs it. Returns what happened so the UI can
+ * report a birthday.
+ *
+ * Keyed off `career.week` (elapsed calendar weeks), not races run — the
+ * player's own debut horse always starts at exactly `DEBUT_AGE` (2), so a
+ * week-count anchored the same way `RACES_PER_SEASON` used to be is safe
+ * here (a rival can start anywhere from 2 to 5 and cannot use this same
+ * anchor — see `RACES_PER_SEASON`'s own comment).
  *
  * Age used to clamp at `FINAL_AGE` — once a horse reached 5 it stayed 5
  * forever, no matter how many more races it ran, and `applyAgeing`'s erosion
@@ -225,8 +268,8 @@ export interface AgeingResult {
  * where the trainer's advice (`getRetirementAdvice`) gets most insistent; it
  * is no longer a ceiling on the number itself.
  */
-export function advanceSeasonIfDue(horse: Horse, racesCompleted: number): AgeingResult {
-  const seasonsElapsed = Math.floor(racesCompleted / RACES_PER_SEASON);
+export function advanceSeasonIfDue(horse: Horse, weeksElapsed: number): AgeingResult {
+  const seasonsElapsed = Math.floor(weeksElapsed / WEEKS_PER_SEASON);
   const targetAge = DEBUT_AGE + seasonsElapsed;
 
   if (targetAge <= horse.age) {
