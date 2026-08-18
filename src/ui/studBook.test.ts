@@ -196,6 +196,21 @@ describe('who a yard can breed to', () => {
 
     expect(figures.size).toBeGreaterThan(1);
   });
+
+  /**
+   * A rival aged out of `world` (`sim/worldRacing.ts`'s ageWorld) moves to
+   * `worldArchive` rather than being deleted, specifically so it can keep
+   * standing at stud — a retired rival is exactly when a real stallion's
+   * stud career tends to start, not when it ends.
+   */
+  it('still offers an eligible horse from worldArchive as an outside stud', () => {
+    const stable = emptyYard();
+    stable.legacy.archivedPoints = 9000;
+    stable.worldArchive = [horse({ id: 'aged-out', gender: 'mare', age: 9, division: 'open' })];
+
+    const studs = outsideStuds(stable, horse({ id: 'mine', gender: 'stallion' }), 8);
+    expect(studs.some((s) => s.horse.id === 'aged-out')).toBe(true);
+  });
 });
 
 describe('the projected foal', () => {

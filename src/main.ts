@@ -43,7 +43,7 @@ import {
 import { mountFacilitiesScreen } from './ui/facilitiesScreen.js';
 import { getDownsideRelief, getPrizeMultiplier, getTrainingMultiplier } from './data/facilities.js';
 import { applyRaceUpkeep, applyRestWeek } from './sim/upkeep.js';
-import { runWorldMeeting } from './sim/worldRacing.js';
+import { ageWorld, runWorldMeeting } from './sim/worldRacing.js';
 import { advanceSeasonIfDue, describeStatChanges, MIDPACK_TRAINING_BONUS } from './sim/growth.js';
 import { applyInjury, isCareerEnding, rollForInjury } from './sim/injury.js';
 import { getJockeySkill, getTrainerBonus } from './data/staff.js';
@@ -1589,6 +1589,22 @@ function startRaceWithHorse(
           createRng(`world-${player.id}-${updatedCareer.horse.starts}-${updatedCareer.week}`),
           updatedCareer.stable.world,
           new Set(placings.map((p) => p.id)),
+        );
+
+        // The world ages on the same tick it races on. A rival that reaches
+        // WORLD_RETIREMENT_AGE moves into worldArchive rather than vanishing
+        // — found in play: "Northern Timber... was the same Closer Runs Late
+        // racer I raced back then" generations later, because nothing ever
+        // aged a rival at all (sim/worldRacing.ts).
+        ageWorld(
+          createRng(`world-age-${player.id}-${updatedCareer.horse.starts}-${updatedCareer.week}`),
+          updatedCareer.stable.world,
+          updatedCareer.stable.worldArchive,
+          [
+            ...updatedCareer.stable.bloodstock.map((entry) => entry.horse.name),
+            ...updatedCareer.stable.world.map((horse) => horse.name),
+            ...updatedCareer.stable.worldArchive.map((horse) => horse.name),
+          ],
         );
 
         // Update player horse records and division progression

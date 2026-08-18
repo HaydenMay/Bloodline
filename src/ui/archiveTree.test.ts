@@ -6,6 +6,7 @@ import {
   allKnownHorses,
   buildAncestry,
   carriesAllele,
+  isArchivedWorld,
   isSoldFoal,
   notableAllele,
   retiredRecordOf,
@@ -160,24 +161,57 @@ describe('siblingsOf', () => {
 });
 
 describe('allKnownHorses', () => {
-  it('combines bloodstock and world', () => {
+  it('combines bloodstock, world and worldArchive', () => {
     const bloodstockHorse = horse({ id: 'b1' });
     const worldHorse = horse({ id: 'w1' });
+    const archivedHorse = horse({ id: 'a1' });
     const stable = emptyYard({
       bloodstock: [retired(bloodstockHorse)],
       world: [worldHorse],
+      worldArchive: [archivedHorse],
     });
-    expect(allKnownHorses(stable).map((h) => h.id).sort()).toEqual(['b1', 'w1']);
+    expect(allKnownHorses(stable).map((h) => h.id).sort()).toEqual(['a1', 'b1', 'w1']);
   });
 
   it('agrees with pedigreeOf on what it can resolve', () => {
     const bloodstockHorse = horse({ id: 'b1' });
     const worldHorse = horse({ id: 'w1' });
-    const stable = emptyYard({ bloodstock: [retired(bloodstockHorse)], world: [worldHorse] });
+    const archivedHorse = horse({ id: 'a1' });
+    const stable = emptyYard({
+      bloodstock: [retired(bloodstockHorse)],
+      world: [worldHorse],
+      worldArchive: [archivedHorse],
+    });
     const pedigree = pedigreeOf(stable);
     for (const h of allKnownHorses(stable)) {
       expect(pedigree(h.id)?.id).toBe(h.id);
     }
+  });
+});
+
+/**
+ * The whole reason ageWorld (sim/worldRacing.ts) moves a rival to
+ * worldArchive rather than deleting it: an ancestor a foal was bred from
+ * must stay resolvable and identifiable forever, even after it ages out of
+ * active racing.
+ */
+describe('isArchivedWorld', () => {
+  it('is true for a horse only present in worldArchive', () => {
+    const agedOut = horse({ id: 'aged-out' });
+    const stable = emptyYard({ worldArchive: [agedOut] });
+    expect(isArchivedWorld(agedOut, stable)).toBe(true);
+  });
+
+  it('is false for a horse still actively racing in world', () => {
+    const active = horse({ id: 'active' });
+    const stable = emptyYard({ world: [active] });
+    expect(isArchivedWorld(active, stable)).toBe(false);
+  });
+
+  it('still resolves an archived ancestor through pedigreeOf', () => {
+    const agedOut = horse({ id: 'aged-out' });
+    const stable = emptyYard({ worldArchive: [agedOut] });
+    expect(pedigreeOf(stable)('aged-out')?.id).toBe('aged-out');
   });
 });
 

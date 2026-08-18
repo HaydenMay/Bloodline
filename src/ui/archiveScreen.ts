@@ -14,6 +14,7 @@ import {
   buildAncestry,
   carriesAllele,
   COAT_LOCI,
+  isArchivedWorld,
   isSoldFoal,
   notableAllele,
   retiredRecordOf,
@@ -76,8 +77,13 @@ function statusOf(horse: Horse, stable: Stable, isLivingRoot: boolean): string {
           : 'retired sound';
     return `In your bloodstock — ${reason}${retired.hallOfFame ? ', Hall of Fame' : ''}.`;
   }
-  if (isSoldFoal(horse, stable)) return 'Sold from your line as a foal — racing in the world.';
-  return 'An outside horse your line has bred to.';
+  const archived = isArchivedWorld(horse, stable);
+  if (isSoldFoal(horse, stable)) {
+    return archived
+      ? 'Sold from your line as a foal — retired from racing.'
+      : 'Sold from your line as a foal — racing in the world.';
+  }
+  return archived ? 'An outside horse your line has bred to — retired from racing.' : 'An outside horse your line has bred to.';
 }
 
 /**

@@ -77,9 +77,13 @@ export function rowsOf(root: AncestorNode): AncestorNode[][] {
   return rows;
 }
 
-/** Every horse the yard knows about — its own bloodstock plus the world. */
+/** Every horse the yard knows about — its own bloodstock plus the world, active or archived. */
 export function allKnownHorses(stable: Stable): Horse[] {
-  return [...stable.bloodstock.map((entry) => entry.horse), ...(stable.world ?? [])];
+  return [
+    ...stable.bloodstock.map((entry) => entry.horse),
+    ...(stable.world ?? []),
+    ...(stable.worldArchive ?? []),
+  ];
 }
 
 /** Other foals of the same pairing — full siblings only; a pairing is one sire and one dam. */
@@ -99,13 +103,22 @@ export function siblingsOf(horse: Horse, allHorses: Horse[]): Horse[] {
  *
  * The world is seeded once with horses that have no recorded parents
  * (`generateWorld`); a sold foal keeps the `sireId`/`damId` it was born
- * with (`releaseAsRival`). Presence in `world` plus a recorded parent is
+ * with (`releaseAsRival`). Presence in `world` (still racing) or
+ * `worldArchive` (aged out, `sim/worldRacing.ts`) plus a recorded parent is
  * exactly that distinction, and it needs no extra field on the horse.
  */
 export function isSoldFoal(horse: Horse, stable: Stable): boolean {
   if (!horse.sireId && !horse.damId) return false;
   if (stable.bloodstock.some((entry) => entry.horse.id === horse.id)) return false;
-  return (stable.world ?? []).some((w) => w.id === horse.id);
+  return (
+    (stable.world ?? []).some((w) => w.id === horse.id) ||
+    (stable.worldArchive ?? []).some((w) => w.id === horse.id)
+  );
+}
+
+/** A rival, sold foal or otherwise, that has aged out of racing and is no longer in `world`. */
+export function isArchivedWorld(horse: Horse, stable: Stable): boolean {
+  return (stable.worldArchive ?? []).some((w) => w.id === horse.id);
 }
 
 /** The bloodstock record for a horse in the tree, if the yard ever retired it. */

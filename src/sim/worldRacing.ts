@@ -33,6 +33,9 @@ import { rateHorse } from '../data/wagering.js';
 import { getPurse, PRIZE_SHARES } from '../data/purse.js';
 import { FIELD_SIZE } from '../data/index.js';
 import { updateAIDivisionProgression } from './division.js';
+import { applyAgeing, RACES_PER_SEASON } from './growth.js';
+import { generateHorse } from './horse.js';
+import { createNameGenerator } from '../data/names.js';
 
 /**
  * Spread of the rating noise, as a share of a horse's own rating.
@@ -124,4 +127,73 @@ export function runWorldMeeting(
   }
 
   return { races, runners };
+}
+
+/**
+ * Age a rival keeps racing at, before it retires and gets replaced.
+ *
+ * `generateHorse` seeds a rival anywhere from 2 to 5, and nothing ever aged
+ * them from there — found in play: a horse first raced against at
+ * generation 3 was still the exact same horse, same stats, same potential,
+ * generations later. Set a little past FINAL_AGE (5): decline
+ * (`AGE_EROSION_GROWTH`) is already biting hard there, so by 9 a rival has
+ * had a real, gradually-declining stretch rather than a cliff, and has
+ * usually built a real record on the way — the same record that makes it
+ * worth archiving rather than just deleting.
+ */
+export const WORLD_RETIREMENT_AGE = 9;
+
+export interface WorldAgeingReport {
+  /** Rivals that had a birthday this tick. */
+  aged: number;
+  /** Rivals retired out of the active world this tick, oldest first. */
+  retired: Horse[];
+}
+
+/**
+ * Ages every rival by whatever `runWorldMeeting` just gave it — one birthday
+ * per RACES_PER_SEASON starts, same pace the player's own horse ages at —
+ * and retires anything that reaches WORLD_RETIREMENT_AGE, replacing it
+ * in-place with a freshly generated horse in the same division.
+ *
+ * A retired rival moves into `archive` rather than disappearing. It is
+ * never removed from there: any foal bred to it keeps a resolvable ancestor
+ * (`pedigreeOf` reads bloodstock, world AND archive), and it stays eligible
+ * as an outside stud in its own right (`outsideStuds` does the same) for as
+ * long as fertility allows — the point of the archive is that the yard does
+ * not have to keep tracking every rival that ever raced to keep the ones it
+ * actually used.
+ *
+ * Reuses `applyAgeing` directly rather than `advanceSeasonIfDue` — that
+ * function anchors seasons to DEBUT_AGE (2), which only holds for a horse
+ * that started racing at 2. A rival can start anywhere from 2 to 5, so its
+ * birthdays are ticked off its own start count instead, with no assumption
+ * about what age it began at.
+ */
+export function ageWorld(
+  rng: Rng,
+  world: Horse[],
+  archive: Horse[],
+  usedNames: Iterable<string>,
+): WorldAgeingReport {
+  const names = createNameGenerator(rng, usedNames);
+  const retired: Horse[] = [];
+  let aged = 0;
+
+  for (let i = 0; i < world.length; i++) {
+    const horse = world[i]!;
+    if (horse.starts === 0 || horse.starts % RACES_PER_SEASON !== 0) continue;
+
+    horse.age += 1;
+    applyAgeing(horse, horse.age);
+    aged += 1;
+
+    if (horse.age >= WORLD_RETIREMENT_AGE) {
+      retired.push(horse);
+      archive.push(horse);
+      world[i] = generateHorse(rng, names, { division: horse.division, isAI: true });
+    }
+  }
+
+  return { aged, retired };
 }

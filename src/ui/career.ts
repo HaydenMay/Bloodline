@@ -106,6 +106,17 @@ export interface SaveSettings {
  */
 export interface Stable {
   world: Horse[];
+  /**
+   * Rivals aged out of `world` by `sim/worldRacing.ts`'s `ageWorld`, kept
+   * forever rather than deleted. A retired rival stops racing and stops
+   * accumulating a record, but any foal bred to it while it was active still
+   * needs a resolvable ancestor — `pedigreeOf` and `allKnownHorses` read this
+   * alongside `bloodstock` and `world` — and it stays available as an
+   * outside stud in its own right (`outsideStuds`) for as long as fertility
+   * allows. Named apart from `bloodstock`, which is the player's own retired
+   * stock and carries legacy/banking data these horses never had.
+   */
+  worldArchive: Horse[];
   dossier: RivalDossier;
   settings: SaveSettings;
   facilities: Record<string, number>; // facility id -> level (0-5)
@@ -257,6 +268,7 @@ export function createStable(seed: string = `stable-${Date.now()}`): Stable {
 
   return {
     world: generateWorld(rng, names, WORLD_POPULATION),
+    worldArchive: [],
     dossier: {},
     settings: { autopilotEnabled: false },
     facilities: {
@@ -300,6 +312,7 @@ function normaliseStable(stable: Stable): Stable {
   // same thing as never having bred: every pairing reads as a first cross.
   if (!stable.pairings || typeof stable.pairings !== 'object') stable.pairings = {};
   if (!Array.isArray(stable.world)) stable.world = [];
+  if (!Array.isArray(stable.worldArchive)) stable.worldArchive = [];
   return stable;
 }
 
@@ -476,10 +489,14 @@ export function loadCareer(): Career | null {
     delete legacyStats.reputation;
 
     // A stable saved separately is the newer record — prefer it, but keep the
-    // career's own copy of the world so an in-flight race still finds its field.
+    // career's own copy of the world (and any rival just archived out of it,
+    // ageWorld — sim/worldRacing.ts) so an in-flight race still finds its field.
     const persisted = loadStable();
     if (persisted) {
       persisted.world = career.stable.world?.length ? career.stable.world : persisted.world;
+      persisted.worldArchive = career.stable.worldArchive?.length
+        ? career.stable.worldArchive
+        : persisted.worldArchive;
       career.stable = persisted;
     } else {
       // The yard's own slot is gone but the career carries a copy of it. Write

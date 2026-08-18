@@ -75,14 +75,17 @@ export interface PartnerOption {
  * Looks up any horse the yard knows about, so relatedness can walk a pedigree.
  *
  * Grandparents only count if they can be found. Bloodstock holds everything you
- * retired and the world holds the rivals you bred to, which between them cover
- * every ancestor a foal of yours can have — a horse from neither is one this
- * yard never had anything to do with, and reads as unrelated because it is.
+ * retired, world holds the rivals still racing, and worldArchive holds the
+ * ones that aged out of racing (`sim/worldRacing.ts`'s ageWorld) without
+ * being deleted — between the three, every ancestor a foal of yours can have
+ * is covered; a horse from none of them is one this yard never had anything
+ * to do with, and reads as unrelated because it is.
  */
 export function pedigreeOf(stable: Stable): Pedigree {
   const index = new Map<string, Horse>();
   for (const entry of stable.bloodstock) index.set(entry.horse.id, entry.horse);
   for (const horse of stable.world ?? []) index.set(horse.id, horse);
+  for (const horse of stable.worldArchive ?? []) index.set(horse.id, horse);
   return (id: string) => index.get(id);
 }
 
@@ -142,7 +145,10 @@ export function outsideStuds(stable: Stable, mine: Horse, limit = 6): BreedingPa
     hallOfFame: false,
   });
 
-  const eligible = (stable.world ?? []).filter(
+  // Archived rivals (aged out of racing, sim/worldRacing.ts) stand at stud
+  // right alongside ones still active — a retired rival is exactly when a
+  // real stallion's stud career tends to start, not when it ends.
+  const eligible = [...(stable.world ?? []), ...(stable.worldArchive ?? [])].filter(
     (horse) =>
       canPair(mine, horse) &&
       DIVISION_RANK.indexOf(horse.division) <= maxRank &&
@@ -336,6 +342,7 @@ export function breedFoal(
   const used = [
     ...stable.bloodstock.map((entry) => entry.horse.name),
     ...(stable.world ?? []).map((horse) => horse.name),
+    ...(stable.worldArchive ?? []).map((horse) => horse.name),
   ];
   const names = createNameGenerator(rng, used);
 

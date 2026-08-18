@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { createRng } from './rng.js';
 import { createNameGenerator } from '../data/names.js';
 import { generateHorse } from './horse.js';
-import { runWorldMeeting } from './worldRacing.js';
+import { RACES_PER_SEASON } from './growth.js';
+import { ageWorld, runWorldMeeting, WORLD_RETIREMENT_AGE } from './worldRacing.js';
 import { seedLegacyFromRecord } from '../data/legacy.js';
 import type { Horse } from './types.js';
 
@@ -109,5 +110,84 @@ describe('the world races when you do', () => {
     const before = snapshot(field);
     for (let week = 0; week < 30; week++) runWorldMeeting(createRng(`u${week}`), field);
     expect(field.filter((h) => gained(before, h, 'wins') > 0).length).toBeGreaterThan(1);
+  });
+});
+
+/**
+ * Found in play: a rival raced against at generation 3 was still the exact
+ * same horse, same stats, same potential, generations later — nothing ever
+ * aged a world horse at all. `ageWorld` is the fix, ticked on the same call
+ * the player's own race triggers `runWorldMeeting` on.
+ */
+describe('ageWorld', () => {
+  it('gives a horse a birthday once it reaches RACES_PER_SEASON starts, not before', () => {
+    const field = world(4);
+    field[0]!.starts = RACES_PER_SEASON - 1;
+    const before = field[0]!.age;
+    ageWorld(createRng('age-1'), field, [], []);
+    expect(field[0]!.age).toBe(before);
+
+    field[0]!.starts = RACES_PER_SEASON;
+    ageWorld(createRng('age-2'), field, [], []);
+    expect(field[0]!.age).toBe(before + 1);
+  });
+
+  it('erodes stats once a birthday pushes a horse past its peak', () => {
+    const field = world(1);
+    field[0]!.age = 4; // PEAK_AGE
+    field[0]!.starts = RACES_PER_SEASON;
+    const beforeSpeed = field[0]!.stats.speed;
+    ageWorld(createRng('age-erode'), field, [], []);
+    expect(field[0]!.age).toBe(5);
+    expect(field[0]!.stats.speed).toBeLessThan(beforeSpeed);
+  });
+
+  it('retires a horse into the archive once it reaches WORLD_RETIREMENT_AGE, replacing it in place', () => {
+    const field = world(1);
+    const original = field[0]!;
+    original.age = WORLD_RETIREMENT_AGE - 1;
+    original.division = 'stakes';
+    original.starts = RACES_PER_SEASON;
+    const archive: Horse[] = [];
+
+    const report = ageWorld(createRng('age-retire'), field, archive, [original.name]);
+
+    expect(report.retired).toHaveLength(1);
+    expect(report.retired[0]!.id).toBe(original.id);
+    // Archived, not deleted.
+    expect(archive).toHaveLength(1);
+    expect(archive[0]!.id).toBe(original.id);
+    // Replaced in place — same array length, same division, different horse.
+    expect(field).toHaveLength(1);
+    expect(field[0]!.id).not.toBe(original.id);
+    expect(field[0]!.division).toBe('stakes');
+  });
+
+  it('never removes a horse from the archive once it is there', () => {
+    const field = world(1);
+    field[0]!.age = WORLD_RETIREMENT_AGE - 1;
+    field[0]!.starts = RACES_PER_SEASON;
+    const archive: Horse[] = [];
+
+    ageWorld(createRng('age-perm-1'), field, archive, []);
+    expect(archive).toHaveLength(1);
+
+    // Age the replacement out too, across enough ticks.
+    field[0]!.age = WORLD_RETIREMENT_AGE - 1;
+    field[0]!.starts = RACES_PER_SEASON;
+    ageWorld(createRng('age-perm-2'), field, archive, []);
+
+    expect(archive).toHaveLength(2);
+  });
+
+  it("gives the replacement a fresh, non-colliding name", () => {
+    const field = world(1);
+    field[0]!.age = WORLD_RETIREMENT_AGE - 1;
+    field[0]!.starts = RACES_PER_SEASON;
+    const originalName = field[0]!.name;
+    const archive: Horse[] = [];
+
+    ageWorld(createRng('age-name'), field, archive, [originalName]);
+    expect(field[0]!.name).not.toBe(originalName);
   });
 });
