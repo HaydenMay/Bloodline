@@ -1213,6 +1213,10 @@ function showRaceCalendar(career: Career): void {
   // Check if player is ready for promotion or at demotion risk
   const isPromotionReady = career.horse.divisionPoints >= 5 && career.horse.divisionLevel < 4;
   const isDemotionRisk = career.horse.divisionPoints <= -3 && career.horse.divisionLevel > 0;
+  // Championship has no division above it to promote into, so a filled ladder
+  // there earns the title decider instead of an ordinary promotion race.
+  const isChampionshipReady =
+    career.horse.divisionLevel === 4 && career.horse.divisionPoints >= 5 && !career.horse.isChampion;
 
   // Show demotion warning if at risk
   if (isDemotionRisk) {
@@ -1228,6 +1232,27 @@ function showRaceCalendar(career: Career): void {
         hint: 'A session on the training grounds before this one counts for a lot.',
         tone: 'warning',
         buttonLabel: 'Understood',
+      },
+      mountCalendarUI,
+    );
+    return;
+  }
+
+  // Show championship decider alert if applicable (checked ahead of ordinary
+  // promotion since a Championship horse can never satisfy isPromotionReady).
+  if (isChampionshipReady) {
+    showNotice(
+      app,
+      {
+        icon: '🏆',
+        title: 'Ready for the Championship!',
+        lines: [
+          "You've proven yourself at the top division, so this week's card is the Championship race.",
+          'Finish first to claim the title.',
+        ],
+        hint: 'Fall short and you keep your points — another shot comes around soon.',
+        tone: 'positive',
+        buttonLabel: "Let's Go",
       },
       mountCalendarUI,
     );
@@ -1267,6 +1292,7 @@ function showRaceCalendar(career: Career): void {
       division: career.horse.division,
       isPromotionReady,
       isDemotionRisk,
+      isChampionshipReady,
     });
   }
 }
@@ -1295,14 +1321,19 @@ function startRaceWithHorse(
 
   let field: Horse[];
   try {
-    // Check if this is a promotion or demotion race
+    // Check if this is a promotion, demotion, or championship race
     const isPromotionRace = race?.isPromotion === true;
     const isDemotionRace = race?.isDemotion === true;
+    const isChampionshipRace = race?.isChampionshipRace === true;
 
     let opponents: Horse[];
 
-    if (isPromotionRace) {
-      // Promotion race field uses special population logic
+    if (isPromotionRace || isChampionshipRace) {
+      // The Championship decider draws its field the same way a promotion
+      // race does — `populatePromotionRaceField` already degrades correctly
+      // at the top division (nextLevel clamps to 4), pulling the strongest
+      // other Championship contenders rather than reaching for a division
+      // that doesn't exist above it.
       opponents = populatePromotionRaceField(player.division, career.stable.world, FIELD_SIZE - 1);
     } else if (isDemotionRace) {
       // Demotion race field uses special population logic
@@ -1588,7 +1619,7 @@ function startRaceWithHorse(
         // Update division points for player horse
         const isPromotionRace = race?.isPromotion === true;
         const isDemotionRace = race?.isDemotion === true;
-        console.log('Race type check:', { isPromotionRace, isDemotionRace, race });
+        const isChampionshipRace = race?.isChampionshipRace === true;
 
         const DIVISIONS = ['Maiden', 'Novice', 'Open', 'Stakes', 'Championship'];
 
@@ -1655,6 +1686,39 @@ function startRaceWithHorse(
               ],
               hint: 'Fresh start in this division — build those points back up.',
               tone: 'positive',
+            };
+          }
+        } else if (isChampionshipRace) {
+          // The Championship decider: there is no division above to promote
+          // into, so a win is handled separately below (the full Championship
+          // Victory screen), and this branch only covers the notice plus what
+          // happens to the ladder on anything short of first.
+          if (playerFinishingPosition >= 1 && playerFinishingPosition <= 4) {
+            if (playerFinishingPosition === 1) {
+              updatedCareer.horse.divisionPoints = 0;
+            } else {
+              divisionNotice = {
+                icon: '🎯',
+                title: 'So Close!',
+                lines: [
+                  `${updatedCareer.horse.name} falls short of the title this time.`,
+                  'You keep your points, so another shot is not far off.',
+                ],
+                hint: 'Keep training and placing well for another run at the Championship.',
+                tone: 'neutral',
+              };
+            }
+          } else {
+            updatedCareer.horse.divisionPoints = 2;
+            divisionNotice = {
+              icon: '📉',
+              title: 'Off the Pace',
+              lines: [
+                `${updatedCareer.horse.name} finishes well back in the Championship.`,
+                'Your division points reset to 2 — build back up for another shot at the title.',
+              ],
+              hint: 'A strong run of form gets you back to the decider.',
+              tone: 'setback',
             };
           }
         } else {
@@ -1798,18 +1862,23 @@ function startRaceWithHorse(
 
           // Check for championship victory
           //
-          // Must read the division the race was actually RUN in, not the
-          // horse's current division. `player` and `updatedCareer.horse` are
-          // the same object, and a Stakes -> Championship PROMOTION race
-          // mutates `.division` to 'championship' via `finalizePromotion`
-          // earlier in this same handler — so checking the live value here
-          // fired this screen the instant a horse was promoted INTO
-          // Championship, off a race that was run and won in Stakes. Found in
-          // play: "I raced the promotion race from stakes to champion and it
-          // gave it to me. It's supposed to be after you climb the ladder in
-          // Championship one last time, you get the championship race."
+          // Must be the dedicated Championship decider race itself
+          // (`race?.isChampionshipRace`), not merely a win while in the
+          // Championship division. Two earlier bugs both traced to using too
+          // loose a signal here:
+          //  - Checking the live `updatedCareer.horse.division` fired this
+          //    screen the instant a horse was PROMOTED into Championship, off
+          //    a race that was run and won in Stakes (`player` and
+          //    `updatedCareer.horse` are the same object, and `division`
+          //    mutates via `finalizePromotion` earlier in this handler).
+          //  - Checking `racedDivision === 'championship'` alone (the first
+          //    fix) stopped that false positive but then fired on ANY win
+          //    inside Championship, not only the decider reached by filling
+          //    the ladder to `divisionPoints >= 5` — found in play: "I just
+          //    joined champ" and won an ordinary Championship race, and the
+          //    victory screen fired anyway.
           const playerWon = playerIndex === 0;
-          const isChampionship = racedDivision === 'championship';
+          const isChampionship = isChampionshipRace;
           const notYetChampion = !updatedCareer.horse.isChampion;
 
           if (playerWon && isChampionship && notYetChampion) {

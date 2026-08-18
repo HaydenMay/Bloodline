@@ -11,17 +11,28 @@ export interface RaceOption {
   hype: number;
   isPromotion?: boolean;
   isDemotion?: boolean;
+  /**
+   * The Championship's own decider — Championship has no division above it to
+   * be promoted into, so filling the ladder there earns this instead of an
+   * ordinary promotion race. `isPromotion` is deliberately not reused for it:
+   * they read the same field-population logic downstream (there is nowhere
+   * higher to draw from either), but the label, the notice copy and the
+   * Championship Victory trigger all need to tell the two apart.
+   */
+  isChampionshipRace?: boolean;
 }
 
 export interface RaceCalendarOptions {
   division?: Division;
   isPromotionReady?: boolean;
   isDemotionRisk?: boolean;
+  /** Championship, ladder filled, title not yet won. See `isChampionshipRace`. */
+  isChampionshipReady?: boolean;
 }
 
 export function generateRaceCalendar(seed: string, opts: RaceCalendarOptions = {}): RaceOption[] {
   const rng = createRng(seed);
-  const { division, isPromotionReady, isDemotionRisk } = opts;
+  const { division, isPromotionReady, isDemotionRisk, isChampionshipReady } = opts;
 
   const regularNames = [
     'Morning Glory Stakes',
@@ -48,6 +59,13 @@ export function generateRaceCalendar(seed: string, opts: RaceCalendarOptions = {
     'Last Chance Derby',
   ];
 
+  const championshipNames = [
+    'The Championship',
+    'Championship Decider',
+    'Title Race',
+    'Grand Final',
+  ];
+
   // Generate distance range based on division, or use default if not provided
   const distanceRange = division ? DIVISION_DISTANCES[division] : { min: 800, max: 2000 };
   const distanceStep = 100;
@@ -59,6 +77,21 @@ export function generateRaceCalendar(seed: string, opts: RaceCalendarOptions = {
   const goingTypes: Array<'firm' | 'good' | 'soft' | 'heavy'> = ['firm', 'good', 'soft', 'heavy'];
 
   const races: RaceOption[] = [];
+
+  // Championship has nowhere higher to promote into, so a filled ladder there
+  // earns the title decider instead — checked ahead of isPromotionReady, though
+  // the two can never both be true (isPromotionReady is gated below level 4).
+  if (isChampionshipReady) {
+    races.push({
+      id: 'race-championship',
+      name: championshipNames[Math.floor(rng.next() * championshipNames.length)]!,
+      distance: distances[Math.floor(rng.next() * distances.length)]!,
+      going: goingTypes[Math.floor(rng.next() * goingTypes.length)]!,
+      hype: 0.85 + rng.next() * 0.15,
+      isChampionshipRace: true,
+    });
+    return races;
+  }
 
   // If promotion ready, show only promotion race
   if (isPromotionReady) {
@@ -132,8 +165,9 @@ export function mountRaceCalendar(
         ${races
           .map(
             (race) => `
-          <button class="race-card ${race.isPromotion ? 'race-promotion' : ''} ${race.isDemotion ? 'race-demotion' : ''}" data-race-id="${race.id}">
+          <button class="race-card ${race.isPromotion ? 'race-promotion' : ''} ${race.isDemotion ? 'race-demotion' : ''} ${race.isChampionshipRace ? 'race-championship' : ''}" data-race-id="${race.id}">
             <div class="race-card-main">
+              ${race.isChampionshipRace ? '<div class="race-badge championship">🏆 Championship</div>' : ''}
               ${race.isPromotion ? '<div class="race-badge promotion">🏆 Promotion</div>' : ''}
               ${race.isDemotion ? '<div class="race-badge demotion">⚠️ Demotion Risk</div>' : ''}
               <h3>${race.name}</h3>
