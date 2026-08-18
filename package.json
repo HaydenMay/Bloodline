@@ -24,7 +24,8 @@
     "sweep": "tsx tools/sweep.ts",
     "margin-profile": "tsx tools/margin-profile.ts",
     "check": "npm run lint && npm run build && npm run test",
-    "stat-leverage": "tsx tools/stat-leverage.ts"
+    "stat-leverage": "tsx tools/stat-leverage.ts",
+    "trained-style-balance": "tsx tools/trained-style-balance.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
