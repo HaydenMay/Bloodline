@@ -675,6 +675,21 @@ Three of five did nothing. Two of the three are in `trainingScreen.ts`'s acquisi
 game spent his career awarding him traits that do not exist — which is the trait-cap defect above
 made considerably worse: it is not just handing out too many, it is handing out blanks.
 
+**Wiring them later is not a neutral act.** Every horse in bloodstock right now carries traits that
+do nothing, and some of them are *downside* traits — a foal bred today with Highly Strung pays
+nothing for it. Implementing the catalogue would switch those on retroactively across every horse
+the player has banked, changing animals they already made decisions about. Whatever gets decided,
+that transition needs a plan: grandfather existing horses, re-roll them, or accept it and say so.
+
+**A second gap in the same section.** DESIGN.md §2 also specifies trait *discovery* — one trait
+visible when choosing a horse, the rest revealed through racing, facilities speeding it up, and
+previously-encountered traits identified faster. Player horses show their full trait list
+immediately, so that appears unbuilt too; the rival dossier is the part that does exist.
+
+**And the count rule is explicit.** §2 says "Count: 2–4. Two is standard." The five-trait horse
+above is not a grey area — it breaches a stated number, which is what the missing training cap
+above allows.
+
 **This is the same class as the two Phase 5 caught** (gendered inheritance and the Stud Farm's
 breeding bonus, both marked ✅ and never built) and the Session Log's warning that it is "worth
 assuming there are others" was correct at a scale nobody had counted. It wants a decision before it

@@ -57,9 +57,13 @@ it looks like a quick win sitting next to whatever you are actually working on.
 
 ## The legacy ladder
 
-- **The Hall of Fame at 1,000 is out of reach** — a generation-8 horse peaks near 495, because a
-  career climbing from Maiden spends most of its starts in divisions that barely pay. Do not lower
-  the bar before trying the two fixes below.
+- **The Hall of Fame at 1,000 is out of reach** — `npm run bloodline` has a generation-8 horse
+  peaking near 495, because a career climbing from Maiden spends most of its starts in divisions
+  that barely pay. Do not lower the bar before trying the two fixes below. **Real play is well ahead
+  of that model, though** **[Hayden]**: a generation-3 horse banked **516** — more at generation 3
+  than the trace projects at generation 8. The trace campaigns its horses mechanically and a person
+  plays better, so treat 495 as a floor rather than the expected curve, and re-measure against a
+  played save before deciding the bar is wrong.
 - **The prestige walls are untouched** — Novice 0 / Professional 400 / Elite 1,500 / Champion 3,500 /
   Legend 7,500, all pending the Hall of Fame work. They probably move together or not at all.
 - **Foals always debut in Maiden** — the main reason a bred horse cannot bank enough legacy to be
