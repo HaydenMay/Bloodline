@@ -1,5 +1,5 @@
 import type { Horse } from '../sim/types.js';
-import { STAT_KEYS, applyTrainedStat, getAgeTrainingFactor } from '../sim/growth.js';
+import { STAT_KEYS, applyTrainedStat, getAgeTrainingFactor, type StatKey } from '../sim/growth.js';
 import { attachStatReveal, renderStatRows } from './statDisplay.js';
 import { TRAITS } from '../data/traits.js';
 import type { TraitId } from '../data/traits.js';
@@ -207,6 +207,43 @@ export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
   },
 };
 
+/**
+ * The stat a session trains hardest — the largest positive number in its
+ * effects, ties broken by `STAT_KEYS` order. Computed rather than stored, so
+ * grouping the training grid by it can never go stale the way the grid's own
+ * ORDER already had: eighteen sessions rendered in whatever sequence they were
+ * historically added, three separate eras stitched together with no relation
+ * to what any of them actually trained.
+ */
+function primaryStatOf(session: TrainingSession): StatKey {
+  let best: StatKey = STAT_KEYS[0]!;
+  let bestValue = -Infinity;
+  for (const key of STAT_KEYS) {
+    const value = session.statEffects[key] ?? -Infinity;
+    if (value > bestValue) {
+      bestValue = value;
+      best = key;
+    }
+  }
+  return best;
+}
+
+/** Sum of a session's effects, gains and losses together. */
+function netValueOf(session: TrainingSession): number {
+  return Object.values(session.statEffects).reduce((sum: number, v) => sum + (v ?? 0), 0);
+}
+
+/**
+ * The training grid's actual order: grouped by primary stat in `STAT_KEYS`
+ * order, strongest option in each group first. `Array.sort` is stable, so two
+ * sessions tied on both keys keep their declaration order rather than
+ * shuffling on every reload.
+ */
+export const ORDERED_SESSIONS: TrainingSession[] = Object.values(TRAINING_SESSIONS).sort((a, b) => {
+  const statOrder = STAT_KEYS.indexOf(primaryStatOf(a)) - STAT_KEYS.indexOf(primaryStatOf(b));
+  return statOrder !== 0 ? statOrder : netValueOf(b) - netValueOf(a);
+});
+
 export function mountTrainingScreen(
   container: HTMLElement,
   horse: Horse,
@@ -268,7 +305,7 @@ export function mountTrainingScreen(
       </div>
 
       <div class="training-grid">
-        ${Object.values(TRAINING_SESSIONS)
+        ${ORDERED_SESSIONS
           .map(
             (session) => `
           <button class="training-card" data-training="${session.id}">

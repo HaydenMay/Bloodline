@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { STAT_KEYS } from '../sim/growth.js';
-import { TRAINING_SESSIONS, scaleTrainingEffects } from './trainingScreen.js';
+import { ORDERED_SESSIONS, TRAINING_SESSIONS, scaleTrainingEffects } from './trainingScreen.js';
 import type { StatEffects } from './trainingScreen.js';
 
 const sessions = Object.values(TRAINING_SESSIONS);
@@ -94,5 +94,45 @@ describe('the training table', () => {
       const gains = Object.values(session.statEffects).filter((effect) => effect > 0);
       expect(gains.length).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * The training grid's own order (ROADMAP.md): eighteen sessions used to render
+ * in whatever sequence they were historically added — three separate design
+ * eras stitched together with no relation to what any of them actually
+ * trained. Grouped by primary stat instead, in STAT_KEYS order, so the page
+ * reads as one system rather than an accretion.
+ */
+describe('the training grid orders itself by primary stat', () => {
+  const primaryOf = (effects: Record<string, number | undefined>): string =>
+    STAT_KEYS.reduce((best, key) => ((effects[key] ?? -Infinity) > (effects[best] ?? -Infinity) ? key : best), STAT_KEYS[0]!);
+
+  it('never regresses to an earlier stat once it has moved on to a later one', () => {
+    let seenIndex = -1;
+    for (const session of ORDERED_SESSIONS) {
+      const statIndex = STAT_KEYS.indexOf(primaryOf(session.statEffects) as (typeof STAT_KEYS)[number]);
+      expect(statIndex).toBeGreaterThanOrEqual(seenIndex);
+      seenIndex = statIndex;
+    }
+  });
+
+  it('leads each stat group with its strongest session', () => {
+    const groups = new Map<string, typeof ORDERED_SESSIONS>();
+    for (const session of ORDERED_SESSIONS) {
+      const stat = primaryOf(session.statEffects);
+      groups.set(stat, [...(groups.get(stat) ?? []), session]);
+    }
+    const netOf = (effects: Record<string, number | undefined>): number =>
+      Object.values(effects).reduce((sum: number, v) => sum + (v ?? 0), 0);
+    for (const group of groups.values()) {
+      const nets = group.map((s) => netOf(s.statEffects));
+      expect(nets).toEqual([...nets].sort((a, b) => b - a));
+    }
+  });
+
+  it('contains every session exactly once', () => {
+    expect(ORDERED_SESSIONS.length).toBe(sessions.length);
+    expect(new Set(ORDERED_SESSIONS.map((s) => s.id)).size).toBe(sessions.length);
   });
 });
