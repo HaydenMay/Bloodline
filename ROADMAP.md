@@ -1043,6 +1043,50 @@ taking its share, it is mid-pack having nothing left for a single-race measureme
 Verified: `npm run stat-leverage` and `npm run ride-probe` both clean, 507 tests, harness 11/13 with
 B1 and the pre-existing B1b as the only failures and the reason for each on record.
 
+### Coat and mane variety — only 8 total looks existed, now fixed for mane
+
+**Found in play**, from two screenshots of packed race fields where most of the pack read as the
+same few horses. Confirmed rather than assumed: `COAT_IDS` has exactly 8 named coats, picked
+uniformly per horse (`sim/horse.ts`: `coat: rng.pick(COAT_IDS)`), and generation and rendering were
+both individually correct — every horse really does get its own independent roll, and the race
+screen really does look each runner's coat up by its own id. The repetition was pure combinatorics:
+eight uniform draws across an eight-horse field collide almost every time. Measured directly:
+
+```
+99.9% of 2,000 simulated 8-horse fields had at least one EXACT coat repeat
+```
+
+Made worse by a second, separate fact: `COATS` (`data/colors.ts`) locked every named coat to exactly
+one fixed mane colour. Every "bay" horse in the game — player, starter, any of hundreds of rivals —
+rendered with the pixel-identical mane, forever. Even fields with no exact coat repeat still read as
+uniform, since five of the eight coats (bay, dark bay, chestnut, buckskin, palomino) are all warm
+brown/tan tones with no shade variation to tell them apart.
+
+**The fix already existed, unused.** `ui/silksDemo.ts` — a developer-only tool behind the hidden
+`?silks-demo` URL parameter, never linked from any menu — had a real 6-swatch mane ramp per coat
+(`hairFor`, built for hand-previewing colour combinations) that nothing in real horse generation
+ever called. Moved to `render/palette.ts` as `hairRampFor` (shared, single source of truth; the demo
+tool now delegates to it instead of keeping its own copy), and wired into `coatForHorse` via a new
+`hairForHorse`: normally a colour from the horse's own coat ramp, chosen deterministically from its
+id (same `hashId` trick already used for silks assignment); occasionally
+(`HAIR_MUTATION_CHANCE = 0.08`, matching the game's other mutation dials) a colour borrowed whole
+from a *different* coat entirely — "you should be able to get a strawberry horse with black hair...
+just don't overdo it," from the player who asked for it. Flaxen, a real inherited gene, still takes
+priority when it expresses; this only governs everyone else's mane.
+
+Measured after the fix, same methodology:
+
+```
+41.4% of fields had a full exact-look repeat (coat AND mane both matching) — down from 99.9%
+7.0% of horses rolled the cross-coat mutation, against a target of 8%
+```
+
+**This is an interim shape, not the final one**, and it is logged as such in ongoing-decisions.md:
+the mane is hashed off the horse's own id, so a foal rolls a fresh mane rather than plausibly taking
+after a parent's — the wrong mechanism for something this game otherwise treats as real, inherited
+genetics (coat itself, flaxen). The real version gives mane its own locus in `sim/coat.ts`, inherited
+through `inheritCoat` the way flaxen already is.
+
 ### The race calendar rerolls its options when you back out of a race
 
 **Found in play** — "go to race calendar, click a race, then click back, and it rerolls your race

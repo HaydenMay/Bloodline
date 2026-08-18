@@ -95,6 +95,17 @@ it looks like a quick win sitting next to whatever you are actually working on.
 - **`rollPotential` is wrong at the top of the ladder** — a freshly generated Championship horse
   averages 94.9 potential with half its stats pinned at 100. Sidestepped by drawing studs from the
   world instead, but the generator is still wrong and starters read from it too.
+- **Mane colour wants to be a real gene, not a per-instance roll** **[Hayden]** — every named coat
+  used to lock to one fixed mane colour, which is most of why a race field reads as the same few
+  horses repeated (below, under Coat and mane variety). Fixed for now with `hairForHorse`
+  (`render/palette.ts`): normally a colour from the coat's own ramp, occasionally
+  (`HAIR_MUTATION_CHANCE`, 0.08) a colour borrowed whole from another coat — "you should be able to
+  get a strawberry horse with black hair, creates uniqueness... just don't overdo it." That is
+  deliberately an interim shape: it is hashed off the horse's own id, so a foal rolls its mane fresh
+  rather than taking after a parent's, which is the wrong mechanic for something this game otherwise
+  treats as real genetics. The real version gives mane its own locus in `sim/coat.ts`'s genotype,
+  inherited through `inheritCoat` the way flaxen already is, with the mutation chance becoming a real
+  allele-flip rather than a render-layer hash roll.
 
 ## The breeding screen
 

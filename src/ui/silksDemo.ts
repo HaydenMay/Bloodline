@@ -1,6 +1,6 @@
 import { getBadgeDataUri } from '../render/shieldBadge.js';
 import { loadFrameSequence, drawFrame, type Scheme } from '../render/frameAnimation.js';
-import { COATS, INK, RIVAL_SILKS, coatFor } from '../render/palette.js';
+import { COATS, INK, RIVAL_SILKS, coatFor, hairRampFor } from '../render/palette.js';
 
 const COAT_COLORS = Object.values(COATS).map((coat) => ({
   id: coat.id,
@@ -16,9 +16,6 @@ const hexToRgb = (hex: string): [number, number, number] => {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 };
-
-/** Toward this rather than pure white: a flaxen mane is warm, not bleached. */
-const CREAM = '#F2E7D2';
 
 /**
  * One unmistakable colour per material, for seeing WHERE each one is.
@@ -47,19 +44,12 @@ const mix = (a: string, b: string, t: number): string => {
 };
 
 /**
- * Manes that could plausibly belong to THIS body colour.
- *
- * A mane has more licence than a pair of legs — flaxen on a chestnut, black on
- * a bay, and both are real — so the ramp reaches further in both directions
- * than the points one does. What it does not do is float free of the body: a
- * mane is still made of the same pigment, so every step here is the body taken
- * toward ink or toward cream rather than an unrelated colour off another coat.
+ * Manes that could plausibly belong to THIS body colour — the same ramp
+ * `render/palette.ts`'s `hairForHorse` actually uses in play now, wrapped for
+ * this screen's swatch buttons.
  */
-const hairFor = (coatId: string): { hex: string }[] => {
-  const { body, hair } = coatFor(coatId);
-  const ramp = [hair, mix(body, INK, 0.8), mix(body, INK, 0.45), body, mix(body, CREAM, 0.5), mix(body, CREAM, 0.85)];
-  return [...new Set(ramp)].map((hex) => ({ hex }));
-};
+const hairFor = (coatId: string): { hex: string }[] =>
+  hairRampFor(coatId).map((hex) => ({ hex }));
 
 /**
  * Points that could plausibly belong to THIS body colour.

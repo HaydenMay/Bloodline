@@ -18,6 +18,76 @@ import { expressesFlaxen, genotypeOf, type CoatGenotype } from '../sim/coat.js';
  */
 export const INK = shade.INK;
 export const lite = shade.lite;
+
+/** Pale end of the mane ramp — matches CREAM in the (former) silks demo tool. */
+const CREAM = '#F2E7D2';
+
+const hexToRgb = (hex: string): [number, number, number] => {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+const mix = (a: string, b: string, t: number): string => {
+  const [r1, g1, b1] = hexToRgb(a);
+  const [r2, g2, b2] = hexToRgb(b);
+  const ch = (x: number, y: number): string =>
+    Math.round(x + (y - x) * t).toString(16).padStart(2, '0');
+  return `#${ch(r1, r2)}${ch(g1, g2)}${ch(b1, b2)}`;
+};
+
+/**
+ * Manes that could plausibly belong to THIS body colour.
+ *
+ * A mane has more licence than a pair of legs — flaxen on a chestnut, black on
+ * a bay, and both are real — so the ramp reaches further in both directions
+ * than a points ramp would. What it does not do is float free of the body:
+ * every step here is the body taken toward ink or toward cream, never an
+ * unrelated colour off another coat. Originally built for the (now retired)
+ * `?silks-demo` colour-picker tool; `hairForHorse` below is what actually uses
+ * it in play.
+ */
+export function hairRampFor(coatId: string): string[] {
+  const { body, hair } = coatFor(coatId);
+  const ramp = [hair, mix(body, INK, 0.8), mix(body, INK, 0.45), body, mix(body, CREAM, 0.5), mix(body, CREAM, 0.85)];
+  return [...new Set(ramp)];
+}
+
+/**
+ * Chance a horse's mane ignores its own coat's ramp entirely and draws from
+ * ANOTHER coat's hair colour instead — a strawberry roan with a black mane,
+ * found in play rather than derived from any real equine genetics. Same
+ * order of magnitude as the game's other mutation dials
+ * (`TRAIT_MUTATION_CHANCE`, `APTITUDE_MUTATION_CHANCE`, both 0.08 in
+ * `sim/breeding.ts`) — common enough to occasionally surprise you, rare
+ * enough that it reads as a surprise rather than the norm.
+ *
+ * Interim: per-instance and hashed off the horse's own id, not inherited. A
+ * foal today rolls its own mane fresh rather than taking after a parent's,
+ * which is the wrong shape for something this game otherwise treats as
+ * genetics — logged in ongoing-decisions.md as wanting a real locus in
+ * `sim/coat.ts`, the way flaxen already has one.
+ */
+export const HAIR_MUTATION_CHANCE = 0.08;
+
+/**
+ * A horse's own mane, chosen once and stable for its lifetime (hashed off its
+ * id, not random per render). Flaxen — a real, inherited, two-copy-recessive
+ * gene — always wins when it expresses. Otherwise: normally a colour from the
+ * horse's own coat ramp, occasionally (`HAIR_MUTATION_CHANCE`) a colour
+ * borrowed whole from a different coat's palette.
+ */
+function hairForHorse(horse: { id: string; coat: string; coatGenotype?: CoatGenotype }): string {
+  if (expressesFlaxen(genotypeOf(horse))) return FLAXEN_HAIR;
+
+  const roll = hashId(`${horse.id}-hair-roll`) % 1000;
+  if (roll < HAIR_MUTATION_CHANCE * 1000) {
+    const donor = COAT_IDS[hashId(`${horse.id}-hair-donor`) % COAT_IDS.length]!;
+    return coatFor(donor).hair;
+  }
+
+  const ramp = hairRampFor(horse.coat);
+  return ramp[hashId(`${horse.id}-hair-shade`) % ramp.length]!;
+}
 export const dark = shade.dark;
 
 // Re-export all color groups
@@ -75,18 +145,19 @@ export function coatFor(id: string): Coat {
 }
 
 /**
- * A horse's coat, with its mane and tail paled if it expresses flaxen.
+ * A horse's coat, with its own mane — never just the coat's flat default.
  *
- * Returns the plain coat id string in the common case — cheap, and every
- * render path already accepts `string | Coat` — and only builds a full
- * `Coat` object where there's an actual override to make. `sim/render`
- * is a one-way street (`sim/` may never import from here), so this is the
- * only place that gets to combine "what colour is this horse" with "does its
- * genotype say the mane doesn't match."
+ * Every named coat used to imply exactly one mane colour, which meant every
+ * horse in the game shared its look with everything else of the same coat:
+ * measured at 99.9% of eight-horse fields drawing at least one exact coat
+ * repeat, and within that, an unvaried, coat-locked mane made even the
+ * non-repeats read as the same few horses over and over. `hairForHorse`
+ * (above) is what actually varies it — this is the one place `sim/render`'s
+ * one-way street (`sim/` may never import from here) lets "what colour is
+ * this horse" and "what does its genotype say about its mane" combine.
  */
-export function coatForHorse(horse: { id: string; coat: string; coatGenotype?: CoatGenotype }): Coat | string {
-  if (!expressesFlaxen(genotypeOf(horse))) return horse.coat;
-  return { ...coatFor(horse.coat), hair: FLAXEN_HAIR };
+export function coatForHorse(horse: { id: string; coat: string; coatGenotype?: CoatGenotype }): Coat {
+  return { ...coatFor(horse.coat), hair: hairForHorse(horse) };
 }
 
 /**
