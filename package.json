@@ -23,7 +23,8 @@
     "probe": "tsx tools/probe.ts",
     "sweep": "tsx tools/sweep.ts",
     "margin-profile": "tsx tools/margin-profile.ts",
-    "check": "npm run lint && npm run build && npm run test"
+    "check": "npm run lint && npm run build && npm run test",
+    "stat-leverage": "tsx tools/stat-leverage.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

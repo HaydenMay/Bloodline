@@ -745,27 +745,64 @@ about 5.4 points to 7.6, not double), which is why this ships as-is rather than 
 cap bolted on. But the real fix is the world turning over, and this makes that item matter more than
 it did.
 
-### Burst is worth seven times what Speed is
+### ⚠️ Only two of the six stats decide a race
 
-**Found in play** — a front-runner clear of the field 70 m into a 1400 m race, having fired no
-kicks, winning by five to ten lengths without being asked a question.
-
-The cause is two constants that were never compared:
+**Found in play** — "only about 3 stats feel like they matter in races, and that's where all stats
+should matter" — and then measured with `npm run stat-leverage`, which holds an eight-horse field
+flat at 60, moves one stat of one horse, and reads the win rate. The swing column is what thirty
+points of a stat actually buys:
 
 ```
-SPEED_STAT_SPAN  = 0.08   Speed 0 → 100 moves cruise speed by 8%
-BURST_ACCEL_SPAN = 0.6    Burst 0 → 100 moves acceleration by 60%
+stat            40      60      75      90     swing (90 − 40)
+speed            0.0%   14.8%   56.5%   90.0%     +90.0 pts
+stamina          0.0%   14.8%   92.5%  100.0%    +100.0 pts
+burst            7.0%   14.8%   18.0%   24.3%     +17.3 pts
+grit            11.8%   14.8%   16.0%   19.3%      +7.5 pts
+consistency     14.5%   14.8%   15.8%   16.5%      +2.0 pts
+temper          15.0%   14.8%   14.8%   14.2%      -0.8 pts
 ```
 
-A horse on Burst 98 against a field averaging 65 accelerates about **18% harder** out of the gate.
-The same horse's Speed of 63 buys it roughly **1%** more cruise than a 60-Speed rival. So the race
-is settled in the first seconds by the stat that should govern the first seconds, and Speed — the
-stat a flat race ought to turn on — is very nearly decorative.
+Speed and Stamina are not merely dominant, they are close to **binary**: at 40 the horse never wins,
+at 90 it always does. Burst is worth a fifth of that, Grit a twelfth, and Consistency and Temper are
+inside the noise — thirty points of Temper is worth *nothing at all*.
 
-That is worth holding next to the margins item. The margins may not be a noise problem at all: if
-one stat decides the race before the field has reached cruise, a wide margin is the *correct* output
-of a badly weighted input. **Do not tune margins before deciding whether these two spans are
-right** — otherwise the noise gets cut to hide a weighting error, and both end up wrong.
+Holds across trips. Burst is correctly trip-sensitive (+28.0 at 1000 m, +17.3 at 1400 m, +11.6 at
+2000 m) but never leaves the minor column; Temper measures 0 at every distance.
+
+**Why, mechanically.** Both dominant stats feed the same term — `cruiseFor`, the speed a horse holds
+for the whole race — while the others feed transient or protective ones:
+
+| Stat | Where it acts | Duration |
+|---|---|---|
+| Stamina | `staminaGate`, a **15%** span on cruise, *plus* tank recovery | whole race, twice over |
+| Speed | `SPEED_STAT_SPAN`, an **8%** span on cruise | whole race |
+| Burst | `BURST_ACCEL_SPAN`, a 60% span on **acceleration** | until the horse reaches cruise |
+| Grit | kick strength, cooldown, a 5% recovery nudge | moments |
+| Consistency | suppresses fumbles, off-colour runs, green moments | only when they'd have happened |
+| Temper | widens or narrows the daily-form roll | only if the roll matters |
+
+The undocumented `staminaGate` — `0.85 + 0.15 * (stamina / 100)` — is the single largest balance
+lever in the game and is nearly twice `SPEED_STAT_SPAN`, which is the one written down as the speed
+knob.
+
+**Correction to a previous entry here**, which claimed Burst was worth seven times Speed on the
+strength of `BURST_ACCEL_SPAN` (0.6) against `SPEED_STAT_SPAN` (0.08). That comparison was invalid:
+the spans apply to different things. A 60% span on acceleration is spent in the first seconds; an 8%
+span on cruise is paid out over every second of the race. Measurement says Speed is worth **five
+times** Burst, not one seventh of it. The visible symptom that prompted the wrong claim — a
+Burst-98 horse clear of the field at 70 m without kicking — is real, and is Burst doing exactly its
+job; it simply is not what wins the race.
+
+**Confirmed in play, unambiguously.** A Stakes race won by Bright Thunder — straight B's, 68/64/66/
+71/65/71 — beating a horse with **S in Burst (99) and Grit (96) and A in Temper and Consistency**.
+Four grades better across four stats, beaten by the horse with more Speed. That is the table above,
+in one race.
+
+**Consistency and Temper cannot be fixed by reweighting.** Their entire job is to reduce variance,
+and an engine this deterministic has almost no variance for them to reduce — a 13-point edge already
+wins 97% of the time. Raising their weights would do nothing, because there is nothing for them to
+protect against. They can only acquire value if race outcomes become genuinely uncertain, which
+makes this and the margins item **the same piece of work**, approached from opposite ends.
 
 ### The race calendar rerolls its options when you back out of a race
 
