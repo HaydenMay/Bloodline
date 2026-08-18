@@ -36,11 +36,13 @@ export const FACILITIES: Record<string, Facility> = {
     name: 'Training Grounds',
     description: 'Training facilities and equipment',
     baseIcon: '🏋️',
-    benefit: '+1 stat point per training, less risk on every session',
+    benefit: '+1 stat point per training; maxed removes every session\'s downside',
     effectAt: (l) =>
       l === 0
         ? 'Not built'
-        : `+${l * 10}% stat gain, ${l * 20}% less downside from every session${l === 5 ? ' (no downside at all)' : ''}`,
+        : l === 5
+          ? `+${l * 10}% stat gain, and no downside from any session`
+          : `+${l * 10}% stat gain from every session`,
     baseCost: 7500,
   },
   medical: {
@@ -170,18 +172,28 @@ export function getTrainingMultiplier(facilities: Record<string, number>): numbe
 }
 
 /**
- * Training Grounds: how much of a trade-off session's downside survives.
+ * Training Grounds: whether a trade-off session's downside is removed.
  *
- * 0 at level 0 (the full cost lands), fading to nothing at level 5 — a fully
- * built Training Grounds trains a horse with no downside at all. This is what
- * makes a maxed facility a genuine unlock rather than one more multiplier: a
- * horse close to its ceiling has real trade-off sessions turning back into
- * safe ones as the yard around it finishes growing, which is also the answer
- * to "facilities cost a lot for very little" (ongoing-decisions.md) — the top
- * level of this one removes a whole category of risk, not a few percent.
+ * A hard cliff at level 5, not a ramp. A gradual version was tried first —
+ * relief scaling linearly with level — and it read as broken rather than
+ * generous: `applyTrainedStat` rounds a scaled downside to the nearest whole
+ * point, and every downside in the roster is -1 or -2, so 80% relief (level
+ * 4) turned a -1 into -0.2, which rounds to zero, and a -2 into -0.4, also
+ * zero. Every session was already losing its cost two levels before the
+ * facility was actually maxed, just inconsistently — a -1 vanished at level
+ * 3, a -2 not until level 4 — which read as random rather than deserved.
+ * Found in play: "the downsides are only 1 or 2 points, 80% of 1 is 0, so I'm
+ * getting zeros all over the place. It should only be for the fully upgraded
+ * training area."
+ *
+ * A full Training Grounds trains with no downside at all — the answer to
+ * "facilities cost a lot for very little" (ongoing-decisions.md) stands
+ * regardless: the top level removes a whole category of risk, not a few
+ * percent. It is just an unlock now, earned in full at level 5, rather than
+ * a curve that was never actually smooth.
  */
 export function getDownsideRelief(facilities: Record<string, number>): number {
-  return lvl(facilities, 'training') / 5;
+  return lvl(facilities, 'training') >= 5 ? 1 : 0;
 }
 
 /** Administration: multiplies prize money. */
