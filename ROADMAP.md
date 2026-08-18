@@ -850,8 +850,49 @@ and drain change — not another pass over the spans. Consistency is a harder ca
 comes from suppressing bad days, and bad days are exactly what the dominance curve punishes, so it
 was measured at +2.8 and could not be raised without failing B4.
 
-Next step, when this is picked up: **make the tank bind more often**, then re-measure. That is the
-one change that lifts three stats at once without touching the dominance curve.
+**The tank-binding step was attempted and reverted. Here is what it found, so nobody repeats it.**
+
+Measured first: the tank **never binds**. Across 1,200 runners at three trips, the average lowest
+tank all race was **0.91** and only 3.7-4.1% of horses ever reached fatigue territory. A horse
+finishes a race having spent nine percent of its energy. That is the whole reason Stamina, Grit and
+Burst cannot matter — they all live in an economy that is never engaged.
+
+The cause is arithmetic, not the riders. `TANK_RACE_COST` is 3.0 against `TANK_RECOVER_RATE` 2.4,
+which reads as a deliberate net drain — but recovery is then multiplied by `staminaFactor` (~1.09 at
+Stamina 60), rank shelter (~1.15) and the easy-lead bonus, while drain is multiplied by
+`(pace / REFERENCE_PACE)^12`, which collapses below reference. Net over a race: recovery ~3.0 versus
+drain ~2.6. **The tank fills up.** Lowering `HOLD_TRIGGER_TANK` from 0.8 to 0.45 barely moved it
+(0.913 to 0.903), so the riders easing off was not the constraint either.
+
+Tuned to bind — `TANK_RECOVER_RATE` 2.2, `TANK_RACE_COST` 3.1 — gives a real energy economy: 29% of
+runners tire at 1000 m, 35% at 1400 m, 44% at 2000 m, correctly scaled by trip. Stat leverage
+improved as predicted: Stamina 11.3 → 15.8, Grit 9.3 → 12.0, Speed 76.3 → 63.8.
+
+**But it fails four gates**, down from 12/13 to 9/13, and the failure is instructive:
+
+```
+B1  style balance     frontRunner 21.9%   (was 13.0%)
+B2  moment balance    early       20.5%   (was 12.2%)
+B6  margin profile    8th at 28.5L        (want <= 20L)
+```
+
+Once energy is scarce, **`EASY_LEAD_RECOVER_BONUS = 0.9`** decides races: an unpressed leader
+recovers ninety percent faster while the horse pressing it pays `PRESS_COST` on top of its own
+drain. Harmless when the tank never binds; overwhelming when it does. Cutting it to 0.45 and 0.3
+pulled front-runners back but never restored the gates, and the margin tail would not come in at all
+— a field where the tired genuinely fall away strings out, which is physically right and fails B6 as
+written.
+
+**Conclusion: this is not a constants pass.** Making the tank bind changes the character of the race
+and needs style, Moment, pace and the lead/press asymmetry retuned alongside it, against the harness,
+as a dedicated piece of work. Reverted rather than shipped as a 9/13. The measurements above are the
+starting point for whoever takes it.
+
+**It also explains a player report** — "I don't understand why my tank ran out; I had more stamina
+than the winner, we were both front-runners, he led early and never gave it up." That is
+`EASY_LEAD_RECOVER_BONUS` and `PRESS_COST` working exactly as written, and entirely invisible: the
+horse that gets the lead uncontested is rewarded twice while the one sitting second pays twice. The
+mechanic may be right; a player having no way to see it is the actual problem.
 
 ### The race calendar rerolls its options when you back out of a race
 

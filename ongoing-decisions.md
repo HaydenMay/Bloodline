@@ -103,6 +103,23 @@ it looks like a quick win sitting next to whatever you are actually working on.
   is not the same restraint. The archive's detail card already renders exactly this and could be
   reused directly. Worth deciding how much: full card, or a summary line.
 
+## The tank, and what the player can see of it
+
+- **Make the tank visible** **[Hayden]** — from play: "I don't understand why my tank ran out. I had
+  more stamina than the winner, we were both front-runners, he led early and never gave it up, I was
+  second, got the red indicator and finished 8th. This doesn't make sense to me." The race was
+  correct — an unpressed leader recovers 90% faster (`EASY_LEAD_RECOVER_BONUS`) while the horse
+  pressing it pays `PRESS_COST` on top of its own drain — but none of that is visible, so a fair
+  result read as a broken one. **This contradicts a stated decision**: REBUILD.md §5 keeps the tank
+  hidden on purpose ("the tank itself stays hidden — no stamina bar") and the charge dots are meant
+  to be its honest proxy. So the call is not just "add a bar", it is whether that decision still
+  holds now that the energy economy has visible consequences a player cannot account for. Options:
+  show the tank outright, keep it hidden but explain the *cause* on screen (a "dictating" / "under
+  pressure" cue, which is the actual missing information), or leave it and cover it in the codex.
+- **The lead/press asymmetry may simply be too strong** — 0.9 and 0.26 are large numbers for a
+  mechanic nobody can see. Decide it with the tank-binding work above, since it only bites when
+  energy is scarce.
+
 ## Condition and form
 
 Found while answering the item above, not previously written down anywhere. **All three are
