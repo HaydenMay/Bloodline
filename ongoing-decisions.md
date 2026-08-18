@@ -206,13 +206,15 @@ Hayden's**, and none of them should be acted on by an agent.
 - **Outside descendants should be counts, not horses** — record a number, and build a real horse only
   when one actually appears on a racecard against you. This is what stops the tree growing
   exponentially once rivals breed to your stallions for real.
-- **The world never ages** — rival horses stay two to five forever and are never replaced, so outside
-  studs are eternally available and the racing population never turns over. **This got more
-  pressing.** Now that `sim/worldRacing.ts` gives rivals real form, a world that never turns over
-  accumulates it without limit: measured at 77 starts a horse after four careers, with a top legacy
-  of 1,050 against a Hall of Fame bar of 1,000. The budget's own saturation absorbs most of the
-  effect for now, but the honest fix is horses ageing out and being replaced, not a cap on the
-  number.
+- ✅ **The world never aged — fixed.** Rivals used to stay two to five forever, never replaced —
+  found in play from a horse first raced at generation 3 turning up identical, stats and all,
+  generations later. `sim/worldRacing.ts`'s new `ageWorld` gives every rival a birthday off its own
+  start count and the same exponential decline (`AGE_EROSION_GROWTH`) the player's horse gets, and
+  retires one into a new `Stable.worldArchive` at `WORLD_RETIREMENT_AGE` (9) rather than deleting it —
+  replaced in-place with a fresh horse in the same division, so the population never shrinks. The
+  archive is permanent and read everywhere an ancestor id needs resolving (`pedigreeOf`,
+  `allKnownHorses`) and everywhere outside studs are offered (`outsideStuds`), so a rival bred to
+  stays traceable and breedable for as long as fertility allows, even after it stops racing.
 - **Rejected foals: price and timing** — what one sells for, and how long before it turns up on a
   racecard carrying your bloodline's name. The keep-or-sell decision is settled; the numbers are not.
 
