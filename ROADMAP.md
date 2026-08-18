@@ -441,9 +441,10 @@ Elite 1,500 / Champion 3,500 / Legend 7,500) are untouched pending the same work
 
 Step 1 (the tree, drawn) and a lightweight Step 2 (the detail card) are on `main`, DOM-rendered,
 rooted on the living horse looking up, direct line only by default with settings for siblings and
-sold foals. Step 3 (the trait/gene inheritance map) and Step 4 (procedural naming) are still open.
-See AI_INSTRUCTIONS.md's Session Log for the shape of what landed and NEXT_PLAN.md for the five
-decisions it was built against.
+sold foals. Step 3 landed for coat genetics — tap a hidden allele on a horse's card, trace every
+carrier currently in the tree. Stat inheritance has no discrete gene to trace and is left for its own
+mechanism if wanted. Step 4 (procedural naming) is still open. See AI_INSTRUCTIONS.md's Session Log
+for the shape of what landed and NEXT_PLAN.md for the decisions it was built against.
 
 Broken out of Phase 5 into a phase of its own, because it is not texture on top of breeding — it is
 the thing breeding exists to produce, and the mechanic the game is named after. It deserves a full

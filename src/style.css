@@ -7240,6 +7240,62 @@ body {
   stroke-width: 2.5;
 }
 
+/*
+ * The inheritance map's trace (Step 3) — a separate class pair from the hover
+ * route above, in a different colour (--ok, teal, already the palette's
+ * "positive" tone), so a sticky trace and a transient hover read as two
+ * distinct things if a player hovers something while a trace is active.
+ */
+.archive-tracing .archive-card {
+  opacity: 0.3;
+  transition: opacity 0.15s ease;
+}
+
+.archive-tracing .archive-card-traced {
+  opacity: 1;
+  border-color: var(--ok);
+}
+
+.archive-tracing .archive-line {
+  stroke-opacity: 0.2;
+}
+
+.archive-tracing .archive-line-traced {
+  stroke: var(--ok);
+  stroke-opacity: 1;
+  stroke-width: 2.5;
+}
+
+.archive-trace-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  background: var(--ok-light);
+  border: 1px solid var(--ok-lighter);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.archive-trace-active button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ok);
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.archive-trace-active button:hover {
+  background: var(--ok-lighter);
+}
+
 .archive-row {
   display: flex;
   align-items: flex-start;
@@ -7452,6 +7508,83 @@ body {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+/*
+ * The inheritance map (Step 3). Only Extension and Agouti can ever have
+ * something hidden in this game's model — `buildGeneticsSection` skips the
+ * whole section when neither does, so this only ever renders with a real
+ * story to tell.
+ */
+.archive-genetics-title {
+  margin: 0 0 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.archive-genetics-hint {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.archive-genetics-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.archive-genetics-row + .archive-genetics-row {
+  border-top: 1px solid var(--line);
+}
+
+.archive-genetics-locus {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.archive-genetics-pair {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.archive-allele {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+/* A plain, non-clickable allele — dominant, always expressed, nothing to trace. */
+span.archive-allele {
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+/* The hidden allele — a button, because tapping it is the whole feature. */
+.archive-allele-trace {
+  background: var(--ok-light);
+  color: var(--ok);
+  border: 1px solid var(--ok-lighter);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.archive-allele-trace:hover {
+  background: var(--ok-lighter);
+  transform: translateY(-1px);
 }
 
 .archive-attrs-toggle {

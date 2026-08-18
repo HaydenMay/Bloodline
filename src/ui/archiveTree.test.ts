@@ -5,7 +5,9 @@ import { pedigreeOf } from './studBook.js';
 import {
   allKnownHorses,
   buildAncestry,
+  carriesAllele,
   isSoldFoal,
+  notableAllele,
   retiredRecordOf,
   rowsOf,
   siblingsOf,
@@ -209,5 +211,60 @@ describe('retiredRecordOf', () => {
   it('is undefined for a horse the yard never retired', () => {
     const h = horse({ id: 'never' });
     expect(retiredRecordOf(h, emptyYard())).toBeUndefined();
+  });
+});
+
+describe('notableAllele', () => {
+  const EXTENSION = ['E', 'e'];
+  const AGOUTI = ['A', 't', 'a'];
+
+  it('is null for a pair homozygous on the top-dominance allele — nothing hides', () => {
+    expect(notableAllele(['E', 'E'], EXTENSION)).toBeNull();
+    expect(notableAllele(['A', 'A'], AGOUTI)).toBeNull();
+  });
+
+  it('surfaces the non-expressing allele when heterozygous', () => {
+    expect(notableAllele(['E', 'e'], EXTENSION)).toBe('e');
+    expect(notableAllele(['e', 'E'], EXTENSION)).toBe('e'); // order in the pair does not matter
+    expect(notableAllele(['A', 't'], AGOUTI)).toBe('t');
+    expect(notableAllele(['A', 'a'], AGOUTI)).toBe('a');
+  });
+
+  it('surfaces the shared allele when homozygous on anything but the top one', () => {
+    expect(notableAllele(['e', 'e'], EXTENSION)).toBe('e');
+    expect(notableAllele(['t', 't'], AGOUTI)).toBe('t');
+    expect(notableAllele(['a', 'a'], AGOUTI)).toBe('a');
+  });
+
+  it('surfaces the more-recessive allele between two non-top alleles', () => {
+    // t beats a in dominance, so t is what shows — a is still hidden beneath it.
+    expect(notableAllele(['t', 'a'], AGOUTI)).toBe('a');
+    expect(notableAllele(['a', 't'], AGOUTI)).toBe('a');
+  });
+});
+
+describe('carriesAllele', () => {
+  it('is true when a horse\'s recorded genotype carries the allele, however it expresses', () => {
+    const bayCarrier = horse({
+      id: 'carrier',
+      coat: 'bay',
+      coatGenotype: {
+        extension: ['E', 'e'],
+        agouti: ['A', 'A'],
+        cream: ['n', 'n'],
+        grey: ['n', 'n'],
+        roan: ['n', 'n'],
+      },
+    });
+    expect(carriesAllele(bayCarrier, 'extension', 'e')).toBe(true);
+    expect(carriesAllele(bayCarrier, 'extension', 'E')).toBe(true);
+    expect(carriesAllele(bayCarrier, 'agouti', 't')).toBe(false);
+  });
+
+  it('falls back to a derived genotype for a horse recorded before Stage 3, without throwing', () => {
+    const preStage3 = horse({ id: 'old-timer', coat: 'chestnut' });
+    expect(() => carriesAllele(preStage3, 'extension', 'e')).not.toThrow();
+    // A chestnut horse is ee by definition, derived genotype or not.
+    expect(carriesAllele(preStage3, 'extension', 'e')).toBe(true);
   });
 });

@@ -90,10 +90,20 @@ folded behind a click.
 Click any ancestor. Stats, traits, record, what it banked, whether it made the Hall of Fame, and how
 it came to the yard — bred, bought, a starter, or an outside stud you paid a fee to.
 
-### Step 3 — The inheritance map
+### Step 3 — The inheritance map ✅
 
-Where a line's speed came from, and which ancestor carried a recessive. The coat genotypes make the
-colour half literal — you can trace an `e` allele back through the horses that carried it unseen.
+Landed for coat genetics: only Extension and Agouti can ever hide anything in this game's model
+(Cream, Grey and Roan all show with a single copy), so a horse's detail card surfaces a tappable
+allele wherever one of those two carries something unseen. Tapping it traces every carrier currently
+rendered in the tree — highlighted, everything else dimmed, a chip naming the trace with a way to
+clear it. `archiveTree.ts`'s `notableAllele`/`carriesAllele` are the pure logic; `archiveScreen.ts`
+walks the same rows and sibling filter the tree itself draws from, so a trace only ever points at
+something actually on screen.
+
+**Not done:** "where a line's speed came from." Stats have no discrete gene to trace — potential comes
+out of a continuous budget-and-variance roll, not an allele — so there is nothing here to point at
+honestly. If this is wanted, it needs its own mechanism (most likely a per-stat heat tint across the
+tree's cards) rather than an extension of the coat tracer.
 
 ### Step 4 — Procedural naming
 

@@ -1,5 +1,6 @@
 import type { Horse } from '../sim/types.js';
 import type { Pedigree } from '../sim/breeding.js';
+import { genotypeOf, type CoatGenotype } from '../sim/coat.js';
 import type { RetiredHorse, Stable } from './career.js';
 
 /**
@@ -110,4 +111,47 @@ export function isSoldFoal(horse: Horse, stable: Stable): boolean {
 /** The bloodstock record for a horse in the tree, if the yard ever retired it. */
 export function retiredRecordOf(horse: Horse, stable: Stable): RetiredHorse | undefined {
   return stable.bloodstock.find((entry) => entry.horse.id === horse.id);
+}
+
+/* ---------------------------------------------------------------------------
+   The inheritance map (Step 3) — coat genetics only.
+
+   `sim/coat.ts`'s own comment names Extension and Agouti "the classic
+   hiders": a single copy of Cream, Grey or Roan already shows, so nothing
+   there ever hides and there is no "surfaced from two unseen carriers" story
+   to tell about them. Only these two loci are worth surfacing here.
+   ------------------------------------------------------------------------ */
+
+export interface CoatLocusInfo {
+  key: keyof CoatGenotype;
+  label: string;
+  /** Most dominant first. */
+  dominance: readonly string[];
+}
+
+export const COAT_LOCI: readonly CoatLocusInfo[] = [
+  { key: 'extension', label: 'Extension', dominance: ['E', 'e'] },
+  { key: 'agouti', label: 'Agouti', dominance: ['A', 't', 'a'] },
+];
+
+/**
+ * The one allele at a locus worth surfacing — the one a dominant allele
+ * would otherwise keep unseen. `null` when the pair is homozygous for the
+ * top-dominance allele: nothing there is hiding anything.
+ *
+ * Heterozygous → the non-expressing allele is the hidden one. Homozygous on
+ * anything but the top allele → both copies are that one, which is itself
+ * the story: two unseen carriers met to produce what is now visible.
+ */
+export function notableAllele(pair: readonly [string, string], dominance: readonly string[]): string | null {
+  const rank = (allele: string): number => dominance.indexOf(allele);
+  const [top, other] = [...pair].sort((a, b) => rank(a) - rank(b)) as [string, string];
+  if (top === other) return rank(top) === 0 ? null : top;
+  return other;
+}
+
+/** Whether a horse's own genotype carries a given allele at a locus, expressed or not. */
+export function carriesAllele(horse: Horse, locus: keyof CoatGenotype, allele: string): boolean {
+  const pair = genotypeOf(horse)[locus] as unknown as readonly [string, string];
+  return pair[0] === allele || pair[1] === allele;
 }

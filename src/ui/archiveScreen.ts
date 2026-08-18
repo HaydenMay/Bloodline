@@ -6,12 +6,16 @@ import { TRAITS } from '../data/traits.js';
 import { attachStatReveal, renderStatRows } from './statDisplay.js';
 import { pedigreeOf } from './studBook.js';
 import { peakDivision } from '../sim/division.js';
+import { genotypeOf, type CoatGenotype } from '../sim/coat.js';
 import { createSurface, startLoop } from '../render/canvas.js';
 import { drawFrame, loadFrameSequence } from '../render/frameAnimation.js';
 import {
   allKnownHorses,
   buildAncestry,
+  carriesAllele,
+  COAT_LOCI,
   isSoldFoal,
+  notableAllele,
   retiredRecordOf,
   rowsOf,
   siblingsOf,
@@ -99,6 +103,7 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
           <input type="checkbox" id="archive-sold" />
           Include foals sold to rivals
         </label>
+        <span id="archive-trace-chip"></span>
         <button class="menu-link" id="archive-top">Jump to Top ↑</button>
       </div>
       <div class="archive-scroll" id="archive-scroll">
@@ -132,6 +137,7 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
   let showSiblings = false;
   let showSold = false;
   let firstRender = true;
+  let activeTrace: { locus: keyof CoatGenotype; allele: string } | undefined;
 
   const scrollEl = el.querySelector<HTMLElement>('#archive-scroll')!;
   const canvasEl = el.querySelector<HTMLElement>('#archive-canvas')!;
@@ -300,6 +306,77 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
   }
 
   /**
+   * The inheritance map (NEXT_PLAN.md Step 3) — every rendered card that
+   * carries a given allele, however folded or unfolded the tree currently
+   * is. Walks the same rows and sibling filter `renderRows` draws from, so
+   * a trace only ever points at something actually on screen.
+   */
+  function tracePaths(locus: keyof CoatGenotype, allele: string): Set<string> {
+    const matched = new Set<string>();
+    const check = (horse: Horse, path: string): void => {
+      if (carriesAllele(horse, locus, allele)) matched.add(path);
+    };
+    for (const rowNodes of rows) {
+      for (const node of rowNodes) {
+        check(node.horse, node.path);
+        if (showSiblings) {
+          const siblings = siblingsOf(node.horse, known).filter(
+            (sibling) => showSold || !isSoldFoal(sibling, stable),
+          );
+          for (const sibling of siblings) check(sibling, `${node.path}-sib-${sibling.id}`);
+        }
+      }
+    }
+    return matched;
+  }
+
+  /**
+   * Marks every carrier found. A separate class pair from `highlightRoute`'s
+   * — `archive-tracing`/`archive-card-traced` rather than
+   * `archive-hovering`/`archive-card-highlight` — so a trace stays sticky
+   * across hovers instead of being cleared by the next `pointerleave`.
+   */
+  function applyTrace(paths: Set<string> | undefined): void {
+    canvasEl.classList.toggle('archive-tracing', !!paths);
+    canvasEl.querySelectorAll<HTMLElement>('.archive-card').forEach((card) => {
+      card.classList.toggle('archive-card-traced', !!paths && paths.has(card.dataset.path ?? ''));
+    });
+    linesEl.querySelectorAll<SVGPathElement>('.archive-line').forEach((line) => {
+      const onIt = !!paths && paths.has(line.dataset.parent ?? '') && paths.has(line.dataset.child ?? '');
+      line.classList.toggle('archive-line-traced', onIt);
+    });
+  }
+
+  function renderTraceChip(): void {
+    const chip = el.querySelector<HTMLElement>('#archive-trace-chip')!;
+    if (!activeTrace) {
+      chip.innerHTML = '';
+      return;
+    }
+    const label = COAT_LOCI.find((l) => l.key === activeTrace!.locus)?.label ?? activeTrace!.locus;
+    chip.innerHTML = `
+      <span class="archive-trace-active">
+        Tracing ${label} ${activeTrace.allele}
+        <button type="button" id="archive-trace-clear" aria-label="Clear trace">✕</button>
+      </span>
+    `;
+    chip.querySelector('#archive-trace-clear')!.addEventListener('click', clearTrace);
+  }
+
+  function traceAllele(locus: keyof CoatGenotype, allele: string): void {
+    closeDetail();
+    activeTrace = { locus, allele };
+    applyTrace(tracePaths(locus, allele));
+    renderTraceChip();
+  }
+
+  function clearTrace(): void {
+    activeTrace = undefined;
+    applyTrace(undefined);
+    renderTraceChip();
+  }
+
+  /**
    * The idle animation, the same spritesheet and tinting `trainingScreen.ts`
    * uses for its own horse preview — scaled down to fit a card corner instead
    * of a full panel. Only one detail card is open at a time, so this is at
@@ -337,6 +414,60 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
       stopLoop?.();
       surface.destroy();
     };
+  }
+
+  /**
+   * The inheritance map's entry point on a horse's own card: which of its
+   * two "hider" loci (DESIGN.md 10 — Extension and Agouti; the others all
+   * show with a single copy, so nothing there ever hides) carry something
+   * worth tracing, and a tappable allele for each. `null` when neither locus
+   * has anything hidden — a horse homozygous dominant on both has no story
+   * to tell here, and the section does not render at all rather than show
+   * an empty "nothing to see" card.
+   */
+  function buildGeneticsSection(horse: Horse): HTMLElement | null {
+    const genotype = genotypeOf(horse);
+    const rowsHtml: string[] = [];
+
+    for (const locus of COAT_LOCI) {
+      const pair = genotype[locus.key] as unknown as readonly [string, string];
+      const notable = notableAllele(pair, locus.dominance);
+      if (!notable) continue;
+
+      const homozygous = pair[0] === pair[1];
+      const plainAllele = homozygous ? null : pair.find((a) => a !== notable);
+
+      rowsHtml.push(`
+        <div class="archive-genetics-row">
+          <span class="archive-genetics-locus">${locus.label}</span>
+          <span class="archive-genetics-pair">
+            ${plainAllele ? `<span class="archive-allele">${plainAllele}</span>` : ''}
+            <button type="button" class="archive-allele archive-allele-trace"
+                    data-locus="${locus.key}" data-allele="${notable}">${
+                      homozygous ? `${notable}${notable}` : notable
+                    }</button>
+          </span>
+        </div>
+      `);
+    }
+
+    if (rowsHtml.length === 0) return null;
+
+    const section = document.createElement('div');
+    section.className = 'archive-detail-section archive-genetics';
+    section.innerHTML = `
+      <h4 class="archive-genetics-title">Coat Genetics</h4>
+      <p class="archive-genetics-hint">Tap a hidden allele to trace it through the tree.</p>
+      ${rowsHtml.join('')}
+    `;
+
+    section.querySelectorAll<HTMLButtonElement>('.archive-allele-trace').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        traceAllele(btn.dataset.locus as keyof CoatGenotype, btn.dataset.allele!);
+      });
+    });
+
+    return section;
   }
 
   function openDetail(horse: Horse): void {
@@ -385,6 +516,9 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
     `;
     detailBody.appendChild(record);
 
+    const genetics = buildGeneticsSection(horse);
+    if (genetics) detailBody.appendChild(genetics);
+
     const attrsSection = document.createElement('div');
     attrsSection.className = 'archive-detail-section';
     attrsSection.innerHTML = `
@@ -420,6 +554,9 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
 
     requestAnimationFrame(() => {
       drawLines();
+      // Toggling siblings rebuilds every card, which wipes the trace classes
+      // along with them — reapply against whatever is now on screen.
+      if (activeTrace) applyTrace(tracePaths(activeTrace.locus, activeTrace.allele));
       if (firstRender) {
         scrollEl.scrollTop = scrollEl.scrollHeight;
         firstRender = false;
