@@ -1022,7 +1022,20 @@ body {
   overflow: hidden;
 }
 
-.ib-bar i {
+/*
+ * The stat's true fill, over the ceiling ghost behind it.
+ *
+ * Found live: this used to be a bare, unclassed `<i>` styled only by a
+ * `.ib-bar i` selector with no `position` set. `.ib-ceiling` next to it is
+ * `position: absolute` — and a positioned element always paints above a
+ * static one regardless of DOM order — so the ceiling covered the real fill
+ * outright. The bar you saw was the potential ceiling's size, not the stat's.
+ * A dedicated class matching `.ib-ceiling`'s own positioning fixes it, the
+ * same pattern `.stat-row-fill` already uses elsewhere.
+ */
+.ib-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
   display: block;
   height: 100%;
   background: var(--ok);

@@ -71,6 +71,40 @@ describe('elements toggled via the `hidden` attribute', () => {
   });
 });
 
+/**
+ * Ghost-and-fill bar pairs — a wider ceiling bar behind, a narrower fill in
+ * front showing the real value. Found live: `.ib-fill` (the info box's stat
+ * bar, shown mid-race) used to be a bare, unclassed `<i>` with no `position`
+ * set, while `.ib-ceiling` next to it was `position: absolute`. A positioned
+ * element always paints above a static one regardless of DOM order, so the
+ * ceiling — the horse's *potential* — covered the real stat bar outright.
+ * Every stat on every horse read as its ceiling, not its current value, and
+ * nothing here caught it because jsdom never renders paint order — only a
+ * screenshot did. Both halves of a pair must be positioned the same way, or
+ * one silently wins the paint order no matter which is "correct" on paper.
+ */
+const GHOST_FILL_PAIRS: Array<[ghost: string, fill: string]> = [
+  ['.ib-ceiling', '.ib-fill'],
+  ['.stat-row-ceiling', '.stat-row-fill'],
+];
+
+describe('ghost-and-fill bar pairs', () => {
+  it('positions both halves the same way, so paint order cannot hide one behind the other', () => {
+    const isPositioned = (selector: string): boolean =>
+      rules().some(
+        ({ selector: sel, body }) =>
+          sel.split(',').some((s) => s.trim() === selector) && /position:\s*absolute/.test(body),
+      );
+
+    for (const [ghost, fill] of GHOST_FILL_PAIRS) {
+      expect(isPositioned(ghost), `${ghost} is not position: absolute`).toBe(true);
+      expect(isPositioned(fill), `${fill} is not position: absolute — it will paint behind ${ghost}`).toBe(
+        true,
+      );
+    }
+  });
+});
+
 describe('full-page screen containers', () => {
   it('is never hidden by an unconditional display:none', () => {
     for (const { selector, body } of rules()) {

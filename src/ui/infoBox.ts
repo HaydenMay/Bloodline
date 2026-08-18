@@ -61,7 +61,7 @@ export function renderInfoBox(horse: Horse, showPotential = false): string {
         <span class="ib-stat-name">${STAT_LABELS[key]}</span>
         <span class="ib-bar">
           ${band ? `<i class="ib-ceiling" style="width:${band.ceilingAt.toFixed(0)}%"></i>` : ""}
-          <i style="width:${value}%"></i>
+          <i class="ib-fill" style="width:${value}%"></i>
         </span>
         <span class="ib-grade ib-g${grade}">${grade}</span>
         <span class="ib-num">${value}</span>
