@@ -43,7 +43,7 @@ export const BASE_SPEED = 21.0;
  * It also delivers DESIGN.md §4's dominance curve directly: a 5% stat edge buys
  * 0.4% speed (almost nothing, as specified), a 40% edge buys 3.2% (dominance).
  */
-export const SPEED_STAT_SPAN = 0.08;
+export const SPEED_STAT_SPAN = 0.072;
 
 /**
  * m/s² at 50 Burst. Burst owns the gate break and how fast a kick bites.
@@ -101,7 +101,7 @@ export const HOLD_FLOOR = 0.92;
  * between finishing places, and mashing beat timing simply by firing more
  * often. A lever nobody can feel is not a lever.
  */
-export const KICK_MAX_BONUS = 0.14;
+export const KICK_MAX_BONUS = 0.2;
 
 /**
  * Speed factor of a completely empty horse.
@@ -123,7 +123,18 @@ export const KICK_MAX_BONUS = 0.14;
  * drafting were all expressing through a lever that did nothing, and none of
  * them could move a win rate. The tank only matters if running dry hurts.
  */
-export const FATIGUE_FLOOR = 0.9;
+/**
+ * How much of the fatigue penalty a maximum-Grit horse escapes.
+ *
+ * Grit's job in DESIGN.md §2 is what a horse has when it has nothing left, and
+ * until the stat rework it had no mechanism for that at all — it nudged tank
+ * recovery by 5% and weighted the kick, which measured out at seven points of
+ * win rate against Speed's ninety. This is the situation Grit now owns: two
+ * horses that both empty do not both stop.
+ */
+export const GRIT_FATIGUE_RELIEF = 0.09;
+
+export const FATIGUE_FLOOR = 0.86;
 
 /**
  * Tank level at which fatigue starts to bite. A smooth ramp below, never a cliff.
@@ -249,7 +260,7 @@ export const TANK_RECOVER_RATE = 2.4;
  * integer breakpoint would make training feel dead everywhere except at the
  * breakpoint; a rate means every point pays off the moment it is trained.
  */
-export const STAMINA_RECOVER_SPAN = 0.5;
+export const STAMINA_RECOVER_SPAN = 0.9;
 
 /**
  * Recovery bonus while drafting. The only effect drafting has (REBUILD.md §9).
@@ -539,10 +550,25 @@ export const DIST_TOLERANCE = 500;
 // ---------------------------------------------------------------------------
 
 /** Daily form spread for a maximally professional (100 Temper) horse. */
-export const FORM_BASE_SPREAD = 0.004;
+export const FORM_BASE_SPREAD = 0.007;
 
 /** Extra spread as Temper falls. Low Temper swings bigger in BOTH directions. */
-export const FORM_TEMPER_AMPLIFY = 0.01;
+export const FORM_TEMPER_AMPLIFY = 0.035;
+
+/**
+ * How much of its own ability a 0-Temper horse throws away on an average day.
+ *
+ * This is what makes Temper worth having. The daily-form roll is symmetric, so
+ * on its own it cannot reward a stat that narrows it — narrowing a symmetric
+ * swing leaves the mean exactly where it was, while the wider swing keeps a
+ * bigger upside. Measured before this existed, Temper was worth **minus** 4.8
+ * points of win rate across its range: the calmer horse was the worse bet.
+ *
+ * Centring the roll below par fixes that at the source. A keen, unprofessional
+ * horse expends effort it never gets back, so it runs below itself on an
+ * ordinary day; a professional one runs to its ability.
+ */
+export const TEMPER_MEAN_COST = 0.015;
 
 /** Chance of a fumbled start at 0 Consistency. Scales down as Consistency rises. */
 export const FUMBLE_BASE = 0.22;
@@ -551,10 +577,10 @@ export const FUMBLE_BASE = 0.22;
 export const FUMBLE_DURATION = 1.6;
 
 /** Chance of running below true ability at 0 Consistency. */
-export const OFF_COLOUR_BASE = 0.16;
+export const OFF_COLOUR_BASE = 0.17;
 
 /** Speed factor applied all race when off-colour. Surfaced live, never silently. */
-export const OFF_COLOUR_PENALTY = 0.985;
+export const OFF_COLOUR_PENALTY = 0.97;
 
 /** Seconds a green moment costs. */
 export const GREEN_DURATION = 1.2;

@@ -48,6 +48,8 @@ import {
   FORM_BASE_SPREAD,
   FORM_TEMPER_AMPLIFY,
   FUMBLE_BASE,
+  GRIT_FATIGUE_RELIEF,
+  TEMPER_MEAN_COST,
   FUMBLE_DURATION,
   GOING_MAX_FACTOR,
   GOING_MIN_FACTOR,
@@ -242,11 +244,26 @@ interface Runner {
 // Gate: everything computed once, before the race moves
 // ---------------------------------------------------------------------------
 
+/**
+ * Cruise — the ceiling, owned by Speed and nothing else (REBUILD.md §4.1).
+ *
+ * There used to be a second term here: `staminaGate = 0.85 + 0.15 * stamina/100`,
+ * undocumented and never in the spec. It was a **15% span on the speed a horse
+ * holds for the entire race** — nearly double `SPEED_STAT_SPAN`, the constant
+ * actually written down as the speed knob — so Stamina quietly owned cruise
+ * more than Speed did, in violation of R1's "one owner each".
+ *
+ * That single line was most of why only two stats decided a race. Measured with
+ * `npm run stat-leverage`, thirty points of Stamina swung the win rate by 100
+ * points and Speed by 90, while Burst managed 17, Grit 7 and Temper none at
+ * all — because both dominant stats were paid out over every second of the
+ * race and nothing else was.
+ *
+ * Stamina's owner is the tank (§5), where it decides whether a horse still has
+ * anything left. It has no business setting top speed as well.
+ */
 function cruiseFor(horse: Horse): number {
-  const baseSpeed = BASE_SPEED * (1 - SPEED_STAT_SPAN / 2 + SPEED_STAT_SPAN * (horse.stats.speed / 100));
-  // Stamina gates speed: can't unlock full speed without stamina (0.85x to 1.0x range)
-  const staminaGate = 0.85 + 0.15 * (horse.stats.stamina / 100);
-  return baseSpeed * staminaGate;
+  return BASE_SPEED * (1 - SPEED_STAT_SPAN / 2 + SPEED_STAT_SPAN * (horse.stats.speed / 100));
 }
 
 function accelFor(horse: Horse): number {
@@ -287,6 +304,8 @@ function tankModsFor(horse: Horse): TankModifiers {
     recoverMult,
     draftMult: horse.traits.includes('quickRecovery') ? TRAIT_QUICK_RECOVERY_DRAFT : 1,
     exponentRelief,
+    // What Grit owns: how far a horse falls apart once the tank is gone.
+    fatigueRelief: GRIT_FATIGUE_RELIEF * (horse.stats.grit / 100),
   };
 }
 
@@ -310,7 +329,19 @@ function makeRunner(
   const amplitude = FORM_BASE_SPREAD + FORM_TEMPER_AMPLIFY * (1 - horse.stats.temper / 100);
   const rawForm = rng.normal(0, amplitude);
   const consistencyFloor = amplitude * (1 - consistency);
-  const form = 1 + Math.max(-consistencyFloor, rawForm);
+  // A hot-headed horse does not merely vary — it **wastes itself**: fights the
+  // rider, runs keen early, arrives at the business end having spent more than
+  // it needed to. So the swing is centred a little below par and Temper is what
+  // pulls the centre back up.
+  //
+  // Without this term Temper was measurably WORSE the higher it went (-4.8
+  // points of win rate across its range, `npm run stat-leverage`). The roll was
+  // symmetric and its downside was clamped by Consistency, so a wider swing was
+  // free upside — which made the stat whose whole job is *narrowing* the swing
+  // a straightforward liability. Symmetric noise cannot reward the stat that
+  // removes it; the centre has to move.
+  const temperCost = TEMPER_MEAN_COST * (1 - horse.stats.temper / 100);
+  const form = 1 - temperCost + Math.max(-consistencyFloor, rawForm);
 
   const going = goingFor(horse, config);
   const distance = distanceFactor(horse.preferredDistance, config.metres);
@@ -596,7 +627,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
 
     // ---- 3. Kick and fatigue ---------------------------------------------
     const kick = kickFactorFor(r, elapsed);
-    const fatigue = fatigueFactor(r.tank);
+    const fatigue = fatigueFactor(r.tank, r.tankMods.fatigueRelief);
 
     // ---- 4. THE ONLY PLACE SPEED IS WRITTEN (REBUILD.md R1) ---------------
     const target = r.cruise * r.preRace * pace * kick * fatigue;

@@ -745,7 +745,7 @@ about 5.4 points to 7.6, not double), which is why this ships as-is rather than 
 cap bolted on. But the real fix is the world turning over, and this makes that item matter more than
 it did.
 
-### ⚠️ Only two of the six stats decide a race
+### 🚧 Only two of the six stats decided a race — one structural half fixed, one open
 
 **Found in play** — "only about 3 stats feel like they matter in races, and that's where all stats
 should matter" — and then measured with `npm run stat-leverage`, which holds an eight-horse field
@@ -803,6 +803,55 @@ and an engine this deterministic has almost no variance for them to reduce — a
 wins 97% of the time. Raising their weights would do nothing, because there is nothing for them to
 protect against. They can only acquire value if race outcomes become genuinely uncertain, which
 makes this and the margins item **the same piece of work**, approached from opposite ends.
+
+**Two structural defects found and fixed, and they were the causes, not the symptoms.**
+
+1. **Stamina secretly owned cruise.** `cruiseFor` multiplied by an undocumented
+   `staminaGate = 0.85 + 0.15 * stamina/100` — a **15% span on the speed a horse holds for the
+   entire race**, nearly double `SPEED_STAT_SPAN`, and nowhere in REBUILD.md §4.1, which defines
+   cruise from Speed alone. It broke R1's "one owner each" and it was most of the problem. Removed;
+   Stamina's owner is the tank. **Stamina went from +100 to +11.3 on one line.**
+2. **Temper was worth less than nothing.** Measured at **−4.8**: the daily-form roll was symmetric
+   and its downside was clamped by Consistency, so a wider swing was free upside and the stat whose
+   job is *narrowing* the swing was a liability. Symmetric noise cannot reward the stat that removes
+   it — the centre has to move. `TEMPER_MEAN_COST` now centres the roll below par, so a keen horse
+   wastes itself and Temper pulls it back. **−4.8 to +10.5.**
+
+Grit also gained a mechanism it never had: `GRIT_FATIGUE_RELIEF` lifts a horse's own fatigue floor,
+so two horses that both empty do not both stop — §2's "what it has when it has nothing", which
+previously had no implementation at all.
+
+Where it stands, thirty points of each stat, against a baseline of `stamina +100 / speed +90 /
+burst +17.3 / grit +7.5 / consistency +2.0 / temper −0.8`:
+
+```
+speed  +76.3    burst  +16.5    stamina  +11.3
+temper +10.5    grit    +9.3    consistency +2.8
+```
+
+And each stat now owns a **situation**, which is what was asked for — Burst is worth +18.0 at 1000 m
+and +8.8 at 2000 m, Stamina the mirror image. Gates held: harness 12/13 (only the pre-existing B1b
+championship style balance still failing, exactly as before), ride-probe 4/4.
+
+**What is still open, and why it is not a tuning problem.** Speed remains dominant at +76.3. It was
+cut to +22 mid-session and every attempt to hold it there broke the **dominance curve** — a +40%
+stat edge fell from 99.5% to 37.5% wins against a required 70% — and blew the margin tail past 20L.
+That is not a coincidence, it is the structure:
+
+> Speed is the only stat that feeds **cruise**, and cruise is the only term paid out over every
+> second of the race. Every other stat acts through the energy economy (Stamina's recovery, Grit's
+> fatigue floor, Burst's kick) or through noise (Temper, Consistency). So dominance and stat
+> equality are currently the same dial, pulling opposite ways.
+
+The consequence is that Stamina, Grit and Burst are all gated on **how often the tank actually
+binds**. In a race where nobody empties, the three stats that live in the energy economy cannot
+matter however they are weighted. Making them matter means making the energy economy bite — a pace
+and drain change — not another pass over the spans. Consistency is a harder case again: its value
+comes from suppressing bad days, and bad days are exactly what the dominance curve punishes, so it
+was measured at +2.8 and could not be raised without failing B4.
+
+Next step, when this is picked up: **make the tank bind more often**, then re-measure. That is the
+one change that lifts three stats at once without touching the dominance curve.
 
 ### The race calendar rerolls its options when you back out of a race
 

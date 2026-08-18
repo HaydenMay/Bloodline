@@ -46,12 +46,15 @@ export interface TankModifiers {
   draftMult: number;
   /** Subtracted from DRAIN_EXPONENT. Cruiser — a flatter cost curve at pace. */
   exponentRelief: number;
+  /** Added to this horse's fatigue floor. Grit — what it has when it has nothing. */
+  fatigueRelief: number;
 }
 
 export const NO_TANK_MODIFIERS: TankModifiers = {
   recoverMult: 1,
   draftMult: 1,
   exponentRelief: 0,
+  fatigueRelief: 0,
 };
 
 /** Stamina sets regen RATE, continuously. Never tank size. */
@@ -126,10 +129,16 @@ export function recoverPerSecond(
  * and therefore what makes pace a real decision. It applies to the horse's
  * whole output, kicks included: a tired horse cannot quicken like a fresh one.
  */
-export function fatigueFactor(tank: number): number {
+export function fatigueFactor(tank: number, gritRelief = 0): number {
   if (tank >= FATIGUE_START) return 1;
   const t = Math.max(0, tank) / FATIGUE_START;
-  return FATIGUE_FLOOR + (1 - FATIGUE_FLOOR) * t;
+  // Grit is what a horse has left when it has nothing left (DESIGN.md §2), so
+  // it lifts this horse's own floor rather than changing when fatigue starts.
+  // A gritty horse still empties at the same point; it just does not fall apart
+  // as far when it does — which is the difference between a horse that stops
+  // and one that keeps finding a bit.
+  const floor = Math.min(1, FATIGUE_FLOOR + gritRelief);
+  return floor + (1 - floor) * t;
 }
 
 /**
