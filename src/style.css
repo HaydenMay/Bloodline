@@ -1055,7 +1055,7 @@ body {
   text-align: right;
 }
 
-.ib-gS {
+.ib-gX {
   color: #f2c14e;
 }
 .ib-gA {
@@ -6835,13 +6835,18 @@ body {
 .grade-C { color: var(--muted); }
 .grade-D { color: var(--warning); }
 
-/* Numbers stay out of the way until asked for. */
+/* Numbers stay out of the way until asked for. Hidden via opacity rather than
+   display:none, so it still occupies layout space — min-width has to fit the
+   widest possible value (100, three digits) or that row's bar visibly runs
+   shorter than its neighbours the moment a stat hits exactly 100: found in
+   play from a maxed Stamina row rendering shorter than every other stat on
+   the same card. */
 .stat-row-num {
   grid-area: num;
   font-family: var(--mono);
   font-size: 0.8rem;
   color: var(--muted);
-  min-width: 2ch;
+  min-width: 3ch;
   text-align: right;
   opacity: 0;
   transition: opacity 0.15s ease;
