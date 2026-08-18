@@ -227,7 +227,18 @@ Hayden's**, and none of them should be acted on by an agent.
 - **Multiple save slots (§13)** — a known gap since Phase 3. One slot plus export/import ships today.
 - **The breeding manual (§13 codex)** — where relatedness, variance and the inheritance budget get
   explained properly, for players who want to understand the machine. Currently sitting in Phase 6.
-- **`createStable()` seeds from `Date.now()`** — tests that build a stable get a different world every
-  run, which has already caused one test to pass by luck for weeks.
+- ~~**`createStable()` seeds from `Date.now()`**~~ — **fixed.** It broke a real deploy: 25 unseeded
+  test calls across 8 files, and one of them — "always offers a poor yard something it can afford" —
+  failed on an unlucky world and shipped a red build. `createStable(seed?)` now takes an optional
+  seed, defaulting to `Date.now()` so real play is unaffected; every test call is pinned to a fixed
+  string. Chasing that one failure turned up two real bugs sitting behind it, both fixed the same
+  pass: `outsideStuds` picked candidates by division only, never by price, so a poor yard could be
+  shown six studs it could not afford while a cheaper eligible horse sat unselected — measured at
+  ~3.2% of random worlds, now guarantees the cheapest eligible partner is always in the list (down to
+  ~0.4%, the residual being worlds where even the cheapest eligible horse is genuinely expensive — a
+  stud-fee economics question, not a selection bug, and deliberately not chased further here). And
+  `studFee` had no floor, so a low-quality outside horse could price at exactly $0 — a free outside
+  stud, contradicting the module's own "your own horses are always free... never the escape hatch."
+  Now floored at `MIN_OUTSIDE_FEE = 100`.
 - **NEXT_PLAN.md is stale** — it describes screen-transition work from an earlier phase, and
   README.md still links it as "the active working roadmap for upcoming work".

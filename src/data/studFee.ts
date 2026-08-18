@@ -49,6 +49,19 @@ export function potentialAverage(horse: Horse): number {
 }
 
 /**
+ * Floor on what any outside stud costs.
+ *
+ * Without it, a horse with no banked legacy and potential at or below
+ * `FEE_QUALITY_FLOOR` prices at exactly $0 — a genuinely free outside
+ * partner, which is a promise this module's own header reserves for a
+ * player's own yard alone: "your own horses are always free... the fee
+ * exists to price the escape hatch." Found by a test that asserts exactly
+ * that distinction and, for one randomly generated world, got a free horse.
+ * Nominal on purpose — this is a floor against an accident, not a price.
+ */
+export const MIN_OUTSIDE_FEE = 100;
+
+/**
  * The fee to breed to an outside stud, in cash.
  *
  * Rounded to the nearest hundred so a stud book never posts an odd price.
@@ -56,5 +69,5 @@ export function potentialAverage(horse: Horse): number {
 export function studFee(horse: Horse, legacyBanked: number): number {
   const legacy = Math.max(0, legacyBanked) * FEE_PER_LEGACY;
   const quality = Math.max(0, potentialAverage(horse) - FEE_QUALITY_FLOOR) ** 2 * FEE_PER_QUALITY;
-  return Math.round((legacy + quality) / 100) * 100;
+  return Math.max(MIN_OUTSIDE_FEE, Math.round((legacy + quality) / 100) * 100);
 }

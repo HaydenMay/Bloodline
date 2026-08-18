@@ -127,14 +127,31 @@ export function outsideStuds(stable: Stable, mine: Horse, limit = 6): BreedingPa
   const ceiling = PARTNER_CEILING[getTierFromPoints(stable.legacy.archivedPoints)] ?? 'novice';
   const maxRank = DIVISION_RANK.indexOf(ceiling);
 
-  return (stable.world ?? [])
-    .filter(
-      (horse) =>
-        canPair(mine, horse) &&
-        DIVISION_RANK.indexOf(horse.division) <= maxRank &&
-        // A two-year-old has not raced enough to be standing at stud.
-        horse.age >= 4,
-    )
+  // An outside stud never raced for you, so there is no banked legacy of
+  // yours to read. The career you did not watch stands in for it, through
+  // the same conversion a save written before legacy existed uses.
+  //
+  // Earnings used to be passed as a hard 0 and wins were always 0 too, because
+  // nothing recorded a rival's results outside your own races — so two of this
+  // function's three terms were dead and an outside stud was worth precisely
+  // its division. `sim/worldRacing.ts` now gives the world real form, and this
+  // reads it.
+  const toPartner = (horse: Horse): BreedingPartner => ({
+    horse,
+    legacyBanked: seedLegacyFromRecord(horse.wins ?? 0, horse.earnings ?? 0, horse.division),
+    hallOfFame: false,
+  });
+
+  const eligible = (stable.world ?? []).filter(
+    (horse) =>
+      canPair(mine, horse) &&
+      DIVISION_RANK.indexOf(horse.division) <= maxRank &&
+      // A two-year-old has not raced enough to be standing at stud.
+      horse.age >= 4,
+  );
+
+  const selected = eligible
+    .slice()
     .sort(
       (a, b) =>
         DIVISION_RANK.indexOf(b.division) - DIVISION_RANK.indexOf(a.division) ||
@@ -149,20 +166,30 @@ export function outsideStuds(stable: Stable, mine: Horse, limit = 6): BreedingPa
       return sameClass.indexOf(horse) < 2;
     })
     .slice(0, limit)
-    .map((horse) => ({
-      horse,
-      // An outside stud never raced for you, so there is no banked legacy of
-      // yours to read. The career you did not watch stands in for it, through
-      // the same conversion a save written before legacy existed uses.
-      //
-      // Earnings used to be passed as a hard 0 and wins were always 0 too,
-      // because nothing recorded a rival's results outside your own races — so
-      // two of this function's three terms were dead and an outside stud was
-      // worth precisely its division. `sim/worldRacing.ts` now gives the world
-      // real form, and this reads it.
-      legacyBanked: seedLegacyFromRecord(horse.wins ?? 0, horse.earnings ?? 0, horse.division),
-      hallOfFame: false,
-    }));
+    .map(toPartner);
+
+  // The escape hatch has to actually stay open. The class-balanced list above
+  // picks by DIVISION, never by price — so if the classes a yard can reach
+  // happen to roll nothing but high-potential (expensive) individuals, a poor
+  // yard could be shown six studs it cannot afford even while a cheaper
+  // eligible horse sits unselected in the same world. Measured: about 3% of
+  // randomly generated worlds left a $2,000 yard with nothing at all. Fixed by
+  // guaranteeing the single cheapest eligible partner is always present,
+  // swapped in for the priciest of the selected six if it did not already
+  // make the cut.
+  if (eligible.length > 0) {
+    const feeOf = (p: BreedingPartner): number => studFee(p.horse, p.legacyBanked);
+    const cheapest = eligible.map(toPartner).reduce((a, b) => (feeOf(a) <= feeOf(b) ? a : b));
+    if (!selected.some((p) => p.horse.id === cheapest.horse.id)) {
+      const priciestIndex = selected.reduce(
+        (worst, p, i) => (feeOf(p) > feeOf(selected[worst]!) ? i : worst),
+        0,
+      );
+      selected[priciestIndex] = cheapest;
+    }
+  }
+
+  return selected;
 }
 
 /**

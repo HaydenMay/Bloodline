@@ -61,7 +61,7 @@ function retired(h: Horse, legacyBanked = 500): RetiredHorse {
 }
 
 function emptyYard(over: Partial<Stable> = {}): Stable {
-  const stable = createStable();
+  const stable = createStable('archiveTree-1');
   stable.world = [];
   stable.bloodstock = [];
   return Object.assign(stable, over);

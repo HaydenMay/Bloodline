@@ -232,8 +232,16 @@ export function takeStudInfluence(): number {
   return earned;
 }
 
-export function createStable(): Stable {
-  const rng = createRng(`stable-${Date.now()}`);
+/**
+ * `seed` defaults to `Date.now()` so every real new game gets a genuinely
+ * different world — but that same default made every test that calls this
+ * unseeded non-deterministic too, which is what let "always offers a poor
+ * yard something it can afford" (`studLife.test.ts`) pass by luck for weeks
+ * and then fail a real CI run the moment it drew an unlucky world. Tests pass
+ * a fixed string here; nothing about ordinary play changes.
+ */
+export function createStable(seed: string = `stable-${Date.now()}`): Stable {
+  const rng = createRng(seed);
   const names = createNameGenerator(rng);
 
   return {

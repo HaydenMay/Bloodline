@@ -32,7 +32,7 @@ function horse(age: number): Horse {
 }
 
 function career(age: number, racesCompleted: number): Career {
-  const made = createNewCareer(horse(age), DEFAULTS.playerSilksDefault, createStable());
+  const made = createNewCareer(horse(age), DEFAULTS.playerSilksDefault, createStable('stableHub-1'));
   made.stats.racesCompleted = racesCompleted;
   made.horseLegacy.peak = 400;
   made.horseLegacy.points = 300;

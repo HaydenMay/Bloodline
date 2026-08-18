@@ -61,7 +61,7 @@ function yardWithTwo(): Stable {
     const career = createNewCareer(
       horse(name, gender),
       DEFAULTS.playerSilksDefault,
-      loadStable() ?? createStable(),
+      loadStable() ?? createStable('foalSale-1'),
     );
     career.horseLegacy.peak = 500;
     career.horseLegacy.points = 500;

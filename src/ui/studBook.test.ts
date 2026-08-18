@@ -69,7 +69,7 @@ function retired(over: Partial<Horse> = {}, legacyBanked = 500): RetiredHorse {
 
 /** A yard with no world horses, so partner sources can be tested one at a time. */
 function emptyYard(over: Partial<Stable> = {}): Stable {
-  const stable = createStable();
+  const stable = createStable('studBook-1');
   stable.world = [];
   return Object.assign(stable, over);
 }
@@ -125,7 +125,7 @@ describe('who a yard can breed to', () => {
    * unable to breed at all.
    */
   it('still offers partners to a yard holding nothing but colts', () => {
-    const stable = createStable();
+    const stable = createStable('studBook-2');
     stable.bloodstock = [retired({ id: 'colt-1' }), retired({ id: 'colt-2' })];
 
     const options = partnersFor(stable, horse({ id: 'mine', gender: 'stallion' }));
@@ -145,7 +145,7 @@ describe('who a yard can breed to', () => {
   /** §10 gates higher-calibre partners behind standing. */
   it('opens better studs to a yard with prestige than to an unknown one', () => {
     const classOf = (points: number): string[] => {
-      const stable = createStable();
+      const stable = createStable('studBook-3');
       stable.legacy.archivedPoints = points;
       return outsideStuds(stable, horse({ id: 'mine' }), 8).map((p) => p.horse.division);
     };
@@ -168,7 +168,7 @@ describe('who a yard can breed to', () => {
    * that they are actually read.
    */
   it('prices an outside stud off the career it actually had', () => {
-    const stable = createStable();
+    const stable = createStable('studBook-4');
     stable.legacy.archivedPoints = 9000;
     const studs = outsideStuds(stable, horse({ id: 'mine' }), 8);
 
@@ -189,7 +189,7 @@ describe('who a yard can breed to', () => {
    * choosing on stud fee instead.
    */
   it('does not price every stud of a division identically', () => {
-    const stable = createStable();
+    const stable = createStable('studBook-5');
     stable.legacy.archivedPoints = 9000;
     const studs = outsideStuds(stable, horse({ id: 'mine' }), 8);
     const figures = new Set(studs.map((stud) => stud.legacyBanked));

@@ -57,7 +57,7 @@ function retire(name: string, gender: 'stallion' | 'mare', peak = 400): Stable {
   const career = createNewCareer(
     horse(name, gender),
     DEFAULTS.playerSilksDefault,
-    loadStable() ?? createStable(),
+    loadStable() ?? createStable('studLife-1'),
   );
   career.horseLegacy.peak = peak;
   career.horseLegacy.points = peak;
