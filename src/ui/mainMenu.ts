@@ -43,11 +43,11 @@ export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbac
       <div class="main-menu-actions">
         ${callbacks.onContinue ? '<button class="btn btn-primary" id="continue-btn">Continue Career</button>' : ''}
         <button class="btn btn-primary" id="new-game-btn">${callbacks.hasStable ? 'New Horse' : 'Start Your Stable'}</button>
-        ${
+ <!--       ${
           callbacks.hasBloodstock
             ? '<button class="btn btn-secondary" id="bloodstock-btn">The Archive</button>'
             : ''
-        }
+        } -->
       </div>
       ${
         callbacks.hasStable
