@@ -1929,9 +1929,17 @@ function startRaceWithHorse(
           } else {
             // A career-ending injury stops the horse whatever the player wants;
             // §6 compensates with full breeding value rather than a penalty.
-            // Otherwise 20 starts is the hard ceiling of a 2-5 racing life, and
-            // everything before it is the player's call from the hub.
-            if (updatedCareer.careerEndedByInjury || updatedCareer.stats.racesCompleted >= 20) {
+            // Otherwise retirement is always the player's call from the hub
+            // (DESIGN.md §8) — the trainer's advice (getRetirementAdvice,
+            // shown in stableHub) is the hint, never a forced cutoff. This
+            // used to also force the recap at racesCompleted >= 20, which
+            // ROADMAP.md's Phase 3 audit had already flagged and claimed
+            // fixed, but the hard cutoff was still here — found in play when
+            // a 19-1 championship-winning horse was retired without being
+            // asked. Age itself already caps at FINAL_AGE (growth.ts), so
+            // racing on past 20 starts just holds at the fully-declined
+            // stat line rather than eroding further.
+            if (updatedCareer.careerEndedByInjury) {
               showCareerRecap(updatedCareer);
             } else {
               // Loop back to stable hub instead of main menu
