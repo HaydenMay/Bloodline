@@ -39,7 +39,7 @@ const FOCUS_BLURB: Record<StatKey, string> = {
   speed: 'Sharp work on the gallops',
   stamina: 'Long, slow miles',
   burst: 'Standing starts and short bursts',
-  grit: 'Company work, and being made to fight',
+  grit: 'Company work, and holding its ground under pressure',
   temper: 'Handling, patience, and the horsebox',
   consistency: 'Routine, and plenty of it',
 };
