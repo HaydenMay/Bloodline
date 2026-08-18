@@ -131,15 +131,27 @@ export function inheritCoat(rng: Rng, sire: CoatGenotype, dam: CoatGenotype): Co
 export function genotypeFor(coat: string, id: string): CoatGenotype {
   const rng = createRng(`coat-${id}`);
 
-  // A masked locus is one the coat says nothing about, so its alleles are free.
+  /**
+   * A masked locus is one the coat says nothing about, so its alleles are
+   * free — but "free" still needs a rate, and this one is deliberately low.
+   *
+   * Every chestnut and palomino is already a guaranteed `e` (that is what the
+   * colour *is*, not a roll), which alone puts a quarter of the game's coats
+   * at a hidden-or-expressed `e`. A high roll on top of that for every other
+   * coat made the Archive's inheritance map light up as "the whole
+   * bloodline" rather than a rare find — found from actually using the
+   * trace, not measured, since there is no harness for how often a hidden
+   * gene should feel special. Low enough that most founders start clean.
+   */
   const maskedExtension = (): AllelePair<ExtensionAllele> => [
     'E',
-    rng.chance(0.35) ? 'e' : 'E',
+    rng.chance(0.12) ? 'e' : 'E',
   ];
   const maskedAgouti = (): AllelePair<AgoutiAllele> => [
     rng.pick(['A', 't', 'a'] as const),
     rng.pick(['A', 't', 'a'] as const),
   ];
+  /** `chance` is the probability of the plain, non-carrier pairing. */
   const carrier = <T>(shown: T, hidden: T, chance: number): AllelePair<T> => [
     shown,
     rng.chance(chance) ? shown : hidden,
@@ -168,10 +180,12 @@ export function genotypeFor(coat: string, id: string): CoatGenotype {
       };
 
     case 'bay':
-      return { ...plain, extension: maskedExtension(), agouti: carrier('A', 'a', 0.5) };
+      // 0.8: an 80% chance of the plain pairing, matching maskedExtension's
+      // rarity above rather than the coin flip this used to be.
+      return { ...plain, extension: maskedExtension(), agouti: carrier('A', 'a', 0.8) };
 
     case 'darkBay':
-      return { ...plain, extension: maskedExtension(), agouti: carrier('t', 'a', 0.5) };
+      return { ...plain, extension: maskedExtension(), agouti: carrier('t', 'a', 0.8) };
 
     case 'black':
       return { ...plain, extension: maskedExtension(), agouti: ['a', 'a'] };
@@ -180,7 +194,7 @@ export function genotypeFor(coat: string, id: string): CoatGenotype {
       return {
         ...plain,
         extension: maskedExtension(),
-        agouti: carrier('A', 'a', 0.5),
+        agouti: carrier('A', 'a', 0.8),
         cream: ['C', 'n'],
       };
 

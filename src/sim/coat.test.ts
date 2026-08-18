@@ -153,6 +153,30 @@ describe('horses born before any of this existed', () => {
     expect(carriers.length).toBeGreaterThan(0);
   });
 
+  /**
+   * The Archive's trace lighting up "the whole bloodline" instead of a rare
+   * find traced back to these two rolls being generous enough that most of
+   * the founding population started as a hidden carrier of something,
+   * independent of any real shared ancestry. Loose bounds — large samples,
+   * wide margins — so this only fails if the rates drift back toward what
+   * made every trace look the same, not on ordinary variance.
+   */
+  it('keeps a hidden extension factor uncommon, not a coin flip', () => {
+    const carriers = Array.from({ length: 800 }, (_, i) => genotypeFor('bay', `rate-${i}`)).filter(
+      (g) => g.extension.includes('e'),
+    );
+    expect(carriers.length / 800).toBeLessThan(0.25);
+  });
+
+  it('keeps a hidden agouti factor uncommon on bay and buckskin', () => {
+    for (const coat of ['bay', 'darkBay', 'buckskin'] as const) {
+      const carriers = Array.from({ length: 800 }, (_, i) => genotypeFor(coat, `rate-${coat}-${i}`)).filter(
+        (g) => g.agouti.includes('a'),
+      );
+      expect(carriers.length / 800, `${coat} carried a hidden factor too often`).toBeLessThan(0.35);
+    }
+  });
+
   it('prefers a stored genotype over an inferred one', () => {
     const stored = gene({ extension: ['e', 'e'] });
     const horse = { id: 'h1', coat: 'bay', coatGenotype: stored };
