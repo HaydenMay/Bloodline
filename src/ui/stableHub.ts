@@ -143,33 +143,31 @@ export function mountStableHub(
         </div>
       </div>
 
-      <!-- Legacy Tier Display -->
-      <div class="hub-legacy-banner">
-        <div class="legacy-tier">
-          <span class="tier-icon">${stableTier.icon}</span>
-          <div class="tier-details">
-            <div class="tier-name">${stableTier.name} Stable</div>
-            <!-- The number itself lives in the status bar; repeating it here was
-                 half of why the hub read as three unexplained figures. -->
-            <div class="tier-points">${stableTier.description}</div>
+      <!-- Legacy Tier Display — and the door to the Archive.
+           DESIGN.md 10 calls the pedigree tree "the title of the game", so it
+           does not get its own separate banner competing for space; instead
+           the yard's own info card *is* the door to it, one tap, no tab to
+           switch. -->
+      <button class="hub-legacy-banner" id="nav-archive">
+        <div class="legacy-banner-top">
+          <div class="legacy-tier">
+            <span class="tier-icon">${stableTier.icon}</span>
+            <div class="tier-details">
+              <div class="tier-name">${stableTier.name} Stable</div>
+              <!-- The number itself lives in the status bar; repeating it here was
+                   half of why the hub read as three unexplained figures. -->
+              <div class="tier-points">${stableTier.description}</div>
+            </div>
+          </div>
+          <div class="legacy-horse-score ${trend}">
+            <span class="horse-score-label">${horse.name}${career.horseLegacy.hallOfFame ? ' ⭐' : ''}</span>
+            <span class="horse-score-value">${career.horseLegacy.points} ${trendArrow}</span>
           </div>
         </div>
-        <div class="legacy-horse-score ${trend}">
-          <span class="horse-score-label">${horse.name}${career.horseLegacy.hallOfFame ? ' ⭐' : ''}</span>
-          <span class="horse-score-value">${career.horseLegacy.points} ${trendArrow}</span>
+        <div class="legacy-archive-cta">
+          <span>📜 The Archive — trace ${horse.name}'s bloodline</span>
+          <span class="legacy-archive-cta-arrow">→</span>
         </div>
-      </div>
-
-      <!-- The pedigree tree — the mechanic the game is named after
-           (DESIGN.md 10), so it gets a banner of its own rather than folding
-           into the nav grid as one tile the same size as Consumables. -->
-      <button class="hub-archive-banner" id="nav-archive">
-        <span class="archive-banner-icon">📜</span>
-        <span class="archive-banner-text">
-          <span class="archive-banner-title">The Archive</span>
-          <span class="archive-banner-sub">Trace ${horse.name}'s bloodline</span>
-        </span>
-        <span class="archive-banner-arrow">→</span>
       </button>
 
       <!-- Navigation Grid -->

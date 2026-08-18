@@ -4802,11 +4802,35 @@ body {
    Legacy & Hall of Fame
    ========================================================================== */
 
+/*
+ * The yard's own info card — and, since DESIGN.md 10 calls the pedigree tree
+ * "the title of the game", also the door to the Archive. One tap, no
+ * separate banner competing for space and no tab to switch to reach it: the
+ * whole card is the button, with a footer row naming what it does.
+ */
 .hub-legacy-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
   background: linear-gradient(135deg, var(--accent-faint) 0%, transparent 100%);
   border: 1px solid var(--accent-border);
   border-radius: 12px;
   padding: 16px;
+  cursor: pointer;
+  font-family: var(--font);
+  text-align: left;
+  color: var(--text);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.hub-legacy-banner:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.legacy-banner-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4835,67 +4859,26 @@ body {
   gap: 4px;
 }
 
-/*
- * The Archive's door from the hub. Deliberately louder than a nav-grid tile —
- * DESIGN.md 10 calls the pedigree tree "the title of the game", and a button
- * the same size as Consumables undersold that.
- */
-.hub-archive-banner {
+.legacy-archive-cta {
   display: flex;
   align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 14px 18px;
-  background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent-faint) 60%, transparent 100%);
-  border: 1.5px solid var(--accent);
-  border-radius: 12px;
-  cursor: pointer;
-  font-family: var(--font);
-  text-align: left;
-  color: var(--text);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.hub-archive-banner:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px var(--accent-glow);
-}
-
-.archive-banner-icon {
-  flex: none;
-  font-size: 2rem;
-}
-
-.archive-banner-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.archive-banner-title {
-  font-size: 1.1rem;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--accent-border);
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--accent-bright);
 }
 
-.archive-banner-sub {
-  font-size: 0.82rem;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.archive-banner-arrow {
+.legacy-archive-cta-arrow {
   flex: none;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   color: var(--accent);
 }
 
 /*
- * Narrow screens stack the banner deliberately rather than leaving it to wrap.
+ * Narrow screens stack the top row deliberately rather than leaving it to wrap.
  *
  * Wrapping made the layout depend on how long the tier name happened to be:
  * "Novice Stable" kept the horse's score on the right, "Professional Stable"
@@ -4903,7 +4886,7 @@ body {
  * stray left-aligned block with its number floating away from its label.
  */
 @media (max-width: 560px) {
-  .hub-legacy-banner {
+  .legacy-banner-top {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
@@ -7377,22 +7360,19 @@ body {
 
 .archive-detail-head {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .archive-detail-heading {
-  flex: 1;
   min-width: 0;
 }
 
-/* The idle horse, same spritesheet as the training screen's preview, tucked
-   into the card's corner instead of filling a panel. */
+/* The idle horse, same spritesheet as the training screen's preview — the
+   card's headline, full width above the name, not a corner thumbnail. */
 .archive-detail-preview {
-  flex: none;
-  width: 110px;
-  height: 110px;
+  width: 100%;
+  height: 200px;
   border-radius: 10px;
   overflow: hidden;
   background: var(--bg);

@@ -301,9 +301,9 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
 
   /**
    * The idle animation, the same spritesheet and tinting `trainingScreen.ts`
-   * uses for its own horse preview — scaled down to fit a card corner instead
-   * of a full panel. Only one detail card is open at a time, so this is at
-   * most one animation loop running.
+   * uses for its own horse preview — the card's headline, not a corner
+   * thumbnail. Only one detail card is open at a time, so this is at most
+   * one animation loop running.
    */
   function mountIdlePreview(host: HTMLElement, horse: Horse): () => void {
     const surface = createSurface(host);
@@ -324,7 +324,10 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
           ctx.fillRect(0, 0, width, height);
           drawFrame(ctx, width / 2, height * 0.92, sequence, {
             phase: (time * 0.1) % 1,
-            scale: width / 100,
+            // Bounded by the shorter side: the box is wide and short, and
+            // scaling off width alone would draw the horse taller than the
+            // box and clip its head off.
+            scale: Math.min(width, height) / 100,
             scheme: { coat: horse.coat, silks: silksFor(horse, root, playerSilks) },
           });
         },
@@ -357,6 +360,12 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
     const head = document.createElement('div');
     head.className = 'archive-detail-head';
 
+    // The animation is the headline, full width above the name — "prominent"
+    // meant it had to stop competing with text for a corner.
+    const preview = document.createElement('div');
+    preview.className = 'archive-detail-preview';
+    head.appendChild(preview);
+
     const heading = document.createElement('div');
     heading.className = 'archive-detail-heading';
     heading.innerHTML = `
@@ -370,9 +379,6 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
     `;
     head.appendChild(heading);
 
-    const preview = document.createElement('div');
-    preview.className = 'archive-detail-preview';
-    head.appendChild(preview);
     detailBody.appendChild(head);
     stopIdlePreview = mountIdlePreview(preview, horse);
 
