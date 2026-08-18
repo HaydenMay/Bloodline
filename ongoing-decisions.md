@@ -11,6 +11,10 @@ bar is reachable. Deciding them one at a time in the wrong order means deciding 
 Items marked **[Hayden]** came out of play rather than out of the code, which is why they are the
 ones worth trusting most.
 
+Items marked **[Hayden — looking into]** are ones Hayden is taking himself. They are not parked for
+want of a decision — he wants to look at them first, so do not pick one up without asking, even if
+it looks like a quick win sitting next to whatever you are actually working on.
+
 ---
 
 ## Economy and betting
@@ -61,21 +65,24 @@ ones worth trusting most.
 
 ## Condition and form
 
-Found while answering the item above, not previously written down anywhere.
+Found while answering the item above, not previously written down anywhere. **All three are
+Hayden's**, and none of them should be acted on by an agent.
 
-- **Condition barely does anything** — `CONDITION_MIN_FACTOR` 0.985 to 1.0, so a jaded horse is
-  **1.5% slower** than the same horse at its peak, in an engine where a 13-point stat edge wins 97%
-  of races. Five labels from "Could not be better in itself" to "Thoroughly over-raced" describe one
-  and a half percent. Its only real teeth are injury risk (`injury.ts`: under 30 doubles a
-  breakdown). Raising its weight is noise, so it interacts with the margins item above — but it may
-  also be part of why the engine reads as more deterministic than intended, since nothing except raw
-  stats is allowed to weigh much. Measure both with `npm run harness` rather than arguing it.
-- **"Form" means two unrelated things in the code** — `getForm` in `sim/upkeep.ts` is the label on
-  condition (Peak / In Form / Steady / Off Form / Jaded), while `form` in `race/engine.ts` is the
-  per-race luck roll scaled by Temper. Same word, no relationship. One of them wants renaming.
-- **Form is surfaced in exactly one place** — `ui/stableHub.ts`. Not on race day, not on the
-  dossier, not in the archive. If peaking a horse for the right race is meant to be a skill (§5),
-  the player currently cannot see it anywhere they would use it.
+- **Condition barely does anything** **[Hayden — looking into]** — `CONDITION_MIN_FACTOR` 0.985 to
+  1.0, so a jaded horse is **1.5% slower** than the same horse at its peak, in an engine where a
+  13-point stat edge wins 97% of races. Five labels from "Could not be better in itself" to
+  "Thoroughly over-raced" describe one and a half percent. Its only real teeth are injury risk
+  (`injury.ts`: under 30 doubles a breakdown). Raising its weight is noise, so it interacts with the
+  margins item above — but it may also be part of why the engine reads as more deterministic than
+  intended, since nothing except raw stats is allowed to weigh much. Measure both with
+  `npm run harness` rather than arguing it.
+- **"Form" means two unrelated things in the code** **[Hayden — looking into]** — `getForm` in
+  `sim/upkeep.ts` is the label on condition (Peak / In Form / Steady / Off Form / Jaded), while
+  `form` in `race/engine.ts` is the per-race luck roll scaled by Temper. Same word, no relationship.
+  One of them wants renaming.
+- **Form is surfaced in exactly one place** **[Hayden — looking into]** — `ui/stableHub.ts`. Not on
+  race day, not on the dossier, not in the archive. If peaking a horse for the right race is meant to
+  be a skill (§5), the player currently cannot see it anywhere they would use it.
 
 ## The clock, and rerolling
 
