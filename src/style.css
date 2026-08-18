@@ -3207,6 +3207,26 @@ body {
   gap: 12px;
 }
 
+/* Deliberately quieter than a .race-card — this is the "none of these" exit,
+   not another option competing for attention alongside three real races. */
+.calendar-back-btn {
+  align-self: center;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 10px 20px;
+  transition: all 0.2s ease;
+}
+
+.calendar-back-btn:hover {
+  border-color: var(--accent-border);
+  color: var(--text);
+}
+
 .race-card {
   /* A <button> takes `color: buttontext` from the user agent, and that does not
      inherit from body — so any child without its own colour renders black on the

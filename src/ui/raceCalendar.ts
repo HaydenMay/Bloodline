@@ -140,19 +140,29 @@ export function generateRaceCalendar(seed: string, opts: RaceCalendarOptions = {
  * offers, and the calendar's whole point is committing to a distance and a date
  * rather than shopping until something suits.
  *
- * The career supplies a key built from the horse and its start count, which
- * holds across a round trip and moves on once a race has actually been run.
+ * The career supplies a key built from the horse's start count and the
+ * career's week, which holds across a round trip and moves on once a race —
+ * or a rest week — has actually happened.
+ *
+ * `onBack`, when given, offers "Rest Instead" — but only on an ordinary week.
+ * A promotion, demotion or championship decider is the one race that has to
+ * stay put: resting to duck it would let the ladder's whole point be
+ * indefinitely postponed, so those weeks render with no way out but picking
+ * the single race shown.
  */
 export function mountRaceCalendar(
   container: HTMLElement,
   onSelectRace: (race: RaceOption) => void,
   seed: string,
   opts: RaceCalendarOptions = {},
+  onBack?: () => void,
 ): () => void {
   const root = document.createElement('div');
   root.className = 'race-calendar';
 
   const races = generateRaceCalendar(seed, opts);
+  const isSpecialWeek = Boolean(opts.isPromotionReady || opts.isDemotionRisk || opts.isChampionshipReady);
+  const showBackButton = Boolean(onBack) && !isSpecialWeek;
 
   root.innerHTML = `
     <div class="calendar-container">
@@ -196,6 +206,8 @@ export function mountRaceCalendar(
           )
           .join('')}
       </div>
+
+      ${showBackButton ? '<button type="button" class="calendar-back-btn" id="calendar-back-btn">None of these — rest instead</button>' : ''}
     </div>
   `;
 
@@ -209,6 +221,10 @@ export function mountRaceCalendar(
       onSelectRace(race);
     });
   });
+
+  if (showBackButton) {
+    root.querySelector<HTMLButtonElement>('#calendar-back-btn')?.addEventListener('click', () => onBack!());
+  }
 
   return () => {
     root.remove();

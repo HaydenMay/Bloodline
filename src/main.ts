@@ -1005,6 +1005,51 @@ function resumeCareer(career: Career): void {
   showStableHub(career);
 }
 
+/**
+ * A week off: recovers condition and morale, works down a lay-off, and
+ * advances the calendar without a race. Shared by the stable hub's Rest nav
+ * button and the race calendar's "Rest Instead" option — declining this
+ * week's card costs the same real week either way.
+ */
+function restWeek(career: Career): void {
+  const change = applyRestWeek(career.horse, career.stable.facilities);
+  const before = career.weeksInjured ?? 0;
+  const after = Math.max(0, before - 1);
+
+  const rested: Career = {
+    ...career,
+    week: career.week + 1,
+    trainingDoneThisWeek: false,
+    raceSelected: false,
+    weeksInjured: after,
+  };
+  if (after === 0) delete rested.injuryName;
+  saveCareer(rested);
+
+  const parts: string[] = [];
+  if (change.condition) parts.push(`${change.condition > 0 ? '+' : ''}${change.condition} condition`);
+  if (change.morale) parts.push(`${change.morale > 0 ? '+' : ''}${change.morale} morale`);
+
+  showStableHub(rested);
+  showNotice(app, {
+    icon: '🌙',
+    title: 'A Week Off',
+    lines: [
+      parts.length
+        ? `${rested.horse.name}: ${parts.join(', ')}.`
+        : `${rested.horse.name} is already as fresh as this yard can get it.`,
+      ...(before > 0
+        ? [
+            after > 0
+              ? `${after} week${after === 1 ? '' : 's'} of the lay-off still to go.`
+              : 'Passed sound — it can race again.',
+          ]
+        : []),
+    ],
+    tone: before > 0 && after === 0 ? 'positive' : 'neutral',
+  });
+}
+
 function showStableHub(career: Career): void {
   teardown?.();
   app.innerHTML = '';
@@ -1115,47 +1160,7 @@ function showStableHub(career: Career): void {
         ],
       });
     },
-    onRest: () => {
-      // A week off: recovers condition and morale, works down a lay-off, and
-      // advances the calendar without a race. This is the lever that makes an
-      // injury survivable and a jaded horse manageable.
-      const change = applyRestWeek(career.horse, career.stable.facilities);
-      const before = career.weeksInjured ?? 0;
-      const after = Math.max(0, before - 1);
-
-      const rested: Career = {
-        ...career,
-        week: career.week + 1,
-        trainingDoneThisWeek: false,
-        raceSelected: false,
-        weeksInjured: after,
-      };
-      if (after === 0) delete rested.injuryName;
-      saveCareer(rested);
-
-      const parts: string[] = [];
-      if (change.condition) parts.push(`${change.condition > 0 ? '+' : ''}${change.condition} condition`);
-      if (change.morale) parts.push(`${change.morale > 0 ? '+' : ''}${change.morale} morale`);
-
-      showStableHub(rested);
-      showNotice(app, {
-        icon: '🌙',
-        title: 'A Week Off',
-        lines: [
-          parts.length
-            ? `${rested.horse.name}: ${parts.join(', ')}.`
-            : `${rested.horse.name} is already as fresh as this yard can get it.`,
-          ...(before > 0
-            ? [
-                after > 0
-                  ? `${after} week${after === 1 ? '' : 's'} of the lay-off still to go.`
-                  : 'Passed sound — it can race again.',
-              ]
-            : []),
-        ],
-        tone: before > 0 && after === 0 ? 'positive' : 'neutral',
-      });
-    },
+    onRest: () => restWeek(career),
   });
 }
 
@@ -1288,12 +1293,16 @@ function showRaceCalendar(career: Career): void {
       const careerWithRaceSelected = { ...career, raceSelected: true };
       saveCareer(careerWithRaceSelected);
       startRaceWithHorse(careerWithRaceSelected, race);
-    }, `calendar-${career.horse.id}-${career.horse.starts}`, {
+    // `week` is folded into the seed alongside `starts` so declining every
+    // race and resting actually draws a fresh set next time — `starts` alone
+    // only ever changes once a race is run, so a back-and-rest loop used to
+    // hand back the exact same three races forever.
+    }, `calendar-${career.horse.id}-${career.horse.starts}-${career.week}`, {
       division: career.horse.division,
       isPromotionReady,
       isDemotionRisk,
       isChampionshipReady,
-    });
+    }, () => restWeek(career));
   }
 }
 
