@@ -2745,6 +2745,8 @@ body {
 }
 
 .training-card {
+  /* Same reason as .race-card — a button needs an explicit colour. */
+  color: var(--text);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -3206,6 +3208,12 @@ body {
 }
 
 .race-card {
+  /* A <button> takes `color: buttontext` from the user agent, and that does not
+     inherit from body — so any child without its own colour renders black on the
+     dark panel. The purse did exactly that: every other child here sets a colour
+     and it was the one that did not. Set it on the container so the next child
+     added cannot repeat it. */
+  color: var(--text);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -6747,6 +6755,8 @@ body {
 }
 
 .stat-row {
+  /* Same reason as .race-card — a button needs an explicit colour. */
+  color: var(--text);
   display: grid;
   grid-template-columns: 5.5rem 1fr auto auto;
   grid-template-areas: 'name bar grade num';
@@ -7001,6 +7011,40 @@ body {
 .stud-card-note {
   font-size: 0.78rem;
   color: var(--text);
+}
+
+/* A partner's public form. Reading a candidate off its fee was the only option
+   before this existed, and the fee is a poor proxy — an outside stud's
+   contribution is seeded from its wins. */
+.stud-card-form {
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.stud-card-grades {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Grades first, numbers never — this is a browsing list, and §3 keeps exact
+   figures for the detail card and the projection below. */
+.stud-card-grade {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.stud-card-grade em {
+  font-style: normal;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.stud-card-grade b {
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .stud-card-traits {

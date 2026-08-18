@@ -1,4 +1,4 @@
-import type { Horse } from '../sim/types.js';
+import { STAT_KEYS, toGrade, type Horse, type StatKey } from '../sim/types.js';
 import { TRAITS } from '../data/traits.js';
 import type { BreedingPartner } from '../sim/breeding.js';
 import type { RetiredHorse, Stable } from './career.js';
@@ -23,6 +23,19 @@ import {
  * outcross and narrower for close family on their own, so the mechanic is felt
  * at the moment of decision rather than explained at it. The explanation lives
  * in the breeding manual (§13) for anyone who goes looking.
+ *
+ * **What that rule does not cover is the partner's own form.** The screen used
+ * to show a candidate's name, class and fee and nothing more, which meant the
+ * only signal for whether a stud was any good was how much it cost — found in
+ * play: "I went blindly based on the fact the new outside horse was expensive
+ * so she must be good." Price is a terrible proxy, and it was actively
+ * misleading here: an outside partner's contribution is seeded almost entirely
+ * from its **wins**, so a well-priced horse that never won brings very little.
+ *
+ * A horse's record, its banked legacy and its stats are public facts about an
+ * animal, not an explanation of the mechanic — the same things the archive's
+ * detail card has always shown. Withholding them was never what §10 asked for.
+ * Grades rather than numbers, per §3.
  *
  * Reached between careers, so it takes a `Stable` rather than a `Career` — at
  * the moment this matters most, the horse that just retired is the yard's
@@ -61,10 +74,65 @@ function describe(horse: Horse): string {
   return traits || 'No notable traits';
 }
 
+/** Short stat names, so six grades fit on one line of a card. */
+const SHORT_STAT: Record<StatKey, string> = {
+  speed: 'SPD',
+  stamina: 'STA',
+  burst: 'BRS',
+  grit: 'GRT',
+  temper: 'TMP',
+  consistency: 'CNS',
+};
+
+/**
+ * The six potentials as grades, in one strip.
+ *
+ * Potential rather than current stats: what a partner passes on is its ceiling,
+ * and an outside stud you meet at four has not finished growing into its own.
+ */
+function renderGrades(horse: Horse): string {
+  return STAT_KEYS.map((key) => {
+    const grade = toGrade(horse.potential?.[key] ?? 50);
+    return `<span class="stud-card-grade"><em>${SHORT_STAT[key]}</em><b class="grade-${grade}">${grade}</b></span>`;
+  }).join('');
+}
+
+/**
+ * A partner's record and what it banked.
+ *
+ * Legacy is the figure that actually decides the pairing — it is what the
+ * inheritance budget reads — so it earns its place beside the record rather
+ * than being left for the player to infer from the fee.
+ *
+ * `withRecord` is false for your own horses, whose note line already carries
+ * the career record from `RetiredHorse` — the authoritative copy. Reading it a
+ * second time off the `Horse` would print the same fact twice from a weaker
+ * source.
+ */
+function renderForm(horse: Horse, legacyBanked: number, withRecord: boolean): string {
+  const legacy = `Legacy ${Math.max(0, Math.round(legacyBanked))}`;
+  if (!withRecord) return `<span class="stud-card-form">${legacy}</span>`;
+
+  const starts = horse.starts ?? 0;
+  const wins = horse.wins ?? 0;
+  const record = starts > 0 ? `${wins} win${wins === 1 ? '' : 's'} from ${starts} starts` : 'Unraced';
+  return `<span class="stud-card-form">${record} · ${legacy}</span>`;
+}
+
 /** One selectable horse: yours or a rival's. */
 function renderCard(
   horse: Horse,
-  opts: { selected: boolean; note: string; badge?: string; fee?: string; barred?: boolean },
+  opts: {
+    selected: boolean;
+    note: string;
+    badge?: string;
+    fee?: string;
+    barred?: boolean;
+    /** Banked legacy. Omitted only where the card is not a breeding candidate. */
+    legacy?: number;
+    /** False where `note` already carries the record. */
+    showRecord?: boolean;
+  },
 ): string {
   return `
     <button type="button" class="stud-card${opts.selected ? ' selected' : ''}${
@@ -76,6 +144,8 @@ function renderCard(
       </span>
       <span class="stud-card-meta">${horse.gender === 'stallion' ? 'Stallion' : 'Mare'} · ${horse.age}yo · ${titleCase(horse.division)}</span>
       <span class="stud-card-note">${opts.note}</span>
+      ${opts.legacy === undefined ? '' : renderForm(horse, opts.legacy, opts.showRecord !== false)}
+      <span class="stud-card-grades">${renderGrades(horse)}</span>
       <span class="stud-card-traits">${describe(horse)}</span>
       ${opts.fee ? `<span class="stud-card-fee">${opts.fee}</span>` : ''}
     </button>`;
@@ -143,6 +213,8 @@ export function mountBreedingScreen(
                   renderCard(entry.horse, {
                     selected: entry.horse.id === mine?.horse.id,
                     note: `${entry.wins} wins from ${entry.starts} starts`,
+                    legacy: entry.legacyBanked,
+                    showRecord: false,
                     ...(entry.hallOfFame ? { badge: '🏛️ Hall of Fame' } : {}),
                   }),
                 )
@@ -164,6 +236,7 @@ export function mountBreedingScreen(
                              option.timesBred === 0
                                ? 'A new cross'
                                : `Bred ${option.timesBred} time${option.timesBred === 1 ? '' : 's'} before`,
+                           legacy: option.partner.legacyBanked,
                            ...(option.source === 'bloodstock'
                              ? { badge: 'Your yard' }
                              : { badge: 'Outside' }),

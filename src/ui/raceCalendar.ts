@@ -100,15 +100,26 @@ export function generateRaceCalendar(seed: string, opts: RaceCalendarOptions = {
   return races;
 }
 
+/**
+ * `seed` is supplied by the caller and must stay **stable while the choice is
+ * open**. This used to be `calendar-${Date.now()}`, which meant every mount
+ * rolled a fresh set — so backing out of a race and coming back rerolled the
+ * offers, and the calendar's whole point is committing to a distance and a date
+ * rather than shopping until something suits.
+ *
+ * The career supplies a key built from the horse and its start count, which
+ * holds across a round trip and moves on once a race has actually been run.
+ */
 export function mountRaceCalendar(
   container: HTMLElement,
   onSelectRace: (race: RaceOption) => void,
+  seed: string,
   opts: RaceCalendarOptions = {},
 ): () => void {
   const root = document.createElement('div');
   root.className = 'race-calendar';
 
-  const races = generateRaceCalendar(`calendar-${Date.now()}`, opts);
+  const races = generateRaceCalendar(seed, opts);
 
   root.innerHTML = `
     <div class="calendar-container">

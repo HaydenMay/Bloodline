@@ -1256,7 +1256,7 @@ function showRaceCalendar(career: Career): void {
       const careerWithRaceSelected = { ...career, raceSelected: true };
       saveCareer(careerWithRaceSelected);
       startRaceWithHorse(careerWithRaceSelected, race);
-    }, {
+    }, `calendar-${career.horse.id}-${career.horse.starts}`, {
       division: career.horse.division,
       isPromotionReady,
       isDemotionRisk,

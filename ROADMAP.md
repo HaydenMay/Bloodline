@@ -696,6 +696,25 @@ assuming there are others" was correct at a scale nobody had counted. It wants a
 wants code: implement the 31, cut the catalogue down to what is real, or stage them — but a horse
 card that lists five traits and means two is lying to the player about the thing traits are for.
 
+### Outside studs are priced on class alone, because rivals almost never record a win
+
+**Found by driving the breeding screen** with a seeded world: every outside stud on offer showed
+**0 wins** — 0 from 9, 0 from 4, 0 from 12, 0 from 14, 0 from 13.
+
+An outside partner's contribution to the inheritance budget is
+`seedLegacyFromRecord(horse.wins, 0, horse.division)` (`ui/studBook.ts`), so wins are half of what
+decides a partner's worth. But a rival's win counter is only ever incremented at `main.ts:1501`, for
+the winner of a race **the player was in**. Rivals racing among themselves record nothing, and since
+a strong player wins most of their own races, the counter almost never fires for anyone else.
+
+The effect: the wins half of the formula is dead, and an outside stud is worth exactly what its
+division says. Two horses of the same class are interchangeable however different their careers were
+— which also makes the stud fee a poor guide, since fees do read potential.
+
+Related to "the world never ages" in ongoing-decisions.md, and probably wants fixing with it: a
+world that neither ages nor accumulates form is a world where outside horses have no history to
+read.
+
 ### The race calendar rerolls its options when you back out of a race
 
 **Found in play** — "go to race calendar, click a race, then click back, and it rerolls your race
