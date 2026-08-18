@@ -137,14 +137,34 @@ export function getCareerStage(age: number): CareerStage {
 }
 
 /**
+ * How much harder each extra season past FINAL_AGE bites, compounding.
+ *
+ * At FINAL_AGE itself (age 5, extraYears 0) this is 1 — the transition every
+ * horse already goes through going into its natural last competitive year is
+ * completely unchanged. Past that, decline stops being a flat cost and starts
+ * accelerating: with age no longer capped (main.ts, growth.ts), "keep racing
+ * forever" needed to become actively ruinous rather than a permanent
+ * plateau, not just a slightly worse one. Speed's base loss of 4 becomes
+ * roughly 4 -> 6 -> 8 -> 11 -> 15 -> 22 at ages 5 -> 6 -> 7 -> 8 -> 9 -> 10 —
+ * a horse that peaked in the 90s is down to the low 20s five extra years in.
+ */
+export const AGE_EROSION_GROWTH = 1.4;
+
+/**
  * Stat erosion applied when a horse ages into decline.
  *
- * Deliberately gradual. §8 wants retiring to be a judgement call, and a cliff
- * would make it obvious instead — the horse should get quietly worse while
- * still being capable of winning, so "one more season" is a real gamble.
+ * Deliberately gradual at first. §8 wants retiring to be a judgement call,
+ * and a cliff would make it obvious instead — the horse should get quietly
+ * worse while still being capable of winning, so "one more season" is a real
+ * gamble. Racing well past FINAL_AGE is the same gamble taken again and
+ * again, and AGE_EROSION_GROWTH is what makes each further bet worse odds
+ * than the last rather than the same ones forever.
  */
 export function applyAgeing(horse: Horse, newAge: number): Partial<Stats> {
   if (newAge <= PEAK_AGE) return {};
+
+  const extraYears = Math.max(0, newAge - FINAL_AGE);
+  const growth = AGE_EROSION_GROWTH ** extraYears;
 
   const changes: Partial<Stats> = {};
   // Speed and burst go first — the sharp end of a horse dulls before its
@@ -159,11 +179,13 @@ export function applyAgeing(horse: Horse, newAge: number): Partial<Stats> {
   };
 
   for (const key of STAT_KEYS) {
-    const loss = erosion[key] ?? 0;
-    if (loss === 0) continue;
+    const base = erosion[key] ?? 0;
+    if (base === 0) continue;
+    const loss = Math.round(base * growth);
     const before = horse.stats[key];
     horse.stats[key] = Math.max(0, before - loss);
-    // Potential erodes with the stat, so decline cannot be trained back off.
+    // Potential erodes with the same loss, so decline cannot be trained back
+    // off — the ceiling itself falls, at the same accelerating rate.
     if (horse.potential) {
       horse.potential[key] = Math.max(horse.stats[key], horse.potential[key] - loss);
     }

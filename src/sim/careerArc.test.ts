@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Horse } from './types.js';
 import { createRng } from './rng.js';
 import {
+  AGE_EROSION_GROWTH,
   DEBUT_AGE,
   FINAL_AGE,
   PEAK_AGE,
@@ -178,6 +179,38 @@ describe('age and the decline arc', () => {
     advanceSeasonIfDue(h, RACES_PER_SEASON * 5); // seasonsElapsed 5 -> age 7, third erosion
     expect(h.age).toBe(7);
     expect(h.stats.speed).toBeLessThan(afterSecond);
+  });
+
+  it('applies the unchanged flat loss for the transition into FINAL_AGE itself', () => {
+    const h = horse({ age: PEAK_AGE, stats: { ...horse().stats, speed: 80 } });
+    advanceSeasonIfDue(h, RACES_PER_SEASON * 3); // -> age 5, extraYears 0
+    // Base loss for speed is 4 (growth.ts); growth^0 === 1, so this transition
+    // is byte-identical to every horse's pre-existing 4->5 birthday.
+    expect(h.stats.speed).toBe(76);
+  });
+
+  it('compounds erosion by AGE_EROSION_GROWTH per extra year past FINAL_AGE', () => {
+    const h = horse({ age: PEAK_AGE, stats: { ...horse().stats, speed: 80 } });
+    advanceSeasonIfDue(h, RACES_PER_SEASON * 3); // -> age 5, extraYears 0
+    const lossAt5 = 80 - h.stats.speed;
+    advanceSeasonIfDue(h, RACES_PER_SEASON * 4); // -> age 6, extraYears 1
+    const speedAt6 = h.stats.speed;
+    const lossAt6 = 76 - speedAt6;
+    // Rounded to the nearest point, so an exact ratio isn't guaranteed, but it
+    // has to land close to lossAt5 * AGE_EROSION_GROWTH rather than repeating
+    // the flat lossAt5 amount.
+    expect(lossAt6).toBeGreaterThan(lossAt5);
+    expect(lossAt6).toBeCloseTo(lossAt5 * AGE_EROSION_GROWTH, 0);
+  });
+
+  it('erodes potential by the same accelerating amount, so training cannot recover it', () => {
+    const h = horse({ age: PEAK_AGE, potential: { ...horse().potential, speed: 95 } });
+    advanceSeasonIfDue(h, RACES_PER_SEASON * 3); // -> age 5
+    const potentialAt5 = h.potential.speed;
+    advanceSeasonIfDue(h, RACES_PER_SEASON * 4); // -> age 6
+    const lostAt5 = 95 - potentialAt5;
+    const lostAt6 = potentialAt5 - h.potential.speed;
+    expect(lostAt6).toBeGreaterThan(lostAt5);
   });
 });
 
