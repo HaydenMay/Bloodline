@@ -167,9 +167,15 @@ Hayden's**, and none of them should be acted on by an agent.
 - **Retiring early buys stud years** **[Hayden]** — a horse retired at three yields about 4.6 foals'
   worth of stud life against 4.2 at five. Self-limiting today because retiring early guts the banked
   legacy that sets every future foal's quality, but it is a strategy some players will find.
-- **The world clock is blunt** — every retirement ages the world four years, even a two-race career.
-  That bluntness *is* the anti-reroll brake §10 asks for, so any fix has to bring a replacement brake
-  with it. The harder half of the problem.
+- ✅ **The world clock was blunt — fixed.** `YEARS_PER_CAREER` used to age every horse already at stud
+  a flat 4 years on every retirement, whether the retiring horse raced a two-race career or a full
+  natural one. Replaced with `BREEDING_ADVANCE_AGE (6) - the retiring horse's own age`, floored at 0:
+  a horse retired at debut age still costs the yard's studs the full 4 (unchanged — the fast
+  reroll-and-retire brake this existed for keeps its bite), but one played out to its natural peak (5)
+  now only costs 1, and one raced well past 6 costs nothing at all. Age itself no longer caps at
+  `FINAL_AGE` either (`sim/growth.ts`) — a horse raced on indefinitely keeps ageing and its stats keep
+  eroding every season, so racing an old horse forever is a real, escalating gamble rather than a
+  plateau, now that retirement is always the player's own call (no forced cutoff).
 
 ## Traits
 
