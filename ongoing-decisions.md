@@ -19,10 +19,15 @@ it looks like a quick win sitting next to whatever you are actually working on.
 
 ## Economy and betting
 
-- **The betting market is a money printer** **[Hayden]** — the market implies a 15–25% chance while
-  the horse actually wins 97–100%, paying +250% a bet with no risk. Fix: price off the rating
-  *difference* against the field rather than share of its total. Measured by `npm run odds`; detail
-  in ROADMAP.md Known Issues.
+- **The betting market prices on a multiplier, not on odds** **[Hayden]** — **largely defused in
+  play, and no longer urgent.** The exploit was betting $5,000 on a Maiden horse that won every
+  race and being paid $35,000+, over and over, until promotion moved it on. Capping the stake at a
+  share of the purse fixed the damage: the Maiden maximum is now $1,000 and scales up with the
+  class, and Hayden reports the economy is "a lot better". What is *not* fixed is the cause —
+  `winProbability` still prices a horse on its share of the field's total rating, so a horse that
+  wins 97–100% of the time is still quoted at 15–25%. The cap bounds the payout without making the
+  price honest. Fix, when it is worth doing: price off the rating *difference* against the field,
+  through a curve fitted to what `npm run odds` measures. Detail in ROADMAP.md Known Issues.
 - **Win rate concerns** **[Hayden]** — a 13-point stat edge wins 97% of 400 races. Is the engine more
   deterministic than intended, or is that the racing you want? Probably the same root as the margins
   issue below.
@@ -46,9 +51,9 @@ it looks like a quick win sitting next to whatever you are actually working on.
 - **Facilities cost too much for what they give** **[Hayden]** — $50,000 for an 8% morale bonus,
   when a player who always wins is already living at 100 morale, so the best upgrade in the game is
   worth nothing to the person who can afford it. Direction: **more levels, each cheaper**, so
-  spending feels like steadily unlocking something rather than saving for one flat number. Note this
-  cuts across the economy items above — if the betting fix takes cash out of the game, the same
-  prices bite very differently.
+  spending feels like steadily unlocking something rather than saving for one flat number. This was
+  first written down as blocked on the betting fix; it is not. The stake cap already took the
+  inflation out, so these prices can be judged against the economy as it actually plays now.
 
 ## The legacy ladder
 
@@ -133,9 +138,22 @@ Hayden's**, and none of them should be acted on by an agent.
 ## The two platforms
 
 - **Desktop has fallen behind mobile** **[Hayden]** — the mobile clean-up was needed and worked, but
-  it was done at desktop's expense and desktop now wants a pass of its own. *Hayden's list of
-  specifics is still to come — this item is a placeholder until it lands, and should not be worked
-  from as written.*
+  it was done at desktop's expense. "I just feel like it should feel more polished." Four
+  specifics, with what each one is caused by:
+
+  - **The screen is a phone column on a monitor** — "it still looks like a mobile game, small and
+    centered, until the races". Screen containers are capped and centred at 400–600 px throughout
+    `style.css` (`.boot` 460, `.pre-race-content` 480, and a long tail of `max-width: 400px` /
+    `600px` / `800px` blocks). The race screen is canvas and fills, which is why the feeling stops
+    exactly there. This is the big one and it is a layout decision, not a bug: desktop wants its
+    own breakpoint doing something with the width, not just a wider column.
+  - **Text is too small to read without squinting** — sizes are absolute px and never scale up:
+    `.detail-label` is 9 px, `.detail-value` 12 px, the HUD's own labels 9 px. They were chosen at
+    phone scale, where a 9 px label sits close to the eye.
+  - **The info box is a scrollable list** — fine on a phone, wrong on a monitor with room to show
+    the whole thing at once.
+  - **The purse renders black and vanishes into the background** on the race calendar. Confirmed,
+    with a one-line cause — logged as a defect in ROADMAP.md Known Issues rather than here.
 
 ## Gaps and housekeeping
 

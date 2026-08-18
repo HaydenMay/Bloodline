@@ -489,7 +489,14 @@ levers if rivals ever breed to your stallions for real.
 
 ### ⚠️ The betting market is a money printer
 
-**Deferred until Phase 5 lands, then fixed.** Found in play — backing a dominant Maiden horse
+**Status: the damage is capped, the pricing is still wrong.** The stake cap (Stage 2) turned out to
+be the fix that mattered in practice — the exploit was betting $5,000 on an unbeatable Maiden horse
+and collecting $35,000+ every time until promotion moved it on. Maiden now caps at $1,000 and scales
+with class, and the economy plays much better for it. Everything below still describes the *cause*
+accurately: the market is a multiplier off share-of-field, not a set of odds, so a horse winning
+97–100% is still quoted at 15–25%. Worth fixing properly one day; no longer urgent.
+
+Found in play — backing a dominant Maiden horse
 returned several times the stake, every time — and confirmed by `npm run odds`, 400 races a row:
 
 ```
@@ -614,6 +621,23 @@ mention anywhere in the UI.
 
 The code comment immediately above it is also stale: it describes "1-3 arrows for low/normal/strong
 regen", which is a different feature from what the code below it draws.
+
+### The purse on the race calendar renders black on a dark panel
+
+**Found in play** — "the text colour for the purse on the race calendar screen seems like it renders
+black and blends with the background".
+
+Confirmed, and the cause is one missing declaration. `.race-card` (`style.css:3208`) is a `<button>`,
+and it sets `background`, `border` and `font-family` but **no `color`** — so it falls back to the
+user agent's `color: buttontext`, which is black, and that does not inherit from the page's theme.
+Its children mostly hide the problem: `.detail-label` sets `var(--muted)` and the going values set
+`.going-firm` and friends, so those all render correctly. The purse uses a bare `.detail-value`,
+which declares font-size and weight but no colour — so it is the one element on the card that shows
+the button's black through.
+
+Fix is `color: var(--text)` on `.race-card`. Worth checking the other `<button>`-based cards for the
+same omission while there, since anything inside one without an explicit colour has the same bug
+waiting.
 
 ### The race intro markers are not laid out responsively
 
