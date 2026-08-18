@@ -471,6 +471,30 @@ levers if rivals ever breed to your stallions for real.
 
 ---
 
+## Phase 8 — The desktop pass
+**Open-ended** · ⏳ *after the Archive; ordering against Phase 7 is open*
+
+The mobile clean-up was needed and it worked, but it was done at desktop's expense and desktop is
+now visibly the weaker of the two. Raised from play; the itemised list and the cause of each entry
+live in [ongoing-decisions.md](ongoing-decisions.md) under "The two platforms".
+
+The headline is that this is **a design decision before it is a CSS one**. Screen containers are
+capped and centred at 400–600 px throughout `style.css`, so a monitor gets a phone column until the
+race canvas takes over — and the fix is not "make the column wider", it is deciding what desktop
+*does* with the space: two columns, a persistent sidebar, larger cards, or something else.
+
+- **Decide the desktop layout**, then build it behind a breakpoint that leaves mobile untouched
+- **Type scale** — sizes are absolute px chosen at phone distance (9 px labels, 12 px values) and
+  never scale up
+- **The info box** scrolls where there is room to show it whole
+- **Audit for colour omissions** — the purse-on-race-calendar defect under Known Issues is one
+  instance of a class, not a one-off
+
+Phase 7's "UI polish — responsive sizing" bullet is this phase; it is listed there only as a
+pointer.
+
+---
+
 ## Phase 7 — Polish
 **~3+ sessions, open-ended**
 
@@ -622,6 +646,41 @@ mention anywhere in the UI.
 The code comment immediately above it is also stale: it describes "1-3 arrows for low/normal/strong
 regen", which is a different feature from what the code below it draws.
 
+### Most traits are catalogued but never read by the simulation
+
+**Found while reading a played horse's card**, and the broadest gap logged so far. `src/data/traits.ts`
+defines **41 traits**, 26 of them in the racing pool the game actually hands out. The simulation
+reads **10**:
+
+```
+allWeather  mudder  firmSpecialist  ironLungs  thirsty
+cruiser     quickRecovery  alert   gateRusher  ironHorse
+```
+
+The other 31 have names, descriptions, categories, affinities and tags, appear on horse cards, are
+handed out at birth by `rollTraits` and acquired through training — and change nothing. Nothing in
+`sim/race/`, `sim/growth.ts`, `sim/injury.ts` or `data/legacy.ts` reads them.
+
+Worked example, from the horse that surfaced it — a generation-3 stallion carrying five traits:
+
+| Trait | Description shown to the player | Wired |
+|---|---|---|
+| Cruiser | Regens charges cheaply at moderate effort, badly at maximum | ✅ `engine.ts:284` |
+| Firm Specialist | Thrives on firm; ordinary on soft | ✅ `engine.ts:269` |
+| Turn of Foot | Kick is stronger but much shorter — punishes an early call | ❌ |
+| Professional | Consistency climbs faster with race starts | ❌ |
+| Tractable | Settles anywhere; much smaller out-of-position regen penalty | ❌ |
+
+Three of five did nothing. Two of the three are in `trainingScreen.ts`'s acquisition pools, so the
+game spent his career awarding him traits that do not exist — which is the trait-cap defect above
+made considerably worse: it is not just handing out too many, it is handing out blanks.
+
+**This is the same class as the two Phase 5 caught** (gendered inheritance and the Stud Farm's
+breeding bonus, both marked ✅ and never built) and the Session Log's warning that it is "worth
+assuming there are others" was correct at a scale nobody had counted. It wants a decision before it
+wants code: implement the 31, cut the catalogue down to what is real, or stage them — but a horse
+card that lists five traits and means two is lying to the player about the thing traits are for.
+
 ### The purse on the race calendar renders black on a dark panel
 
 **Found in play** — "the text colour for the purse on the race calendar screen seems like it renders
@@ -675,6 +734,7 @@ viewport.
 | 5 · Breeding | ~3–4 | ✅ Complete — budget and foal, partners and fees, genetics texture, foal development |
 | 6 · The Archive | open-ended | 🚀 **NEXT** — the pedigree tree, broken out of Phase 5 to get a session of its own |
 | 7 · Polish | ~3+ | ⏳ After the Archive |
+| 8 · The desktop pass | open-ended | ⏳ Raised from play; ordering against 7 is open |
 | **Total estimate** | **~22–28** | |
 
 ---
