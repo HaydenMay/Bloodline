@@ -47,39 +47,43 @@ export function scaleTrainingEffects(effects: StatEffects, multiplier: number): 
 }
 
 export const TRAINING_SESSIONS: Record<string, TrainingSession> = {
+  // Four sessions rebuilt from an audit (ROADMAP.md): the original five here
+  // predated every trade-off session below them and had fallen well behind —
+  // net +2/+3 with no downside, against a +4 ceiling everywhere else, so an
+  // experienced player had no reason to ever pick them. `restDay` was worse
+  // than that: strictly dominated by `routineWork`, which gives everything it
+  // gives plus Consistency for the same zero cost. Cut outright.
+  //
+  // The other four are rebuilt to the same net +4, real-trade-off shape as the
+  // rest of the roster. Two are rethemed onto Consistency, which had only two
+  // sessions treating it as the main event against three-to-five for every
+  // other stat — added late, per DESIGN.md's own history, and never caught up.
   gatePractice: {
     id: 'gatePractice',
     name: 'Gate Practice',
-    description: 'Refine your break technique.',
-    statEffects: { speed: 2, grit: 1 },
+    description: 'A clean break, drilled until it repeats itself without thinking.',
+    statEffects: { consistency: 3, speed: 2, temper: -1 },
     traitPool: ['alert', 'professional'],
   },
   gallopsWork: {
     id: 'gallopsWork',
     name: 'Gallops Work',
-    description: 'Extended aerobic conditioning.',
-    statEffects: { stamina: 2, grit: 1 },
+    description: 'Long, steady miles — stamina built the unglamorous way.',
+    statEffects: { stamina: 3, grit: 2, speed: -1 },
     traitPool: ['cruiser', 'relentless'],
   },
   recovery: {
     id: 'recovery',
     name: 'Recovery Day',
-    description: 'Focused restoration and balance.',
-    statEffects: { stamina: 1, grit: 1, temper: 1 },
-    traitPool: ['tractable', 'goodDoer'],
-  },
-  restDay: {
-    id: 'restDay',
-    name: 'Rest Day',
-    description: 'Complete recovery and adaptation.',
-    statEffects: { stamina: 1, temper: 1 },
+    description: 'The same disciplined downtime, every time — nothing left to chance.',
+    statEffects: { consistency: 3, stamina: 2, temper: -1 },
     traitPool: ['tractable', 'goodDoer'],
   },
   crossTraining: {
     id: 'crossTraining',
     name: 'Cross Training',
-    description: 'Varied conditioning routines.',
-    statEffects: { speed: 1, stamina: 1, burst: 1 },
+    description: 'A little of everything, at the cost of specialising in nothing.',
+    statEffects: { speed: 2, stamina: 2, burst: 2, grit: -2 },
     traitPool: ['professional', 'tractable'],
   },
   swimming: {
