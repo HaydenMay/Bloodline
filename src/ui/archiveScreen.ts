@@ -1,6 +1,6 @@
 import type { Horse } from '../sim/types.js';
 import type { Silks } from '../render/palette.js';
-import { hashId, RIVAL_SILKS } from '../render/palette.js';
+import { coatForHorse, hashId, RIVAL_SILKS } from '../render/palette.js';
 import { createBadgeElement } from './badgeLoader.js';
 import { TRAITS } from '../data/traits.js';
 import { attachStatReveal, renderStatRows } from './statDisplay.js';
@@ -158,7 +158,7 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
     button.dataset.id = horse.id;
 
     const badge = createBadgeElement(
-      horse.coat,
+      coatForHorse(horse),
       silksFor(horse, root, playerSilks),
       badgeCache,
       horse.id,
@@ -402,7 +402,7 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
           drawFrame(ctx, width / 2, height * 0.92, sequence, {
             phase: (time * 0.1) % 1,
             scale: width / 100,
-            scheme: { coat: horse.coat, silks: silksFor(horse, root, playerSilks) },
+            scheme: { coat: coatForHorse(horse), silks: silksFor(horse, root, playerSilks) },
           });
         },
       );

@@ -1,8 +1,8 @@
-import type { Silks } from '../render/palette.js';
+import type { Coat, Silks } from '../render/palette.js';
 import { getBadgeDataUri } from '../render/shieldBadge.js';
 
 export function createBadgeElement(
-  coat: string,
+  coat: string | Coat,
   silks: Silks,
   badgeCache: Map<string, string>,
   horseId: string,

@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { createRng } from './rng.js';
 import {
   expressCoat,
+  expressesFlaxen,
   genotypeFor,
   genotypeOf,
   inheritCoat,
   type CoatGenotype,
 } from './coat.js';
+import { COAT_IDS } from '../data/index.js';
 
 const plain: CoatGenotype = {
   extension: ['E', 'E'],
@@ -14,6 +16,7 @@ const plain: CoatGenotype = {
   cream: ['n', 'n'],
   grey: ['n', 'n'],
   roan: ['n', 'n'],
+  flaxen: ['F', 'F'],
 };
 
 const gene = (over: Partial<CoatGenotype>): CoatGenotype => ({ ...plain, ...over });
@@ -182,5 +185,44 @@ describe('horses born before any of this existed', () => {
     const horse = { id: 'h1', coat: 'bay', coatGenotype: stored };
     expect(genotypeOf(horse)).toBe(stored);
     expect(genotypeOf({ id: 'h1', coat: 'bay' })).toEqual(genotypeFor('bay', 'h1'));
+  });
+});
+
+describe('flaxen', () => {
+  it('only shows with two copies — one hidden f is exactly as invisible as a single e', () => {
+    expect(expressesFlaxen(gene({ flaxen: ['F', 'F'] }))).toBe(false);
+    expect(expressesFlaxen(gene({ flaxen: ['F', 'f'] }))).toBe(false);
+    expect(expressesFlaxen(gene({ flaxen: ['f', 'F'] }))).toBe(false);
+    expect(expressesFlaxen(gene({ flaxen: ['f', 'f'] }))).toBe(true);
+  });
+
+  it('does not change which coat a horse is — only its mane, at render time', () => {
+    expect(expressCoat(gene({ flaxen: ['f', 'f'] }))).toBe(expressCoat(gene({ flaxen: ['F', 'F'] })));
+  });
+
+  it('inherits one allele from each parent, same as every other locus', () => {
+    const sire = gene({ flaxen: ['F', 'F'] });
+    const dam = gene({ flaxen: ['f', 'f'] });
+    for (let i = 0; i < 50; i++) {
+      const foal = inheritCoat(createRng(`flaxen-mix-${i}`), sire, dam);
+      expect(foal.flaxen).toContain('F');
+      expect(foal.flaxen).toContain('f');
+    }
+  });
+
+  it('gives every coat a real flaxen pair, not an accidental gap', () => {
+    for (const coat of COAT_IDS) {
+      const g = genotypeFor(coat, `flaxen-${coat}`);
+      expect(g.flaxen).toBeDefined();
+      expect(['F', 'f']).toContain(g.flaxen[0]);
+      expect(['F', 'f']).toContain(g.flaxen[1]);
+    }
+  });
+
+  it('keeps a hidden flaxen factor uncommon, matching the other hider loci', () => {
+    const carriers = Array.from({ length: 800 }, (_, i) => genotypeFor('bay', `flaxen-rate-${i}`)).filter(
+      (g) => g.flaxen.includes('f'),
+    );
+    expect(carriers.length / 800).toBeLessThan(0.25);
   });
 });

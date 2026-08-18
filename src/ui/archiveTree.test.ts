@@ -254,6 +254,7 @@ describe('carriesAllele', () => {
         cream: ['n', 'n'],
         grey: ['n', 'n'],
         roan: ['n', 'n'],
+        flaxen: ['F', 'F'],
       },
     });
     expect(carriesAllele(bayCarrier, 'extension', 'e')).toBe(true);

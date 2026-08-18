@@ -5,7 +5,7 @@ import { TRAITS } from '../data/traits.js';
 import type { TraitId } from '../data/traits.js';
 import { createSurface, startLoop } from '../render/canvas.js';
 import { loadFrameSequence, drawFrame, type DrawFrameOptions } from '../render/frameAnimation.js';
-import type { Silks } from '../render/palette.js';
+import { coatForHorse, type Silks } from '../render/palette.js';
 
 export interface TrainingSession {
   id: string;
@@ -298,7 +298,7 @@ export function mountTrainingScreen(
             phase,
             scale: 4,
             scheme: {
-              coat: horse.coat,
+              coat: coatForHorse(horse),
               silks: playerSilks,
             },
           };

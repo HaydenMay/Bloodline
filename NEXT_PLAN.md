@@ -92,13 +92,27 @@ it came to the yard — bred, bought, a starter, or an outside stud you paid a f
 
 ### Step 3 — The inheritance map ✅
 
-Landed for coat genetics: only Extension and Agouti can ever hide anything in this game's model
-(Cream, Grey and Roan all show with a single copy), so a horse's detail card surfaces a tappable
-allele wherever one of those two carries something unseen. Tapping it traces every carrier currently
-rendered in the tree — highlighted, everything else dimmed, a chip naming the trace with a way to
-clear it. `archiveTree.ts`'s `notableAllele`/`carriesAllele` are the pure logic; `archiveScreen.ts`
-walks the same rows and sibling filter the tree itself draws from, so a trace only ever points at
-something actually on screen.
+Landed for coat genetics: Extension, Agouti and (added after play surfaced the next two items) Flaxen
+are the loci that can hide anything in this game's model (Cream, Grey and Roan all show with a single
+copy), so a horse's detail card surfaces a tappable allele wherever one carries something unseen.
+Tapping it traces every carrier currently rendered in the tree — highlighted, everything else dimmed,
+a chip naming the trace with a way to clear it. `archiveTree.ts`'s `notableAllele`/`carriesAllele` are
+the pure logic; `archiveScreen.ts` walks the same rows and sibling filter the tree itself draws from,
+so a trace only ever points at something actually on screen. Adding Flaxen to `COAT_LOCI` was the
+entire UI change needed — the genetics section and the trace both work off that list generically.
+
+Two follow-ups from actually using it in play:
+- **Carrier rates were too high to feel like a find.** `genotypeFor()`'s masked-extension roll and
+  the three agouti `carrier()` calls were tuned down (0.35→0.12, 0.5→0.8) after measuring the
+  population-wide rate at ~51% for a hidden `e`. Chestnut and palomino still guarantee one — that's
+  what those colours *are* — so the floor is real, but the "extra" roll no longer stacks on top of it.
+- **Flaxen** — a real, recessive gene added as a sixth locus: pales the mane and tail independent of
+  body colour, needs no new coat and no new art since the render pipeline already tints `hair` as its
+  own material. `render/palette.ts`'s `coatForHorse()` is the one place allowed to combine a horse's
+  base coat with its genotype (`sim/` may never import `render/`, so this direction only). Wired into
+  the Archive's cards/preview and the training screen's preview; race sprites and other rival-facing
+  screens (dossier, breeding) still show the base coat only — a fast follow-up, not done because race
+  rendering is a per-frame hot loop and resolving a genotype there needs a cache, not a rushed change.
 
 **Not done:** "where a line's speed came from." Stats have no discrete gene to trace — potential comes
 out of a continuous budget-and-variance roll, not an allele — so there is nothing here to point at

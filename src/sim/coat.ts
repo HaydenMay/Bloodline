@@ -11,8 +11,8 @@ import type { CoatId } from '../data/index.js';
  * which is exactly why Stage 1 refused to invent a genotype rather than shipping
  * a fake one for Stage 3 to inherit.
  *
- * **Five loci, chosen because they express the eight coats the game already
- * draws** — nothing here needs art that does not exist:
+ * **Six loci, five of which are chosen because they express the eight coats
+ * the game already draws** — nothing here needs art that does not exist:
  *
  *   Extension  E/e     `ee` is chestnut. The classic hider: two bays can throw
  *                      a chestnut foal, and the gene can sit unseen for
@@ -23,6 +23,12 @@ import type { CoatId } from '../data/index.js';
  *   Cream      C/n     One copy: chestnut → palomino, bay → buckskin.
  *   Grey       G/n     Dominant, and paints over everything else.
  *   Roan       R/n     Dominant, roans the base coat.
+ *   Flaxen     F/f     Real, recessive: pales the mane and tail independent of
+ *                      the body colour underneath. `ff` on a bay is a
+ *                      different-looking horse without touching the body
+ *                      material at all — it needs no new coat and no new art,
+ *                      only a different colour fed into the `hair` slot the
+ *                      render pipeline already tints on its own.
  *
  * Adding a locus later — dun, tobiano, sabino — means adding a field, an
  * expression rule and the art. Nothing else here changes shape.
@@ -34,6 +40,7 @@ export type AgoutiAllele = 'A' | 't' | 'a';
 export type CreamAllele = 'C' | 'n';
 export type GreyAllele = 'G' | 'n';
 export type RoanAllele = 'R' | 'n';
+export type FlaxenAllele = 'F' | 'f';
 
 export type AllelePair<T> = [T, T];
 
@@ -43,6 +50,7 @@ export interface CoatGenotype {
   cream: AllelePair<CreamAllele>;
   grey: AllelePair<GreyAllele>;
   roan: AllelePair<RoanAllele>;
+  flaxen: AllelePair<FlaxenAllele>;
 }
 
 /* ---------------------------------------------------------------------------
@@ -84,6 +92,16 @@ export function expressCoat(genotype: CoatGenotype): CoatId {
   return base;
 }
 
+/**
+ * Flaxen only shows with two copies — a single `f` sits exactly as hidden as
+ * a single `e` does, which is the whole point. Doesn't change which `CoatId`
+ * a horse is; it changes the `hair` material fed to the render pipeline for
+ * whatever coat that turns out to be, so it needs no new coat and no new art.
+ */
+export function expressesFlaxen(genotype: CoatGenotype): boolean {
+  return genotype.flaxen[0] === 'f' && genotype.flaxen[1] === 'f';
+}
+
 /* ---------------------------------------------------------------------------
    Inheritance
    ------------------------------------------------------------------------ */
@@ -108,6 +126,7 @@ export function inheritCoat(rng: Rng, sire: CoatGenotype, dam: CoatGenotype): Co
     cream: [passOn(rng, sire.cream), passOn(rng, dam.cream)],
     grey: [passOn(rng, sire.grey), passOn(rng, dam.grey)],
     roan: [passOn(rng, sire.roan), passOn(rng, dam.roan)],
+    flaxen: [passOn(rng, sire.flaxen), passOn(rng, dam.flaxen)],
   };
 }
 
@@ -156,6 +175,11 @@ export function genotypeFor(coat: string, id: string): CoatGenotype {
     shown,
     rng.chance(chance) ? shown : hidden,
   ];
+  /** Independent of every other locus — a carrier at any coat, at the same low rate. */
+  const maskedFlaxen = (): AllelePair<FlaxenAllele> => [
+    'F',
+    rng.chance(0.12) ? 'f' : 'F',
+  ];
 
   const plain: CoatGenotype = {
     extension: ['E', 'E'],
@@ -163,6 +187,7 @@ export function genotypeFor(coat: string, id: string): CoatGenotype {
     cream: ['n', 'n'],
     grey: ['n', 'n'],
     roan: ['n', 'n'],
+    flaxen: maskedFlaxen(),
   };
 
   switch (coat) {
@@ -216,6 +241,7 @@ export function genotypeFor(coat: string, id: string): CoatGenotype {
         cream: rng.chance(0.15) ? ['C', 'n'] : ['n', 'n'],
         grey: ['G', 'n'],
         roan: rng.chance(0.1) ? ['R', 'n'] : ['n', 'n'],
+        flaxen: maskedFlaxen(),
       };
 
     default:

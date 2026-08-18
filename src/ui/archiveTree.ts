@@ -116,10 +116,13 @@ export function retiredRecordOf(horse: Horse, stable: Stable): RetiredHorse | un
 /* ---------------------------------------------------------------------------
    The inheritance map (Step 3) — coat genetics only.
 
-   `sim/coat.ts`'s own comment names Extension and Agouti "the classic
-   hiders": a single copy of Cream, Grey or Roan already shows, so nothing
-   there ever hides and there is no "surfaced from two unseen carriers" story
-   to tell about them. Only these two loci are worth surfacing here.
+   `sim/coat.ts`'s own comment names Extension, Agouti and Flaxen the loci
+   that actually hide something: a single copy of Cream, Grey or Roan already
+   shows, so nothing there ever hides and there is no "surfaced from two
+   unseen carriers" story to tell about them. Only these three loci are worth
+   surfacing here — and Flaxen needs nothing else added when it lands, since
+   `notableAllele`/`carriesAllele` below both work generically off whatever
+   is in this list.
    ------------------------------------------------------------------------ */
 
 export interface CoatLocusInfo {
@@ -132,6 +135,7 @@ export interface CoatLocusInfo {
 export const COAT_LOCI: readonly CoatLocusInfo[] = [
   { key: 'extension', label: 'Extension', dominance: ['E', 'e'] },
   { key: 'agouti', label: 'Agouti', dominance: ['A', 't', 'a'] },
+  { key: 'flaxen', label: 'Flaxen', dominance: ['F', 'f'] },
 ];
 
 /**

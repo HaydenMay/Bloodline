@@ -102,6 +102,15 @@ export const COATS = {
 } as const;
 
 /**
+ * Flaxen — a real, recessive gene that pales the mane and tail independent of
+ * the body colour underneath (`sim/coat.ts`'s `flaxen` locus). A warm golden
+ * blonde, deliberately distinct from grey's own near-white `#EDECEC`: two
+ * different genes producing the same hex would read as one, and a flaxen bay
+ * is a different animal from a grey one.
+ */
+export const FLAXEN_HAIR = '#D9C08A';
+
+/**
  * Jockey silks. Distinct, colourblind-safe hues for AI runners.
  * Stable colours drive silks, tack and grooming from a single choice
  * (DESIGN.md §11), so a horse is instantly findable in a pack of eight.

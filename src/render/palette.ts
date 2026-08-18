@@ -2,11 +2,13 @@ import { COAT_IDS, type CoatId } from '../data/index.js';
 import {
   shade,
   COATS as COAT_DATA,
+  FLAXEN_HAIR,
   SILKS as SILK_DATA,
   SCENE as SCENE_DATA,
   HORSE as HORSE_DATA,
   UI as UI_DATA,
 } from '../data/colors.js';
+import { expressesFlaxen, genotypeOf, type CoatGenotype } from '../sim/coat.js';
 
 /**
  * Re-export shading functions and color system from centralized colors.ts.
@@ -70,6 +72,21 @@ export { COAT_IDS };
  */
 export function coatFor(id: string): Coat {
   return COATS[id as CoatId] ?? COATS.bay;
+}
+
+/**
+ * A horse's coat, with its mane and tail paled if it expresses flaxen.
+ *
+ * Returns the plain coat id string in the common case — cheap, and every
+ * render path already accepts `string | Coat` — and only builds a full
+ * `Coat` object where there's an actual override to make. `sim/render`
+ * is a one-way street (`sim/` may never import from here), so this is the
+ * only place that gets to combine "what colour is this horse" with "does its
+ * genotype say the mane doesn't match."
+ */
+export function coatForHorse(horse: { id: string; coat: string; coatGenotype?: CoatGenotype }): Coat | string {
+  if (!expressesFlaxen(genotypeOf(horse))) return horse.coat;
+  return { ...coatFor(horse.coat), hair: FLAXEN_HAIR };
 }
 
 /**
