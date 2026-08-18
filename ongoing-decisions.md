@@ -210,8 +210,10 @@ Hayden's**, and none of them should be acted on by an agent.
   found in play from a horse first raced at generation 3 turning up identical, stats and all,
   generations later. `sim/worldRacing.ts`'s new `ageWorld` gives every rival a birthday off its own
   start count and the same exponential decline (`AGE_EROSION_GROWTH`) the player's horse gets, and
-  retires one into a new `Stable.worldArchive` at `WORLD_RETIREMENT_AGE` (9) rather than deleting it —
-  replaced in-place with a fresh horse in the same division, so the population never shrinks. The
+  retires one into a new `Stable.worldArchive` at a randomised, per-horse age between
+  `WORLD_RETIREMENT_MIN_AGE` (6) and `WORLD_RETIREMENT_MAX_AGE` (9) rather than deleting it or using
+  one fixed age every rival shared — replaced in-place with a fresh horse in the same division, so the
+  population never shrinks. The
   archive is permanent and read everywhere an ancestor id needs resolving (`pedigreeOf`,
   `allKnownHorses`) and everywhere outside studs are offered (`outsideStuds`), so a rival bred to
   stays traceable and breedable for as long as fertility allows, even after it stops racing.
