@@ -3,7 +3,13 @@ import { createRng } from './rng.js';
 import { createNameGenerator } from '../data/names.js';
 import { generateHorse } from './horse.js';
 import { RACES_PER_SEASON } from './growth.js';
-import { ageWorld, runWorldMeeting, WORLD_RETIREMENT_AGE } from './worldRacing.js';
+import {
+  ageWorld,
+  retirementAgeOf,
+  runWorldMeeting,
+  WORLD_RETIREMENT_MAX_AGE,
+  WORLD_RETIREMENT_MIN_AGE,
+} from './worldRacing.js';
 import { seedLegacyFromRecord } from '../data/legacy.js';
 import type { Horse } from './types.js';
 
@@ -142,10 +148,24 @@ describe('ageWorld', () => {
     expect(field[0]!.stats.speed).toBeLessThan(beforeSpeed);
   });
 
-  it('retires a horse into the archive once it reaches WORLD_RETIREMENT_AGE, replacing it in place', () => {
+  it('draws a retirement age in [WORLD_RETIREMENT_MIN_AGE, WORLD_RETIREMENT_MAX_AGE], stable per horse', () => {
+    const field = world(20, 'retirement-spread');
+    const ages = field.map((h) => retirementAgeOf(h));
+    for (const age of ages) {
+      expect(age).toBeGreaterThanOrEqual(WORLD_RETIREMENT_MIN_AGE);
+      expect(age).toBeLessThanOrEqual(WORLD_RETIREMENT_MAX_AGE);
+    }
+    // Never re-rolled — same horse, same answer, called twice.
+    expect(retirementAgeOf(field[0]!)).toBe(ages[0]);
+    // Random per horse, not the same value for every one of them — the whole
+    // point of "never know when they're gonna be gone."
+    expect(new Set(ages).size).toBeGreaterThan(1);
+  });
+
+  it("retires a horse into the archive once it reaches its own retirement age, replacing it in place", () => {
     const field = world(1);
     const original = field[0]!;
-    original.age = WORLD_RETIREMENT_AGE - 1;
+    original.age = retirementAgeOf(original) - 1;
     original.division = 'stakes';
     original.starts = RACES_PER_SEASON;
     const archive: Horse[] = [];
@@ -165,15 +185,15 @@ describe('ageWorld', () => {
 
   it('never removes a horse from the archive once it is there', () => {
     const field = world(1);
-    field[0]!.age = WORLD_RETIREMENT_AGE - 1;
+    field[0]!.age = retirementAgeOf(field[0]!) - 1;
     field[0]!.starts = RACES_PER_SEASON;
     const archive: Horse[] = [];
 
     ageWorld(createRng('age-perm-1'), field, archive, []);
     expect(archive).toHaveLength(1);
 
-    // Age the replacement out too, across enough ticks.
-    field[0]!.age = WORLD_RETIREMENT_AGE - 1;
+    // Age the replacement out too, across enough ticks, using its own draw.
+    field[0]!.age = retirementAgeOf(field[0]!) - 1;
     field[0]!.starts = RACES_PER_SEASON;
     ageWorld(createRng('age-perm-2'), field, archive, []);
 
@@ -182,7 +202,7 @@ describe('ageWorld', () => {
 
   it("gives the replacement a fresh, non-colliding name", () => {
     const field = world(1);
-    field[0]!.age = WORLD_RETIREMENT_AGE - 1;
+    field[0]!.age = retirementAgeOf(field[0]!) - 1;
     field[0]!.starts = RACES_PER_SEASON;
     const originalName = field[0]!.name;
     const archive: Horse[] = [];

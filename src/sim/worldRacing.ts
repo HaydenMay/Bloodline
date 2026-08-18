@@ -27,7 +27,7 @@
  * uses, feeding the same legacy conversion.
  */
 
-import type { Rng } from './rng.js';
+import { hashSeed, type Rng } from './rng.js';
 import type { Horse } from './types.js';
 import { rateHorse } from '../data/wagering.js';
 import { getPurse, PRIZE_SHARES } from '../data/purse.js';
@@ -130,18 +130,34 @@ export function runWorldMeeting(
 }
 
 /**
- * Age a rival keeps racing at, before it retires and gets replaced.
+ * Range a rival's own retirement age is drawn from — a little past
+ * FINAL_AGE (5), where decline (`AGE_EROSION_GROWTH`) is already biting
+ * hard, so every rival has had a real, gradually-declining stretch and
+ * usually a real record by the time it goes.
  *
  * `generateHorse` seeds a rival anywhere from 2 to 5, and nothing ever aged
  * them from there — found in play: a horse first raced against at
  * generation 3 was still the exact same horse, same stats, same potential,
- * generations later. Set a little past FINAL_AGE (5): decline
- * (`AGE_EROSION_GROWTH`) is already biting hard there, so by 9 a rival has
- * had a real, gradually-declining stretch rather than a cliff, and has
- * usually built a real record on the way — the same record that makes it
- * worth archiving rather than just deleting.
+ * generations later. A single fixed retirement age would just trade that
+ * problem for a new, equally readable one — every rival vanishing on
+ * schedule at exactly the same age. Randomised per horse instead, so there
+ * is no age at which a rival is safe and no age at which it is guaranteed
+ * gone.
  */
-export const WORLD_RETIREMENT_AGE = 9;
+export const WORLD_RETIREMENT_MIN_AGE = 6;
+export const WORLD_RETIREMENT_MAX_AGE = 9;
+
+/**
+ * A rival's own retirement age — fixed from birth, hidden from the player,
+ * but stable rather than re-rolled on every check (a horse's fate should
+ * not wobble week to week). Hashed off the horse's own id rather than drawn
+ * from `ageWorld`'s rng, so it reads the same regardless of how many other
+ * horses were checked first or in what order.
+ */
+export function retirementAgeOf(horse: Horse): number {
+  const span = WORLD_RETIREMENT_MAX_AGE - WORLD_RETIREMENT_MIN_AGE + 1;
+  return WORLD_RETIREMENT_MIN_AGE + (hashSeed(`${horse.id}-retirement`) % span);
+}
 
 export interface WorldAgeingReport {
   /** Rivals that had a birthday this tick. */
@@ -153,7 +169,7 @@ export interface WorldAgeingReport {
 /**
  * Ages every rival by whatever `runWorldMeeting` just gave it — one birthday
  * per RACES_PER_SEASON starts, same pace the player's own horse ages at —
- * and retires anything that reaches WORLD_RETIREMENT_AGE, replacing it
+ * and retires anything that reaches its own retirementAgeOf, replacing it
  * in-place with a freshly generated horse in the same division.
  *
  * A retired rival moves into `archive` rather than disappearing. It is
@@ -188,7 +204,7 @@ export function ageWorld(
     applyAgeing(horse, horse.age);
     aged += 1;
 
-    if (horse.age >= WORLD_RETIREMENT_AGE) {
+    if (horse.age >= retirementAgeOf(horse)) {
       retired.push(horse);
       archive.push(horse);
       world[i] = generateHorse(rng, names, { division: horse.division, isAI: true });

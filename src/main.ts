@@ -1592,10 +1592,11 @@ function startRaceWithHorse(
         );
 
         // The world ages on the same tick it races on. A rival that reaches
-        // WORLD_RETIREMENT_AGE moves into worldArchive rather than vanishing
-        // — found in play: "Northern Timber... was the same Closer Runs Late
-        // racer I raced back then" generations later, because nothing ever
-        // aged a rival at all (sim/worldRacing.ts).
+        // its own (randomised, per-horse) retirement age moves into
+        // worldArchive rather than vanishing — found in play: "Northern
+        // Timber... was the same Closer Runs Late racer I raced back then"
+        // generations later, because nothing ever aged a rival at all
+        // (sim/worldRacing.ts).
         ageWorld(
           createRng(`world-age-${player.id}-${updatedCareer.horse.starts}-${updatedCareer.week}`),
           updatedCareer.stable.world,
