@@ -313,6 +313,11 @@ export function mountTrainingScreen(
             <p class="training-desc">${session.description}</p>
             <div class="training-stats">
               ${Object.entries(scaleTrainingEffects(session.statEffects, totalMultiplier, downsideRelief))
+                // A maxed-out Training Grounds relieves a downside all the way
+                // to 0 (getDownsideRelief's hard cliff at level 5) rather than
+                // softening it — that 0 is a real "no cost here any more", not
+                // a value worth a pill of its own.
+                .filter(([, effect]) => effect !== 0)
                 .map(([stat, effect]) => {
                   const sign = effect > 0 ? '+' : '';
                   const color = effect > 0 ? 'positive' : 'negative';
