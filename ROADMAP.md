@@ -696,6 +696,75 @@ assuming there are others" was correct at a scale nobody had counted. It wants a
 wants code: implement the 31, cut the catalogue down to what is real, or stage them — but a horse
 card that lists five traits and means two is lying to the player about the thing traits are for.
 
+### The race calendar rerolls its options when you back out of a race
+
+**Found in play** — "go to race calendar, click a race, then click back, and it rerolls your race
+options."
+
+`generateRaceCalendar(seed, opts)` in `ui/raceCalendar.ts` is properly deterministic — it takes a
+seed and builds its options from `createRng(seed)`. So the reroll is in what the caller passes:
+`main.ts:1254` re-mounts the calendar on the way back and the seed it supplies is not stable across
+that round trip. The offered races are meant to be a *choice*, and a choice you can reroll by
+backing out is not one — it also quietly undoes the calendar's whole point, which is committing to a
+race at a distance and a date.
+
+Fix is to derive the seed from something that does not change while the choice is open — the career
+and the number of starts run, say — rather than regenerating per mount.
+
+### Horses are drawn outside the running surface, and the top of the screen is wasted
+
+**Found in play, desktop** — "horses on desktop don't fit in the lane, mine always runs in the
+grass, and there's a lot of screen real estate at the top that isn't being used."
+
+Two sets of numbers that were never reconciled, in two different files:
+
+- `render/track.ts:43` puts the horizon at `height * 0.44` and the running surface at
+  `horizon + height * 0.09`, i.e. the dirt starts at **0.53 × height** and runs to the bottom.
+- `ui/raceScreen.ts:427` puts lane 0 at **0.60 × height** with `0.055 × height` between lanes, so
+  the eight lanes span **0.60 to 0.985 × height**.
+
+So the horses occupy the bottom 40% of the frame while the drawn surface occupies the bottom 47%,
+lane 7 sits within 1.5% of the bottom edge, and the whole top 44% is sky. Neither file knows the
+other's constants. Confirming exactly which lanes land on grass wants driving the real screen at
+desktop width rather than reasoning from the ratios — but the two layouts being independent is the
+root, and any fix should make the track hand the lane geometry to the renderer instead of both
+guessing.
+
+Related, same screenshot: the sky occupies nearly half the frame at desktop width with nothing in
+it. Phase 8's brief.
+
+### The player seems to start in the same lane every race
+
+**Found in play** — "my player always races at the top position, it should be somewhat random."
+
+**The code already shuffles.** `engine.ts:419-421` builds `lanes` and calls `rng.shuffle(lanes)`
+before handing them out, with a comment saying exactly why ("so player doesn't always start in lane
+0"), and `rng.shuffle` is a correct Fisher-Yates. So either the player's lane genuinely varies and
+what reads as "always the top" is the *drawing* — lane 0 being the rail and drawn furthest away,
+plus the geometry mismatch above — or the entrant order and the shuffle interact in a way the
+reading here missed.
+
+Worth resolving with the two items above rather than separately, since all three are about where a
+horse appears on screen. Log the player's actual lane across a few races first; if it varies, this
+is a rendering issue and not a lane issue at all.
+
+### Mobile: the training screen's growth bar runs off the edge
+
+**Found in play** — "when training consistency the bar showing how much you train goes off the
+screen and you can't see the animation." Consistency is the longest stat name, which is the likely
+trigger — a row laid out to fit the shorter labels.
+
+### Mobile: tapping for exact numbers on the training screen behaves erratically
+
+**Found in play** — "it shows all of them, then you click again and one goes away, then it comes
+back, then three go away. It's just weird."
+
+Expected behaviour, per §3's grades-first rule: **tap anywhere in the box, all numbers appear; tap
+again, all go away.** `ui/statDisplay.ts:153` already implements exactly that toggle-all for the
+stat rows, so the training screen is likely either wiring its own per-row handlers alongside it or
+mounting the rows more than once, giving two handlers that fight. Compare the training screen's
+usage against the archive and dossier, which behave.
+
 ### The purse on the race calendar renders black on a dark panel
 
 **Found in play** — "the text colour for the purse on the race calendar screen seems like it renders

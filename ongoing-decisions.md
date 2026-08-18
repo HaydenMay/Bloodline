@@ -48,6 +48,12 @@ it looks like a quick win sitting next to whatever you are actually working on.
   little. Each has its own item below or above; this is the one that says they add up to a game that
   stops being a contest around generation three. Whatever gets decided elsewhere, this is the
   symptom to check it against.
+- **A new foal resets your income but not your prices** **[Hayden]** — starting a fresh horse drops
+  earnings back to Maiden level while the facility upgrades still on offer cost $10,000–$32,000,
+  and a $1,000 bet returning $6,000 means weeks of racing per upgrade. Possibly correct — a real
+  yard does not get cheaper as it grows — but it is the point in the loop where progress most
+  visibly stalls, and it lands right after the moment breeding is meant to feel like a reward.
+  Decide it alongside the facility pricing below rather than separately.
 - **Facilities cost too much for what they give** **[Hayden]** — $50,000 for an 8% morale bonus,
   when a player who always wins is already living at 100 morale, so the best upgrade in the game is
   worth nothing to the person who can afford it. Direction: **more levels, each cheaper**, so
@@ -87,6 +93,16 @@ it looks like a quick win sitting next to whatever you are actually working on.
   averages 94.9 potential with half its stats pinned at 100. Sidestepped by drawing studs from the
   world instead, but the generator is still wrong and starters read from it too.
 
+## The breeding screen
+
+- **The pairing screen shows a price and nothing else** **[Hayden]** — "we just show the cost, so I
+  went blindly based on the fact the new outside horse was expensive so she must be good." That is
+  the whole decision being made on a proxy. §10 asks the screen to show projected potential *ranges*
+  and deliberately nothing else, to avoid a relatedness lecture — but a partner's own **stats,
+  legacy, wins and record** are not theory, they are the horse's public form, and withholding them
+  is not the same restraint. The archive's detail card already renders exactly this and could be
+  reused directly. Worth deciding how much: full card, or a summary line.
+
 ## Condition and form
 
 Found while answering the item above, not previously written down anywhere. **All three are
@@ -124,8 +140,27 @@ Hayden's**, and none of them should be acted on by an agent.
   That bluntness *is* the anti-reroll brake §10 asks for, so any fix has to bring a replacement brake
   with it. The harder half of the problem.
 
+## Traits
+
+- **What to do about 31 inert traits** **[Hayden — looking into]** — `data/traits.ts` defines 41
+  traits, 26 in the racing pool, and the simulation reads 10. The rest have descriptions, appear on
+  cards, are dealt at birth and awarded by training, and change nothing. Three choices: implement
+  the catalogue, cut it down to what is real, or stage them in over time. Two things make this more
+  than a backlog item. **Wiring them later is retroactive** — bloodstock is full of horses carrying
+  inert traits, some of them downside traits, which would switch on across animals the player has
+  already bred and made decisions about. And **DESIGN.md §2 marks the whole system ✅**, including a
+  trait *discovery* mechanic that also appears unbuilt for the player's own horse. Full detail and
+  the worked example in ROADMAP.md Known Issues.
+
 ## The world, and the size of the tree
 
+- **Rivals never ask to use your stallion** **[Hayden]** — "I haven't ever gotten a request to do
+  that and I don't know how to do so." Confirmed: there is no such interaction. What exists is
+  `studInfluence` in `ui/career.ts`, a silent prestige payment at retirement — **and it is gated on
+  Hall of Fame horses only**, so a yard without one has been paid exactly nothing and had nothing
+  to see. Two decisions in one: whether outside use becomes a thing the player is *asked about*
+  rather than a background number, and whether the Hall of Fame gate is right. Note the book-limit
+  item below assumes outside use exists as a real mechanic; today it barely does.
 - **Limit outside use of your stud** **[Hayden]** — a book limit, so a stallion covers a set number
   of outside mares a season rather than being available without end.
 - **Family tree scale** **[Hayden]** — storage is not the constraint: a horse is 657 bytes, so a
