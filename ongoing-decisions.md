@@ -35,6 +35,21 @@ it looks like a quick win sitting next to whatever you are actually working on.
 - **The stake cap** — bets are capped at 25% of the race's purse, which closed the Maiden exploit.
   The number itself was never play-tested.
 
+## How long the game lasts
+
+- **The game may be over too quickly** **[Hayden]** — three generations in, a horse is 8 starts, 7
+  wins, 8 top-three. Not one cause but three compounding: super horses arrive early from breeding,
+  training outruns what the opposition ever becomes, and facilities cost a great deal for very
+  little. Each has its own item below or above; this is the one that says they add up to a game that
+  stops being a contest around generation three. Whatever gets decided elsewhere, this is the
+  symptom to check it against.
+- **Facilities cost too much for what they give** **[Hayden]** — $50,000 for an 8% morale bonus,
+  when a player who always wins is already living at 100 morale, so the best upgrade in the game is
+  worth nothing to the person who can afford it. Direction: **more levels, each cheaper**, so
+  spending feels like steadily unlocking something rather than saving for one flat number. Note this
+  cuts across the economy items above — if the betting fix takes cash out of the game, the same
+  prices bite very differently.
+
 ## The legacy ladder
 
 - **The Hall of Fame at 1,000 is out of reach** — a generation-8 horse peaks near 495, because a
@@ -83,6 +98,13 @@ Hayden's**, and none of them should be acted on by an agent.
 - **Form is surfaced in exactly one place** **[Hayden — looking into]** — `ui/stableHub.ts`. Not on
   race day, not on the dossier, not in the archive. If peaking a horse for the right race is meant to
   be a skill (§5), the player currently cannot see it anywhere they would use it.
+- **The player cannot find condition at all** **[Hayden]** — reported from play as "I have no
+  indicator of what my horse's condition is, I see form and spirit but not condition". Form *is*
+  condition, bucketed — but nothing on screen says so, so the number the whole training and rest
+  loop turns on reads as a missing feature. Strong evidence the naming problem above is not
+  cosmetic: it is already costing a player the ability to see a mechanic that is fully built.
+  Note the word is overloaded a **third** time in `race/engine.ts`, where `player.condition` on the
+  race HUD is the in-race tank, unrelated to either of the other two.
 
 ## The clock, and rerolling
 
@@ -107,6 +129,13 @@ Hayden's**, and none of them should be acted on by an agent.
   studs are eternally available and the racing population never turns over.
 - **Rejected foals: price and timing** — what one sells for, and how long before it turns up on a
   racecard carrying your bloodline's name. The keep-or-sell decision is settled; the numbers are not.
+
+## The two platforms
+
+- **Desktop has fallen behind mobile** **[Hayden]** — the mobile clean-up was needed and worked, but
+  it was done at desktop's expense and desktop now wants a pass of its own. *Hayden's list of
+  specifics is still to come — this item is a placeholder until it lands, and should not be worked
+  from as written.*
 
 ## Gaps and housekeeping
 

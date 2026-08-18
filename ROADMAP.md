@@ -546,6 +546,86 @@ watching rather than fixing: if the economy ever makes early retirement cheap, t
 strategy. The fiction is also loose in the same place, since a two-race career jumps the calendar
 four years. Any fix has to keep the anti-reroll brake, which is the harder half.
 
+### ⚠️ Pulling reportedly does nothing in play, but is powerful in the sim
+
+**Found in play** — "Pulling does absolutely nothing. I don't slow down. I have been using it to
+cheese the game: get ahead early and then hold that lead very simply."
+
+**The simulation says the opposite, emphatically.** Measured over 150 races at 1400 m, with a probe
+written for this (personas that lead early, then hold):
+
+```
+ride                 avg place   wins   win%   avg beaten   % of race in front
+hands off              5.11      10    6.7%      10.0L            8.9%
+lead, no pull          4.45      21   14.0%       7.9L           17.0%
+lead then pull         6.81       0    0.0%      15.2L            9.1%
+pull when leading      5.22       3    2.0%      10.3L            6.2%
+pull all race          7.27       0    0.0%      19.4L            0.8%
+```
+
+Holding costs about **14 points of win rate**. `HOLD_DELTA` is -0.03 on a pace band of 0.92-1.00, so
+a pull gives up roughly 3% of speed — a third of the entire band. It is not a no-op in `sim/`.
+
+**So the disconnect is in the UI layer, and that is where to look.** Two candidates, neither
+confirmed:
+
+1. `race.setPlayer()` is only called at `ui/raceScreen.ts:299`, once, when the countdown ends, and
+   only `if (!getAutopilot() && !playerInputRegistered && !autoRaceActive)`. A race begun on
+   autopilot never binds the input object at all, and `playerInputRegistered` is not revisited if
+   autopilot is switched off later.
+2. The HUD's "TAKING A PULL" label at `ui/raceScreen.ts:708` reads the UI's own `input.takingBack`,
+   **not** anything the engine reports back. So the screen will say the horse is taking a pull
+   whether or not the simulation ever heard about it — which is exactly what "it does nothing" looks
+   like from the player's seat.
+
+Worth ruling out the innocent explanation too: a horse strong enough to win every race may simply be
+able to afford the 3%, which would make this a symptom of the difficulty item rather than a bug.
+
+### Traits are acquired past the limits TRAITS.md sets
+
+**Found in play** — a 3-year-old carrying five traits: Professional, Firm Specialist, Turn of Foot,
+Cruiser, Tractable. Four of the five are on TRAITS.md's own training table, so the mechanic is
+working as designed. Two of its stated limits are simply not built:
+
+- **"Early years only, so a two-year-old's schedule genuinely shapes what it becomes."** There is no
+  age check anywhere in `ui/trainingScreen.ts` — a horse of any age keeps rolling for new traits.
+- **No cap on the total.** `rollTraits` in `sim/horse.ts` is careful about this at birth: two traits
+  base, a third on a roll, a fourth only for a well-bred horse, and the comment for starters reads
+  "Never a 4th". Training then adds without limit, so a horse can and does exceed the ceiling
+  breeding itself respects.
+
+Rate, for reference: 5% a session, 15% after a breakthrough, and breakthrough chance is
+`(morale/100) * (temper/100) * 0.5`. A horse living at 100 morale on 67 Temper rolls about 8.3% a
+session, so roughly 1.5 acquired traits across an 18-start career — on top of what it was born with.
+
+Also worth fixing while there: this path uses `Math.random()` rather than the project's seeded
+`Rng`, so trait acquisition is not reproducible in a test.
+
+### The race HUD's stamina indicator is unexplained
+
+**Found in play** — "I don't understand the indicators on the kick meter. Most times three yellow
+equals signs, then my horse pulls way back and I get a red equal sign and can no longer kick."
+
+The read is correct and there is nothing on screen that says so. `ui/raceScreen.ts:633` draws
+`"=".repeat(condTier)`, where the tier is the **in-race tank**: three above 66%, two above 33%, one
+below, coloured good/fair/poor. It is the only view of stamina in the game — the comment three lines
+above notes "the tank itself stays hidden — no stamina bar" — and it has no label, no legend, and no
+mention anywhere in the UI.
+
+The code comment immediately above it is also stale: it describes "1-3 arrows for low/normal/strong
+regen", which is a different feature from what the code below it draws.
+
+### The race intro markers are not laid out responsively
+
+**Found in play** — "the preview isn't the full width of the screen so it gets weird on the right
+side, and on mobile the word wrapping happens weird."
+
+`.race-intro-marker` in `src/style.css:742` is `position: fixed; left: 50%; transform:
+translateX(-50%)` with **no width, no max-width and no padding**, at a hard `font-size: 56px` that
+does not scale. So the text box is only as wide as its content and cannot wrap predictably at narrow
+widths. The panel behind it is a separate problem in `.race-intro-canvas`, which is not sized to the
+viewport.
+
 ### Winning margins are too wide
 
 **Currently ~3.7L between first and second**, down from 4.1L. Real racing is decided by 1–3, and 5+ is a rout. The tail is the bigger problem (60L instead of 74.7L, but still wide).
