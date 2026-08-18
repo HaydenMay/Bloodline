@@ -87,6 +87,8 @@ import {
   TRAIT_ALERT_FUMBLE,
   TRAIT_CRUISER_EXPONENT_RELIEF,
   FRONT_RUNNER_EXPONENT_RELIEF,
+  FRONT_RUNNER_RANK_LIMIT,
+  FRONT_RUNNER_PRESS_TOLERANCE,
   TRAIT_GATE_RUSHER_EARLY,
   TRAIT_GATE_RUSHER_PAYBACK,
   TRAIT_IRON_LUNGS_RECOVER,
@@ -227,6 +229,8 @@ interface Runner {
   press: number;
   /** 0-1: how clear of the field this horse is while leading it. */
   easyLead: number;
+  /** DRAIN_EXPONENT relief, earned only while actually up with the pace. */
+  frontRelief: number;
   holding: boolean;
   regenMult: number;
   paceNow: number;
@@ -297,9 +301,13 @@ function tankModsFor(horse: Horse): TankModifiers {
   if (horse.traits.includes('thirsty')) recoverMult *= TRAIT_THIRSTY_RECOVER;
   // Grit increases tank recovery: 0.95x at 0 grit to 1.0x at 100 grit (5% max bonus)
   recoverMult *= (0.95 + 0.05 * (horse.stats.grit / 100));
+  // Style's own effort-cost relief is EARNED, not issued at the gate — see
+  // `frontRunnerRelief` below, applied per-tick once rank is known. A style
+  // branch here would hand it to a front-runner buried in eighth exactly as
+  // freely as one holding the lead, which is the opposite of what the style is
+  // supposed to mean.
   let exponentRelief = 0;
   if (horse.traits.includes('cruiser')) exponentRelief += TRAIT_CRUISER_EXPONENT_RELIEF;
-  if (horse.style === 'frontRunner') exponentRelief += FRONT_RUNNER_EXPONENT_RELIEF;
   return {
     recoverMult,
     draftMult: horse.traits.includes('quickRecovery') ? TRAIT_QUICK_RECOVERY_DRAFT : 1,
@@ -385,6 +393,7 @@ function makeRunner(
     drafting: false,
     press: 0,
     easyLead: 0,
+    frontRelief: 0,
     holding: false,
     regenMult: 1,
     paceNow: PACE_MIN,
@@ -525,6 +534,23 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
       } else {
         r.easyLead = 0;
       }
+
+      // A front-runner's own effort-cost relief, earned by actually being up
+      // there — "racing the way they are supposed to" — rather than issued to
+      // every front-runner at the gate regardless of where the race finds it.
+      // Gated the same way easyLead and press are: settled, and by RANK, not
+      // by style alone.
+      // Not while contested. Press is already the flag for "actively duelling
+      // for this spot" — a front-runner sharing the lead with a rival breathing
+      // on it is not racing clear, it is racing hard, and the two mechanics
+      // should not both reward the same horse for the same moment at once.
+      r.frontRelief =
+        settled &&
+        r.horse.style === 'frontRunner' &&
+        r.rank <= FRONT_RUNNER_RANK_LIMIT &&
+        r.press <= FRONT_RUNNER_PRESS_TOLERANCE
+          ? FRONT_RUNNER_EXPONENT_RELIEF
+          : 0;
     }
   };
 
@@ -639,7 +665,11 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
     r.distance += r.speed * dt;
 
     // ---- 6. Tank ----------------------------------------------------------
-    const drain = drainPerSecond(pace, r.speed, totalMetres, r.tankMods, r.press);
+    const effectiveTankMods: TankModifiers =
+      r.frontRelief > 0
+        ? { ...r.tankMods, exponentRelief: r.tankMods.exponentRelief + r.frontRelief }
+        : r.tankMods;
+    const drain = drainPerSecond(pace, r.speed, totalMetres, effectiveTankMods, r.press);
     const recover = recoverPerSecond(
       r.horse.stats.stamina,
       r.speed,

@@ -932,6 +932,55 @@ happened — worth treating any hand-tuned constant as suspect and checking it a
 trusting it, since this is now the second time a documented value and the shipped value disagreed
 silently.
 
+### A front-runner's effort-cost relief was issued at the gate, not earned by racing up front
+
+**Found in play**, following directly from the constant-drift fix above — "front runners currently
+have the ability and desire to race in first place, press other racers, and have less stamina drain
+from being in first... the front-runner bonus should only apply in the first couple of spots, racing
+the way they're supposed to."
+
+Bigger than the drift. `tankModsFor` computed `exponentRelief` **once, at the gate, before the race
+starts** — and `if (horse.style === 'frontRunner') exponentRelief += FRONT_RUNNER_EXPONENT_RELIEF`
+(11 out of `DRAIN_EXPONENT`'s 12) applied to *any* horse with that style, unconditionally, for the
+whole race. A front-runner buried in eighth got the same near-total relief from the superlinear drain
+curve as one leading by ten lengths. Not documented in REBUILD.md at all, and no `git log -S` history
+for when it was added.
+
+**Fixed by moving it from a style property to an earned, per-tick state**, the same pattern
+`easyLead` and `press` already use: computed every tick in `updatePack`, gated on `r.rank <=
+FRONT_RUNNER_RANK_LIMIT` (2 — "the first couple of spots," taken directly from how the player
+described it) and `r.press <= FRONT_RUNNER_PRESS_TOLERANCE` (1 rival's worth of company, not zero —
+see below for why zero was tried first and reverted).
+
+**One new rule needed, found by testing rather than guessed.** Gating on rank alone recovered B1 and
+B6 but left B3 ("a contested lead wrecks front-runners") failing by a hair — 1.39 against a required
+1.4 ratio, and completely insensitive to the relief's magnitude (9, 10 and 11 all produced the
+identical measured rate, so that lever was not the cause). Gating additionally on `press === 0` —
+relief only while genuinely uncontested — fixed B3 outright but broke B6's margin tail, because any
+company at all, even a single trailing rival, now cost a front-runner its entire relief in one step.
+`FRONT_RUNNER_PRESS_TOLERANCE = 1` splits the difference: a *little* company is still "running up
+front," a real duel is not. That is what got the full suite back to 12/13.
+
+Verified: harness 12/13 (only the pre-existing B1b), `npm run stat-leverage` and `npm run ride-probe`
+both unaffected, 507 tests.
+
+**Still open, from the same message.** The player described what each of the four styles is
+supposed to feel like, and only front-runner had an existing mechanic to correct — the others need
+new ones, not yet built:
+
+- **Stalker** — bonuses for drafting, so it can slingshot late. Drafting exists (`DRAFT_RECOVER_BONUS`)
+  but is purely positional, identical for every style; a stalker gets nothing a front-runner tucked
+  in behind another horse would not also get.
+- **Closer** — a large, genuine bonus right at the end to close a real gap. What exists today is
+  `CONTACT` (§6.6), which is deliberately universal and capped at what a leader could also reach
+  (R4) — it keeps a patient horse in the race, it does not let a closer overturn a placing it
+  otherwise would not have earned. There is no closer-specific late mechanic.
+- **Mid-pack** — the generalist, meant to win on trained stats rather than a positional bonus. No
+  such training or potential effect exists anywhere in `growth.ts`, `trainingScreen.ts` or
+  `facilities.ts` — this is a different kind of gap than the other three, since it is not a race
+  mechanic at all, and the two ways to build it (a training-gain multiplier, or a potential
+  advantage in the Stud Farm's style) are genuinely different systems with no obvious default.
+
 ### The race calendar rerolls its options when you back out of a race
 
 **Found in play** — "go to race calendar, click a race, then click back, and it rerolls your race

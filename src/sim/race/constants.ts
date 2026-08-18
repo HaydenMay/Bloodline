@@ -727,7 +727,31 @@ export const TRAIT_CRUISER_EXPONENT_RELIEF = 2;
  * exponent rewards their archetype directly: running fast early costs them
  * less tank, so they can establish and maintain leads without depleting.
  */
+/**
+ * A front-runner's own effort-cost relief. Applies to `DRAIN_EXPONENT`, so at
+ * 11 out of 12 the superlinear cost curve is nearly flattened — pushing hard
+ * early stops being punished the way it is for every other style.
+ *
+ * **Earned, not issued.** Gated on `FRONT_RUNNER_RANK_LIMIT` and computed
+ * per-tick (`engine.ts`'s `updatePack`), the same pattern as `easyLead` and
+ * `press` — not baked into the horse once at the gate. It used to be: any
+ * horse with style `frontRunner` carried this for the entire race regardless
+ * of where it actually was, so a front-runner buried in eighth got the same
+ * relief as one holding the lead. That is the opposite of what the style is
+ * for, and it was found from play: "front runner should only get the bonus
+ * from being in the first couple of spots — racing the way they're supposed
+ * to."
+ */
 export const FRONT_RUNNER_EXPONENT_RELIEF = 11;
+
+/** How many places count as "up front" for `FRONT_RUNNER_EXPONENT_RELIEF`. */
+export const FRONT_RUNNER_RANK_LIMIT = 2;
+
+/**
+ * How many rivals within press range a front-runner can have and still count
+ * as running clear, not just running fast.
+ */
+export const FRONT_RUNNER_PRESS_TOLERANCE = 1;
 
 export const TRAIT_ALERT_FUMBLE = 0.4;
 export const TRAIT_GATE_RUSHER_EARLY = 0.015;
