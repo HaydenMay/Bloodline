@@ -178,7 +178,7 @@ export const REFERENCE_PACE = 0.971;
  * The only pack interaction in the simulation besides drafting, and like
  * drafting it is TANK-side — nothing here touches speed (R1).
  */
-export const PRESS_RANGE_METRES = 7.5;
+export const PRESS_RANGE_METRES = 5;
 
 /**
  * Extra drain per pressing rival, for a horse in the front of the field.
@@ -196,7 +196,7 @@ export const PRESS_RANGE_METRES = 7.5;
  * a fair 12.5%. Press is now specifically about a CONTESTED lead; the general
  * cost of being in front is the rank gradient's job.
  */
-export const PRESS_COST = 0.26;
+export const PRESS_COST = 0.17;
 
 /**
  * Rank at or above which a horse is "in front" and can be pressed.
@@ -207,7 +207,7 @@ export const PRESS_COST = 0.26;
  * all paid, which inverted the mechanic: press started HELPING front-runners
  * (16.0% against a fair 12.5%) instead of punishing contested ones.
  */
-export const PRESS_RANK_LIMIT = 2;
+export const PRESS_RANK_LIMIT = 3;
 
 /** Never more than this many rivals count, so a bunched field cannot run away. */
 export const PRESS_MAX_RIVALS = 2;
@@ -314,7 +314,7 @@ export const RANK_SHELTER = 0.15;
  * ahead to shelter behind. A drafting back-marker recovers at 1.3 x 1.34; this
  * is what an unchallenged leader has to be worth to sit alongside that.
  */
-export const EASY_LEAD_RECOVER_BONUS = 0.9;
+export const EASY_LEAD_RECOVER_BONUS = 0.44;
 
 /**
  * Metres of daylight at which a leader is fully "in the clear".

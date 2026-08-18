@@ -894,6 +894,44 @@ than the winner, we were both front-runners, he led early and never gave it up."
 horse that gets the lead uncontested is rewarded twice while the one sitting second pays twice. The
 mechanic may be right; a player having no way to see it is the actual problem.
 
+### The press/easy-lead constants had drifted from REBUILD.md §20's own documented numbers
+
+**Found while answering a player question** — "front runners are busted: they race up front, press
+other racers, and lose less stamina for being in first. Wasn't the front-runner bonus supposed to
+apply to the top three?"
+
+The player was remembering something real, but about the wrong side of the mechanic. `PRESS_RANK_LIMIT`
+— which horses pay extra tank for crowding the leader — **is** documented as top-3 in REBUILD.md §20.
+`EASY_LEAD_RECOVER_BONUS` — the reward for a clear, unpressed lead — was always rank-1-only by design,
+in both the spec and the code; that part never changed.
+
+What had changed is that the code no longer matched the numbers §20 itself records, with the reasoning
+for each written down at the time they were measured:
+
+| Constant | REBUILD.md §20 | Code (before this fix) | Drift |
+|---|---|---|---|
+| `PRESS_RANGE_METRES` | 5 | 7.5 | +50% |
+| `PRESS_COST` | 0.17 | 0.26 | +53% |
+| `PRESS_RANK_LIMIT` | 3 | 2 | narrowed — rank 3 stopped paying press at all |
+| `EASY_LEAD_RECOVER_BONUS` | 0.44 | 0.9 | +105%, more than doubled |
+
+Every drift pointed the same direction: **living in an uncontested lead got cheaper, and contesting
+it got both narrower and more expensive.** That is exactly "front-runners are busted," and it explains
+the specific race that prompted the question — a player running second against an unpressed leader was
+paying a widened, pricier press cost against a leader collecting more than double the recovery §20
+measured for that situation.
+
+**Fixed by reverting all four to the documented values.** Not a retune — the spec already carried the
+reasoning and the measurement for the original numbers, so this restores a decision rather than making
+a new one. Gates: 12/13, same pass rate as before, with a materially healthier B1 (worst archetype
+moved from frontRunner 13.0% to midPack 10.1%, and the frontRunner/stalker/closer spread tightened).
+`npm run stat-leverage` unaffected — Speed still dominant as logged above, everything else intact.
+
+No `git log -S` history exists for either constant, so there is no record of when or why the drift
+happened — worth treating any hand-tuned constant as suspect and checking it against REBUILD.md before
+trusting it, since this is now the second time a documented value and the shipped value disagreed
+silently.
+
 ### The race calendar rerolls its options when you back out of a race
 
 **Found in play** — "go to race calendar, click a race, then click back, and it rerolls your race
