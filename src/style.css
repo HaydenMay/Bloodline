@@ -7533,19 +7533,34 @@ body {
 
 .archive-genetics-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
 }
 
 .archive-genetics-row + .archive-genetics-row {
   border-top: 1px solid var(--line);
 }
 
+.archive-genetics-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .archive-genetics-locus {
   font-size: 0.85rem;
   color: var(--text);
+}
+
+/* The plain-language decode of the letters beside it — found necessary
+   after "ff" alone read as jargon with nothing to explain it. */
+.archive-genetics-story {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .archive-genetics-pair {

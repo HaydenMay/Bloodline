@@ -80,6 +80,38 @@ function statusOf(horse: Horse, stable: Stable, isLivingRoot: boolean): string {
   return 'An outside horse your line has bred to.';
 }
 
+/**
+ * What a notable allele actually means, in words — the raw letters ("Ff",
+ * "ee") read as jargon on their own, which is exactly the gap a player
+ * flagged after using this blind. One entry per locus, since each of the
+ * three "hider" loci has exactly one non-dominant story worth telling
+ * (`notableAllele` never returns more than one candidate per locus).
+ */
+const ALLELE_STORY: Record<string, { hidden: string; surfaced: string }> = {
+  'extension:e': {
+    hidden: 'Carries a hidden chestnut factor — invisible unless it meets another copy.',
+    surfaced: 'Chestnut, here, came from two hidden carriers meeting.',
+  },
+  'agouti:t': {
+    hidden: 'Carries a hidden dark bay factor.',
+    surfaced: 'Dark bay, here, came from two hidden carriers meeting.',
+  },
+  'agouti:a': {
+    hidden: 'Carries a hidden black factor.',
+    surfaced: 'Black, here, came from two hidden carriers meeting.',
+  },
+  'flaxen:f': {
+    hidden: 'Carries a hidden pale-mane factor.',
+    surfaced: "This horse's pale mane came from two hidden carriers meeting.",
+  },
+};
+
+function alleleStory(locus: keyof CoatGenotype, allele: string, surfaced: boolean): string {
+  const story = ALLELE_STORY[`${locus}:${allele}`];
+  if (!story) return '';
+  return surfaced ? story.surfaced : story.hidden;
+}
+
 export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptions): () => void {
   const { stable, root, playerSilks, rootLegacyPoints, onBack, onBreed } = options;
 
@@ -436,17 +468,26 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
 
       const homozygous = pair[0] === pair[1];
       const plainAllele = homozygous ? null : pair.find((a) => a !== notable);
+      const story = alleleStory(locus.key, notable, homozygous);
 
       rowsHtml.push(`
         <div class="archive-genetics-row">
-          <span class="archive-genetics-locus">${locus.label}</span>
-          <span class="archive-genetics-pair">
-            ${plainAllele ? `<span class="archive-allele">${plainAllele}</span>` : ''}
-            <button type="button" class="archive-allele archive-allele-trace"
-                    data-locus="${locus.key}" data-allele="${notable}">${
-                      homozygous ? `${notable}${notable}` : notable
-                    }</button>
-          </span>
+          <div class="archive-genetics-row-top">
+            <span class="archive-genetics-locus">${locus.label}</span>
+            <span class="archive-genetics-pair">
+              ${
+                plainAllele
+                  ? `<span class="archive-allele" title="The dominant allele — always shows, nothing hidden here">${plainAllele}</span>`
+                  : ''
+              }
+              <button type="button" class="archive-allele archive-allele-trace"
+                      data-locus="${locus.key}" data-allele="${notable}"
+                      title="Tap to find every other horse in the tree carrying this">${
+                        homozygous ? `${notable}${notable}` : notable
+                      }</button>
+            </span>
+          </div>
+          <p class="archive-genetics-story">${story}</p>
         </div>
       `);
     }

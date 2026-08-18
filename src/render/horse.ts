@@ -1,4 +1,4 @@
-import { coatFor, dark, lite, HORSE, type Silks } from './palette.js';
+import { coatFor, dark, lite, HORSE, type Coat, type Silks } from './palette.js';
 import { BODY, EAR, HOOF, LEG, MANE, NECK_HEAD, TAIL, path } from './horseArt.js';
 
 /**
@@ -303,7 +303,7 @@ function drawLeg(
 }
 
 export interface DrawHorseOptions {
-  coat: string;
+  coat: string | Coat;
   silks: Silks;
   pose: HorsePose;
   scale: number;
@@ -316,7 +316,7 @@ export function drawHorse(
   y: number,
   opts: DrawHorseOptions,
 ): void {
-  const coat = coatFor(opts.coat);
+  const coat = typeof opts.coat === 'string' ? coatFor(opts.coat) : opts.coat;
   const { phase, intensity, drive } = opts.pose;
   const body = coat.body;
 

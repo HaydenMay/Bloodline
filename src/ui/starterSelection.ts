@@ -2,7 +2,7 @@ import { createRng } from '../sim/rng.js';
 import { createNameGenerator } from '../data/names.js';
 import { generateStarterSix } from '../sim/horse.js';
 import type { Horse } from '../sim/types.js';
-import { hashId, RIVAL_SILKS, type Silks } from '../render/palette.js';
+import { coatForHorse, hashId, RIVAL_SILKS, type Silks } from '../render/palette.js';
 import { TRAITS } from '../data/traits.js';
 import { mountCarousel } from './carousel.js';
 import { createBadgeElement } from './badgeLoader.js';
@@ -46,7 +46,7 @@ export function mountStarterSelection(
     const container = document.createElement('div');
     container.className = 'sc-carousel-box';
 
-    const badgeWrap = createBadgeElement(horse.coat, silksFor.get(horse.id)!, badgeCache, horse.id, 'sc-badge', 'Horse badge');
+    const badgeWrap = createBadgeElement(coatForHorse(horse), silksFor.get(horse.id)!, badgeCache, horse.id, 'sc-badge', 'Horse badge');
     const infoEl = document.createElement('div');
     infoEl.className = 'sc-carousel-info';
 

@@ -1,6 +1,6 @@
 import type { Horse } from '../sim/types.js';
 import type { RivalDossier } from './career.js';
-import { hashId, RIVAL_SILKS } from '../render/palette.js';
+import { coatForHorse, hashId, RIVAL_SILKS } from '../render/palette.js';
 import { mountCarousel } from './carousel.js';
 import { createBadgeElement } from './badgeLoader.js';
 
@@ -38,7 +38,7 @@ export function mountDossierScreen(
     const container = document.createElement('div');
     container.className = 'dc-carousel-box';
 
-    const badgeWrap = createBadgeElement(rival.coat, silksFor.get(rival.id)!, badgeCache, rival.id, 'dc-badge', 'Rival badge');
+    const badgeWrap = createBadgeElement(coatForHorse(rival), silksFor.get(rival.id)!, badgeCache, rival.id, 'dc-badge', 'Rival badge');
     const infoEl = document.createElement('div');
     infoEl.className = 'dc-carousel-info';
 

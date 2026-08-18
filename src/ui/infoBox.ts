@@ -1,7 +1,7 @@
 import { toGrade, STAT_KEYS, type Horse, type StatKey } from "../sim/types.js";
 import { getPotentialBand } from "./statDisplay.js";
 import { TRAITS } from "../data/traits.js";
-import { coatFor, type Silks } from "../render/palette.js";
+import { coatFor, coatForHorse, type Silks } from "../render/palette.js";
 import { getBadgeDataUri } from "../render/shieldBadge.js";
 
 /**
@@ -149,7 +149,7 @@ export function attachInfoBox(
 
   // Load badge asynchronously if silks provided
   if (silks) {
-    getBadgeDataUri({ coat: horse.coat, silks })
+    getBadgeDataUri({ coat: coatForHorse(horse), silks })
       .then((uri) => {
         const placeholder = card.querySelector(".ib-badge-placeholder");
         if (uri && placeholder) {

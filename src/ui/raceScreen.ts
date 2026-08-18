@@ -6,10 +6,12 @@ import {
 } from "../render/canvas.js";
 import { drawHorse } from "../render/horse.js";
 import {
+  coatForHorse,
   hashId,
   RIVAL_SILKS,
   SKIN_TONES,
   UI,
+  type Coat,
   type Silks,
 } from "../render/palette.js";
 import { loadFrameSequence, drawFrame } from "../render/frameAnimation.js";
@@ -232,6 +234,12 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     taken.add(slot);
     silksFor.set(h.id, RIVAL_SILKS[slot]!);
   }
+
+  // `coatForHorse` derives a genotype and checks it for flaxen — real work,
+  // not a field lookup. This is a 60Hz-times-field-size render loop, so it is
+  // resolved once per horse here rather than on every frame it gets drawn.
+  const coatOf = new Map<string, Coat | string>();
+  for (const h of field) coatOf.set(h.id, coatForHorse(h));
 
   // Stride phase is visual only, advanced from speed so hooves match the ground.
   const stride = new Map<string, number>();
@@ -464,14 +472,14 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
           phase,
           scale: scale * 2.2,
           scheme: {
-            coat: r.coat,
+            coat: coatOf.get(r.id)!,
             silks: silksFor.get(r.id)!,
             jockeySkin: skinToneFor(r.id),
           },
         });
       } else {
         drawHorse(ctx, x, y, {
-          coat: r.coat,
+          coat: coatOf.get(r.id)!,
           silks: silksFor.get(r.id)!,
           pose: {
             phase,
