@@ -730,27 +730,35 @@ function showFoalDevelopment(foal: Horse, stable: Stable, playerSilks: Silks): v
 }
 
 /**
- * The Archive, reached from the main menu's Bloodstock door.
+ * The Archive, reached from the main menu's Bloodstock door or, mid-career,
+ * from the stable hub's own nav grid.
  *
  * DESIGN.md 10: "first-class screen, not a submenu" — so this is what that
  * door opens onto now, rooted on the horse in training (or the newest
  * retiree, between careers), with the stud book reachable from inside it
  * rather than the other way round.
+ *
+ * `fromCareer` is the live `Career` when opened from the hub — read directly
+ * rather than reloaded from storage, the same way `onLegacy`/`onDossier`
+ * already do in `showStableHub`, so a result from seconds ago is never shown
+ * stale. Opened from the main menu instead, there is no in-memory career to
+ * hand it, and it falls back to whatever is on disk.
  */
-function showArchive(): void {
-  const stable = loadStable();
+function showArchive(fromCareer?: Career): void {
+  const stable = fromCareer?.stable ?? loadStable();
   if (!stable) {
     showMainMenu();
     return;
   }
-  const inTraining = loadCareer();
+  const inTraining = fromCareer ?? loadCareer();
   const playerSilks = inTraining?.playerSilks ?? DEFAULTS.playerSilksDefault;
   const root = inTraining?.horse ?? stable.bloodstock[stable.bloodstock.length - 1]?.horse;
+  const goBack = (): void => (fromCareer ? showStableHub(fromCareer) : showMainMenu());
 
   const openBreeding = (): void => {
     showBreeding(stable, playerSilks, {
       mode: inTraining ? 'browse' : 'breed',
-      onBack: () => showArchive(),
+      onBack: () => showArchive(fromCareer),
     });
   };
 
@@ -767,7 +775,7 @@ function showArchive(): void {
     root,
     playerSilks: inTraining?.playerSilks,
     rootLegacyPoints: inTraining?.horseLegacy?.points,
-    onBack: () => showMainMenu(),
+    onBack: goBack,
     onBreed: openBreeding,
   });
 }
@@ -1074,6 +1082,7 @@ function showStableHub(career: Career): void {
       app.innerHTML = '';
       teardown = mountLegacyScreen(app, career, () => showStableHub(career));
     },
+    onArchive: () => showArchive(career),
     onRetire: () => {
       const value = getRetirementValue(career.horseLegacy, career.careerEndedByInjury === true);
       const peak = career.horseLegacy.peak;

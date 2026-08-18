@@ -12,6 +12,8 @@ export interface StableHubCallbacks {
   onConsumables: () => void;
   onDossier: () => void;
   onLegacy: () => void;
+  /** The pedigree tree, rooted on this horse. */
+  onArchive: () => void;
   /** Skip the week to recover — and the only way to work off an injury. */
   onRest: () => void;
   /** End this horse's career on the player's terms. */
@@ -202,6 +204,11 @@ export function mountStableHub(
             <div class="nav-label">Legacy</div>
             <div class="nav-desc">View achievements</div>
           </button>
+          <button class="nav-button" id="nav-archive" data-action="archive">
+            <div class="nav-icon">📜</div>
+            <div class="nav-label">Archive</div>
+            <div class="nav-desc">Family tree</div>
+          </button>
         </div>
       </div>
 
@@ -226,6 +233,7 @@ export function mountStableHub(
   const consumablesBtn = root.querySelector('#nav-consumables');
   const dossierBtn = root.querySelector('#nav-dossier');
   const legacyBtn = root.querySelector('#nav-legacy');
+  const archiveBtn = root.querySelector('#nav-archive');
   const restBtn = root.querySelector('#nav-rest');
   // Two of these when the trainer is prompting — the callout by the horse and
   // the quiet link at the foot. Both retire.
@@ -238,6 +246,7 @@ export function mountStableHub(
   consumablesBtn?.addEventListener('click', callbacks.onConsumables);
   dossierBtn?.addEventListener('click', callbacks.onDossier);
   legacyBtn?.addEventListener('click', callbacks.onLegacy);
+  archiveBtn?.addEventListener('click', callbacks.onArchive);
   restBtn?.addEventListener('click', callbacks.onRest);
   retireBtns.forEach((btn) => btn.addEventListener('click', callbacks.onRetire));
 
