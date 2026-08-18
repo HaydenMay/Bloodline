@@ -560,12 +560,22 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
     const genetics = buildGeneticsSection(horse);
     if (genetics) detailBody.appendChild(genetics);
 
+    // §2's ceiling-masking is about not spoiling a career still being trained
+    // out — it was never meant to erase the story once that career is over.
+    // Left as `isLivingRoot` alone, every retired horse's potential vanished
+    // from the tree forever, so a horse whose training never caught up to its
+    // ceiling (a real, common case) showed a flatly lower grade here than the
+    // one that actually fed the foal it produced — found in play from a horse
+    // whose attributes read all-B here but had bred S/A potentials. A horse
+    // the yard itself retired has nothing left to protect; an outside-world
+    // ancestor the player never owned still does.
+    const ownStory = isLivingRoot || retired !== undefined;
     const attrsSection = document.createElement('div');
     attrsSection.className = 'archive-detail-section';
     attrsSection.innerHTML = `
       <button type="button" class="archive-attrs-toggle" id="archive-attrs-toggle">Show attributes ▾</button>
       <div class="stat-rows" id="archive-attrs-rows" hidden>
-        ${renderStatRows(horse, { revealNumbers: false, showPotential: isLivingRoot })}
+        ${renderStatRows(horse, { revealNumbers: false, showPotential: ownStory })}
       </div>
     `;
     detailBody.appendChild(attrsSection);
