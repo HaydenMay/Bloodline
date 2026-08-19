@@ -250,12 +250,12 @@ function drawTurf(
     const scrollPx = cam.scrollMetres * cam.pixelsPerMetre;
     // Full scroll rate — this is the same near-ground plane the horses run
     // on, not a distant layer that should parallax slower.
-    tileImage(ctx, raceBackgroundImages.grass, horizon, width, height * 0.09, scrollPx);
-    // lower_track.png is the dirt and the near turf apron composed as one
-    // strip (an artist call, not a code one — see ROADMAP.md), so it fills
-    // the whole span below the far turf in a single tiled draw rather than
-    // two separate fills the way the procedural version below needs.
-    tileImage(ctx, raceBackgroundImages.lowerTrack, trackTop, width, height - trackTop, scrollPx);
+    //
+    // Hayden's call: this is a turf race, so grass.png IS the running
+    // surface — tiled across the whole span below the horizon, not just the
+    // thin strip beyond it. lower_track.png (dirt) stays loaded for a future
+    // dirt-track venue but isn't drawn here.
+    tileImage(ctx, raceBackgroundImages.grass, horizon, width, height - horizon, scrollPx);
     return;
   }
 
