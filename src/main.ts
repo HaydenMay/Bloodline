@@ -12,6 +12,7 @@ import { mountSilksDemo } from './ui/silksDemo.js';
 import { mountRoadmap } from './ui/roadmap.js';
 import { mountMainMenu, type MainMenuCallbacks } from './ui/mainMenu.js';
 import { mountStarterSelection } from './ui/starterSelection.js';
+import { mountStarterConfirmScreen } from './ui/starterConfirmScreen.js';
 import { mountBreedingScreen } from './ui/breedingScreen.js';
 import { mountArchiveScreen } from './ui/archiveScreen.js';
 import { allKnownHorses } from './ui/archiveTree.js';
@@ -975,7 +976,14 @@ function showStarterSelection(): void {
   teardown = mountStarterSelection(
     app,
     (selectedHorse, selectedSilks) => {
-      startCareer(selectedHorse, selectedSilks);
+      teardown?.();
+      app.innerHTML = '';
+      teardown = mountStarterConfirmScreen(app, {
+        horse: selectedHorse,
+        silks: selectedSilks,
+        usedNames,
+        onConfirm: (named) => startCareer(named, selectedSilks),
+      });
     },
     prestige,
     usedNames,

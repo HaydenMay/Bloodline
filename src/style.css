@@ -6991,16 +6991,17 @@ body {
 }
 
 /*
- * The foal reveal (Hayden: "currently I have no reason to think I should
- * sell cause idk what I got"). Same panel chrome as the rest of breeding,
+ * The horse reveal — a foal being born (Hayden: "currently I have no reason
+ * to think I should sell cause idk what I got") and, the same pattern,
+ * confirming a chosen starter. Same panel chrome as the rest of breeding,
  * built around the one real portrait rather than a preview.
  */
-.foal-born-section {
+.horse-reveal-section {
   align-items: center;
   text-align: center;
 }
 
-.foal-born-portrait {
+.horse-reveal-portrait {
   width: 140px;
   height: 140px;
   border-radius: 12px;
@@ -7009,7 +7010,7 @@ body {
   border: 1px solid var(--accent-border);
 }
 
-.foal-born-name-label {
+.horse-reveal-name-label {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -7020,13 +7021,13 @@ body {
   letter-spacing: 0.06em;
 }
 
-.foal-born-name-row {
+.horse-reveal-name-row {
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
-.foal-born-name-input {
+.horse-reveal-name-input {
   padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid var(--line);
@@ -7040,24 +7041,24 @@ body {
   text-align: center;
 }
 
-.foal-born-name-input:focus {
+.horse-reveal-name-input:focus {
   outline: none;
   border-color: var(--accent-border);
 }
 
-.foal-born-traits {
+.horse-reveal-traits {
   margin: 0;
   color: var(--muted);
   font-size: 0.85rem;
 }
 
-.foal-born-actions {
+.horse-reveal-actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.foal-born-actions .btn {
+.horse-reveal-actions .btn {
   flex: 1;
   min-width: 160px;
 }

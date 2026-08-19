@@ -69,13 +69,13 @@ export function mountFoalBornScreen(
         <div style="width: 80px;"></div>
       </div>
 
-      <section class="breeding-section foal-born-section">
-        <div class="foal-born-portrait" id="foal-born-portrait"></div>
+      <section class="breeding-section horse-reveal-section">
+        <div class="horse-reveal-portrait" id="foal-born-portrait"></div>
 
-        <label class="foal-born-name-label">
+        <label class="horse-reveal-name-label">
           Name
-          <div class="foal-born-name-row">
-            <input type="text" id="foal-born-name" class="foal-born-name-input"
+          <div class="horse-reveal-name-row">
+            <input type="text" id="foal-born-name" class="horse-reveal-name-input"
                    value="${foal.name}" maxlength="${MAX_LENGTH}" />
             <button type="button" class="btn btn-secondary" id="foal-born-randomize" title="Suggest a different name">
               🎲 Randomize
@@ -91,7 +91,7 @@ export function mountFoalBornScreen(
           ${renderStatRows(foal, { showPotential: true })}
         </div>
 
-        ${traits ? `<p class="foal-born-traits">${traits}</p>` : ''}
+        ${traits ? `<p class="horse-reveal-traits">${traits}</p>` : ''}
 
         <p class="breeding-hint">
           It debuts at two, well short of what it will become. What it carries is its parents.
@@ -101,7 +101,7 @@ export function mountFoalBornScreen(
       <section class="breeding-section">
         <h3>What Next</h3>
         <p class="breeding-empty">Passing costs a covering season — every horse at stud ages a year.</p>
-        <div class="foal-born-actions">
+        <div class="horse-reveal-actions">
           <button class="btn btn-primary" id="foal-born-keep">Take It Into Training</button>
           <button class="btn btn-secondary" id="foal-born-sell">Pass — sell for $${sellPrice.toLocaleString()}</button>
         </div>
