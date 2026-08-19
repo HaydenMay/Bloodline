@@ -106,8 +106,24 @@ describe('stat rows', () => {
     );
   });
 
-  it('leads with the grade', () => {
-    root.innerHTML = renderStatRows(horse({ stats: { ...horse().stats, speed: 92 } }));
+  /**
+   * Picking a starter or a yearling is a bet on the ceiling, not on the low
+   * baby numbers every horse opens with — so the grade reads the potential,
+   * and the current value only shows up once you tap for it.
+   */
+  it('leads with the potential grade, not the current one', () => {
+    root.innerHTML = renderStatRows(
+      horse({ potential: { ...horse().potential, speed: 92 } }),
+    );
+    const speedRow = root.querySelector('[data-stat="speed"]')!;
+    expect(speedRow.querySelector('.stat-row-grade')!.textContent).toBe('X');
+    expect(speedRow.querySelector('.stat-row-num')!.textContent).toBe('50');
+  });
+
+  it('falls back to the current grade when potential is hidden, for rivals', () => {
+    root.innerHTML = renderStatRows(horse({ stats: { ...horse().stats, speed: 92 } }), {
+      showPotential: false,
+    });
     const speedRow = root.querySelector('[data-stat="speed"]')!;
     expect(speedRow.querySelector('.stat-row-grade')!.textContent).toBe('X');
   });

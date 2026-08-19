@@ -61,15 +61,22 @@ export interface StatRowOptions {
    * §3 makes the grade the primary reading.
    */
   revealNumbers?: boolean;
-  /** Show the potential band. Off for rivals, whose ceilings you never see. */
+  /** Show the potential band, and lead with the potential grade rather than
+   *  the current one. Off for rivals, whose ceilings you never see. */
   showPotential?: boolean;
 }
 
 /**
  * Renders the six stat rows. Pair with `attachStatReveal` to make them tappable.
  *
- * The bar carries two fills: the solid one is the stat as it stands, the ghost
- * behind it is how far the ceiling is. Watching the gap close *is* the
+ * The grade and the number are two different questions, so they never show at
+ * once: the grade is what the horse *could* become — its potential, where a
+ * ceiling is known — and tapping swaps it for what it *is right now*, as an
+ * exact figure. Picking a starter or a yearling is a bet on the grade; training
+ * one day to day is watching the number climb toward it.
+ *
+ * The bar still carries both: the solid fill is the stat as it stands, the
+ * ghost behind it is how far the ceiling is. Watching the gap close is the
  * narrowing range, without ever printing the ceiling itself.
  */
 export function renderStatRows(horse: Horse, options: StatRowOptions = {}): string {
@@ -77,15 +84,14 @@ export function renderStatRows(horse: Horse, options: StatRowOptions = {}): stri
 
   return STAT_KEYS.map((key) => {
     const value = Math.round(horse.stats[key]);
-    const grade = toGrade(value);
     const ceiling = horse.potential?.[key];
-    const band = showPotential && ceiling !== undefined
-      ? getPotentialBand(value, ceiling)
-      : null;
+    const hasPotential = showPotential && ceiling !== undefined;
+    const grade = toGrade(hasPotential ? ceiling : value);
+    const band = hasPotential ? getPotentialBand(value, ceiling) : null;
 
     return `
       <button class="stat-row${revealNumbers ? ' revealed' : ''}" data-stat="${key}"
-              aria-label="${STAT_LABELS[key]}, grade ${grade}${band ? `, ${band.label}` : ''}">
+              aria-label="${STAT_LABELS[key]}, ${hasPotential ? 'potential grade' : 'grade'} ${grade}${band ? `, ${band.label}` : ''}, currently ${value}">
         <span class="stat-row-name">${STAT_LABELS[key]}</span>
         <span class="stat-row-bar">
           ${band ? `<i class="stat-row-ceiling" style="width:${band.ceilingAt.toFixed(0)}%"></i>` : ''}

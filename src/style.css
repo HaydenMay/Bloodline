@@ -2116,60 +2116,12 @@ body {
   color: var(--text);
 }
 
-.sc-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
-}
-
-.sc-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  position: relative;
-}
-
-.sc-stat {
-  cursor: help;
-}
-
-.sc-stat:hover::after {
-  content: attr(title);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 8px;
-  padding: 8px 12px;
-  background: var(--panel);
-  border: 1px solid var(--accent-border);
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--text);
-  z-index: 1000;
-  pointer-events: none;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.3);
-}
-
-.sc-stat-label {
-  font-size: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--muted);
-  font-weight: 650;
-}
-
-.sc-stat-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--accent);
-  position: relative;
-  z-index: 1;
+.sc-stats-hint {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  font-style: italic;
+  opacity: 0.8;
 }
 
 .sc-traits {
@@ -6858,6 +6810,14 @@ body {
   font-size: 0.95rem;
   min-width: 1.1rem;
   text-align: center;
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+/* Grade or number, never both — tapping swaps which one is showing rather
+   than adding the number alongside the grade. */
+.stat-row.revealed .stat-row-grade {
+  opacity: 0;
 }
 
 .grade-X { color: #f2c14e; }

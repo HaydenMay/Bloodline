@@ -362,8 +362,8 @@ export function mountTrainingScreen(
 
       <div class="current-stats">
         <div class="current-stats-head">
-          <h3>Current Stats</h3>
-          <span class="stats-hint">Tap for exact numbers</span>
+          <h3>Attributes</h3>
+          <span class="stats-hint">Grades show potential — tap for today's numbers</span>
         </div>
         <div class="stat-rows" id="training-stat-rows">
           ${renderStatRows(horse)}
@@ -374,7 +374,7 @@ export function mountTrainingScreen(
 
   container.appendChild(root);
 
-  // Grades read first; tapping any row switches the whole block to numbers.
+  // Grades read first; tapping any row swaps the whole block to today's numbers.
   const detachReveal = attachStatReveal(root);
 
   // Set up horse preview canvas
