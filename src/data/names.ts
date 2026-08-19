@@ -1,10 +1,18 @@
 /**
  * Procedural horse names (DESIGN.md §13).
  *
- * Real thoroughbreds are often named with wordplay on their sire and dam, so
- * foal names are derived from parents in Phase 5. This file provides the pools
- * and the safeguards: no nonsense combinations, no duplicates within a save,
- * and a length cap. Player horses always get a suggestion they can overwrite.
+ * Real thoroughbreds are often named with wordplay on their sire and dam.
+ * That derivation was the original aim for Phase 5 but was never built — a
+ * foal's name today is drawn from these flat pools with no reference to its
+ * parents at all. What this file actually provides is the safeguards: no
+ * nonsense combinations, no duplicates within a save, and a length cap.
+ * Player horses always get a suggestion they can overwrite.
+ *
+ * The pools were doubled from their original ~56/56/24 (found in play: the
+ * same handful of words kept resurfacing across a long save's worth of
+ * horses). More words per pool directly cuts how often two horses echo each
+ * other, since it's the count of each pool — not the combinations, which
+ * were never actually the scarce resource — that a player notices.
  */
 
 const FIRST = [
@@ -15,6 +23,11 @@ const FIRST = [
   'Fierce', 'Keen', 'Swift', 'Proud', 'True', 'Noble', 'Wise', 'Dark',
   'Regal', 'Vital', 'Sacred', 'Royal', 'Loyal', 'Brash', 'Sleek', 'Mystic',
   'Vivid', 'Sharp', 'Daring', 'Graceful', 'Majestic', 'Savage', 'Serene', 'Zesty',
+  'Ancient', 'Blazing', 'Brave', 'Burning', 'Calm', 'Crystal', 'Cunning', 'Deep',
+  'Electric', 'Emerald', 'Eternal', 'Fabled', 'Feral', 'Flying', 'Forgotten', 'Free',
+  'Frost', 'Gallant', 'Ghost', 'Gleaming', 'Hollow', 'Honest', 'Ivory', 'Jade',
+  'Radiant', 'Rising', 'Rogue', 'Rustic', 'Scarlet', 'Solitary', 'Southern', 'Stark',
+  'Steel', 'Sudden', 'Timeless', 'Ashen', 'Auburn', 'Bronze', 'Onyx', 'Pale',
 ] as const;
 
 const SECOND = [
@@ -25,6 +38,10 @@ const SECOND = [
   'Vessel', 'Oracle', 'Prophet', 'Timber', 'Forge', 'Tide', 'Spark', 'Prism',
   'Rebel', 'Victor', 'Horizon', 'Phantom', 'Summit', 'Torch', 'Warden', 'Sentinel',
   'Crown', 'Mantle', 'Scepter', 'Throne', 'Justice', 'Valor', 'Glory', 'Honor',
+  'Ballad', 'Baron', 'Blade', 'Bounty', 'Cascade', 'Citadel', 'Cove', 'Crest',
+  'Current', 'Dagger', 'Echo', 'Frontier', 'Gambit', 'Garrison', 'Harvest', 'Haven',
+  'Herald', 'Journey', 'Lance', 'Bastion', 'Outpost', 'Ranger', 'Reef', 'Ridge',
+  'Saga', 'Scout', 'Sentry', 'Skyline', 'Stampede', 'Standard', 'Stronghold', 'Vanguard',
 ] as const;
 
 /** Single-word names, used occasionally so the field isn't uniformly two-word. */
@@ -33,6 +50,8 @@ const SOLO = [
   'Overture', 'Backdraft', 'Riptide', 'Freehand', 'Nobleman', 'Windfall',
   'Maverick', 'Phantom', 'Tempest', 'Wildfire', 'Starlight', 'Thunder',
   'Blaze', 'Eclipse', 'Mirage', 'Vortex', 'Zenith', 'Dynamo',
+  'Ironclad', 'Renegade', 'Whirlwind', 'Sundown', 'Daybreak', 'Nightfall',
+  'Uprising', 'Cornerstone', 'Trailblazer', 'Firestorm', 'Stormfront', 'Lodestar',
 ] as const;
 
 /** Combinations that read badly or unfortunately. Checked case-insensitively. */
