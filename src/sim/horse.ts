@@ -78,10 +78,64 @@ function rollStats(rng: Rng, band: DivisionBand): Stats {
 }
 
 /** Hidden ceilings, always at or above current stats. */
-function rollPotential(rng: Rng, stats: Stats, generosity = 1): Stats {
+function rollPotential(
+  rng: Rng,
+  stats: Stats,
+  generosity = 1,
+  opts: { starter?: boolean } = {},
+): Stats {
+  if (opts.starter) return rollStarterPotential(rng, stats, generosity);
+
   const out = {} as Stats;
   for (const key of STAT_KEYS) {
     const headroom = rng.range(8, 45) * generosity;
+    out[key] = clamp100(stats[key] + headroom);
+  }
+  return out;
+}
+
+/**
+ * Six independent rolls means six independent chances at the top of the
+ * range, uncorrelated with the rest of the horse — measured at 82.8% of
+ * starters carrying at least one A-tier (75+) potential and 12.3% an X-tier
+ * (90+) one, found in play from a single Gen-1 starter whose one outlier
+ * stat (Grit) "set me up like crazy." A starter picked blind is supposed to
+ * be a real six-way choice, not "which of these six has the hidden lottery
+ * ticket."
+ *
+ * Replaces that with a shared pool split across the six stats, so a big
+ * number in one place is a smaller number somewhere else on the same
+ * horse — matching the player's own framing, and the same "budget, not six
+ * free rolls" shape `sim/breeding.ts` already uses for a bred foal's
+ * potential. Only for starters: a bred foal earning a real standout stat
+ * through good pairings is the reward breeding is supposed to offer, and
+ * this leaves that untouched.
+ *
+ * The pool's own mean is set to match the six-independent-rolls mean
+ * exactly (6 * the midpoint of the old 8-45 range), so an average starter
+ * is no better or worse than before — only how far any one stat can run
+ * ahead of the rest of the same horse changes. Weights are kept in a
+ * narrow band (0.85-1.15) rather than let one stat claim most of the pool,
+ * which is what actually caps the outlier: even a maximally lucky pool
+ * total and a maximally lucky weight cannot hand one stat much more than
+ * about a fifth of it.
+ */
+const STARTER_POOL_MEAN = STAT_KEYS.length * ((8 + 45) / 2);
+
+function rollStarterPotential(rng: Rng, stats: Stats, generosity: number): Stats {
+  const pool = rng.range(STARTER_POOL_MEAN * 0.75, STARTER_POOL_MEAN * 1.25) * generosity;
+
+  const weights = {} as Record<(typeof STAT_KEYS)[number], number>;
+  let weightSum = 0;
+  for (const key of STAT_KEYS) {
+    const w = rng.range(0.85, 1.15);
+    weights[key] = w;
+    weightSum += w;
+  }
+
+  const out = {} as Stats;
+  for (const key of STAT_KEYS) {
+    const headroom = (weights[key] / weightSum) * pool;
     out[key] = clamp100(stats[key] + headroom);
   }
   return out;
@@ -327,6 +381,7 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
       rng,
       displayStats,
       (opts.starter ? 1.35 : 1) * (style === 'midPack' ? MIDPACK_GENEROSITY : 1),
+      { starter: opts.starter === true },
     ),
     style,
     moment,

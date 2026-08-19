@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createRng } from './rng.js';
 import { generateStarterSix, rollTraits } from './horse.js';
 import { createNameGenerator } from '../data/names.js';
+import { STAT_KEYS } from './types.js';
 
 /** Trait counts across many rolls, so the assertions are about rates not luck. */
 function traitCounts(legacy: number, opts: { starter?: boolean } = {}): number[] {
@@ -72,6 +73,58 @@ describe('the six starters offered', () => {
       const counts = pools(prestige);
       expect(Math.max(...counts)).toBeLessThanOrEqual(3);
       expect(shareWith(counts, 3)).toBeLessThan(0.05);
+    }
+  });
+});
+
+/**
+ * Found in play: "I had one my first gen that the potential was A tier for
+ * grit and that set me up like crazy." Six independent per-stat rolls meant
+ * six independent chances at the top of the range, uncorrelated with the
+ * rest of the horse — measured at 82.8% of starters carrying at least one
+ * A-tier (75+) potential and 12.3% an X-tier (90+) one before this. Now a
+ * shared pool is split across the six stats, so a big number in one place
+ * comes at the expense of the others on the same horse, the way a bred
+ * foal's potential already works (sim/breeding.ts's budget).
+ */
+describe('starter potential is a shared pool, not six independent lottery tickets', () => {
+  function starterPotentials(prestige = 0, trials = 400): number[] {
+    const out: number[] = [];
+    for (let i = 0; i < trials; i++) {
+      const rng = createRng(`starter-pool-${prestige}-${i}`);
+      const names = createNameGenerator(rng);
+      for (const horse of generateStarterSix(rng, names, prestige)) {
+        for (const key of STAT_KEYS) out.push(horse.potential[key]);
+      }
+    }
+    return out;
+  }
+
+  it('keeps the average starter unchanged — only the outlier ceiling moves', () => {
+    const potentials = starterPotentials();
+    const mean = potentials.reduce((a, b) => a + b, 0) / potentials.length;
+    // Old six-independent-rolls mean: statValue(~26) + headroom(~35.8) ≈ 61.8.
+    // The pool's own mean is deliberately set to match it.
+    expect(mean).toBeGreaterThan(58);
+    expect(mean).toBeLessThan(66);
+  });
+
+  it('makes a single X-tier (90+) stat exceedingly rare rather than one time in eight', () => {
+    const potentials = starterPotentials(0, 2000);
+    const xTierShare = potentials.filter((p) => p >= 90).length / potentials.length;
+    expect(xTierShare).toBeLessThan(0.01);
+  });
+
+  it('still allows an A-tier (75+) stat sometimes, just not on most starters', () => {
+    const potentials = starterPotentials(0, 2000);
+    const aTierShare = potentials.filter((p) => p >= 75).length / potentials.length;
+    expect(aTierShare).toBeGreaterThan(0);
+    expect(aTierShare).toBeLessThan(0.15);
+  });
+
+  it('never lets one stat consume so much of the pool that potential exceeds 100 on its own', () => {
+    for (const p of starterPotentials(0, 200)) {
+      expect(p).toBeLessThanOrEqual(100);
     }
   });
 });
