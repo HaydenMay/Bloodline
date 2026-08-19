@@ -1,11 +1,8 @@
 import { createRng } from '../sim/rng.js';
 import { createNameGenerator } from '../data/names.js';
-import { MAX_LENGTH } from '../data/names.js';
-import { TRAITS } from '../data/traits.js';
 import type { Horse } from '../sim/types.js';
 import type { Silks } from '../render/palette.js';
-import { attachStatReveal, renderStatRows } from './statDisplay.js';
-import { mountPortrait } from './breedingScreen.js';
+import { mountHorseRevealCard } from './horseRevealCard.js';
 
 /**
  * Confirming a starter (Hayden: "we should add it after start[er] selection
@@ -45,11 +42,6 @@ export function mountStarterConfirmScreen(
   const usedList = Array.from(usedNames);
   let rerolls = 0;
 
-  const traits = horse.traits
-    .map((id) => TRAITS[id]?.name)
-    .filter(Boolean)
-    .join(' · ');
-
   root.innerHTML = `
     <div class="breeding-container">
       <div class="breeding-top-bar">
@@ -57,30 +49,7 @@ export function mountStarterConfirmScreen(
         <div style="width: 80px;"></div>
       </div>
 
-      <section class="breeding-section horse-reveal-section">
-        <div class="horse-reveal-portrait" id="starter-confirm-portrait"></div>
-
-        <label class="horse-reveal-name-label">
-          Name
-          <div class="horse-reveal-name-row">
-            <input type="text" id="starter-confirm-name" class="horse-reveal-name-input"
-                   value="${horse.name}" maxlength="${MAX_LENGTH}" />
-            <button type="button" class="btn btn-secondary" id="starter-confirm-randomize" title="Suggest a different name">
-              🎲 Randomize
-            </button>
-          </div>
-        </label>
-
-        <p class="breeding-hint">
-          A ${horse.gender === 'stallion' ? 'colt' : 'filly'}, generation 1 — a starter inherits nothing but what it shows here.
-        </p>
-
-        <div class="stat-rows" id="starter-confirm-stats">
-          ${renderStatRows(horse, { showPotential: true })}
-        </div>
-
-        ${traits ? `<p class="horse-reveal-traits">${traits}</p>` : ''}
-      </section>
+      <section class="breeding-section horse-reveal-section" id="starter-confirm-card-host"></section>
 
       <section class="breeding-section">
         <div class="horse-reveal-actions">
@@ -90,22 +59,21 @@ export function mountStarterConfirmScreen(
     </div>
   `;
 
-  const portraitHost = root.querySelector<HTMLElement>('#starter-confirm-portrait')!;
-  const stopPortrait = mountPortrait(portraitHost, horse, silks);
+  const cardHost = root.querySelector<HTMLElement>('#starter-confirm-card-host')!;
+  const card = mountHorseRevealCard(cardHost, {
+    horse,
+    silks,
+    subtitle: `${horse.gender === 'stallion' ? 'Colt' : 'Filly'} · Generation 1 — inherits nothing but what it shows here.`,
+  });
 
-  const statsHost = root.querySelector<HTMLElement>('#starter-confirm-stats')!;
-  const detachReveal = attachStatReveal(statsHost);
+  const finalName = (): string => card.nameInput.value.trim() || horse.name;
 
-  const nameInput = root.querySelector<HTMLInputElement>('#starter-confirm-name')!;
-
-  const finalName = (): string => nameInput.value.trim() || horse.name;
-
-  on(root.querySelector('#starter-confirm-randomize'), 'click', () => {
+  on(card.randomizeButton, 'click', () => {
     rerolls += 1;
     const rng = createRng(`starter-confirm-${horse.id}-${rerolls}-${Date.now()}`);
     const names = createNameGenerator(rng, usedList);
-    nameInput.value = names.next();
-    nameInput.focus();
+    card.nameInput.value = names.next();
+    card.nameInput.focus();
   });
 
   on(root.querySelector('#starter-confirm-start'), 'click', () => {
@@ -115,8 +83,7 @@ export function mountStarterConfirmScreen(
 
   return () => {
     listeners.splice(0).forEach((off) => off());
-    stopPortrait();
-    detachReveal();
+    card.teardown();
     root.remove();
   };
 }

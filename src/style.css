@@ -6993,32 +6993,17 @@ body {
 /*
  * The horse reveal — a foal being born (Hayden: "currently I have no reason
  * to think I should sell cause idk what I got") and, the same pattern,
- * confirming a chosen starter. Same panel chrome as the rest of breeding,
- * built around the one real portrait rather than a preview.
+ * confirming a chosen starter. Rebuilt on the starter carousel's own
+ * `sc-*` layout (`mountHorseRevealCard`) rather than a bespoke centred
+ * portrait — found wonky in its first pass, floating alone with too much
+ * empty space and no visual continuity with the screen before it.
  */
 .horse-reveal-section {
   align-items: center;
-  text-align: center;
 }
 
-.horse-reveal-portrait {
-  width: 140px;
-  height: 140px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--bg);
-  border: 1px solid var(--accent-border);
-}
-
-.horse-reveal-name-label {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.78rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.horse-reveal-box {
+  width: 100%;
 }
 
 .horse-reveal-name-row {
@@ -7028,28 +7013,20 @@ body {
 }
 
 .horse-reveal-name-input {
+  flex: 1;
+  min-width: 0;
   padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--text);
-  font-size: 1rem;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: normal;
-  min-width: 12rem;
-  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 700;
 }
 
 .horse-reveal-name-input:focus {
   outline: none;
   border-color: var(--accent-border);
-}
-
-.horse-reveal-traits {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.85rem;
 }
 
 .horse-reveal-actions {
