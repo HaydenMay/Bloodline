@@ -6741,8 +6741,8 @@ body {
   /* Same reason as .race-card — a button needs an explicit colour. */
   color: var(--text);
   display: grid;
-  grid-template-columns: 5.5rem 1fr auto auto;
-  grid-template-areas: 'name bar grade num';
+  grid-template-columns: 5.5rem 1fr auto;
+  grid-template-areas: 'name bar value';
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -6804,12 +6804,39 @@ body {
   border-radius: 4px;
 }
 
+/* Grade and number share one box rather than sitting in two side-by-side
+   grid columns — found off (Hayden: "does it go to the open space or stay
+   right aligned... I prefer to just have it not do that"): measured the
+   two states 30px apart, since a plain two-column layout still reserves
+   both columns' width even while one is opacity 0. A fixed-size relative
+   wrapper with both children absolutely positioned over it fixes that the
+   same way `.stat-cell-value` already does for the boxed grid — the width
+   still has to fit the widest possible value (100, three digits) or the
+   row's bar visibly runs shorter than its neighbours the moment a stat
+   hits exactly 100, same reasoning as the old min-width fix this replaces. */
+.stat-row-value {
+  grid-area: value;
+  position: relative;
+  min-width: 3ch;
+  height: 1.3rem;
+}
+
+/* Scoped to `.stat-row-value`'s own children — `.dev-row` in the foal
+   development screen reuses the bare `.stat-row-grade` class outside that
+   wrapper (a static grade with no number and nothing to toggle), which an
+   unscoped `position: absolute` here would silently break. */
+.stat-row-value > .stat-row-grade,
+.stat-row-value > .stat-row-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .stat-row-grade {
-  grid-area: grade;
   font-weight: 800;
   font-size: 0.95rem;
-  min-width: 1.1rem;
-  text-align: center;
   opacity: 1;
   transition: opacity 0.15s ease;
 }
@@ -6826,19 +6853,10 @@ body {
 .grade-C { color: var(--muted); }
 .grade-D { color: var(--warning); }
 
-/* Numbers stay out of the way until asked for. Hidden via opacity rather than
-   display:none, so it still occupies layout space — min-width has to fit the
-   widest possible value (100, three digits) or that row's bar visibly runs
-   shorter than its neighbours the moment a stat hits exactly 100: found in
-   play from a maxed Stamina row rendering shorter than every other stat on
-   the same card. */
 .stat-row-num {
-  grid-area: num;
   font-family: var(--mono);
   font-size: 0.8rem;
   color: var(--muted);
-  min-width: 3ch;
-  text-align: right;
   opacity: 0;
   transition: opacity 0.15s ease;
 }
@@ -6856,10 +6874,10 @@ body {
 
 /* The band only earns its own line once there is something notable to say. */
 .stat-row:has(.stat-row-room) {
-  grid-template-columns: 5.5rem 1fr auto auto;
+  grid-template-columns: 5.5rem 1fr auto;
   grid-template-areas:
-    'name bar grade num'
-    'room room room room';
+    'name bar value'
+    'room room room';
   row-gap: 2px;
 }
 

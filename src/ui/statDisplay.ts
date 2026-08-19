@@ -107,8 +107,10 @@ export function renderStatRows(horse: Horse, options: StatRowOptions = {}): stri
           ${band ? `<i class="stat-row-ceiling" style="width:${band.ceilingAt.toFixed(0)}%"></i>` : ''}
           <i class="stat-row-fill" style="width:${value}%"></i>
         </span>
-        <span class="stat-row-grade grade-${grade}">${grade}</span>
-        <span class="stat-row-num">${value}</span>
+        <span class="stat-row-value">
+          <span class="stat-row-grade grade-${grade}">${grade}</span>
+          <span class="stat-row-num">${value}</span>
+        </span>
         ${band ? `<span class="stat-row-room room-${band.id}">${band.label}</span>` : ''}
       </button>`;
   }).join('');
@@ -175,10 +177,12 @@ export function renderRangeRows(
         <span class="stat-row-bar">
           <i class="stat-row-span" style="left:${low}%;width:${Math.max(1, high - low)}%"></i>
         </span>
-        <span class="stat-row-grade${settled ? ` grade-${lowGrade}` : ''}">${
-          settled ? lowGrade : `${lowGrade}–${highGrade}`
-        }</span>
-        <span class="stat-row-num">${low}–${high}</span>
+        <span class="stat-row-value">
+          <span class="stat-row-grade${settled ? ` grade-${lowGrade}` : ''}">${
+            settled ? lowGrade : `${lowGrade}–${highGrade}`
+          }</span>
+          <span class="stat-row-num">${low}–${high}</span>
+        </span>
       </button>`;
   }).join('');
 }
