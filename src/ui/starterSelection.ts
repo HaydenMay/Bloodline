@@ -19,9 +19,17 @@ export function mountStarterSelection(
    * bloodline produces (§1).
    */
   stablePrestige = 0,
+  /**
+   * Every name already in the yard's history — bloodstock, the current
+   * world, its archive. Without this a starter could be handed the same
+   * name as a rival already out there, or one of the yard's own retired
+   * horses; the name registry is scoped per call, so nothing else checks it
+   * for you.
+   */
+  usedNames: Iterable<string> = [],
 ): () => void {
   const rng = createRng(`starter-${Date.now()}`);
-  const names = createNameGenerator(rng);
+  const names = createNameGenerator(rng, usedNames);
   const starters = generateStarterSix(rng, names, stablePrestige);
 
   const silksFor = new Map<string, Silks>();

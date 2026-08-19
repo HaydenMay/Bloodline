@@ -5,6 +5,7 @@ import type { Horse } from '../sim/types.js';
 import { TRAITS } from '../data/traits.js';
 import { YEARLING_OFFERS, yearlingPrice } from '../data/yearling.js';
 import type { Stable } from './career.js';
+import { allKnownHorses } from './archiveTree.js';
 
 /**
  * The sale ring — buying a yearling instead of breeding one.
@@ -40,9 +41,12 @@ export function mountYearlingScreen(
   // holds the same three horses however often the screen is redrawn. A list
   // that rerolled on every render would be a slot machine.
   const rng = createRng(`yearlings-${stable.careersCompleted}-${stable.bloodstock.length}`);
+  // Every name already in the yard's history, not just bloodstock — a
+  // yearling that only checked retired horses could still be handed the
+  // same name as a rival out in the world.
   const names = createNameGenerator(
     rng,
-    stable.bloodstock.map((entry) => entry.horse.name),
+    allKnownHorses(stable).map((horse) => horse.name),
   );
   const offers = generateStarterSix(rng, names, stable.legacy.archivedPoints).slice(
     0,

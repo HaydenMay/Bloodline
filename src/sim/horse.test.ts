@@ -75,6 +75,28 @@ describe('the six starters offered', () => {
       expect(shareWith(counts, 3)).toBeLessThan(0.05);
     }
   });
+
+  /**
+   * The wiring bug this closes: starter selection and the yearling screen
+   * both call this with a fresh `createNameGenerator`, but two of the three
+   * real call sites were building that generator with no `used` names at
+   * all — so a new starter could be handed the exact name of a rival
+   * already out in the world, or one of the yard's own retired horses.
+   * `generateStarterSix` itself never had a bug; it just was never being
+   * told what to avoid.
+   */
+  it('never offers a starter with a name already used elsewhere in the yard', () => {
+    for (let i = 0; i < 50; i++) {
+      const rng = createRng(`starter-collision-${i}`);
+      const used = ['Copper Ledger', 'Dynamo', 'Iron Tide', 'Storm Lantern'];
+      const names = createNameGenerator(rng, used);
+      const taken = new Set(used.map((n) => n.toLowerCase()));
+
+      for (const horse of generateStarterSix(rng, names, 0)) {
+        expect(taken.has(horse.name.toLowerCase())).toBe(false);
+      }
+    }
+  });
 });
 
 /**

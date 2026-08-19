@@ -14,6 +14,7 @@ import { mountMainMenu, type MainMenuCallbacks } from './ui/mainMenu.js';
 import { mountStarterSelection } from './ui/starterSelection.js';
 import { mountBreedingScreen } from './ui/breedingScreen.js';
 import { mountArchiveScreen } from './ui/archiveScreen.js';
+import { allKnownHorses } from './ui/archiveTree.js';
 import { mountYearlingScreen } from './ui/yearlingScreen.js';
 import { yearlingPrice } from './data/yearling.js';
 import { breedingStock, partnersFor, sellFoal } from './ui/studBook.js';
@@ -967,6 +968,10 @@ function showStarterSelection(): void {
   // taken this, but the call site passed a hardcoded 0, so the pool never moved.
   const yard = loadStable();
   const prestige = yard ? yard.legacy.archivedPoints : 0;
+  // Otherwise a fresh starter could be handed the same name as a rival
+  // already out in the world, or one of the yard's own retired horses —
+  // nothing here was ever checking against them.
+  const usedNames = yard ? allKnownHorses(yard).map((horse) => horse.name) : [];
 
   teardown = mountStarterSelection(
     app,
@@ -974,6 +979,7 @@ function showStarterSelection(): void {
       startCareer(selectedHorse, selectedSilks);
     },
     prestige,
+    usedNames,
   );
 }
 
