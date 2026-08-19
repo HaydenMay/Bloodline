@@ -7690,6 +7690,48 @@ span.archive-allele {
   transform: translateY(-1px);
 }
 
+/*
+ * The potential trace. Same "tap a grade to find its match through the
+ * tree" idea as the genetics section above, but every stat gets a pill —
+ * a grade is never "nothing to report" the way a homozygous-dominant
+ * allele is, so there's no notability filter to apply first.
+ */
+.archive-potential-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.archive-potential-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--ok-light);
+  border: 1px solid var(--ok-lighter);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.archive-potential-pill:hover {
+  background: var(--ok-lighter);
+  transform: translateY(-1px);
+}
+
+.archive-potential-stat {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.archive-potential-grade {
+  font-family: var(--mono);
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
 .archive-attrs-toggle {
   width: 100%;
   padding: 8px;

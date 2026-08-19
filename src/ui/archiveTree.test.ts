@@ -8,7 +8,9 @@ import {
   carriesAllele,
   isArchivedWorld,
   isSoldFoal,
+  meetsPotentialFloor,
   notableAllele,
+  potentialKnown,
   retiredRecordOf,
   rowsOf,
   siblingsOf,
@@ -301,5 +303,59 @@ describe('carriesAllele', () => {
     expect(() => carriesAllele(preStage3, 'extension', 'e')).not.toThrow();
     // A chestnut horse is ee by definition, derived genotype or not.
     expect(carriesAllele(preStage3, 'extension', 'e')).toBe(true);
+  });
+});
+
+describe('meetsPotentialFloor', () => {
+  it('grades at or above the floor as a match', () => {
+    const h = horse({ potential: stats(80) }); // 80 -> A
+    expect(meetsPotentialFloor(h, 'speed', 'D')).toBe(true);
+    expect(meetsPotentialFloor(h, 'speed', 'C')).toBe(true);
+    expect(meetsPotentialFloor(h, 'speed', 'B')).toBe(true);
+    expect(meetsPotentialFloor(h, 'speed', 'A')).toBe(true);
+  });
+
+  it('grades below the floor as no match', () => {
+    const h = horse({ potential: stats(80) }); // 80 -> A, not X
+    expect(meetsPotentialFloor(h, 'speed', 'X')).toBe(false);
+  });
+
+  it('is exact at the boundary, not just close', () => {
+    const h = horse({ potential: stats(90) }); // 90 -> X, the threshold itself
+    expect(meetsPotentialFloor(h, 'speed', 'X')).toBe(true);
+    const justUnder = horse({ potential: stats(89) }); // 89 -> A
+    expect(meetsPotentialFloor(justUnder, 'speed', 'X')).toBe(false);
+  });
+});
+
+describe('potentialKnown', () => {
+  it('is true for the living root', () => {
+    const root = horse({ id: 'root' });
+    const stable = emptyYard();
+    expect(potentialKnown(root, stable, root)).toBe(true);
+  });
+
+  it('is true for a horse in the yard\'s own bloodstock', () => {
+    const owned = horse({ id: 'owned' });
+    const root = horse({ id: 'root' });
+    const stable = emptyYard({ bloodstock: [retired(owned)] });
+    expect(potentialKnown(owned, stable, root)).toBe(true);
+  });
+
+  it('is true for a horse the yard has ever bred to, own or outside', () => {
+    const partner = horse({ id: 'outside-stud' });
+    const mine = horse({ id: 'my-mare' });
+    const root = horse({ id: 'root' });
+    const stable = emptyYard({
+      pairings: { [[mine.id, partner.id].sort().join('~')]: 1 },
+    });
+    expect(potentialKnown(partner, stable, root)).toBe(true);
+  });
+
+  it('is false for a rival never owned, bred to, or in training', () => {
+    const untouched = horse({ id: 'stranger' });
+    const root = horse({ id: 'root' });
+    const stable = emptyYard();
+    expect(potentialKnown(untouched, stable, root)).toBe(false);
   });
 });

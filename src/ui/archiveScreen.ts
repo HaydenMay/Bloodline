@@ -1,9 +1,9 @@
-import type { Horse } from '../sim/types.js';
+import { STAT_KEYS, toGrade, type Grade, type Horse, type StatKey } from '../sim/types.js';
 import type { Silks } from '../render/palette.js';
 import { coatForHorse, hashId, RIVAL_SILKS } from '../render/palette.js';
 import { createBadgeElement } from './badgeLoader.js';
 import { TRAITS } from '../data/traits.js';
-import { attachStatReveal, renderStatRows } from './statDisplay.js';
+import { attachStatReveal, renderStatRows, STAT_LABELS } from './statDisplay.js';
 import { pedigreeOf } from './studBook.js';
 import { peakDivision } from '../sim/division.js';
 import { genotypeOf, type CoatGenotype } from '../sim/coat.js';
@@ -16,7 +16,9 @@ import {
   COAT_LOCI,
   isArchivedWorld,
   isSoldFoal,
+  meetsPotentialFloor,
   notableAllele,
+  potentialKnown,
   retiredRecordOf,
   rowsOf,
   siblingsOf,
@@ -175,7 +177,10 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
   let showSiblings = false;
   let showSold = false;
   let firstRender = true;
-  let activeTrace: { locus: keyof CoatGenotype; allele: string } | undefined;
+  type ActiveTrace =
+    | { kind: 'allele'; locus: keyof CoatGenotype; allele: string }
+    | { kind: 'potential'; stat: StatKey; grade: Grade };
+  let activeTrace: ActiveTrace | undefined;
 
   const scrollEl = el.querySelector<HTMLElement>('#archive-scroll')!;
   const canvasEl = el.querySelector<HTMLElement>('#archive-canvas')!;
@@ -344,15 +349,16 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
   }
 
   /**
-   * The inheritance map (NEXT_PLAN.md Step 3) — every rendered card that
-   * carries a given allele, however folded or unfolded the tree currently
-   * is. Walks the same rows and sibling filter `renderRows` draws from, so
-   * a trace only ever points at something actually on screen.
+   * The inheritance map (NEXT_PLAN.md Step 3) and the potential trace below
+   * it share this: every rendered card matching some predicate, however
+   * folded or unfolded the tree currently is. Walks the same rows and
+   * sibling filter `renderRows` draws from, so a trace only ever points at
+   * something actually on screen.
    */
-  function tracePaths(locus: keyof CoatGenotype, allele: string): Set<string> {
+  function scanTree(matches: (horse: Horse) => boolean): Set<string> {
     const matched = new Set<string>();
     const check = (horse: Horse, path: string): void => {
-      if (carriesAllele(horse, locus, allele)) matched.add(path);
+      if (matches(horse)) matched.add(path);
     };
     for (const rowNodes of rows) {
       for (const node of rowNodes) {
@@ -366,6 +372,18 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
       }
     }
     return matched;
+  }
+
+  /** Rebuilds the current trace's match set — used both on first trace and after a re-render. */
+  function activeTracePaths(): Set<string> | undefined {
+    const trace = activeTrace;
+    if (!trace) return undefined;
+    if (trace.kind === 'allele') {
+      return scanTree((horse) => carriesAllele(horse, trace.locus, trace.allele));
+    }
+    return scanTree(
+      (horse) => potentialKnown(horse, stable, root) && meetsPotentialFloor(horse, trace.stat, trace.grade),
+    );
   }
 
   /**
@@ -387,14 +405,18 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
 
   function renderTraceChip(): void {
     const chip = el.querySelector<HTMLElement>('#archive-trace-chip')!;
-    if (!activeTrace) {
+    const trace = activeTrace;
+    if (!trace) {
       chip.innerHTML = '';
       return;
     }
-    const label = COAT_LOCI.find((l) => l.key === activeTrace!.locus)?.label ?? activeTrace!.locus;
+    const label =
+      trace.kind === 'allele'
+        ? `${COAT_LOCI.find((l) => l.key === trace.locus)?.label ?? trace.locus} ${trace.allele}`
+        : `${STAT_LABELS[trace.stat]} ${trace.grade}+`;
     chip.innerHTML = `
       <span class="archive-trace-active">
-        Tracing ${label} ${activeTrace.allele}
+        Tracing ${label}
         <button type="button" id="archive-trace-clear" aria-label="Clear trace">✕</button>
       </span>
     `;
@@ -403,8 +425,20 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
 
   function traceAllele(locus: keyof CoatGenotype, allele: string): void {
     closeDetail();
-    activeTrace = { locus, allele };
-    applyTrace(tracePaths(locus, allele));
+    activeTrace = { kind: 'allele', locus, allele };
+    applyTrace(activeTracePaths());
+    renderTraceChip();
+  }
+
+  /**
+   * The same trace, for a stat's potential grade instead of a coat allele.
+   * "At or above" per Hayden — click a horse's own A in Grit and every card
+   * that also grades A or X in Grit lights up, not only an exact match.
+   */
+  function tracePotential(stat: StatKey, grade: Grade): void {
+    closeDetail();
+    activeTrace = { kind: 'potential', stat, grade };
+    applyTrace(activeTracePaths());
     renderTraceChip();
   }
 
@@ -517,6 +551,58 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
     return section;
   }
 
+  /**
+   * The potential trace's entry point on a horse's own card — one pill per
+   * stat, its potential grade, tappable to find every other horse in the
+   * tree that also grades at or above it in that stat (Hayden: "highlight
+   * all previous horses that are listed with A or X").
+   *
+   * `null` when the player has never actually been shown this horse's
+   * potential — an outside rival never bred to keeps its ceiling masked
+   * per §3, and there is nothing honest to check here. `potentialKnown`
+   * covers the yard's own bloodstock and the living root, same as
+   * `renderStatRows`'s existing gate, but also anyone ever bred to: the
+   * breeding screen's stud-card grades already show a partner's ceiling
+   * before it is even chosen, own yard or an outside hire alike.
+   *
+   * Unlike the genetics section, every stat gets a pill rather than only
+   * the ones with something notable — a grade is never "nothing to
+   * report" the way a homozygous-dominant allele is.
+   */
+  function buildPotentialSection(horse: Horse): HTMLElement | null {
+    if (!potentialKnown(horse, stable, root)) return null;
+
+    const pillsHtml = STAT_KEYS.map((key) => {
+      const value = horse.potential?.[key];
+      if (value === undefined) return '';
+      const grade = toGrade(value);
+      return `
+        <button type="button" class="archive-potential-pill" data-stat="${key}" data-grade="${grade}"
+                title="Tap to find every horse in the tree grading ${grade} or better in ${STAT_LABELS[key]}">
+          <span class="archive-potential-stat">${STAT_LABELS[key]}</span>
+          <span class="archive-potential-grade grade-${grade}">${grade}</span>
+        </button>`;
+    }).join('');
+
+    if (!pillsHtml) return null;
+
+    const section = document.createElement('div');
+    section.className = 'archive-detail-section archive-potential';
+    section.innerHTML = `
+      <h4 class="archive-genetics-title">Potential</h4>
+      <p class="archive-genetics-hint">Tap a grade to find every horse in the tree at or above it.</p>
+      <div class="archive-potential-pills">${pillsHtml}</div>
+    `;
+
+    section.querySelectorAll<HTMLButtonElement>('.archive-potential-pill').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        tracePotential(btn.dataset.stat as StatKey, btn.dataset.grade as Grade);
+      });
+    });
+
+    return section;
+  }
+
   function openDetail(horse: Horse): void {
     detachReveal?.();
     stopIdlePreview?.();
@@ -566,6 +652,9 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
     const genetics = buildGeneticsSection(horse);
     if (genetics) detailBody.appendChild(genetics);
 
+    const potentialSection = buildPotentialSection(horse);
+    if (potentialSection) detailBody.appendChild(potentialSection);
+
     // §2's ceiling-masking is about not spoiling a career still being trained
     // out — it was never meant to erase the story once that career is over.
     // Left as `isLivingRoot` alone, every retired horse's potential vanished
@@ -613,7 +702,7 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
       drawLines();
       // Toggling siblings rebuilds every card, which wipes the trace classes
       // along with them — reapply against whatever is now on screen.
-      if (activeTrace) applyTrace(tracePaths(activeTrace.locus, activeTrace.allele));
+      if (activeTrace) applyTrace(activeTracePaths());
       if (firstRender) {
         scrollEl.scrollTop = scrollEl.scrollHeight;
         firstRender = false;

@@ -1,4 +1,4 @@
-import type { Horse } from '../sim/types.js';
+import { toGrade, type Grade, type Horse, type StatKey } from '../sim/types.js';
 import type { Pedigree } from '../sim/breeding.js';
 import { genotypeOf, type CoatGenotype } from '../sim/coat.js';
 import type { RetiredHorse, Stable } from './career.js';
@@ -171,4 +171,34 @@ export function notableAllele(pair: readonly [string, string], dominance: readon
 export function carriesAllele(horse: Horse, locus: keyof CoatGenotype, allele: string): boolean {
   const pair = genotypeOf(horse)[locus] as unknown as readonly [string, string];
   return pair[0] === allele || pair[1] === allele;
+}
+
+/* ---------------------------------------------------------------------------
+   The potential trace — same shape as the allele tracer above, for a stat's
+   grade rather than a coat locus.
+   ------------------------------------------------------------------------ */
+
+const GRADE_RANK: Record<Grade, number> = { D: 0, C: 1, B: 2, A: 3, X: 4 };
+
+/** Whether a horse's potential in `stat` grades at or above `floor`. */
+export function meetsPotentialFloor(horse: Horse, stat: StatKey, floor: Grade): boolean {
+  const value = horse.potential?.[stat];
+  if (value === undefined) return false;
+  return GRADE_RANK[toGrade(value)] >= GRADE_RANK[floor];
+}
+
+/**
+ * Whether the player has actually been shown this horse's potential
+ * anywhere — their own bloodstock or the horse currently in training, or
+ * any horse ever bred to. The breeding screen's stud-card grades show a
+ * partner's ceiling before it is even chosen, own yard or an outside hire
+ * alike, so both count. A rival never bred to keeps its ceiling masked,
+ * per DESIGN.md §3 — its card has nothing honest to check here.
+ */
+export function potentialKnown(horse: Horse, stable: Stable, root: Horse): boolean {
+  const isLivingRoot = horse.id === root.id && !retiredRecordOf(root, stable);
+  if (isLivingRoot || retiredRecordOf(horse, stable)) return true;
+
+  const pairings = stable.pairings ?? {};
+  return Object.keys(pairings).some((key) => key.split('~').includes(horse.id));
 }
