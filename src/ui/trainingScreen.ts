@@ -7,6 +7,14 @@ import { createSurface, startLoop } from '../render/canvas.js';
 import { loadFrameSequence, drawFrame, type DrawFrameOptions } from '../render/frameAnimation.js';
 import { coatForHorse, type Silks } from '../render/palette.js';
 
+/** `#rrggbb` to `rgba(...)` at the given alpha, for canvas gradient stops. */
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export interface TrainingSession {
   id: string;
   name: string;
@@ -380,6 +388,7 @@ export function mountTrainingScreen(
   // Set up horse preview canvas
   const canvasWrapper = root.querySelector('.horse-preview-wrapper') as HTMLElement;
   const surface = createSurface(canvasWrapper);
+  const previewCoat = coatForHorse(horse);
   void loadFrameSequence('southwest-idle', 9).then(
     (sequence) => {
       let time = 0;
@@ -393,6 +402,23 @@ export function mountTrainingScreen(
           ctx.fillStyle = '#1a1a2e';
           ctx.fillRect(0, 0, width, height);
 
+          // The horse only occupies the right side of this box, leaving a lot
+          // of flat, empty space on the left. Filling it with more art would
+          // mean repeating the same small handful of assets right next to
+          // themselves; washing it with the horse's own coat colours instead
+          // costs no new art and never looks identical twice.
+          const washLeft = ctx.createRadialGradient(width * 0.16, height * 0.5, 0, width * 0.16, height * 0.5, width * 0.62);
+          washLeft.addColorStop(0, hexToRgba(previewCoat.body, 0.28));
+          washLeft.addColorStop(1, hexToRgba(previewCoat.body, 0));
+          ctx.fillStyle = washLeft;
+          ctx.fillRect(0, 0, width, height);
+
+          const washRight = ctx.createRadialGradient(width * 0.78, height * 0.15, 0, width * 0.78, height * 0.15, width * 0.4);
+          washRight.addColorStop(0, hexToRgba(previewCoat.points, 0.14));
+          washRight.addColorStop(1, hexToRgba(previewCoat.points, 0));
+          ctx.fillStyle = washRight;
+          ctx.fillRect(0, 0, width, height);
+
           const phase = (time * 0.1) % 1;
 
           const isSmallScreen = window.innerWidth < 600;
@@ -403,7 +429,7 @@ export function mountTrainingScreen(
             phase,
             scale: 4,
             scheme: {
-              coat: coatForHorse(horse),
+              coat: previewCoat,
               silks: playerSilks,
             },
           };
