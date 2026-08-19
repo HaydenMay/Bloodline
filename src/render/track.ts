@@ -41,7 +41,7 @@ const noise = (n: number): number => {
 // renders correctly rather than showing a gap.
 
 interface RaceBackgroundImages {
-  sky: HTMLImageElement;
+  skies: HTMLImageElement[];
   crowd: HTMLImageElement;
   grass: HTMLImageElement;
   lowerTrack: HTMLImageElement;
@@ -49,6 +49,8 @@ interface RaceBackgroundImages {
 
 let raceBackgroundImages: RaceBackgroundImages | null = null;
 let raceBackgroundLoading: Promise<void> | null = null;
+/** Which of `skies` this race is using. Picked once per race — see `chooseRaceSky`. */
+let raceSkyIndex = 0;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -77,16 +79,34 @@ export function loadRaceBackgroundImages(): Promise<void> {
     // broke that: every one of these loaded fine from the dev server, which
     // serves raw files with no such analysis, and then 404'd in the actual
     // production build.
-    const [sky, crowd, grass, lowerTrack] = await Promise.all([
+    const [daySky, eveningSky, stormySky, crowd, grass, lowerTrack] = await Promise.all([
+      loadImage(new URL('../assets/backgrounds/race/day_sky.png', import.meta.url).href),
       loadImage(new URL('../assets/backgrounds/race/evening_sky.png', import.meta.url).href),
+      loadImage(new URL('../assets/backgrounds/race/stormy_sky.png', import.meta.url).href),
       loadImage(new URL('../assets/backgrounds/race/crowd.png', import.meta.url).href),
       loadImage(new URL('../assets/backgrounds/race/grass.png', import.meta.url).href),
       loadImage(new URL('../assets/backgrounds/race/lower_track.png', import.meta.url).href),
     ]);
-    raceBackgroundImages = { sky, crowd, grass, lowerTrack };
+    raceBackgroundImages = { skies: [daySky, eveningSky, stormySky], crowd, grass, lowerTrack };
   })();
 
   return raceBackgroundLoading;
+}
+
+/**
+ * Picks which sky this race uses, at random, out of whichever variants have
+ * loaded so far. Purely cosmetic — like the training-screen breakthrough
+ * roll, this doesn't touch race-affecting state, so it uses `Math.random()`
+ * rather than the sim's seeded RNG rather than threading a seed through the
+ * renderer for something that can't change the outcome.
+ *
+ * Call once per race, from raceIntro (which mounts before raceScreen on
+ * every path into a race) — calling it from raceScreen too would let the
+ * sky change between the intro card and the race itself.
+ */
+export function chooseRaceSky(): void {
+  if (!raceBackgroundImages) return;
+  raceSkyIndex = Math.floor(Math.random() * raceBackgroundImages.skies.length);
 }
 
 /**
@@ -138,8 +158,9 @@ export function drawBackdrop(
   const skyBottom = height * 0.29;
 
   if (raceBackgroundImages) {
+    const sky = raceBackgroundImages.skies[raceSkyIndex] ?? raceBackgroundImages.skies[0]!;
     // Barely parallaxes — the sky is the furthest thing in the scene.
-    tileImage(ctx, raceBackgroundImages.sky, 0, width, skyBottom, cam.scrollMetres * cam.pixelsPerMetre * 0.05);
+    tileImage(ctx, sky, 0, width, skyBottom, cam.scrollMetres * cam.pixelsPerMetre * 0.05);
   } else {
     // Sky
     const sky = ctx.createLinearGradient(0, 0, 0, horizon);

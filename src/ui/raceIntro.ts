@@ -1,5 +1,5 @@
 import { createSurface, startLoop, type Loop } from '../render/canvas.js';
-import { drawBackdrop, loadRaceBackgroundImages } from '../render/track.js';
+import { chooseRaceSky, drawBackdrop, loadRaceBackgroundImages } from '../render/track.js';
 import type { Camera } from '../render/track.js';
 
 export interface RaceIntroConfig {
@@ -34,7 +34,10 @@ export function mountRaceIntro(
   const container = document.createElement('div');
   container.className = 'race-intro';
 
-  void loadRaceBackgroundImages();
+  // Picked here, once per race — raceIntro mounts before raceScreen on every
+  // path into a race, so picking anywhere else risks the sky changing
+  // between the intro card and the race itself.
+  void loadRaceBackgroundImages().then(chooseRaceSky);
 
   // Canvas for blurred track background
   const surface = createSurface(container);
