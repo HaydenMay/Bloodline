@@ -1618,11 +1618,19 @@ body {
   font-size: clamp(11px, 2.5vw, 13px);
 }
 
+/* Found in play: badge overlapping the header title on mobile, and the
+   Select button overlapping the traits below it. Cause: `.sc-content` had
+   no definite height, so `align-items: center` centered its full intrinsic
+   height inside `.sc-stage` and `overflow: visible` let the overflow bleed
+   symmetrically above and below the stage's box instead of scrolling.
+   `stretch` clamps `.sc-content` to the stage's actual height so its own
+   `overflow-y: auto` can do the job; the arrows keep their fixed size and
+   get re-centered via `align-self` below. */
 .sc-stage {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   gap: 16px;
   overflow: visible;
@@ -1674,6 +1682,7 @@ body {
 
 .sc-arrow {
   flex: none;
+  align-self: center;
   width: clamp(40px, 8vw, 52px);
   height: clamp(40px, 8vw, 52px);
   border-radius: 50%;
@@ -1727,7 +1736,10 @@ body {
   overflow-x: visible;
   -webkit-overflow-scrolling: touch;
   gap: 20px;
-  align-items: center;
+  /* "safe center": centers short content (desktop) same as plain center, but
+     falls back to start alignment when content overflows (mobile) instead of
+     clipping the start off-screen with no way to scroll back up to it. */
+  align-items: safe center;
   justify-content: center;
   position: relative;
 }
@@ -2326,6 +2338,8 @@ body {
 .sc-select {
   flex: none;
   width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
 }
 
 .dc-dots {
@@ -2355,6 +2369,8 @@ body {
 .dc-select {
   flex: none;
   width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
 }
 
 /* Results screen */
@@ -3660,10 +3676,13 @@ body {
   font-weight: 500;
 }
 
+/* Same fix as .sc-stage: stretch clamps .dc-content to the stage's actual
+   height so its own overflow-y: auto can scroll instead of the content
+   bleeding out of the stage's box when it's taller than the available space. */
 .dc-stage {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   gap: 16px;
   padding: 20px;
@@ -3681,7 +3700,9 @@ body {
   overflow-x: visible;
   -webkit-overflow-scrolling: touch;
   gap: 20px;
-  align-items: center;
+  /* safe center: see .sc-content for why plain center clips overflowing
+     content unreachably; safe falls back to start alignment when it overflows. */
+  align-items: safe center;
   justify-content: center;
   position: relative;
 }
@@ -3757,6 +3778,7 @@ body {
   border-radius: 50%;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  align-self: center;
 }
 
 .dc-arrow:hover {
