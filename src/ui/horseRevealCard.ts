@@ -4,17 +4,18 @@ import type { Horse } from '../sim/types.js';
 import { coatForHorse, type Silks } from '../render/palette.js';
 import { createBadgeElement } from './badgeLoader.js';
 import { attachStatReveal, renderStatRows } from './statDisplay.js';
+import { mountPortrait } from './breedingScreen.js';
 
 /**
  * The horse-reveal card shared by `foalBornScreen.ts` and
  * `starterConfirmScreen.ts` — a foal being born, or a starter just chosen.
  *
- * Found wonky in its first pass: a centred idle-animation sprite floating in
- * a mostly-empty square, disconnected from the data below it. Rebuilt on the
- * starter carousel's own layout instead of inventing a new one — badge left,
- * everything else in a column to its right, the same `sc-*` classes the
- * carousel the player just came from already uses, so the reveal reads as
- * the same screen continuing rather than a style change.
+ * First pass centred just the idle sprite alone, floating in a mostly-empty
+ * square. Rebuilt per Hayden's own sketch: the shield badge (from the
+ * carousel this follows) and the idle sprite both, stacked on the left on a
+ * wide screen; side by side above a two-column attribute grid on narrow
+ * ones, since stacking everything in one column there put the fold well
+ * past the fold.
  */
 
 export interface HorseRevealCardOptions {
@@ -37,9 +38,18 @@ export function mountHorseRevealCard(host: HTMLElement, options: HorseRevealCard
   box.className = 'sc-carousel-box horse-reveal-box';
   host.appendChild(box);
 
+  const media = document.createElement('div');
+  media.className = 'horse-reveal-media';
+  box.appendChild(media);
+
   const badgeCache = new Map<string, string>();
   const badgeWrap = createBadgeElement(coatForHorse(horse), silks, badgeCache, horse.id, 'sc-badge', 'Horse badge');
-  box.appendChild(badgeWrap);
+  media.appendChild(badgeWrap);
+
+  const spriteFrame = document.createElement('div');
+  spriteFrame.className = 'horse-reveal-sprite';
+  media.appendChild(spriteFrame);
+  const stopSprite = mountPortrait(spriteFrame, horse, silks);
 
   const info = document.createElement('div');
   info.className = 'sc-carousel-info';
@@ -75,6 +85,7 @@ export function mountHorseRevealCard(host: HTMLElement, options: HorseRevealCard
     randomizeButton,
     teardown: () => {
       detachReveal();
+      stopSprite();
       box.remove();
     },
   };

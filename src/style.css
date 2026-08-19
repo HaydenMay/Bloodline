@@ -7006,6 +7006,24 @@ body {
   width: 100%;
 }
 
+/* Shield and sprite together — stacked on a wide screen, side by side on a
+   narrow one (below). */
+.horse-reveal-media {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+}
+
+.horse-reveal-sprite {
+  width: clamp(120px, 20vw, 160px);
+  height: clamp(120px, 20vw, 160px);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+
 .horse-reveal-name-row {
   display: flex;
   gap: 8px;
@@ -7038,6 +7056,49 @@ body {
 .horse-reveal-actions .btn {
   flex: 1;
   min-width: 160px;
+}
+
+/* The horse reveal breaks from `.sc-carousel-box`'s own mobile stacking:
+   shield and sprite side by side up top (not centred narrow), attributes
+   as a two-column grid below rather than one long column — Hayden's own
+   sketch, after the single-column version ran well past the fold. */
+@media (max-width: 768px) {
+  .horse-reveal-box {
+    align-items: stretch;
+  }
+
+  .horse-reveal-media {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .horse-reveal-sprite {
+    width: clamp(120px, 30vw, 160px);
+    height: clamp(120px, 30vw, 160px);
+  }
+
+  .horse-reveal-box .stat-rows {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .horse-reveal-box .stat-row {
+    grid-template-columns: 3.4rem 1fr auto auto;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .horse-reveal-box .stat-row-name {
+    font-size: 0.76rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .horse-reveal-box .stat-row-room {
+    display: none;
+  }
 }
 
 .breeding-portrait-label {
