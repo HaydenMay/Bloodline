@@ -231,7 +231,11 @@ Hayden's**, and none of them should be acted on by an agent.
     `style.css` (`.boot` 460, `.pre-race-content` 480, and a long tail of `max-width: 400px` /
     `600px` / `800px` blocks). The race screen is canvas and fills, which is why the feeling stops
     exactly there. This is the big one and it is a layout decision, not a bug: desktop wants its
-    own breakpoint doing something with the width, not just a wider column.
+    own breakpoint doing something with the width, not just a wider column. **Update:** "fills the
+    viewport" turned out not to mean "uses it well" — the race screen has its own desktop-specific
+    composition problems (empty track once the field spreads, an overlapping blob at the start),
+    catalogued in ROADMAP.md Known Issues under "Race screen:". Worth folding into this phase rather
+    than treating the canvas as already-solved.
   - **Text is too small to read without squinting** — sizes are absolute px and never scale up:
     `.detail-label` is 9 px, `.detail-value` 12 px, the HUD's own labels 9 px. They were chosen at
     phone scale, where a 9 px label sits close to the eye.
