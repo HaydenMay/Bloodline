@@ -242,9 +242,15 @@ Hayden's**, and none of them should be acted on by an agent.
 
 ## Gaps and housekeeping
 
-- **Starter selection maximum stats** **[Hayden]** — what the ceiling on a generation-1 horse should
-  be, and how far the pool should scale with stable prestige without ever matching what breeding
-  produces.
+- ~~**Starter selection maximum stats**~~ **[Hayden]** — **resolved.** Two parts: (1) potential moved
+  from six independent per-stat rolls (measured at 82.8% of starters carrying an A-tier stat, 12.3%
+  an X-tier one, from a single lucky outlier) to a shared pool split across the six stats, same mean,
+  much rarer outliers. (2) stable prestige — previously fully inert for starters, despite §13 saying
+  "a well-known yard is offered better yearlings" — now scales the pool's generosity across the
+  legacy tiers (Novice 1.35 up to Legend 1.53), calibrated so even a maxed-out yard's starter
+  averages 66.9, clear of the 68.0 an ordinary bred foal already reaches by its second generation.
+  Traits stay flat regardless of prestige — a past fix found that scaling those handed a bred
+  horse's opening hand to a starter with no bloodline behind it.
 - **Multiple save slots (§13)** — a known gap since Phase 3. One slot plus export/import ships today.
 - **The breeding manual (§13 codex)** — where relatedness, variance and the inheritance budget get
   explained properly, for players who want to understand the machine. Currently sitting in Phase 6.
