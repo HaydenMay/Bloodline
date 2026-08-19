@@ -242,6 +242,22 @@ Hayden's**, and none of them should be acted on by an agent.
 
 ## Gaps and housekeeping
 
+- **B1/B1b harness "failures" may be a methodology gap, not a balance bug** **[Hayden]** — midPack
+  reads weak (8.7% win share, and frontRunner 4.3% in championship) in `npm run harness`, but
+  `buildField()` generates every horse straight from its division band with no training simulated,
+  and midPack is the only style with zero race-day mechanic in the engine (frontRunner gets a
+  pace-collapse edge, stalker a draft multiplier, closer a behind-kick bonus) — its whole
+  compensation is `MIDPACK_GENEROSITY`, a training-ceiling bonus the harness never exercises. Needs
+  either a harness that simulates a trained horse before judging these styles, or confirmation that
+  midPack is meant to have no untrained-race-day edge at all.
+- **13 of 33 traits do nothing** **[Hayden]** — grepped every `TraitId` against the sim: `crowdFeeder`,
+  `enduring`, `freeRunner`, `goodDoer`, `grudgeHolder`, `heart`, `hotHeaded`, `needsRoom`,
+  `outcrossGem`, `prepotent`, `professional`, `pacePusher`, `tractable` are rollable/trainable but
+  never read anywhere outside `data/traits.ts` — their described effect never fires. Needs either
+  real implementations or cutting from the pool.
+- **No cap on lifetime trait count** **[Hayden]** — the initial roll is capped at 2-4
+  (`rollTraits`), but training's per-session trait chance (`ui/trainingScreen.ts`, 5%/15% on a
+  breakthrough) has no ceiling, so a long career can end up well past that.
 - ~~**Starter selection maximum stats**~~ **[Hayden]** — **resolved.** Two parts: (1) potential moved
   from six independent per-stat rolls (measured at 82.8% of starters carrying an A-tier stat, 12.3%
   an X-tier one, from a single lucky outlier) to a shared pool split across the six stats, same mean,
