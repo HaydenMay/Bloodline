@@ -127,4 +127,41 @@ describe('starter potential is a shared pool, not six independent lottery ticket
       expect(p).toBeLessThanOrEqual(100);
     }
   });
+
+  /**
+   * DESIGN.md §13: "a well-known yard is offered better yearlings." Traits
+   * stay flat regardless of prestige (a past fix — see the trait describe
+   * block above), but potential can move: it reads as better scouting, not
+   * inheritance, and a starter is generation 1 whichever yard it comes from.
+   */
+  describe('and scales with the yard\'s legacy tier, per §13', () => {
+    it('raises the average starter as the yard climbs from Novice to Legend', () => {
+      const means = [0, 400, 1500, 3500, 7500].map((prestige) => {
+        const potentials = starterPotentials(prestige);
+        return potentials.reduce((a, b) => a + b, 0) / potentials.length;
+      });
+
+      for (let i = 1; i < means.length; i++) {
+        expect(means[i]).toBeGreaterThan(means[i - 1]!);
+      }
+    });
+
+    /**
+     * Measured with `npm run bloodline`: an ordinary bred foal already
+     * averages 68.0 by its own second generation. Even a maxed-out Legend
+     * yard's starter must stay under that, or §1's "a starter never matches
+     * what a good bloodline produces" stops being true at the top tier.
+     */
+    it('keeps even a Legend-tier starter weaker than an ordinary bred foal', () => {
+      const potentials = starterPotentials(7500, 2000);
+      const mean = potentials.reduce((a, b) => a + b, 0) / potentials.length;
+      expect(mean).toBeLessThan(68);
+    });
+
+    it('keeps a single X-tier (90+) stat rare even at Legend, not a reopened lottery ticket', () => {
+      const potentials = starterPotentials(7500, 2000);
+      const xTierShare = potentials.filter((p) => p >= 90).length / potentials.length;
+      expect(xTierShare).toBeLessThan(0.03);
+    });
+  });
 });

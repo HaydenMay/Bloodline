@@ -18,6 +18,7 @@ import {
 } from './race/constants.js';
 import { RACING_TRAIT_IDS, TRAITS, type TraitId } from '../data/traits.js';
 import { getPurse, PRIZE_SHARES } from '../data/purse.js';
+import { getTierFromPoints } from '../data/legacy.js';
 import { MIDPACK_GENEROSITY } from './growth.js';
 import type { NameGenerator } from '../data/names.js';
 
@@ -121,6 +122,33 @@ function rollPotential(
  * about a fifth of it.
  */
 const STARTER_POOL_MEAN = STAT_KEYS.length * ((8 + 45) / 2);
+
+/**
+ * How much extra headroom a starter's pool gets, by the yard's legacy tier
+ * (DESIGN.md §13: "a well-known yard is offered better yearlings").
+ *
+ * Traits stay flat regardless of prestige (`rollTraits` below) — scaling
+ * those with banked prestige alone, no bloodline behind it, was found in
+ * play to hand a bred horse's opening hand to a starter for free. Potential
+ * doesn't carry that risk: it reads as the yard's scouting finding a
+ * stronger prospect rather than as inheritance, so it can move.
+ *
+ * Measured against `npm run bloodline`: an ordinary bred foal already
+ * averages 68.0 by its second generation. Run through the real six-starter
+ * offer (including the mid-pack style's own separate generosity bonus,
+ * which stacks with this), the ladder holds a mean of 62.1 at Novice
+ * climbing to 66.9 at Legend — clear of that floor at every tier, so a
+ * maxed-out yard's starter still never matches what a good bloodline
+ * produces (§1). It is offered a better *choice of six*, not a shortcut
+ * past breeding. A lucky single X-tier (90+) stat stays rare throughout too
+ * (0.00% at Novice to 0.13% at Legend) rather than let prestige reopen the
+ * lottery-ticket outlier the shared pool exists to close.
+ */
+const STARTER_GENEROSITY_BY_TIER = [1.35, 1.39, 1.44, 1.49, 1.53];
+
+function starterGenerosity(legacy: number): number {
+  return STARTER_GENEROSITY_BY_TIER[getTierFromPoints(legacy)] ?? 1.35;
+}
 
 function rollStarterPotential(rng: Rng, stats: Stats, generosity: number): Stats {
   const pool = rng.range(STARTER_POOL_MEAN * 0.75, STARTER_POOL_MEAN * 1.25) * generosity;
@@ -380,7 +408,8 @@ export function generateHorse(rng: Rng, names: NameGenerator, opts: GenerateOpti
     potential: rollPotential(
       rng,
       displayStats,
-      (opts.starter ? 1.35 : 1) * (style === 'midPack' ? MIDPACK_GENEROSITY : 1),
+      (opts.starter ? starterGenerosity(opts.legacy ?? 0) : 1) *
+        (style === 'midPack' ? MIDPACK_GENEROSITY : 1),
       { starter: opts.starter === true },
     ),
     style,
