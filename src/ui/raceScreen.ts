@@ -40,7 +40,7 @@ import type {
   RaceConfig,
   RaceEntrant,
 } from "../sim/race/types.js";
-import { CHARGE_CAPACITY, TICK_HZ } from "../sim/race/constants.js";
+import { CHARGE_CAPACITY, LANE_COUNT, TICK_HZ } from "../sim/race/constants.js";
 import type { Horse } from "../sim/types.js";
 import { attachInfoBox } from "./infoBox.js";
 
@@ -424,11 +424,21 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // Lane 0 is the rail (furthest from camera), so higher lanes draw nearer
     // and larger. Sorting by lane keeps the overlap correct.
     const isSmallScreen = width < 600;
-    const laneY = (lane: number): number => {
-      const baseY = isSmallScreen ? height * 0.58 : height * 0.60;
-      const laneSpacing = isSmallScreen ? height * 0.0525 : height * 0.055;
-      return baseY + lane * laneSpacing;
-    };
+    const baseY = isSmallScreen ? height * 0.58 : height * 0.60;
+    // The charges bar (drawHud, below) is drawn on top of the horses, near
+    // the bottom of the canvas. A fixed height-relative spacing pushed the
+    // deepest lane's feet behind it — found in play: the nearest horse's
+    // legs read as cut off, worse on mobile because the bar's fixed pixel
+    // height eats a bigger share of a shorter canvas. Deriving the spacing
+    // from the actual clear space above the bar keeps every lane's feet
+    // above it regardless of screen height.
+    const reservedBottom = 96;
+    const maxLaneY = height - reservedBottom;
+    const laneSpacing = Math.min(
+      isSmallScreen ? height * 0.0525 : height * 0.055,
+      (maxLaneY - baseY) / (LANE_COUNT - 1),
+    );
+    const laneY = (lane: number): number => baseY + lane * laneSpacing;
     // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
     const baseScale =
       (HORSE_METRES * cam.pixelsPerMetre * HORSE_SCALE) / RIG_UNITS;
