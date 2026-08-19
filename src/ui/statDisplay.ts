@@ -23,6 +23,16 @@ export const STAT_LABELS: Record<StatKey, string> = {
   consistency: 'Consistency',
 };
 
+/** Three-letter codes for a grid tight on room — the stud-card's own abbreviations. */
+export const SHORT_STAT_LABELS: Record<StatKey, string> = {
+  speed: 'SPD',
+  stamina: 'STA',
+  burst: 'BRS',
+  grit: 'GRT',
+  temper: 'TMP',
+  consistency: 'CNS',
+};
+
 /**
  * How much room a stat has left, in words.
  *
@@ -100,6 +110,33 @@ export function renderStatRows(horse: Horse, options: StatRowOptions = {}): stri
         <span class="stat-row-grade grade-${grade}">${grade}</span>
         <span class="stat-row-num">${value}</span>
         ${band ? `<span class="stat-row-room room-${band.id}">${band.label}</span>` : ''}
+      </button>`;
+  }).join('');
+}
+
+/**
+ * The same six stats as a grid of boxes rather than a stack of bar rows —
+ * Hayden's own sketch, for a screen tight on vertical room and not trying to
+ * show headroom (no bar, no room label, just the letter). Same tap-to-reveal
+ * pattern as `renderStatRows`: `.stat-row`/`.stat-row-grade`/`.stat-row-num`
+ * are the same classes `attachStatReveal` already toggles, so it works here
+ * unmodified — only the cell's own layout is different.
+ */
+export function renderStatGrid(horse: Horse, options: StatRowOptions = {}): string {
+  const { revealNumbers = false, showPotential = true } = options;
+
+  return STAT_KEYS.map((key) => {
+    const value = Math.round(horse.stats[key]);
+    const ceiling = horse.potential?.[key];
+    const hasPotential = showPotential && ceiling !== undefined;
+    const grade = toGrade(hasPotential ? ceiling : value);
+
+    return `
+      <button class="stat-row stat-cell${revealNumbers ? ' revealed' : ''}" data-stat="${key}"
+              aria-label="${STAT_LABELS[key]}, ${hasPotential ? 'potential grade' : 'grade'} ${grade}, currently ${value}">
+        <span class="stat-cell-label">${SHORT_STAT_LABELS[key]}</span>
+        <span class="stat-row-grade grade-${grade}">${grade}</span>
+        <span class="stat-row-num">${value}</span>
       </button>`;
   }).join('');
 }

@@ -7059,9 +7059,7 @@ body {
 }
 
 /* The horse reveal breaks from `.sc-carousel-box`'s own mobile stacking:
-   shield and sprite side by side up top (not centred narrow), attributes
-   as a two-column grid below rather than one long column — Hayden's own
-   sketch, after the single-column version ran well past the fold. */
+   shield and sprite side by side up top (not centred narrow) instead. */
 @media (max-width: 768px) {
   .horse-reveal-box {
     align-items: stretch;
@@ -7076,28 +7074,64 @@ body {
     width: clamp(120px, 30vw, 160px);
     height: clamp(120px, 30vw, 160px);
   }
+}
 
-  .horse-reveal-box .stat-rows {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
+/*
+ * The six stats as boxed cells rather than bar rows — Hayden's own sketch.
+ * No headroom to show here (no bar), so `.stat-row-grade`/`.stat-row-num`
+ * are reused at a larger size and `attachStatReveal` needs nothing new: it
+ * already toggles those same two classes regardless of what's around them.
+ */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
 
-  .horse-reveal-box .stat-row {
-    grid-template-columns: 3.4rem 1fr auto auto;
-    gap: 6px;
-    padding: 6px 8px;
-  }
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
 
-  .horse-reveal-box .stat-row-name {
-    font-size: 0.76rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+.stat-cell:hover {
+  border-color: var(--accent-border);
+}
 
-  .horse-reveal-box .stat-row-room {
-    display: none;
+.stat-cell-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 650;
+}
+
+.stat-cell .stat-row-grade {
+  grid-area: unset;
+  font-size: 1.4rem;
+  min-width: 0;
+}
+
+.stat-cell .stat-row-num {
+  grid-area: unset;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 0;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 

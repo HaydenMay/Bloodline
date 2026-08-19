@@ -3,19 +3,19 @@ import { TRAITS } from '../data/traits.js';
 import type { Horse } from '../sim/types.js';
 import { coatForHorse, type Silks } from '../render/palette.js';
 import { createBadgeElement } from './badgeLoader.js';
-import { attachStatReveal, renderStatRows } from './statDisplay.js';
+import { attachStatReveal, renderStatGrid } from './statDisplay.js';
 import { mountPortrait } from './breedingScreen.js';
 
 /**
  * The horse-reveal card shared by `foalBornScreen.ts` and
  * `starterConfirmScreen.ts` — a foal being born, or a starter just chosen.
  *
- * First pass centred just the idle sprite alone, floating in a mostly-empty
- * square. Rebuilt per Hayden's own sketch: the shield badge (from the
- * carousel this follows) and the idle sprite both, stacked on the left on a
- * wide screen; side by side above a two-column attribute grid on narrow
- * ones, since stacking everything in one column there put the fold well
- * past the fold.
+ * Media (shield + idle sprite) stacked on the left on a wide screen, side by
+ * side above the attributes on a narrow one. Attributes render as
+ * `renderStatGrid`'s boxed cells rather than `renderStatRows`'s bar rows —
+ * Hayden's own sketch: no headroom bar to show here, so the row's width was
+ * spent on nothing, and a grid of boxes reads better at a glance than a
+ * stack of six.
  */
 
 export interface HorseRevealCardOptions {
@@ -66,7 +66,7 @@ export function mountHorseRevealCard(host: HTMLElement, options: HorseRevealCard
     </div>
     <p class="sc-sub">${subtitle}</p>
     <div class="sc-section">Attributes</div>
-    <div class="stat-rows">${renderStatRows(horse, { showPotential: true })}</div>
+    <div class="stat-grid">${renderStatGrid(horse, { showPotential: true })}</div>
     ${
       traits.length
         ? `<div class="sc-section">Traits</div>
@@ -77,7 +77,7 @@ export function mountHorseRevealCard(host: HTMLElement, options: HorseRevealCard
 
   const nameInput = info.querySelector<HTMLInputElement>('.horse-reveal-name-input')!;
   const randomizeButton = info.querySelector<HTMLButtonElement>('.horse-reveal-randomize')!;
-  const statsHost = info.querySelector<HTMLElement>('.stat-rows')!;
+  const statsHost = info.querySelector<HTMLElement>('.stat-grid')!;
   const detachReveal = attachStatReveal(statsHost);
 
   return {

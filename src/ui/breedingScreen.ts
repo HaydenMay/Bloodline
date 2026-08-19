@@ -1,8 +1,8 @@
-import { STAT_KEYS, toGrade, type Horse, type StatKey } from '../sim/types.js';
+import { STAT_KEYS, toGrade, type Horse } from '../sim/types.js';
 import { TRAITS } from '../data/traits.js';
 import type { BreedingPartner } from '../sim/breeding.js';
 import type { RetiredHorse, Stable } from './career.js';
-import { attachStatReveal, renderRangeRows } from './statDisplay.js';
+import { attachStatReveal, renderRangeRows, SHORT_STAT_LABELS } from './statDisplay.js';
 import {
   breedFoal,
   breedingStock,
@@ -89,15 +89,6 @@ function describe(horse: Horse): string {
   return traits || 'No notable traits';
 }
 
-/** Short stat names, so six grades fit on one line of a card. */
-const SHORT_STAT: Record<StatKey, string> = {
-  speed: 'SPD',
-  stamina: 'STA',
-  burst: 'BRS',
-  grit: 'GRT',
-  temper: 'TMP',
-  consistency: 'CNS',
-};
 
 /**
  * The six potentials as grades, in one strip.
@@ -108,7 +99,7 @@ const SHORT_STAT: Record<StatKey, string> = {
 function renderGrades(horse: Horse): string {
   return STAT_KEYS.map((key) => {
     const grade = toGrade(horse.potential?.[key] ?? 50);
-    return `<span class="stud-card-grade"><em>${SHORT_STAT[key]}</em><b class="grade-${grade}">${grade}</b></span>`;
+    return `<span class="stud-card-grade"><em>${SHORT_STAT_LABELS[key]}</em><b class="grade-${grade}">${grade}</b></span>`;
   }).join('');
 }
 
