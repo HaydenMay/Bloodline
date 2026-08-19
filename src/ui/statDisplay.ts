@@ -135,8 +135,10 @@ export function renderStatGrid(horse: Horse, options: StatRowOptions = {}): stri
       <button class="stat-row stat-cell${revealNumbers ? ' revealed' : ''}" data-stat="${key}"
               aria-label="${STAT_LABELS[key]}, ${hasPotential ? 'potential grade' : 'grade'} ${grade}, currently ${value}">
         <span class="stat-cell-label">${SHORT_STAT_LABELS[key]}</span>
-        <span class="stat-row-grade grade-${grade}">${grade}</span>
-        <span class="stat-row-num">${value}</span>
+        <span class="stat-cell-value">
+          <span class="stat-row-grade grade-${grade}">${grade}</span>
+          <span class="stat-row-num">${value}</span>
+        </span>
       </button>`;
   }).join('');
 }

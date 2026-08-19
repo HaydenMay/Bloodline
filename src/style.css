@@ -7114,19 +7114,39 @@ body {
   font-weight: 650;
 }
 
-.stat-cell .stat-row-grade {
+/* Grade and number stacked in the exact same spot — found off (Hayden:
+   "it currently has the numbers above and then potential grades slightly
+   below") because both sat in normal flow, so the invisible one still
+   reserved its own space and pushed the visible one off centre. A fixed-
+   height relative wrapper with both children absolutely positioned over
+   it fixes that with no JS change: `attachStatReveal` still just toggles
+   opacity on the same two classes, they simply now occupy one box instead
+   of two stacked ones. */
+.stat-cell-value {
+  position: relative;
+  width: 100%;
+  height: 1.9rem;
+}
+
+.stat-cell .stat-row-grade,
+.stat-cell .stat-row-num {
   grid-area: unset;
-  font-size: 1.4rem;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
 }
 
+.stat-cell .stat-row-grade {
+  font-size: 1.4rem;
+}
+
 .stat-cell .stat-row-num {
-  grid-area: unset;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--text);
-  min-width: 0;
-  text-align: center;
 }
 
 @media (max-width: 480px) {
