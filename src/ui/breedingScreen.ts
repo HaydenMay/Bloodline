@@ -176,9 +176,19 @@ function previewSilks(id: string) {
  * `archiveScreen.ts`'s own preview uses — this is "what the parents look
  * like," found missing in play: a pairing was made on stats and grades
  * alone, with no way to see either horse before committing.
+ *
+ * `ownSilks`, when given, is what this horse actually raced in — your own
+ * bloodstock (whether "mine" or a partner drawn from the same yard) raced
+ * in the yard's real silks, not a hashed placeholder. Found in play: the
+ * foal preview (already fixed to use the yard's real silks) showed a
+ * different colour than "mine" right next to it, because mine was still
+ * falling back to the hash — the yard's own horse looked like it had never
+ * raced in its own colours. An outside stud never raced in yours, so it
+ * keeps the hashed fallback, same as before.
  */
-function mountPortrait(host: HTMLElement, horse: Horse): () => void {
+function mountPortrait(host: HTMLElement, horse: Horse, ownSilks: Silks | undefined): () => void {
   const surface = createSurface(host);
+  const silks = ownSilks ?? previewSilks(horse.id);
   let stopped = false;
   let stopLoop: (() => void) | undefined;
 
@@ -197,7 +207,7 @@ function mountPortrait(host: HTMLElement, horse: Horse): () => void {
         drawFrame(ctx, width / 2, height * 0.92, sequence, {
           phase: (time * 0.1) % 1,
           scale: width / 100,
-          scheme: { coat: coatForHorse(horse), silks: previewSilks(horse.id) },
+          scheme: { coat: coatForHorse(horse), silks },
         });
       },
     );
@@ -470,9 +480,18 @@ export function mountBreedingScreen(
       const sireHost = root.querySelector<HTMLElement>('#portrait-sire');
       const damHost = root.querySelector<HTMLElement>('#portrait-dam');
       const foalHost = root.querySelector<HTMLElement>('#portrait-foal');
+      // Raced in the yard's own silks: "mine" always did, and so did a
+      // partner drawn from your own bloodstock rather than the outside list.
+      const ranInYourColours = (horse: Horse): boolean =>
+        horse.id === mine?.horse.id ||
+        (chosen?.source === 'bloodstock' && horse.id === chosen.partner.horse.id);
       const stops = [
-        sireHost ? mountPortrait(sireHost, sireHorse) : undefined,
-        damHost ? mountPortrait(damHost, damHorse) : undefined,
+        sireHost
+          ? mountPortrait(sireHost, sireHorse, ranInYourColours(sireHorse) ? playerSilks : undefined)
+          : undefined,
+        damHost
+          ? mountPortrait(damHost, damHorse, ranInYourColours(damHorse) ? playerSilks : undefined)
+          : undefined,
         foalHost ? mountFoalPreview(foalHost, sireHorse, damHorse, playerSilks) : undefined,
       ];
       stopPortraits = () => stops.forEach((stop) => stop?.());
