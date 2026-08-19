@@ -186,7 +186,8 @@ function previewSilks(id: string) {
  * raced in its own colours. An outside stud never raced in yours, so it
  * keeps the hashed fallback, same as before.
  */
-function mountPortrait(host: HTMLElement, horse: Horse, ownSilks: Silks | undefined): () => void {
+/** Exported for `foalBornScreen.ts` — the reveal after breeding wants the same idle portrait. */
+export function mountPortrait(host: HTMLElement, horse: Horse, ownSilks: Silks | undefined): () => void {
   const surface = createSurface(host);
   const silks = ownSilks ?? previewSilks(horse.id);
   let stopped = false;

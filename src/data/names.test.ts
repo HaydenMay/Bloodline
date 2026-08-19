@@ -80,3 +80,67 @@ describe('createNameGenerator', () => {
     }
   });
 });
+
+/**
+ * DESIGN.md §13: "Procedural, derived from parents, always editable" — the
+ * worked example is *Storm Signal* x *Quiet Lantern* suggesting *Lantern
+ * Warning*. Confirmed with Hayden: not every word has to come from a parent,
+ * just at least one — the rest is a fresh roll, and it's fine for the
+ * suggestion to be one editable starting point rather than the final word.
+ */
+describe('suggestFromParents', () => {
+  it('echoes a word from one of the two parents', () => {
+    const rng = createRng('derive-1');
+    const gen = createNameGenerator(rng);
+
+    for (let i = 0; i < 100; i++) {
+      const name = gen.suggestFromParents('Storm Signal', 'Quiet Lantern');
+      const words = name.split(' ');
+      const echoesAParent = words.some((w) =>
+        ['Storm', 'Signal', 'Quiet', 'Lantern'].includes(w),
+      );
+      expect(echoesAParent).toBe(true);
+    }
+  });
+
+  it('falls back to a fresh name when neither parent has a word to echo', () => {
+    const rng = createRng('derive-2');
+    const gen = createNameGenerator(rng);
+    // Both solo (single-word) names — nothing to split.
+    expect(() => gen.suggestFromParents('Dynamo', 'Wildfire')).not.toThrow();
+    const name = gen.suggestFromParents('Dynamo', 'Wildfire');
+    expect(name.length).toBeGreaterThan(0);
+  });
+
+  it('still derives from whichever parent has two words, when the other is solo', () => {
+    const rng = createRng('derive-3');
+    const gen = createNameGenerator(rng);
+    for (let i = 0; i < 100; i++) {
+      const name = gen.suggestFromParents('Storm Signal', 'Dynamo');
+      const words = name.split(' ');
+      expect(words.some((w) => ['Storm', 'Signal'].includes(w))).toBe(true);
+    }
+  });
+
+  it('never suggests a name already taken', () => {
+    const rng = createRng('derive-4');
+    const used = ['Storm Signal', 'Storm Lantern', 'Quiet Signal'];
+    const gen = createNameGenerator(rng, used);
+    const seen = new Set(used.map((n) => n.toLowerCase()));
+    for (let i = 0; i < 100; i++) {
+      const name = gen.suggestFromParents('Storm Signal', 'Quiet Lantern');
+      expect(seen.has(name.toLowerCase())).toBe(false);
+    }
+  });
+
+  it('calling it repeatedly (a "Randomize" button) does not exhaust the registry', () => {
+    const rng = createRng('derive-5');
+    const gen = createNameGenerator(rng);
+    // A player clicking Randomize a lot should still keep getting names, not
+    // fall into the numbered-variant fallback after just a handful of tries.
+    for (let i = 0; i < 50; i++) {
+      const name = gen.suggestFromParents('Storm Signal', 'Quiet Lantern');
+      expect(name).not.toMatch(/\d$/);
+    }
+  });
+});

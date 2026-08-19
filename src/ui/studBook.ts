@@ -349,7 +349,18 @@ export function breedFoal(
   // The pedigree is what lets relatedness see past the parents, so a line bred
   // back into itself keeps narrowing instead of reading as an outcross the
   // moment the shared parents drop out of view.
-  const result = breed(rng, sire, dam, names.next(), repeats, pedigreeOf(stable));
+  //
+  // The name is a suggestion, not a verdict (DESIGN.md §13: "always
+  // editable") — `foalBornScreen.ts` shows it before the foal joins the
+  // yard and lets the player retype or reroll it.
+  const result = breed(
+    rng,
+    sire,
+    dam,
+    names.suggestFromParents(sire.horse.name, dam.horse.name),
+    repeats,
+    pedigreeOf(stable),
+  );
   recordPairing(stable, mine.horse, partner.horse);
   stable.cash -= Math.max(0, fee);
   return result;

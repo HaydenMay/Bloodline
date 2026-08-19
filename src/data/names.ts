@@ -57,12 +57,22 @@ const SOLO = [
 /** Combinations that read badly or unfortunately. Checked case-insensitively. */
 const BLOCKLIST = ['wild wager', 'shadow bandit', 'lucky chancer'];
 
-const MAX_LENGTH = 18;
+/** Exported so a player-editable name field can cap input to what the game can store/display. */
+export const MAX_LENGTH = 18;
 
 export interface NameGenerator {
   next(): string;
   /** Register an externally chosen name so it is never re-issued. */
   reserve(name: string): void;
+  /**
+   * A suggestion for a bred foal, echoing one of its parents (DESIGN.md §13:
+   * "Procedural, derived from parents, always editable" — *Storm Signal* x
+   * *Quiet Lantern* suggesting *Lantern Warning*). Not reserved on its own;
+   * whichever name the player actually confirms gets recorded the ordinary
+   * way once the foal joins the yard, so calling this repeatedly (a
+   * "Randomize" button) never burns through the registry.
+   */
+  suggestFromParents(sireName: string, damName: string): string;
 }
 
 /**
@@ -70,45 +80,81 @@ export interface NameGenerator {
  * stable's history ever share a name.
  */
 export function createNameGenerator(
-  rng: { pick: <T>(items: readonly T[]) => T; chance: (p: number) => boolean },
+  rng: {
+    pick: <T>(items: readonly T[]) => T;
+    chance: (p: number) => boolean;
+    int: (min: number, max: number) => number;
+  },
   used: Iterable<string> = [],
 ): NameGenerator {
   const registry = new Set<string>(Array.from(used, (n) => n.toLowerCase()));
+
+  const isAvailable = (name: string): boolean => {
+    const key = name.toLowerCase();
+    return !registry.has(key) && !BLOCKLIST.includes(key) && name.length <= MAX_LENGTH;
+  };
 
   const build = (): string | null => {
     const name = rng.chance(0.12)
       ? rng.pick(SOLO)
       : `${rng.pick(FIRST)} ${rng.pick(SECOND)}`;
+    return isAvailable(name) ? name : null;
+  };
 
-    const key = name.toLowerCase();
-    if (registry.has(key)) return null;
-    if (BLOCKLIST.includes(key)) return null;
-    if (name.length > MAX_LENGTH) return null;
-    return name;
+  /** A two-word name split into its parts, or null for a solo name — nothing to echo from those. */
+  const splitTwoWord = (name: string): [string, string] | null => {
+    const parts = name.trim().split(/\s+/);
+    return parts.length === 2 ? [parts[0]!, parts[1]!] : null;
+  };
+
+  const next = (): string => {
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const name = build();
+      if (name) {
+        registry.add(name.toLowerCase());
+        return name;
+      }
+    }
+    // Pools exhausted — fall back to a numbered variant rather than repeat.
+    let n = 2;
+    for (;;) {
+      const base = `${rng.pick(FIRST)} ${rng.pick(SECOND)} ${n}`;
+      if (!registry.has(base.toLowerCase())) {
+        registry.add(base.toLowerCase());
+        return base;
+      }
+      n++;
+    }
   };
 
   return {
-    next(): string {
-      for (let attempt = 0; attempt < 60; attempt++) {
-        const name = build();
-        if (name) {
+    next,
+    reserve(name: string): void {
+      registry.add(name.toLowerCase());
+    },
+    suggestFromParents(sireName: string, damName: string): string {
+      const parents = [splitTwoWord(sireName), splitTwoWord(damName)].filter(
+        (parts): parts is [string, string] => parts !== null,
+      );
+
+      for (let attempt = 0; attempt < 30 && parents.length > 0; attempt++) {
+        const parts = rng.pick(parents);
+        const echoed = parts[rng.int(0, 1)];
+        // The echoed word can land in either slot of the foal's name, not
+        // just the one it came from — §13's own example does this (the
+        // dam's second word becomes the foal's first).
+        const name = rng.chance(0.5)
+          ? `${echoed} ${rng.pick(SECOND)}`
+          : `${rng.pick(FIRST)} ${echoed}`;
+        if (isAvailable(name)) {
           registry.add(name.toLowerCase());
           return name;
         }
       }
-      // Pools exhausted — fall back to a numbered variant rather than repeat.
-      let n = 2;
-      for (;;) {
-        const base = `${rng.pick(FIRST)} ${rng.pick(SECOND)} ${n}`;
-        if (!registry.has(base.toLowerCase())) {
-          registry.add(base.toLowerCase());
-          return base;
-        }
-        n++;
-      }
-    },
-    reserve(name: string): void {
-      registry.add(name.toLowerCase());
+
+      // Neither parent has two words to echo, or every echo tried collided —
+      // still a real name, just not a derived one.
+      return next();
     },
   };
 }
