@@ -142,6 +142,10 @@ export function mountStarterSelection(
     showCounter: true,
     showDots: true,
     showArrows: true,
+    getItemAccent: (horse) => {
+      const coat = coatForHorse(horse);
+      return [coat.body, coat.points];
+    },
   });
 
   // Swipe support

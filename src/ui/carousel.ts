@@ -26,6 +26,14 @@ export interface CarouselConfig<T> {
   className?: string;
   /** CSS class prefix for inner elements (e.g., "sc" → .sc-header, .sc-counter). Default: uses className. */
   cssPrefix?: string;
+  /**
+   * Two colours to wash across the stage behind the current item, e.g. a
+   * horse's coat colours. Derived from data rather than a repeated image
+   * asset, so it varies with every item instead of drawing attention to a
+   * fixed, small pool of art. Applied as CSS custom properties the stage's
+   * own gradient reads — see `.sc-stage`/`.dc-stage` in style.css.
+   */
+  getItemAccent?: (item: T, index: number) => readonly [string, string] | null;
 }
 
 export interface CarouselState<T> {
@@ -51,6 +59,7 @@ export function mountCarousel<T>(
     selectLabel = 'Select',
     className = 'carousel',
     cssPrefix = className.split('-')[0],
+    getItemAccent,
   } = config;
 
   if (items.length === 0) {
@@ -168,6 +177,12 @@ export function mountCarousel<T>(
       contentEl.innerHTML = rendered;
     } else {
       contentEl.appendChild(rendered);
+    }
+
+    if (getItemAccent) {
+      const accent = getItemAccent(item, currentIndex);
+      stage.style.setProperty('--wash-a', accent ? accent[0] : 'transparent');
+      stage.style.setProperty('--wash-b', accent ? accent[1] : 'transparent');
     }
   };
 

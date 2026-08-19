@@ -99,6 +99,10 @@ export function mountDossierScreen(
     showCounter: true,
     showDots: true,
     showArrows: true,
+    getItemAccent: (rival) => {
+      const coat = coatForHorse(rival);
+      return [coat.body, coat.points];
+    },
   });
 
   // Swipe support

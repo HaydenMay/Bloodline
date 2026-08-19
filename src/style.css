@@ -1634,6 +1634,13 @@ body {
   justify-content: center;
   gap: 16px;
   overflow: visible;
+  /* A wash of the current horse's own coat colours, not a repeated image —
+     fills the empty space around the card on wide screens without drawing
+     attention to how few art assets there are. --wash-a/-b are set per item
+     by carousel.ts's getItemAccent; transparent by default. */
+  background:
+    radial-gradient(ellipse 55% 60% at 12% 25%, color-mix(in srgb, var(--wash-a, transparent) 16%, transparent) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 55% at 88% 75%, color-mix(in srgb, var(--wash-b, transparent) 14%, transparent) 0%, transparent 70%);
 }
 
 /* Container columns for badge and info */
@@ -3689,6 +3696,10 @@ body {
   position: relative;
   min-height: 0;
   overflow: visible;
+  /* See .sc-stage for why this is a per-rival colour wash rather than art. */
+  background:
+    radial-gradient(ellipse 55% 60% at 12% 25%, color-mix(in srgb, var(--wash-a, transparent) 16%, transparent) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 55% at 88% 75%, color-mix(in srgb, var(--wash-b, transparent) 14%, transparent) 0%, transparent 70%);
 }
 
 .dc-content {
