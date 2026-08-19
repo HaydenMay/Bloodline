@@ -165,7 +165,7 @@ export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
   const accentColor = scheme.silks?.primary ?? scheme.accentColor ?? DEFAULTS.badgeAccentColor;
   const maneColor = scheme.silks?.secondary ?? accentColor;
   const coat = typeof scheme.coat === 'string' ? coatFor(scheme.coat) : scheme.coat;
-  const key = `${coat.body}|${coat.hair}|${accentColor}|${maneColor}`;
+  const key = `${coat.body}|${coat.hair}|${coat.points}|${accentColor}|${maneColor}`;
   const hit = tinted.get(key);
   if (hit) {
     // Re-insert so the map's order stays least-recently-used first.
@@ -177,15 +177,25 @@ export function tintedBadge(scheme: BadgeScheme): HTMLCanvasElement | null {
   const target: Partial<Record<number, [number, number, number]>> = {
     [MATERIAL.body]: hexToHsl(coat.body),
     [MATERIAL.hair]: hexToHsl(coat.hair),
-    // The badge has no legs, so `points` carries the LINE ART instead — the
-    // black outline around the horse and around the shield. It is deliberately
-    // NOT part of the scheme: an outline that changes colour with the silks
-    // stops being an outline. Half the rival silks have a near-white secondary,
-    // and drawing the outline in it gave the badge a pale halo that merged into
-    // a pale mane, which at 40px is the difference between a horse and a smudge.
+    // `points` carries the LINE ART — the black outline around the horse and
+    // around the shield. It is deliberately NOT part of the scheme: an
+    // outline that changes colour with the silks stops being an outline.
+    // Half the rival silks have a near-white secondary, and drawing the
+    // outline in it gave the badge a pale halo that merged into a pale
+    // mane, which at 40px is the difference between a horse and a smudge.
     [MATERIAL.points]: hexToHsl(INK),
     [MATERIAL.silks]: hexToHsl(accentColor),
     [MATERIAL.trim]: hexToHsl(maneColor),
+    // The badge DOES have a legs/lower-chest region — found in play: it had
+    // been baked in with `hair` (same flat colour as the mane in the source
+    // art), then briefly with `body` before that turned out to be just as
+    // wrong. `points` was already spoken for by the outline (above), so this
+    // region is hand-marked `fixed` in shield-badge-mask.png instead — the
+    // one material id the flat-art pipeline never assigns by colour here —
+    // and repurposed on the badge only to mean "coat points", matching the
+    // idle sprite's own legs. A `bake-flat` rerun on this asset will NOT
+    // reproduce that hand edit; re-apply it if the art is ever repainted.
+    [MATERIAL.fixed]: hexToHsl(coat.points),
   };
 
   const { width: W, height: H, base, mask } = loaded;
