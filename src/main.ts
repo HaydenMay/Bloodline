@@ -665,6 +665,7 @@ function showBreeding(
   teardown = mountBreedingScreen(app, {
     stable,
     mode: options.mode ?? 'breed',
+    playerSilks,
     onBred: (foal, yard) => {
       // §10's keep-or-sell. The projected ranges were the decision; this is the
       // horse those ranges actually produced, and passing on it is a real

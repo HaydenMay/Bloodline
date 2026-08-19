@@ -17,7 +17,7 @@ import { createRng } from '../sim/rng.js';
 import { expressCoat, genotypeOf, inheritCoat, type CoatGenotype } from '../sim/coat.js';
 import { createSurface, startLoop } from '../render/canvas.js';
 import { drawFrame, loadFrameSequence } from '../render/frameAnimation.js';
-import { coatForHorse, hashId, RIVAL_SILKS } from '../render/palette.js';
+import { coatForHorse, hashId, RIVAL_SILKS, type Silks } from '../render/palette.js';
 
 /**
  * The pairing screen (DESIGN.md §10).
@@ -65,6 +65,16 @@ export interface BreedingScreenOptions {
    * horse retires, which is when there is a place for it.
    */
   mode?: 'breed' | 'browse';
+  /**
+   * The yard's own silks, for the foal preview only. Silks stay with the
+   * yard rather than any one horse (main.ts: "the next one runs in the same
+   * colours"), so whatever this pairing produces races in these regardless
+   * of whether the sire or the dam is the outside half of it — found in
+   * play, the preview defaulted to a hashed placeholder colour instead and
+   * read as simply wrong next to a yard whose actual silks the player
+   * already knows on sight.
+   */
+  playerSilks?: Silks;
 }
 
 /** Division names are stored lower case; they are proper nouns on screen. */
@@ -210,16 +220,31 @@ function mountPortrait(host: HTMLElement, horse: Horse): () => void {
  */
 const FOAL_PREVIEW_CYCLE_MS = 5000;
 
-function mountFoalPreview(host: HTMLElement, sire: Horse, dam: Horse): () => void {
+/** How long a reroll takes to cross-fade in — found in play, an instant swap read as a glitch against the idle loop's own smooth motion. */
+const FOAL_PREVIEW_FADE_SECONDS = 0.4;
+
+type CoatCandidate = { coat: string; genotype: CoatGenotype };
+
+function mountFoalPreview(
+  host: HTMLElement,
+  sire: Horse,
+  dam: Horse,
+  playerSilks: Silks | undefined,
+): () => void {
   const surface = createSurface(host);
   const sireGenotype = genotypeOf(sire);
   const damGenotype = genotypeOf(dam);
+  // Silks stay with the yard, not any one horse — the foal races in yours
+  // regardless of which parent is the outside half of the pairing.
+  const silks = playerSilks ?? previewSilks('foal-preview');
   let stopped = false;
   let stopLoop: (() => void) | undefined;
   let roll = 0;
+  let previous: CoatCandidate | null = null;
   let candidate = rollCandidate();
+  let fadeStartTime = 0;
 
-  function rollCandidate(): { coat: string; genotype: CoatGenotype } {
+  function rollCandidate(): CoatCandidate {
     roll += 1;
     // Seeded off both parents plus a running counter, not the clock — the
     // cycle timer decides *when* to reroll, this decides *what* to, and
@@ -231,8 +256,16 @@ function mountFoalPreview(host: HTMLElement, sire: Horse, dam: Horse): () => voi
   }
 
   const cycle = window.setInterval(() => {
+    previous = candidate;
     candidate = rollCandidate();
+    fadeStartTime = -1; // set on the next draw tick, once `time` is known
   }, FOAL_PREVIEW_CYCLE_MS);
+
+  const previewHorseFor = (c: CoatCandidate, tag: string) => ({
+    id: `${sire.id}-${dam.id}-${tag}`,
+    coat: c.coat,
+    coatGenotype: c.genotype,
+  });
 
   void loadFrameSequence('southwest-idle', 9).then((sequence) => {
     if (stopped) return;
@@ -246,12 +279,26 @@ function mountFoalPreview(host: HTMLElement, sire: Horse, dam: Horse): () => voi
         const { ctx, width, height } = surface;
         ctx.fillStyle = '#0e1218';
         ctx.fillRect(0, 0, width, height);
-        const previewHorse = { id: `${sire.id}-${dam.id}-${roll}`, coat: candidate.coat, coatGenotype: candidate.genotype };
-        drawFrame(ctx, width / 2, height * 0.92, sequence, {
+
+        if (fadeStartTime === -1) fadeStartTime = time;
+        const fadeElapsed = previous ? time - fadeStartTime : Infinity;
+        const drawOpts = (c: CoatCandidate, tag: string) => ({
           phase: (time * 0.1) % 1,
           scale: width / 100,
-          scheme: { coat: coatForHorse(previewHorse), silks: previewSilks('foal-preview') },
+          scheme: { coat: coatForHorse(previewHorseFor(c, tag)), silks },
         });
+
+        if (previous && fadeElapsed < FOAL_PREVIEW_FADE_SECONDS) {
+          const t = fadeElapsed / FOAL_PREVIEW_FADE_SECONDS;
+          ctx.globalAlpha = 1 - t;
+          drawFrame(ctx, width / 2, height * 0.92, sequence, drawOpts(previous, 'prev'));
+          ctx.globalAlpha = t;
+          drawFrame(ctx, width / 2, height * 0.92, sequence, drawOpts(candidate, String(roll)));
+          ctx.globalAlpha = 1;
+        } else {
+          previous = null;
+          drawFrame(ctx, width / 2, height * 0.92, sequence, drawOpts(candidate, String(roll)));
+        }
       },
     );
     stopLoop = () => loop.stop();
@@ -267,7 +314,7 @@ function mountFoalPreview(host: HTMLElement, sire: Horse, dam: Horse): () => voi
 
 export function mountBreedingScreen(
   container: HTMLElement,
-  { stable, onBred, onBack, backLabel = '← Back', mode = 'breed' }: BreedingScreenOptions,
+  { stable, onBred, onBack, backLabel = '← Back', mode = 'breed', playerSilks }: BreedingScreenOptions,
 ): () => void {
   const root = document.createElement('div');
   root.className = 'breeding-screen';
@@ -396,7 +443,7 @@ export function mountBreedingScreen(
                        <span class="breeding-portrait-label">${damHorse!.name}</span>
                      </div>
                    </div>
-                   <p class="breeding-hint breeding-hint-coat">Every colour it could take after its parents — cycling on its own.</p>
+                   <p class="breeding-hint breeding-hint-coat">A preview of the foal this pairing could produce.</p>
                    <div class="stat-rows" id="projection">${renderRangeRows(projection)}</div>
                    <p class="breeding-hint">Where this pairing usually lands. Tap for numbers.</p>
                    ${
@@ -426,7 +473,7 @@ export function mountBreedingScreen(
       const stops = [
         sireHost ? mountPortrait(sireHost, sireHorse) : undefined,
         damHost ? mountPortrait(damHost, damHorse) : undefined,
-        foalHost ? mountFoalPreview(foalHost, sireHorse, damHorse) : undefined,
+        foalHost ? mountFoalPreview(foalHost, sireHorse, damHorse, playerSilks) : undefined,
       ];
       stopPortraits = () => stops.forEach((stop) => stop?.());
     }
