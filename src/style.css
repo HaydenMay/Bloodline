@@ -2610,8 +2610,8 @@ body {
   padding: 16px;
 }
 
-.horse-card h3 {
-  font-size: clamp(18px, 5vw, 22px);
+.horse-preview-info h3 {
+  font-size: clamp(16px, 4vw, 20px);
   margin: 0 0 6px;
   font-weight: 700;
 }
@@ -2625,9 +2625,6 @@ body {
 }
 
 .division-progress {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
 }
 
 .division-label {
@@ -2695,16 +2692,23 @@ body {
   margin-bottom: 16px;
   display: flex;
   align-items: center;
-  justify-content: center;
   overflow: hidden;
 }
 
-.horse-preview-canvas {
-  width: 100%;
+/* Name and division context live here now instead of empty box beside the
+   horse — filling the space with real information rather than more art or
+   a decorative colour wash. */
+.horse-preview-info {
+  flex: 1 1 40%;
+  min-width: 0;
+  padding: 0 16px;
+  text-align: left;
+}
+
+.horse-preview-canvas-wrap {
+  flex: 1 1 60%;
+  min-width: 0;
   height: 100%;
-  display: block;
-  image-rendering: crisp-edges;
-  image-rendering: pixelated;
 }
 
 .training-grid {

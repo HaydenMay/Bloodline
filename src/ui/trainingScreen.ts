@@ -298,12 +298,13 @@ export function mountTrainingScreen(
       <div class="training-header">
         <h2>Training Plan — Week 1</h2>
         <div class="horse-preview-wrapper">
-          <canvas class="horse-preview-canvas"></canvas>
+          <div class="horse-preview-info">
+            <h3>${horse.name}${horse.isChampion ? ' 🏆' : ''}</h3>
+            <p class="horse-meta">Age ${horse.age} &middot; Trainer Career</p>
+          </div>
+          <div class="horse-preview-canvas-wrap"></div>
         </div>
         <div class="horse-card">
-          <h3>${horse.name}${horse.isChampion ? ' 🏆' : ''}</h3>
-          <p class="horse-meta">Age 2 • Trainer Career</p>
-
           <div class="division-progress">
             <div class="division-label">
               <span class="division-name">${horse.division.charAt(0).toUpperCase() + horse.division.slice(1)}</span>
@@ -377,8 +378,10 @@ export function mountTrainingScreen(
   // Grades read first; tapping any row swaps the whole block to today's numbers.
   const detachReveal = attachStatReveal(root);
 
-  // Set up horse preview canvas
-  const canvasWrapper = root.querySelector('.horse-preview-wrapper') as HTMLElement;
+  // Set up horse preview canvas — mounted into its own sub-column so the
+  // canvas is only ever as wide as the space actually left for the horse,
+  // not the full preview box now that the name/meta share it.
+  const canvasWrapper = root.querySelector('.horse-preview-canvas-wrap') as HTMLElement;
   const surface = createSurface(canvasWrapper);
   void loadFrameSequence('southwest-idle', 9).then(
     (sequence) => {
