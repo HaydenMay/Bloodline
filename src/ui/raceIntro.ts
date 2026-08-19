@@ -1,5 +1,5 @@
 import { createSurface, startLoop, type Loop } from '../render/canvas.js';
-import { drawBackdrop } from '../render/track.js';
+import { drawBackdrop, loadRaceBackgroundImages } from '../render/track.js';
 import type { Camera } from '../render/track.js';
 
 export interface RaceIntroConfig {
@@ -33,6 +33,8 @@ export function mountRaceIntro(
 ): () => void {
   const container = document.createElement('div');
   container.className = 'race-intro';
+
+  void loadRaceBackgroundImages();
 
   // Canvas for blurred track background
   const surface = createSurface(container);

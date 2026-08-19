@@ -19,6 +19,7 @@ import {
   drawBackdrop,
   drawDistanceMarkers,
   drawMinimap,
+  loadRaceBackgroundImages,
   metreToScreen,
   type Camera,
 } from "../render/track.js";
@@ -172,6 +173,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   void loadFrameSequence("east-run", 8).then((seq) => {
     frameSequence = seq;
   });
+  void loadRaceBackgroundImages();
   const input: PlayerInput = {
     takingBack: false,
     kickPending: false,

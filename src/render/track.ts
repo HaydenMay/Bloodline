@@ -33,6 +33,92 @@ const noise = (n: number): number => {
   return s - Math.floor(s);
 };
 
+// ---- Hand-drawn backdrop art -----------------------------------------------
+//
+// Optional real art over the procedural bands above. Loaded once, cached, and
+// drawn only once ready — every band still has its procedural version as a
+// fallback, so a race started before loading finishes (or if it fails) still
+// renders correctly rather than showing a gap.
+
+interface RaceBackgroundImages {
+  sky: HTMLImageElement;
+  crowd: HTMLImageElement;
+  grass: HTMLImageElement;
+  lowerTrack: HTMLImageElement;
+}
+
+let raceBackgroundImages: RaceBackgroundImages | null = null;
+let raceBackgroundLoading: Promise<void> | null = null;
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Failed to load ${src}`));
+    img.src = src;
+  });
+}
+
+/**
+ * Loads the hand-drawn race backdrop art once. Safe to call from multiple
+ * screens (raceIntro, raceScreen) — cached after the first call, and each
+ * caller can fire-and-forget it since `drawBackdrop` picks the art up
+ * automatically as soon as it's ready.
+ */
+export function loadRaceBackgroundImages(): Promise<void> {
+  if (raceBackgroundImages) return Promise.resolve();
+  if (raceBackgroundLoading) return raceBackgroundLoading;
+
+  raceBackgroundLoading = (async () => {
+    // Each path is written out in full, inline, rather than built from a
+    // shared prefix — Vite's production build only statically detects (and
+    // therefore bundles) a `new URL(..., import.meta.url)` call when the
+    // whole string is visible right there in the call. A shared variable
+    // broke that: every one of these loaded fine from the dev server, which
+    // serves raw files with no such analysis, and then 404'd in the actual
+    // production build.
+    const [sky, crowd, grass, lowerTrack] = await Promise.all([
+      loadImage(new URL('../assets/backgrounds/race/evening_sky.png', import.meta.url).href),
+      loadImage(new URL('../assets/backgrounds/race/crowd.png', import.meta.url).href),
+      loadImage(new URL('../assets/backgrounds/race/grass.png', import.meta.url).href),
+      loadImage(new URL('../assets/backgrounds/race/lower_track.png', import.meta.url).href),
+    ]);
+    raceBackgroundImages = { sky, crowd, grass, lowerTrack };
+  })();
+
+  return raceBackgroundLoading;
+}
+
+/**
+ * Tiles `img` horizontally across `[0, width]` at `y`, scaled so its native
+ * height fills `destHeight`. `scrollPx` is world-space scroll in screen
+ * pixels — pass a fraction of the camera's actual scroll for anything that
+ * should parallax slower than the foreground.
+ */
+function tileImage(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  y: number,
+  width: number,
+  destHeight: number,
+  scrollPx: number,
+): void {
+  const scale = destHeight / img.height;
+  const tileWidth = img.width * scale;
+  // JS's `%` keeps the dividend's sign, so a negative scrollPx (the camera
+  // pins the player ahead of scroll 0, so this is negative for the first
+  // few seconds of every race) produced a *positive* offset here — pushing
+  // the first tile right instead of wrapping it behind the left edge, which
+  // left a gap of raw canvas showing through until the camera caught up.
+  // Normalising into (-tileWidth, 0] keeps the first tile flush regardless
+  // of scroll direction.
+  const offset = -(((scrollPx % tileWidth) + tileWidth) % tileWidth);
+  ctx.imageSmoothingEnabled = false;
+  for (let x = offset; x < width + tileWidth; x += tileWidth) {
+    ctx.drawImage(img, x, y, tileWidth, destHeight);
+  }
+}
+
 export function drawBackdrop(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -41,29 +127,45 @@ export function drawBackdrop(
   hype: number,
 ): void {
   const horizon = height * 0.44;
+  // Where pure sky ends and the crowd stand begins. Found in play once the
+  // real art was in: the crowd was squeezed into a fixed 58px sliver at the
+  // tail of the sky region regardless of screen size, reading as "way too
+  // small" next to a full-height sky image, while the sky itself felt like
+  // it dominated the frame. Carving real, proportional space for the crowd
+  // out of the sky's share fixes both without touching `horizon` itself —
+  // drawDistanceMarkers and the race-screen lane math both key off that
+  // exact value, so leaving it alone keeps everything below it aligned.
+  const skyBottom = height * 0.29;
 
-  // Sky
-  const sky = ctx.createLinearGradient(0, 0, 0, horizon);
-  sky.addColorStop(0, SCENE.skyTop);
-  sky.addColorStop(1, SCENE.skyBottom);
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, width, horizon);
+  if (raceBackgroundImages) {
+    // Barely parallaxes — the sky is the furthest thing in the scene.
+    tileImage(ctx, raceBackgroundImages.sky, 0, width, skyBottom, cam.scrollMetres * cam.pixelsPerMetre * 0.05);
+  } else {
+    // Sky
+    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, SCENE.skyTop);
+    sky.addColorStop(1, SCENE.skyBottom);
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, width, horizon);
 
-  // Distant hills, parallaxed slowly so there is depth without distraction.
-  const hillShift = -(cam.scrollMetres * cam.pixelsPerMetre * 0.06) % (width + 400);
-  ctx.fillStyle = SCENE.distantHills;
-  ctx.beginPath();
-  ctx.moveTo(hillShift - 200, horizon);
-  for (let i = 0; i <= 12; i++) {
-    const x = hillShift - 200 + (i * (width + 400)) / 12;
-    const h = 26 + noise(i * 3.7) * 34;
-    ctx.lineTo(x, horizon - h);
+    // Distant hills, parallaxed slowly so there is depth without distraction.
+    // Only drawn procedurally — the real sky art already carries its own
+    // horizon detail (low clouds), so this would double up once it's loaded.
+    const hillShift = -(cam.scrollMetres * cam.pixelsPerMetre * 0.06) % (width + 400);
+    ctx.fillStyle = SCENE.distantHills;
+    ctx.beginPath();
+    ctx.moveTo(hillShift - 200, horizon);
+    for (let i = 0; i <= 12; i++) {
+      const x = hillShift - 200 + (i * (width + 400)) / 12;
+      const h = 26 + noise(i * 3.7) * 34;
+      ctx.lineTo(x, horizon - h);
+    }
+    ctx.lineTo(hillShift + width + 400, horizon);
+    ctx.closePath();
+    ctx.fill();
   }
-  ctx.lineTo(hillShift + width + 400, horizon);
-  ctx.closePath();
-  ctx.fill();
 
-  drawCrowd(ctx, width, horizon, cam, hype);
+  drawCrowd(ctx, width, horizon, skyBottom, cam, hype);
   drawTurf(ctx, width, height, horizon, cam);
   drawRail(ctx, width, horizon, cam);
 }
@@ -76,9 +178,28 @@ function drawCrowd(
   ctx: CanvasRenderingContext2D,
   width: number,
   horizon: number,
+  skyBottom: number,
   cam: Camera,
   hype: number,
 ): void {
+  if (raceBackgroundImages) {
+    // Fills the real, proportional gap between sky and horizon carved out in
+    // drawBackdrop, not the old fixed-58px sliver the procedural version
+    // below still uses — that was sized for a thin decorative band, not a
+    // textured image that needs real room to read at a glance.
+    tileImage(
+      ctx,
+      raceBackgroundImages.crowd,
+      skyBottom,
+      width,
+      horizon - skyBottom,
+      // Same parallax rate the procedural heads below used to scroll at, so
+      // swapping the art in doesn't change how the crowd feels to look at.
+      cam.scrollMetres * cam.pixelsPerMetre * 0.35,
+    );
+    return;
+  }
+
   const standTop = horizon - 58;
   const standHeight = 58;
 
@@ -123,12 +244,26 @@ function drawTurf(
   horizon: number,
   cam: Camera,
 ): void {
+  const trackTop = horizon + height * 0.09;
+
+  if (raceBackgroundImages) {
+    const scrollPx = cam.scrollMetres * cam.pixelsPerMetre;
+    // Full scroll rate — this is the same near-ground plane the horses run
+    // on, not a distant layer that should parallax slower.
+    tileImage(ctx, raceBackgroundImages.grass, horizon, width, height * 0.09, scrollPx);
+    // lower_track.png is the dirt and the near turf apron composed as one
+    // strip (an artist call, not a code one — see ROADMAP.md), so it fills
+    // the whole span below the far turf in a single tiled draw rather than
+    // two separate fills the way the procedural version below needs.
+    tileImage(ctx, raceBackgroundImages.lowerTrack, trackTop, width, height - trackTop, scrollPx);
+    return;
+  }
+
   // Far turf, beyond the running surface.
   ctx.fillStyle = SCENE.turfFar;
   ctx.fillRect(0, horizon, width, height * 0.09);
 
   // The running surface.
-  const trackTop = horizon + height * 0.09;
   ctx.fillStyle = SCENE.dirt;
   ctx.fillRect(0, trackTop, width, height - trackTop);
 
