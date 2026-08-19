@@ -6992,6 +6992,54 @@ body {
   font-style: italic;
 }
 
+.breeding-hint-coat {
+  margin-top: -6px;
+  text-align: center;
+}
+
+/* Sire — foal preview — dam, so the two real portraits bracket the guess. */
+.breeding-portraits {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 18px;
+  padding: 4px 0 2px;
+}
+
+.breeding-portrait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.breeding-portrait-frame {
+  width: 92px;
+  height: 92px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+
+/* The foal's frame reads as the centrepiece — larger, and its own accent
+   border, so a first glance can tell it apart from the two real parents. */
+.breeding-portrait-foal .breeding-portrait-frame {
+  width: 112px;
+  height: 112px;
+  border-color: var(--accent-border);
+}
+
+.breeding-portrait-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  max-width: 100px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .stud-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

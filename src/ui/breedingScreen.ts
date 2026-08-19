@@ -13,6 +13,11 @@ import {
   toPartner,
   type PartnerOption,
 } from './studBook.js';
+import { createRng } from '../sim/rng.js';
+import { expressCoat, genotypeOf, inheritCoat, type CoatGenotype } from '../sim/coat.js';
+import { createSurface, startLoop } from '../render/canvas.js';
+import { drawFrame, loadFrameSequence } from '../render/frameAnimation.js';
+import { coatForHorse, hashId, RIVAL_SILKS } from '../render/palette.js';
 
 /**
  * The pairing screen (DESIGN.md §10).
@@ -151,6 +156,115 @@ function renderCard(
     </button>`;
 }
 
+/** A horse this screen shows has no silks of its own worth reading — outside studs never do. */
+function previewSilks(id: string) {
+  return RIVAL_SILKS[hashId(id) % RIVAL_SILKS.length]!;
+}
+
+/**
+ * A single horse's idle portrait, same spritesheet and tinting
+ * `archiveScreen.ts`'s own preview uses — this is "what the parents look
+ * like," found missing in play: a pairing was made on stats and grades
+ * alone, with no way to see either horse before committing.
+ */
+function mountPortrait(host: HTMLElement, horse: Horse): () => void {
+  const surface = createSurface(host);
+  let stopped = false;
+  let stopLoop: (() => void) | undefined;
+
+  void loadFrameSequence('southwest-idle', 9).then((sequence) => {
+    if (stopped) return;
+    let time = 0;
+    const loop = startLoop(
+      30,
+      () => {
+        time += 1 / 30;
+      },
+      () => {
+        const { ctx, width, height } = surface;
+        ctx.fillStyle = '#0e1218';
+        ctx.fillRect(0, 0, width, height);
+        drawFrame(ctx, width / 2, height * 0.92, sequence, {
+          phase: (time * 0.1) % 1,
+          scale: width / 100,
+          scheme: { coat: coatForHorse(horse), silks: previewSilks(horse.id) },
+        });
+      },
+    );
+    stopLoop = () => loop.stop();
+  });
+
+  return () => {
+    stopped = true;
+    stopLoop?.();
+    surface.destroy();
+  };
+}
+
+/**
+ * What the foal *could* look like — a fresh roll of `inheritCoat` swapped in
+ * every few seconds while the pairing sits open, rather than a single guess.
+ * Genuinely a different possible outcome each time, drawn the same way a
+ * real foal's coat will be the moment this pairing is actually bred
+ * (`sim/coat.ts`'s inheritCoat), not a canned animation.
+ */
+const FOAL_PREVIEW_CYCLE_MS = 5000;
+
+function mountFoalPreview(host: HTMLElement, sire: Horse, dam: Horse): () => void {
+  const surface = createSurface(host);
+  const sireGenotype = genotypeOf(sire);
+  const damGenotype = genotypeOf(dam);
+  let stopped = false;
+  let stopLoop: (() => void) | undefined;
+  let roll = 0;
+  let candidate = rollCandidate();
+
+  function rollCandidate(): { coat: string; genotype: CoatGenotype } {
+    roll += 1;
+    // Seeded off both parents plus a running counter, not the clock — the
+    // cycle timer decides *when* to reroll, this decides *what* to, and
+    // stays reproducible from the pairing rather than the moment it was
+    // opened.
+    const rng = createRng(`foal-preview-${sire.id}-${dam.id}-${roll}`);
+    const genotype = inheritCoat(rng, sireGenotype, damGenotype);
+    return { coat: expressCoat(genotype), genotype };
+  }
+
+  const cycle = window.setInterval(() => {
+    candidate = rollCandidate();
+  }, FOAL_PREVIEW_CYCLE_MS);
+
+  void loadFrameSequence('southwest-idle', 9).then((sequence) => {
+    if (stopped) return;
+    let time = 0;
+    const loop = startLoop(
+      30,
+      () => {
+        time += 1 / 30;
+      },
+      () => {
+        const { ctx, width, height } = surface;
+        ctx.fillStyle = '#0e1218';
+        ctx.fillRect(0, 0, width, height);
+        const previewHorse = { id: `${sire.id}-${dam.id}-${roll}`, coat: candidate.coat, coatGenotype: candidate.genotype };
+        drawFrame(ctx, width / 2, height * 0.92, sequence, {
+          phase: (time * 0.1) % 1,
+          scale: width / 100,
+          scheme: { coat: coatForHorse(previewHorse), silks: previewSilks('foal-preview') },
+        });
+      },
+    );
+    stopLoop = () => loop.stop();
+  });
+
+  return () => {
+    stopped = true;
+    window.clearInterval(cycle);
+    stopLoop?.();
+    surface.destroy();
+  };
+}
+
 export function mountBreedingScreen(
   container: HTMLElement,
   { stable, onBred, onBack, backLabel = '← Back', mode = 'breed' }: BreedingScreenOptions,
@@ -163,6 +277,7 @@ export function mountBreedingScreen(
   let mine: RetiredHorse | undefined = stock[0];
   let chosen: PartnerOption | undefined;
   let detachReveal: (() => void) | undefined;
+  let stopPortraits: (() => void) | undefined;
 
   const listeners: Array<() => void> = [];
   const on = (el: Element | null, event: string, handler: EventListener): void => {
@@ -177,6 +292,7 @@ export function mountBreedingScreen(
 
   function render(): void {
     detachReveal?.();
+    stopPortraits?.();
     listeners.splice(0).forEach((off) => off());
 
     const options = partners();
@@ -189,6 +305,16 @@ export function mountBreedingScreen(
       mine && chosen
         ? projectFoal(toPartner(mine), chosen.partner, chosen.timesBred, pedigreeOf(stable))
         : null;
+
+    // Same rule breedFoal itself uses (studBook.ts): the stallion is the
+    // sire whichever side of the pairing the player picked first, so the
+    // portrait row and the actual foal agree on who is who.
+    const [sireHorse, damHorse] =
+      mine && chosen
+        ? chosen.partner.horse.gender === 'mare'
+          ? [mine.horse, chosen.partner.horse]
+          : [chosen.partner.horse, mine.horse]
+        : [undefined, undefined];
 
     root.innerHTML = `
       <div class="breeding-container">
@@ -256,7 +382,22 @@ export function mountBreedingScreen(
             <h3>The foal</h3>
             ${
               projection
-                ? `<div class="stat-rows" id="projection">${renderRangeRows(projection)}</div>
+                ? `<div class="breeding-portraits">
+                     <div class="breeding-portrait">
+                       <div class="breeding-portrait-frame" id="portrait-sire"></div>
+                       <span class="breeding-portrait-label">${sireHorse!.name}</span>
+                     </div>
+                     <div class="breeding-portrait breeding-portrait-foal">
+                       <div class="breeding-portrait-frame" id="portrait-foal"></div>
+                       <span class="breeding-portrait-label">The foal, maybe</span>
+                     </div>
+                     <div class="breeding-portrait">
+                       <div class="breeding-portrait-frame" id="portrait-dam"></div>
+                       <span class="breeding-portrait-label">${damHorse!.name}</span>
+                     </div>
+                   </div>
+                   <p class="breeding-hint breeding-hint-coat">Every colour it could take after its parents — cycling on its own.</p>
+                   <div class="stat-rows" id="projection">${renderRangeRows(projection)}</div>
                    <p class="breeding-hint">Where this pairing usually lands. Tap for numbers.</p>
                    ${
                      mode === 'breed'
@@ -277,6 +418,18 @@ export function mountBreedingScreen(
           </section>`
         }
       </div>`;
+
+    if (projection && sireHorse && damHorse) {
+      const sireHost = root.querySelector<HTMLElement>('#portrait-sire');
+      const damHost = root.querySelector<HTMLElement>('#portrait-dam');
+      const foalHost = root.querySelector<HTMLElement>('#portrait-foal');
+      const stops = [
+        sireHost ? mountPortrait(sireHost, sireHorse) : undefined,
+        damHost ? mountPortrait(damHost, damHorse) : undefined,
+        foalHost ? mountFoalPreview(foalHost, sireHorse, damHorse) : undefined,
+      ];
+      stopPortraits = () => stops.forEach((stop) => stop?.());
+    }
 
     on(root.querySelector('#back-btn'), 'click', onBack);
 
@@ -312,6 +465,7 @@ export function mountBreedingScreen(
 
   return () => {
     detachReveal?.();
+    stopPortraits?.();
     listeners.splice(0).forEach((off) => off());
     root.remove();
   };
