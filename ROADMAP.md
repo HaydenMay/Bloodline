@@ -1230,13 +1230,31 @@ too much for one pass.
 
 **Fixed.** `laneScale` is now `baseScale * (0.97 + lane * 0.01)` — an 8-point span recentred on true
 scale instead of the old 28-point span skewed below it, so lanes read as same-size runners rather than
-a receding row. A new `laneXOffset`, `(lane - (LANE_COUNT - 1) / 2) * LANE_X_SPREAD` with
-`LANE_X_SPREAD = 32`, fans the eight lanes symmetrically around the true screen-x — the x-offset that
-was completely missing before. Driven in the browser rather than guessed: at the gate the pack now
-reads as a diagonal cascade of distinct horses and silks instead of one black stack, and by ~300m in,
+a receding row. A new `laneXOffset` fans the eight lanes symmetrically around the true screen-x — the
+x-offset that was completely missing before. Driven in the browser rather than guessed: at the gate the
+pack now reads as a cluster of distinct horses and silks instead of one black stack, and by ~300m in,
 once real gaps exist, the offset is small enough next to those gaps to be invisible — confirming the
-"unnoticeable once the field spreads out for real" requirement this entry set for itself. No change to
-`visibleMetres` or the camera anchor — that's the entry above, still open.
+"unnoticeable once the field spreads out for real" requirement this entry set for itself. `visibleMetres`
+untouched; the camera anchor got its own fix in the entry above.
+
+**Corrected — found in play.** The first version of `laneXOffset` was a straight ramp,
+`(lane - (LANE_COUNT - 1) / 2) * LANE_X_SPREAD` with a flat 32px `LANE_X_SPREAD`. Two problems, both
+raised by a player looking at it rather than caught building it:
+
+- Lane 7 is also the nearest/biggest lane (`laneScale` above), so the ramp always drew the *same* lane
+  both biggest and furthest to the right — reads as "lane 7 starts ahead," a fairness complaint, even
+  though `sim/race/engine.ts` shuffles lanes every race and the offset never touches real race distance.
+  It was a purely cosmetic ranking that happened to look like a designed advantage.
+- A flat pixel offset is a bigger fraction of a smaller horse. Mobile-landscape width (812px, same
+  `visibleMetres` tier as desktop) draws horses noticeably smaller than desktop's 1440px, so the same
+  32px read as a much more exaggerated stagger there — the player who found this saw it specifically
+  on mobile landscape.
+
+`laneXOffset` is now `laneXZigzag(lane) * baseScale * LANE_X_SPREAD_FACTOR`: a signed, symmetric zigzag
+(`+1, -1, +2, -2, +3, -3, +4, -4` across the eight lanes) instead of a ramp, so the near/big lane is no
+longer always the one drawn furthest along the track, and scaled by `baseScale` — the horse's own drawn
+size — instead of a flat pixel count, so the fan-out stays proportionate on any screen. Verified at both
+1440×900 and 812×375: the pack now reads as a jostling cluster rather than a staged line-up.
 
 ### Race screen: a trailing horse can render straddling the canvas edge
 

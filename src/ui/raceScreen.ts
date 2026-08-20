@@ -125,17 +125,38 @@ const PULL_UP_WALK = 1.74;
 const HORSE_SCALE = 1.55;
 
 /**
- * Pixels of horizontal fan-out per lane step, decided in ROADMAP.md's
- * "bunched field renders as one illegible blob" entry.
+ * Horizontal fan-out per lane step, decided in ROADMAP.md's "bunched field
+ * renders as one illegible blob" entry.
  *
  * At the start, before real gaps exist, every runner sits at nearly
  * identical race-distance x with no separation but a ~1% size difference
  * per lane — eight horses render as one stacked column. This fans lanes
  * out symmetrically around the true x instead, so the pack reads as eight
- * runners in parallel lanes from the gate. It is small enough to stay
- * unnoticeable once the field spreads out for real.
+ * runners in parallel lanes from the gate.
+ *
+ * Zigzag, not a ramp: an earlier version offset each lane by
+ * `(lane - middle) * SPREAD`, a straight line from furthest-left to
+ * furthest-right. Lane 7 is also the nearest/biggest lane (`laneScale`
+ * below), so that combination always drew the same lane both biggest AND
+ * furthest along the track — reads as "lane 7 starts ahead," a fairness
+ * complaint (found in play), even though `sim/race/engine.ts` shuffles
+ * lanes per race and the offset never touches race distance. Alternating
+ * the sign breaks the correlation: the near/big lane is no longer always
+ * the one drawn furthest right.
+ *
+ * Scaled by `baseScale` rather than a flat pixel count, found in the same
+ * report: a flat offset is a bigger fraction of a smaller horse, so it
+ * read as more exaggerated on a narrower, more-zoomed-out mobile-landscape
+ * canvas than on desktop for the same lane. Tying it to the horse's own
+ * drawn size keeps the fan-out proportionate everywhere.
  */
-const LANE_X_SPREAD = 32;
+const LANE_X_SPREAD_FACTOR = 22;
+
+/** Signed, symmetric zigzag magnitude for `laneXOffset` — see above. */
+function laneXZigzag(lane: number): number {
+  const sign = lane % 2 === 0 ? 1 : -1;
+  return sign * Math.ceil((lane + 1) / 2);
+}
 
 /**
  * How far from the left edge the player sits, as a fraction of the
@@ -509,7 +530,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const laneScale = (lane: number): number =>
       baseScale * (0.97 + lane * 0.01);
     const laneXOffset = (lane: number): number =>
-      (lane - (LANE_COUNT - 1) / 2) * LANE_X_SPREAD;
+      laneXZigzag(lane) * baseScale * LANE_X_SPREAD_FACTOR;
 
     for (const r of [...runners].sort((a, b) => a.lane - b.lane)) {
       const pu0 = pullUp.get(r.id);
