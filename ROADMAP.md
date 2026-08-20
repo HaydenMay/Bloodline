@@ -1150,25 +1150,28 @@ dirt band for realistic screen heights, but that's incidental, not contractual. 
 geometry to the renderer instead of both guessing" fix this entry originally called for is still the
 real fix.
 
-### Race screen: the field spread wastes most of a wide desktop canvas
+### Race screen: the field spread wastes most of a wide canvas
 
 **Found in play** — "It's worse on desktop mode too" (raised right after the charges-bar fix above,
-about the race screen generally).
+about the race screen generally); confirmed a second time from a player screenshot ("Landscape
+Mobile all the horses are huddled together") that first read as a landscape-specific bug.
 
-Confirmed by driving a full race at 1440×900 and at 375×812 side by side. Mid-race, once the field
-has any real gap, the trailing pack clusters on one side and the leader runs alone against open
-track — normal enough, but on a wide canvas that "empty" fraction is a large absolute number of
-pixels rather than a small one: by roughly 250m to go, the right two-thirds of the 1440px canvas
-showed nothing but plain dirt and sky, no horses at all. The same composition at 375px reads fine,
-because the narrower canvas doesn't leave enough width for the emptiness to register as wasted.
+Confirmed by driving the same race at three wide aspect ratios side by side — desktop (1440×900),
+landscape phone (812×375), landscape tablet (1180×820) — and comparing the same moment in each
+(~515m to go). All three show the identical composition: the trailing pack in one tight overlapping
+clump, a big gap to the isolated leader, and a large stretch of plain turf and sky beyond that with
+nothing in it. **Not landscape-specific** — it's this entry and the bunched-field one below, showing
+up together on any screen wide enough to expose them. Portrait mobile hides it well simply because a
+narrower canvas doesn't have enough spare width for the emptiness to register as wasted; the pack is
+just as bunched there, it's just less obvious.
 
 **Cause — two things compound:**
-- `visibleMetres` (`raceScreen.ts:394`) is a binary switch, 28m below a 600px width and 42m at or
+- `visibleMetres` (`raceScreen.ts:396`) is a binary switch, 28m below a 600px width and 42m at or
   above it, not something that scales with the actual viewport. Every width from 600px to a 4K
   monitor shows the *same* 42m window, just at a bigger pixel-per-metre ratio — so a wider screen
   doesn't show *more* track, it shows the *same* track bigger, with the rest left as margin.
 - The camera's horizontal anchor (`target = player.distance - width * 0.36 / cam.pixelsPerMetre`,
-  `raceScreen.ts:397`) always pins the player at 36% from the left, full stop, with no notion of how
+  `raceScreen.ts:399`) always pins the player at 36% from the left, full stop, with no notion of how
   spread out the rest of the field actually is. When the player is genuinely clear of the pack,
   there's nothing left of that mark and nothing far enough right to be relevant either.
 
@@ -1177,25 +1180,36 @@ rather than a bigger version of the same slice), or make the camera anchor respo
 actual spread — center on the pack's bounding box instead of a fixed screen fraction — or both.
 Check whichever gets picked against the bunched-field entry below before committing: the two pull in
 opposite directions, early race wants to show *less* track to keep the pack legible, late race has
-empty track to fill.
+empty track to fill. (Note: the running surface is `grass.png` now, not dirt — Hayden's call to run
+this as a turf race, landed after this entry was first written; doesn't change the camera math.)
 
 ### Race screen: a bunched field renders as one illegible blob of horses
 
 **Found in play (this investigation)** — confirmed on both breakpoints. In the first ~10-15m of a
 race, before any real gap exists, all eight runners sit at nearly identical x and are separated only
-by lane: a ~5% size difference per lane (`laneScale`, `raceScreen.ts:449-450`) and a modest y-offset,
+by lane: a ~5% size difference per lane (`laneScale`, `raceScreen.ts:447-448`) and a modest y-offset,
 with **no x-offset between lanes at all**. At the sprite's drawn size that isn't enough separation —
 the eight horses render as one stacked column, jockey silks the only way to tell them apart, and even
 those overlap. The same field 250m later, once real gaps exist, is completely legible — this is
 specifically an early-race problem, not a general rendering one, and it's the first thing a player
 sees every single race ("and they're off!").
 
-**Direction, not a fix:** this is a composition problem more than a bug — each lane genuinely is a
-distinct position, the issue is legibility at a glance during exactly the moment meant to grab
-attention. Worth weighing: widen lane spacing specifically for the first second or two and ease it
-back as the field naturally spreads, or give lanes a small x-offset in addition to the y/scale
-stagger they already have, so a photo-finish start doesn't stack eight horses on the same vertical
-line.
+**Decided, not just a direction now:** this was originally left as a fork — widen the depth cheat
+(bigger size/y spread per lane, leaning toward an over-the-shoulder camera like Rival Stars Horse
+Racing) vs. flatten it (smaller size difference, same-size horses in parallel lanes like swim lanes,
+staying true to a side-scroller). Settled by what's actually buildable: the hand-drawn backdrop art
+now shipped (day/evening/stormy skies, the turf running surface) is flat pixel art with no depth
+cues, generated through a pipeline that can't reliably produce the consistent multi-layer parallax an
+OTS camera would need. Leaning into depth would mean fighting that pipeline for the same reason
+PixelLab kept defaulting to a receding sky no one wanted. So: **flatten it.**
+
+Concretely, that means *reducing* `laneScale`'s existing size variance (`raceScreen.ts:447-448`,
+`baseScale * (0.88 + lane * 0.04)` — the `0.04` is the per-lane depth cheat, shrink it toward 0 rather
+than growing it) so horses read as same-size runners in parallel lanes, and adding a small **x-offset
+per lane** (there is currently none at all) so a bunched start fans out across the width instead of
+stacking vertically on one line. Widening lane spacing for just the first second and easing it back
+as the field naturally spreads is the cheaper partial version of the same idea, if the full fix is
+too much for one pass.
 
 ### Race screen: a trailing horse can render straddling the canvas edge
 
@@ -1204,41 +1218,46 @@ drawn straddling `x = 0`, mid-sprite, rather than fully in or out of frame. `rac
 already culls runners outside `[-140, width + 140]` in screen-space by design, so pop-in/pop-out at
 the edge is expected — the 140px margin just doesn't account for the sprite's own width at a large
 lane scale, so a horse can still be freshly, partially visible instead of clipped at something that
-reads as an edge (a rail post, the dirt boundary). Worth a look in the same pass as the two above,
+reads as an edge (a rail post, the turf boundary). Worth a look in the same pass as the two above,
 same code path.
 
-### Background art: the race camera scrolls sideways, it does not recede into depth
+### ✅ Background art: the race camera scrolls sideways, it does not recede into depth
 
-**Raised by Hayden**, chasing PixelLab generations for a race background: every attempt has come back
+**Raised by Hayden**, chasing PixelLab generations for a race background: every attempt had come back
 with the track receding away from the camera — a vanishing point, converging rail lines — instead of
 moving across the screen.
 
-Worth knowing before generating more: the camera is genuinely a horizontal scroll (a horse's screen-x
-is a direct function of its race distance, `metreToScreen` in `render/track.ts`) with a **per-lane
-pseudo-depth cheat** layered on top (`laneY`/`laneScale` in `raceScreen.ts` — nearer lanes drawn
-bigger and lower). Closer to a classic 2D side-scroller with an Out-Run-style lane stagger than to
-any real 3D perspective. So PixelLab defaulting to a receding, vanishing-point image isn't a mismatch
-with some other design choice — "racetrack" as a prompt just strongly biases toward the real-world
-broadcast angle (rail lines converging on the horizon), which *is* a depth composition, and isn't
-what this renderer draws.
+The cause: the camera is genuinely a horizontal scroll (a horse's screen-x is a direct function of
+its race distance, `metreToScreen` in `render/track.ts`) with a **per-lane pseudo-depth cheat**
+layered on top (`laneY`/`laneScale` in `raceScreen.ts` — nearer lanes drawn bigger and lower). Closer
+to a classic 2D side-scroller with an Out-Run-style lane stagger than to any real 3D perspective. So
+PixelLab defaulting to a receding, vanishing-point image wasn't a mismatch with some other design
+choice — "racetrack" as a prompt just strongly biases toward the real-world broadcast angle (rail
+lines converging on the horizon), which *is* a depth composition, and isn't what this renderer draws.
 
-What would actually fit: a **seamless, horizontally-tileable side-view strip** — grandstand, rail,
-track surface, viewed from a fixed low camera height with no vanishing point — since
-`render/track.ts`'s `drawBackdrop` already composites the scene as flat horizontal bands (sky
-gradient, hillside, crowd/stands, far turf, dirt track with a scrolling mown-stripe texture, near
-turf apron) rather than a single perspective image. Real art would slot in as a tile under or in
-place of those bands, one band at a time — the sky and the crowd stand are the best first candidates,
-see the next entry.
+**Fixed** — `render/track.ts`'s `drawBackdrop` now tiles real hand-drawn art (seamless,
+horizontally-tileable side-view strips, no vanishing point) in place of the flat procedural bands for
+sky, crowd stand and the turf running surface, each scrolling at its own rate (sky barely, crowd at
+0.35x, turf at full rate) with the original flat-colour version as a fallback if the art hasn't loaded
+yet. Two real bugs turned up building it, neither obvious from the code alone: a sign bug in the
+tiling offset math left a gap at the left edge whenever the camera's scroll went negative (the first
+few seconds of every race), and a shared path variable defeated Vite's static asset detection, so the
+images loaded fine in dev and would have silently 404'd in the real production build. Sky now also
+varies per race — day, evening or stormy, picked at random once per race in `raceIntro.ts` so it
+stays consistent from the intro card through to the finish.
 
-### The sky is nearly half the frame with almost nothing in it
+**Still open, and this is the one place the depth-cheat question actually matters going forward:**
+see "a bunched field renders as one illegible blob of horses" below — that entry was originally a
+fork between leaning into the depth cheat (closer to what this entry's art turned out to make
+possible) and flattening it, and it's now decided in favour of flattening, specifically because this
+art is flat pixel art with no depth cues.
+
+### ✅ The sky is nearly half the frame with almost nothing in it
 
 Same investigation as the geometry entry above: the horizon sits at `height * 0.44`
-(`render/track.ts:43`), so on every screen the top 44% is a sky gradient plus a scatter of
-crowd-flash sparkles (`spawnFlash`, `raceScreen.ts`) and nothing else. Not a layout bug — there's
-genuinely nothing else in the current design to put there — but it's the single biggest block of
-empty pixels on the screen, on both breakpoints, and the highest-value place to spend new art if the
-background pass above goes ahead. Phase 8's brief already flags this; repeating it here since it's
-the same investigation and would land alongside the background-art work.
+(`render/track.ts:43`), so on every screen the top 44% was a sky gradient plus a scatter of
+crowd-flash sparkles (`spawnFlash`, `raceScreen.ts`) and nothing else. **Addressed** by the background
+art entry above — the sky band now carries real art (three variants) instead of a flat gradient.
 
 ### The player seems to start in the same lane every race
 
