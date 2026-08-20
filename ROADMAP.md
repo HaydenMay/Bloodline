@@ -1256,6 +1256,35 @@ longer always the one drawn furthest along the track, and scaled by `baseScale` 
 size — instead of a flat pixel count, so the fan-out stays proportionate on any screen. Verified at both
 1440×900 and 812×375: the pack now reads as a jostling cluster rather than a staged line-up.
 
+### ✅ Race screen: lanes still read flat on a short canvas even after the x-offset fix
+
+**Found in play**, immediately after the zigzag fix above: "on mobile landscape the horses stack but
+not flat," with a specific suggestion — a steeper, higher-angle camera on short screens so the eight
+lanes get more vertical room to spread into, rather than leaning further on horizontal tricks alone.
+
+**Cause.** `laneY`'s vertical spacing was already deriving itself from the actual clear space between
+`baseY` and the charges bar (an earlier fix, above in this file), but `baseY` itself was still a flat
+0.58/0.60 fraction of height, same as the backdrop's horizon at a flat 0.44 — both tuned for a canvas
+tall enough to leave hundreds of pixels below them. A landscape phone (812×375) has plenty of *width*
+but very little *height*: at 375px, `baseY` (225) left only 54px of band for all eight lanes — about
+7.7px between adjacent lanes, nowhere near enough for a horse sprite to read as separated vertically,
+whatever the x-offset does. Not a regression from the fix above; the same ceiling was there before it
+and the zigzag fix didn't touch `baseY` or the horizon.
+
+**Fixed — the suggested camera tilt, not a lane-math patch.** `render/track.ts` now exports
+`cameraTilt(height)`, 0 (steepest) to 1 (today's angle, unchanged), and `horizonY(height)` built on it —
+the single source both the backdrop and the race screen's lane math key off, closing the "no shared
+source of truth" gap an earlier entry in this file flagged as still owed. Above `REFERENCE_HEIGHT` (650)
+`cameraTilt` is exactly 1 and every number below is byte-identical to before — desktop, tablets, and
+portrait phones (tall despite a narrow width) are untouched. Below it, the horizon fraction tilts from
+0.44 down toward 0.16 (more ground, less sky) and `raceScreen.ts`'s `baseY` gap — the near-rail strip
+between the horizon and lane 0 — tilts down from 0.16/0.14 toward 0.06/0.05 on the same curve, so the
+room the steeper horizon reclaims from the sky actually reaches the lanes instead of being spent
+widening that strip back out. At 812×375 this roughly doubles the vertical band the eight lanes have to
+spread into. Verified with a controlled A/B on the same seeded race at 812×375, 1180×820 (landscape
+tablet, unaffected — well above `REFERENCE_HEIGHT`) and 1440×900 (unaffected): the mobile-landscape pack
+now visibly spreads taller instead of reading as one thin horizontal smear under a heavy crowd band.
+
 ### Race screen: a trailing horse can render straddling the canvas edge
 
 **Found in play (this investigation)**, minor — while the leader pulls away, a trailing horse can be

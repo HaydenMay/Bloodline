@@ -23,6 +23,40 @@ export interface Camera {
  */
 const MARKER_SPACING = 200;
 
+/**
+ * How steeply the camera looks down, from 0 (as steep as it gets) to 1
+ * (today's angle, unchanged). The single source both the backdrop's horizon
+ * and the race screen's lane math key off, so they can't drift apart the
+ * way `visibleMetres` and the lane geometry once did.
+ *
+ * A flat camera angle read fine on anything tall enough to leave hundreds of
+ * pixels of ground below the horizon, but on a short canvas — a landscape
+ * phone above all, plenty of width, very little height — that same angle
+ * left almost no vertical room for the eight lanes to spread into below it.
+ * Found in play: "the horses stack but not flat," a request for a camera
+ * that looks down on the group more steeply once height is scarce, trading
+ * sky for ground rather than shrinking the lanes further. Tilts continuously
+ * by height rather than switching on an orientation flag, so it also helps a
+ * squat split-screen window or a foldable's cover display without a new
+ * case. Unchanged at/above REFERENCE_HEIGHT — desktop and tablets keep
+ * today's framing exactly.
+ */
+const REFERENCE_HEIGHT = 650;
+
+export function cameraTilt(height: number): number {
+  return Math.min(1, Math.max(0, height / REFERENCE_HEIGHT));
+}
+
+const HORIZON_FRACTION_TALL = 0.44;
+const HORIZON_FRACTION_SHORT = 0.16;
+
+export function horizonY(height: number): number {
+  const t = cameraTilt(height);
+  const fraction =
+    HORIZON_FRACTION_SHORT + (HORIZON_FRACTION_TALL - HORIZON_FRACTION_SHORT) * t;
+  return height * fraction;
+}
+
 export function metreToScreen(metres: number, cam: Camera): number {
   return (metres - cam.scrollMetres) * cam.pixelsPerMetre;
 }
@@ -146,7 +180,7 @@ export function drawBackdrop(
   cam: Camera,
   hype: number,
 ): void {
-  const horizon = height * 0.44;
+  const horizon = horizonY(height);
   // Where pure sky ends and the crowd stand begins. Found in play once the
   // real art was in: the crowd was squeezed into a fixed 58px sliver at the
   // tail of the sky region regardless of screen size, reading as "way too
@@ -154,8 +188,11 @@ export function drawBackdrop(
   // it dominated the frame. Carving real, proportional space for the crowd
   // out of the sky's share fixes both without touching `horizon` itself —
   // drawDistanceMarkers and the race-screen lane math both key off that
-  // exact value, so leaving it alone keeps everything below it aligned.
-  const skyBottom = height * 0.29;
+  // exact value, so leaving it alone keeps everything below it aligned. Kept
+  // as a constant fraction of `horizon` itself, not of `height` directly, so
+  // the crowd band stays proportionate even as `horizonY` tilts the camera
+  // steeper on a short canvas.
+  const skyBottom = horizon * (0.29 / 0.44);
 
   if (raceBackgroundImages) {
     const sky = raceBackgroundImages.skies[raceSkyIndex] ?? raceBackgroundImages.skies[0]!;
@@ -343,7 +380,7 @@ export function drawDistanceMarkers(
   cam: Camera,
   totalMetres: number,
 ): void {
-  const horizon = height * 0.44;
+  const horizon = horizonY(height);
   const markerY = horizon + 10;
 
   // Count back from the wire so the winning post lands exactly on the line,

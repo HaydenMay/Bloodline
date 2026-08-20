@@ -16,9 +16,11 @@ import {
 } from "../render/palette.js";
 import { loadFrameSequence, drawFrame } from "../render/frameAnimation.js";
 import {
+  cameraTilt,
   drawBackdrop,
   drawDistanceMarkers,
   drawMinimap,
+  horizonY,
   loadRaceBackgroundImages,
   metreToScreen,
   type Camera,
@@ -257,7 +259,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const spawnFlash = (): void => {
     // Random position in crowd area (bleachers above horizon)
     const { width, height } = surface;
-    const horizon = height * 0.44;
+    const horizon = horizonY(height);
     const x = Math.random() * width;
     // Crowd is positioned from horizon-58 to horizon, spawn flashes above them
     const y = (horizon - 58) + Math.random() * 58; // Within crowd stand area
@@ -504,7 +506,17 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // Lane 0 is the rail (furthest from camera), so higher lanes draw nearer
     // and larger. Sorting by lane keeps the overlap correct.
     const isSmallScreen = width < 600;
-    const baseY = isSmallScreen ? height * 0.58 : height * 0.60;
+    // The gap between the horizon and where lane 0 starts — the near-rail
+    // strip of track before any runner appears. At today's camera angle
+    // (tall screens) this reproduces the old flat 0.58/0.60 exactly: it's
+    // `horizonY` (0.44) plus a 0.14/0.16 gap. On a short canvas the gap
+    // shrinks too, using the same `cameraTilt` the horizon itself tilts on,
+    // so the room `horizonY` reclaims from the sky actually reaches the
+    // lanes instead of being spent widening this decorative strip instead.
+    const tilt = cameraTilt(height);
+    const gapTall = isSmallScreen ? 0.14 : 0.16;
+    const gapShort = isSmallScreen ? 0.05 : 0.06;
+    const baseY = horizonY(height) + height * (gapShort + (gapTall - gapShort) * tilt);
     // The charges bar (drawHud, below) is drawn on top of the horses, near
     // the bottom of the canvas. A fixed height-relative spacing pushed the
     // deepest lane's feet behind it — found in play: the nearest horse's
