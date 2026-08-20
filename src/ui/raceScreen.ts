@@ -14,7 +14,7 @@ import {
 } from "../render/palette.js";
 import { drawMinimap } from "../render/track.js";
 import { createRaceView2d } from "../render/raceView2d.js";
-import { createRaceView3d } from "../render/raceView3d.js";
+import { createRaceView3d, type RaceView3d } from "../render/raceView3d.js";
 import { interpolateRunners, type RaceView } from "../render/raceView.js";
 import {
   createRace,
@@ -150,7 +150,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   // The world is drawn by a view. Everything below this line is the screen's
   // own business — loop, chrome, input — and does not care which view it is.
-  const view: RaceView =
+  // Held separately from `view` because the camera bar below needs the 3D
+  // view's own controls, which the shared interface deliberately does not have.
+  const view3d: RaceView3d | null =
     viewMode === "3d"
       ? createRaceView3d({
           host,
@@ -162,15 +164,21 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
           horseIds: field.map((h) => h.id),
           cameraMode: opts.cameraMode,
         })
-      : createRaceView2d({
-          surface,
-          playerHorseId,
-          silksFor,
-          coatOf,
-          totalMetres,
-          hype: config.hype,
-          horseIds: field.map((h) => h.id),
-        });
+      : null;
+
+  const view: RaceView =
+    view3d ??
+    createRaceView2d({
+      surface,
+      playerHorseId,
+      silksFor,
+      coatOf,
+      totalMetres,
+      hype: config.hype,
+      horseIds: field.map((h) => h.id),
+    });
+
+  const cameraBar = view3d ? mountCameraBar(host, view3d, opts.cameraMode) : null;
 
   let prev: RaceSnapshot = race.snapshot();
   let curr: RaceSnapshot = prev;
@@ -260,6 +268,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       // Disable skip and auto-race buttons when race finishes
       if (skipToggle) skipToggle.disabled = true;
       if (autoRaceToggle) autoRaceToggle.disabled = true;
+      // The recap owns the screen from here; nothing left to frame.
+      cameraBar?.remove();
       opts.onFinish?.(placings);
     }
   };
@@ -805,6 +815,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   return (): void => {
     loop.stop();
+    cameraBar?.remove();
     view.dispose();
     surface.destroy();
     window.clearTimeout(holdTimer);
@@ -819,6 +830,64 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     }
     resultHoverTargets.clear();
   };
+}
+
+/**
+ * The camera picker — 3D only.
+ *
+ * Sat under the TO GO panel rather than at the foot of the stage, because the
+ * foot is where the charge bar and the YOUR MOMENT banner are drawn and this
+ * must never cover the one cue the player rides on.
+ */
+const CAMERAS: readonly (readonly [RaceCameraMode, string])[] = [
+  ['side-on', 'Broadcast'],
+  ['chase', 'Chase'],
+  ['aerial', 'Aerial'],
+  ['head-on', 'Head-on'],
+] as const;
+
+export function mountCameraBar(
+  host: HTMLElement,
+  view: RaceView3d,
+  opening: RaceCameraMode | undefined,
+): HTMLElement {
+  const bar = document.createElement('div');
+  bar.className = 'race-cams';
+  bar.setAttribute('role', 'group');
+  bar.setAttribute('aria-label', 'Camera');
+
+  const active = opening ?? 'side-on';
+  const buttons: HTMLButtonElement[] = [];
+
+  const select = (mode: RaceCameraMode): void => {
+    view.setCameraMode(mode);
+    for (const b of buttons) {
+      const on = b.dataset['cam'] === mode;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
+  };
+
+  for (const [mode, label] of CAMERAS) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'race-cam-btn';
+    btn.dataset['cam'] = mode;
+    btn.textContent = label;
+    btn.setAttribute('aria-pressed', String(mode === active));
+    if (mode === active) btn.classList.add('is-active');
+    btn.addEventListener('click', () => select(mode));
+    buttons.push(btn);
+    bar.appendChild(btn);
+  }
+
+  // The stage turns any press into a kick, and a press that started on a
+  // button is not a ride instruction. Stopped here rather than filtered in the
+  // stage handler so the button stays an ordinary button.
+  bar.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  host.appendChild(bar);
+  return bar;
 }
 
 /** How the race was run, in three words, under the placings. */

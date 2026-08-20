@@ -169,9 +169,21 @@ export function buildCourse(scene: THREE.Scene): { dispose(): void } {
   // The dirt is a hand-built ribbon with no UVs, so it stays flat-shaded
   // colour rather than textured; at trackside distance the horses and the
   // rails are what the eye reads anyway.
+  // Turf, dirt, infield and the finish line are four flat surfaces stacked
+  // within 5 cm of each other. Two centimetres of clearance is plenty from
+  // trackside, but the aerial camera looks down from fifty metres, where the
+  // depth buffer can no longer separate them and the dirt breaks up into
+  // patches of grass. Polygon offset settles the order outright instead of
+  // leaving it to precision, lowest surface first.
   const dirt = track(
     ribbon(-TRACK_HALF_WIDTH, TRACK_HALF_WIDTH, 0),
-    new THREE.MeshStandardMaterial({ color: '#a87048', roughness: 1 }),
+    new THREE.MeshStandardMaterial({
+      color: '#a87048',
+      roughness: 1,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    }),
   );
   dirt.receiveShadow = true;
   scene.add(dirt);
@@ -187,7 +199,13 @@ export function buildCourse(scene: THREE.Scene): { dispose(): void } {
   }
   const infield = track(
     new THREE.ShapeGeometry(infieldShape),
-    new THREE.MeshStandardMaterial({ color: '#5b8f45', roughness: 1 }),
+    new THREE.MeshStandardMaterial({
+      color: '#5b8f45',
+      roughness: 1,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    }),
   );
   infield.rotation.x = -Math.PI / 2;
   infield.position.y = 0.01;
@@ -224,7 +242,13 @@ export function buildCourse(scene: THREE.Scene): { dispose(): void } {
   // the whole running surface rather than stopping short of the rails.
   const line = track(
     new THREE.PlaneGeometry(TRACK_HALF_WIDTH * 2 + 3, 1),
-    new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }),
+    new THREE.MeshStandardMaterial({
+      color: '#ffffff',
+      roughness: 0.95,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    }),
   );
   const at = sample(FINISH_DISTANCE);
   line.position.set(at.position.x, 0.03, at.position.z);
