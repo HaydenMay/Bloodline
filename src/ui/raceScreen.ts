@@ -137,6 +137,33 @@ const HORSE_SCALE = 1.55;
  */
 const LANE_X_SPREAD = 32;
 
+/**
+ * How far from the left edge the player sits, as a fraction of the
+ * screen — the camera's horizontal anchor. Decided in ROADMAP.md's "field
+ * spread wastes most of a wide canvas" entry.
+ *
+ * Used to be a flat 0.36 always, which reserved 64% of the screen for
+ * whatever lay ahead of the player — fine mid-pack, but a horse running
+ * clear at the front has nothing ahead of it at all, so that 64% was
+ * empty turf and sky every time. DEFAULT_ANCHOR_FRACTION is that old
+ * constant, kept for the case where the field has no spread to read yet
+ * (everyone at the same distance, e.g. still at the gate). Once there is
+ * real spread, the anchor slides between the two extremes below by how
+ * much of the field's content actually lies ahead of the player versus
+ * behind it — MIN when the player is caught (nothing ahead, show the
+ * field it's chasing), MAX when the player is clear (nothing behind,
+ * show the field it's outrunning instead of empty track).
+ *
+ * Deliberately leaves `visibleMetres` alone rather than also widening it
+ * on wide screens: that would shrink every horse to fit more track in,
+ * trading away the "deliberately oversized... legibility cheat" HORSE_SCALE
+ * documents above. Reclaiming the wasted-ahead space by pointing it at
+ * real content does not have that cost.
+ */
+const MIN_ANCHOR_FRACTION = 0.22;
+const MAX_ANCHOR_FRACTION = 0.7;
+const DEFAULT_ANCHOR_FRACTION = 0.36;
+
 /** Track sections, by the leader's progress. Each fires once. */
 const CALLOUTS = [
   { at: 0.24, text: "Down the backstretch" },
@@ -409,7 +436,24 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const visibleMetres = width < 600 ? 28 : 42;
     cam.pixelsPerMetre = width / visibleMetres;
 
-    const target = player.distance - (width * 0.36) / cam.pixelsPerMetre;
+    // How far the rest of the field actually extends beyond the player, in
+    // metres each way — the real content the anchor should be pointed at.
+    let aheadMetres = 0;
+    let behindMetres = 0;
+    for (const r of runners) {
+      const delta = r.distance - player.distance;
+      if (delta > aheadMetres) aheadMetres = delta;
+      else if (-delta > behindMetres) behindMetres = -delta;
+    }
+    const fieldSpan = aheadMetres + behindMetres;
+    const anchorFraction =
+      fieldSpan > 0
+        ? MIN_ANCHOR_FRACTION +
+          (MAX_ANCHOR_FRACTION - MIN_ANCHOR_FRACTION) *
+            (behindMetres / fieldSpan)
+        : DEFAULT_ANCHOR_FRACTION;
+
+    const target = player.distance - (width * anchorFraction) / cam.pixelsPerMetre;
     cam.scrollMetres += (target - cam.scrollMetres) * 0.1;
 
     drawBackdrop(ctx, width, height, cam, config.hype);

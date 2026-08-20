@@ -1150,7 +1150,7 @@ dirt band for realistic screen heights, but that's incidental, not contractual. 
 geometry to the renderer instead of both guessing" fix this entry originally called for is still the
 real fix.
 
-### Race screen: the field spread wastes most of a wide canvas
+### ✅ Race screen: the field spread wastes most of a wide canvas
 
 **Found in play** — "It's worse on desktop mode too" (raised right after the charges-bar fix above,
 about the race screen generally); confirmed a second time from a player screenshot ("Landscape
@@ -1182,6 +1182,23 @@ Check whichever gets picked against the bunched-field entry below before committ
 opposite directions, early race wants to show *less* track to keep the pack legible, late race has
 empty track to fill. (Note: the running surface is `grass.png` now, not dirt — Hayden's call to run
 this as a turf race, landed after this entry was first written; doesn't change the camera math.)
+
+**Fixed — the anchor, not `visibleMetres`.** Checked against the bunched-field entry below as asked:
+that fix (the lane fan-out) makes the pack legible independent of zoom, so the "opposite directions"
+tension no longer applies and there was nothing forcing a joint decision. `visibleMetres` was left
+alone deliberately — widening it on wide screens would shrink every horse to fit more track in,
+trading away the "deliberately oversized... legibility cheat" `HORSE_SCALE` documents, for a problem
+the anchor alone already solves.
+
+The fixed 0.36 reserved 64% of the screen for whatever lay ahead of the player, which is empty turf
+the instant the player is clear of the field — there is nothing ahead of a leader. `anchorFraction` now
+slides between 0.22 and 0.7 by how much of the field's content actually lies ahead of the player versus
+behind (`aheadMetres` / `behindMetres`, the furthest runner each way), falling back to the old 0.36 only
+when there's no spread yet to read (e.g. still at the gate). Verified in the browser with a controlled
+A/B on the same seeded race: at "1st of 8," the old anchor held the leader at 36% with the entire right
+two-thirds of the canvas empty grass; the new one puts the leader around 68%, filling most of the canvas
+with the chasing pack instead. A trailing horse gets the mirror treatment, sliding toward 22% to show
+more of the field it's chasing.
 
 ### ✅ Race screen: a bunched field renders as one illegible blob of horses
 
