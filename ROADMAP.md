@@ -1183,7 +1183,7 @@ opposite directions, early race wants to show *less* track to keep the pack legi
 empty track to fill. (Note: the running surface is `grass.png` now, not dirt — Hayden's call to run
 this as a turf race, landed after this entry was first written; doesn't change the camera math.)
 
-### Race screen: a bunched field renders as one illegible blob of horses
+### ✅ Race screen: a bunched field renders as one illegible blob of horses
 
 **Found in play (this investigation)** — confirmed on both breakpoints. In the first ~10-15m of a
 race, before any real gap exists, all eight runners sit at nearly identical x and are separated only
@@ -1210,6 +1210,16 @@ per lane** (there is currently none at all) so a bunched start fans out across t
 stacking vertically on one line. Widening lane spacing for just the first second and easing it back
 as the field naturally spreads is the cheaper partial version of the same idea, if the full fix is
 too much for one pass.
+
+**Fixed.** `laneScale` is now `baseScale * (0.97 + lane * 0.01)` — an 8-point span recentred on true
+scale instead of the old 28-point span skewed below it, so lanes read as same-size runners rather than
+a receding row. A new `laneXOffset`, `(lane - (LANE_COUNT - 1) / 2) * LANE_X_SPREAD` with
+`LANE_X_SPREAD = 32`, fans the eight lanes symmetrically around the true screen-x — the x-offset that
+was completely missing before. Driven in the browser rather than guessed: at the gate the pack now
+reads as a diagonal cascade of distinct horses and silks instead of one black stack, and by ~300m in,
+once real gaps exist, the offset is small enough next to those gaps to be invisible — confirming the
+"unnoticeable once the field spreads out for real" requirement this entry set for itself. No change to
+`visibleMetres` or the camera anchor — that's the entry above, still open.
 
 ### Race screen: a trailing horse can render straddling the canvas edge
 
@@ -1246,11 +1256,10 @@ images loaded fine in dev and would have silently 404'd in the real production b
 varies per race — day, evening or stormy, picked at random once per race in `raceIntro.ts` so it
 stays consistent from the intro card through to the finish.
 
-**Still open, and this is the one place the depth-cheat question actually matters going forward:**
-see "a bunched field renders as one illegible blob of horses" below — that entry was originally a
-fork between leaning into the depth cheat (closer to what this entry's art turned out to make
-possible) and flattening it, and it's now decided in favour of flattening, specifically because this
-art is flat pixel art with no depth cues.
+**Resolved the fork it left open:** see "a bunched field renders as one illegible blob of horses"
+below — that entry was originally a fork between leaning into the depth cheat (closer to what this
+entry's art turned out to make possible) and flattening it. Decided in favour of flattening,
+specifically because this art is flat pixel art with no depth cues, and now built.
 
 ### ✅ The sky is nearly half the frame with almost nothing in it
 

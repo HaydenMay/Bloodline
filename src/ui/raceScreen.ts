@@ -124,6 +124,19 @@ const PULL_UP_WALK = 1.74;
  */
 const HORSE_SCALE = 1.55;
 
+/**
+ * Pixels of horizontal fan-out per lane step, decided in ROADMAP.md's
+ * "bunched field renders as one illegible blob" entry.
+ *
+ * At the start, before real gaps exist, every runner sits at nearly
+ * identical race-distance x with no separation but a ~1% size difference
+ * per lane — eight horses render as one stacked column. This fans lanes
+ * out symmetrically around the true x instead, so the pack reads as eight
+ * runners in parallel lanes from the gate. It is small enough to stay
+ * unnoticeable once the field spreads out for real.
+ */
+const LANE_X_SPREAD = 32;
+
 /** Track sections, by the leader's progress. Each fires once. */
 const CALLOUTS = [
   { at: 0.24, text: "Down the backstretch" },
@@ -444,12 +457,21 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
     const baseScale =
       (HORSE_METRES * cam.pixelsPerMetre * HORSE_SCALE) / RIG_UNITS;
+    // Flattened per ROADMAP.md's decision: the backdrop art is flat pixel
+    // art with no depth cues, so horses read as same-size runners in
+    // parallel lanes rather than leaning into an over-the-shoulder depth
+    // cheat. Was 0.88 + lane * 0.04 (a 28% span); shrunk toward 0 and
+    // recentred on true scale rather than skewed below it.
     const laneScale = (lane: number): number =>
-      baseScale * (0.88 + lane * 0.04);
+      baseScale * (0.97 + lane * 0.01);
+    const laneXOffset = (lane: number): number =>
+      (lane - (LANE_COUNT - 1) / 2) * LANE_X_SPREAD;
 
     for (const r of [...runners].sort((a, b) => a.lane - b.lane)) {
       const pu0 = pullUp.get(r.id);
-      const x = metreToScreen(r.distance + (pu0?.extra ?? 0), cam);
+      const x =
+        metreToScreen(r.distance + (pu0?.extra ?? 0), cam) +
+        laneXOffset(r.lane);
       if (x < -140 || x > width + 140) continue;
 
       const y = laneY(r.lane);
