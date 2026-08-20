@@ -406,6 +406,9 @@ body {
  * Camera picker, 3D only. Above both canvases, and tucked under the TO GO
  * panel: the foot of the stage belongs to the charge bar and the moment
  * banner, and the top right to the minimap.
+ *
+ * Collapsed to a single pill naming the camera you are on. The list drops out
+ * of it rather than sitting open, so watching the race costs no chrome.
  */
 .race-cams {
   position: absolute;
@@ -413,12 +416,55 @@ body {
   left: 14px;
   z-index: 2;
   display: flex;
-  gap: 2px;
-  padding: 3px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  touch-action: manipulation;
+}
+
+.race-cam-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 6px 12px;
+  min-height: 32px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--panel);
-  touch-action: manipulation;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.race-cam-toggle:hover {
+  border-color: var(--accent);
+}
+
+.race-cam-chevron {
+  font-size: 9px;
+  color: var(--muted);
+  transition: transform 120ms ease;
+}
+
+.race-cams.is-open .race-cam-chevron {
+  transform: rotate(180deg);
+}
+
+.race-cam-menu {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.race-cams.is-open .race-cam-menu {
+  display: flex;
 }
 
 .race-cam-btn {
@@ -426,7 +472,8 @@ body {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  padding: 5px 10px;
+  text-align: left;
+  padding: 5px 12px;
   min-height: 30px;
   border: 0;
   border-radius: 999px;
@@ -443,15 +490,6 @@ body {
 .race-cam-btn.is-active {
   background: var(--accent);
   color: var(--bg);
-}
-
-/* On a phone the minimap is only ~100px from the right edge; shrink to clear it. */
-@media (max-width: 460px) {
-  .race-cam-btn {
-    font-size: 10px;
-    letter-spacing: 0;
-    padding: 4px 7px;
-  }
 }
 
 .racebar {

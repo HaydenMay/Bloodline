@@ -269,7 +269,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       if (skipToggle) skipToggle.disabled = true;
       if (autoRaceToggle) autoRaceToggle.disabled = true;
       // The recap owns the screen from here; nothing left to frame.
-      cameraBar?.remove();
+      cameraBar?.destroy();
       opts.onFinish?.(placings);
     }
   };
@@ -815,7 +815,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   return (): void => {
     loop.stop();
-    cameraBar?.remove();
+    cameraBar?.destroy();
     view.dispose();
     surface.destroy();
     window.clearTimeout(holdTimer);
@@ -835,6 +835,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 /**
  * The camera picker — 3D only.
  *
+ * A single pill showing the camera you are on, which opens into the list when
+ * you click it. Four buttons sat open across the top was a permanent strip of
+ * chrome over a race you are meant to be watching; collapsed, it costs one
+ * pill's worth of screen and still says which camera you are on.
+ *
  * Sat under the TO GO panel rather than at the foot of the stage, because the
  * foot is where the charge bar and the YOUR MOMENT banner are drawn and this
  * must never cover the one cue the player rides on.
@@ -846,18 +851,46 @@ const CAMERAS: readonly (readonly [RaceCameraMode, string])[] = [
   ['head-on', 'Head-on'],
 ] as const;
 
+export interface CameraBar {
+  destroy(): void;
+}
+
 export function mountCameraBar(
   host: HTMLElement,
   view: RaceView3d,
   opening: RaceCameraMode | undefined,
-): HTMLElement {
+): CameraBar {
   const bar = document.createElement('div');
   bar.className = 'race-cams';
-  bar.setAttribute('role', 'group');
-  bar.setAttribute('aria-label', 'Camera');
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'race-cam-toggle';
+  toggle.setAttribute('aria-haspopup', 'true');
+  toggle.setAttribute('aria-expanded', 'false');
+
+  const name = document.createElement('span');
+  name.className = 'race-cam-name';
+  const chevron = document.createElement('span');
+  chevron.className = 'race-cam-chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  chevron.textContent = '\u25be';
+  toggle.append(name, chevron);
+
+  const menu = document.createElement('div');
+  menu.className = 'race-cam-menu';
+  menu.setAttribute('role', 'group');
+  menu.setAttribute('aria-label', 'Camera');
+
+  bar.append(toggle, menu);
 
   const active = opening ?? 'side-on';
   const buttons: HTMLButtonElement[] = [];
+
+  const close = (): void => {
+    bar.classList.remove('is-open');
+    toggle.setAttribute('aria-expanded', 'false');
+  };
 
   const select = (mode: RaceCameraMode): void => {
     view.setCameraMode(mode);
@@ -865,7 +898,11 @@ export function mountCameraBar(
       const on = b.dataset['cam'] === mode;
       b.classList.toggle('is-active', on);
       b.setAttribute('aria-pressed', String(on));
+      // The pill has to keep saying which camera you are on once it shuts,
+      // otherwise the collapsed state tells you nothing at all.
+      if (on) name.textContent = b.textContent;
     }
+    close();
   };
 
   for (const [mode, label] of CAMERAS) {
@@ -875,19 +912,45 @@ export function mountCameraBar(
     btn.dataset['cam'] = mode;
     btn.textContent = label;
     btn.setAttribute('aria-pressed', String(mode === active));
-    if (mode === active) btn.classList.add('is-active');
+    if (mode === active) {
+      btn.classList.add('is-active');
+      name.textContent = label;
+    }
     btn.addEventListener('click', () => select(mode));
     buttons.push(btn);
-    bar.appendChild(btn);
+    menu.appendChild(btn);
   }
 
-  // The stage turns any press into a kick, and a press that started on a
-  // button is not a ride instruction. Stopped here rather than filtered in the
-  // stage handler so the button stays an ordinary button.
+  toggle.addEventListener('click', () => {
+    const open = !bar.classList.contains('is-open');
+    bar.classList.toggle('is-open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+
+  // The stage turns any press into a kick, and a press that started on this
+  // is not a ride instruction. Stopped here rather than filtered in the stage
+  // handler so the buttons stay ordinary buttons — and it doubles as the test
+  // for "did that press land outside the picker", below.
   bar.addEventListener('pointerdown', (e) => e.stopPropagation());
 
+  // Anything that reaches the window started outside the picker, so the menu
+  // should not still be sitting open over the race.
+  const away = (): void => close();
+  const escape = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') close();
+  };
+  window.addEventListener('pointerdown', away);
+  window.addEventListener('keydown', escape);
+
   host.appendChild(bar);
-  return bar;
+
+  return {
+    destroy(): void {
+      window.removeEventListener('pointerdown', away);
+      window.removeEventListener('keydown', escape);
+      bar.remove();
+    },
+  };
 }
 
 /** How the race was run, in three words, under the placings. */

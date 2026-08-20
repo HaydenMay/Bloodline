@@ -6,9 +6,10 @@ import type { RaceView3d } from '../render/raceView3d.js';
 /**
  * The in-race camera picker.
  *
- * Two things here are invisible until they break. The bar has to actually
- * reach the 3D view — it is the only caller of `setCameraMode`, so nothing
- * else would notice if the wiring went. And a press on it must not reach the
+ * Three things here are invisible until they break. The picker has to reach
+ * the 3D view — it is the only caller of `setCameraMode`, so nothing else
+ * would notice if the wiring went. Collapsed, it has to keep naming the camera
+ * you are on, or it says nothing at all. And a press on it must not reach the
  * stage, which turns any press into a kick charge: a player changing camera
  * would otherwise spend a charge every time they looked at the race a
  * different way.
@@ -24,6 +25,12 @@ function fakeView(): RaceView3d & { modes: RaceCameraMode[] } {
   };
 }
 
+const bar = (): HTMLElement => document.querySelector('.race-cams')!;
+const toggle = (): HTMLButtonElement => document.querySelector('.race-cam-toggle')!;
+const option = (cam: RaceCameraMode): HTMLButtonElement =>
+  document.querySelector(`.race-cam-btn[data-cam="${cam}"]`)!;
+const isOpen = (): boolean => bar().classList.contains('is-open');
+
 describe('camera bar', () => {
   let host: HTMLElement;
 
@@ -33,37 +40,71 @@ describe('camera bar', () => {
     document.body.appendChild(host);
   });
 
-  it('opens on the camera the race was started with', () => {
+  it('opens closed, naming the camera the race was started with', () => {
     mountCameraBar(host, fakeView(), 'aerial');
-    expect(host.querySelector('.race-cam-btn.is-active')?.getAttribute('data-cam')).toBe('aerial');
+
+    expect(isOpen()).toBe(false);
+    expect(toggle().textContent).toContain('Aerial');
+    expect(option('aerial').classList.contains('is-active')).toBe(true);
   });
 
-  it('opens on the broadcast camera when none was asked for', () => {
+  it('names the broadcast camera when none was asked for', () => {
     mountCameraBar(host, fakeView(), undefined);
-    expect(host.querySelector('.race-cam-btn.is-active')?.getAttribute('data-cam')).toBe('side-on');
+    expect(toggle().textContent).toContain('Broadcast');
   });
 
-  it('tells the view about a pick, and moves the active state to it', () => {
+  it('shows the options on a click, and hides them again', () => {
+    mountCameraBar(host, fakeView(), undefined);
+
+    toggle().click();
+    expect(isOpen()).toBe(true);
+    toggle().click();
+    expect(isOpen()).toBe(false);
+  });
+
+  it('tells the view about a pick, then collapses onto it', () => {
     const view = fakeView();
     mountCameraBar(host, view, undefined);
 
-    host.querySelector<HTMLButtonElement>('.race-cam-btn[data-cam="chase"]')!.click();
+    toggle().click();
+    option('chase').click();
 
     expect(view.modes).toEqual(['chase']);
-    const active = host.querySelectorAll('.race-cam-btn.is-active');
+    expect(isOpen()).toBe(false);
+    expect(toggle().textContent).toContain('Chase');
+    const active = document.querySelectorAll('.race-cam-btn.is-active');
     expect(active.length).toBe(1);
     expect(active[0]!.getAttribute('data-cam')).toBe('chase');
   });
 
-  it('keeps its presses off the stage, so changing camera costs no charge', () => {
+  it('shuts when the press lands on the race instead', () => {
+    mountCameraBar(host, fakeView(), undefined);
+    toggle().click();
+
+    host.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+
+    expect(isOpen()).toBe(false);
+  });
+
+  it('keeps its own presses off the stage, so changing camera costs no charge', () => {
     const ridden = vi.fn();
     host.addEventListener('pointerdown', ridden);
     mountCameraBar(host, fakeView(), undefined);
 
-    host
-      .querySelector<HTMLButtonElement>('.race-cam-btn[data-cam="aerial"]')!
-      .dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    toggle().dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    option('aerial').dispatchEvent(new Event('pointerdown', { bubbles: true }));
 
     expect(ridden).not.toHaveBeenCalled();
+  });
+
+  it('takes its window listeners with it when the race ends', () => {
+    const picker = mountCameraBar(host, fakeView(), undefined);
+    const off = vi.spyOn(window, 'removeEventListener');
+
+    picker.destroy();
+
+    expect(document.querySelector('.race-cams')).toBeNull();
+    expect(off).toHaveBeenCalledWith('pointerdown', expect.any(Function));
+    expect(off).toHaveBeenCalledWith('keydown', expect.any(Function));
   });
 });
