@@ -1366,6 +1366,19 @@ landscape canvases, unchanged at 42m once height clears `REFERENCE_HEIGHT` — s
 byte-identical to before. Verified at 812×375: horses visibly larger, both at the bunched start and once
 real gaps open mid-race; desktop and tablet screenshots confirmed pixel-unchanged.
 
+**Corrected — found in play immediately: "you can see they're all mashed together, right?"** They were.
+Bigger horses need proportionally bigger `SPRITE_HEADROOM` in pixels — same rig-unit clearance, but
+`baseScale` grew ~20% with the zoom above — and that headroom is subtracted from the *same fixed band*
+`laneSpacing` draws from. Zooming in to fix the grass complaint spent the band the y-axis spacing entries
+above had just fought to win back, on the shortest landscape canvases worst of all, since that's exactly
+where the zoom pushes `baseScale` hardest. `MIN_LANE_SPACING` (`baseScale * 18`) is now a floor
+`laneSpacing` can't be pushed below: whenever sitting at the sky-clearance floor would leave less than
+this much room per lane, `baseY` is pulled back up toward the crowd instead — trading away sky clearance,
+never spacing, and never the grounding floor (`trackTopY`) either; a horse floating in the air is a worse
+failure than one whose head brushes the crowd stand. Verified: mobile landscape reads as eight separable
+runners again at both the bunched start and mid-race; desktop, tablet and portrait unaffected, since the
+floor never binds where the band was already generous.
+
 **Found in play (this investigation)**, minor — while the leader pulls away, a trailing horse can be
 drawn straddling `x = 0`, mid-sprite, rather than fully in or out of frame. `raceScreen.ts:441`
 already culls runners outside `[-140, width + 140]` in screen-space by design, so pop-in/pop-out at

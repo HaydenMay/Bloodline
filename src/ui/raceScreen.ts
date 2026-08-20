@@ -537,6 +537,15 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // band to spare, get the full margin; mobile landscape gets little to
     // none, sliding in on the same curve everything else here tilts on.
     const START_LOWER_MARGIN = 40 * tilt;
+    // The charges bar (drawHud, below) is drawn on top of the horses, near
+    // the bottom of the canvas. A fixed height-relative spacing pushed the
+    // deepest lane's feet behind it — found in play: the nearest horse's
+    // legs read as cut off, worse on mobile because the bar's fixed pixel
+    // height eats a bigger share of a shorter canvas. Deriving the spacing
+    // from the actual clear space above the bar keeps every lane's feet
+    // above it regardless of screen height.
+    const reservedBottom = 96;
+    const maxLaneY = height - reservedBottom;
     // `baseY` — lane 0's own anchor, i.e. its feet — has to clear three
     // separate floors, found in play one at a time as each fix chased more
     // vertical spread than the last:
@@ -555,20 +564,29 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     //    headroom itself above `baseY` — (2) already accounts for it — so
     //    there is no separate bare-headroom term here; it would only ever
     //    be weaker than (2).
-    const baseY = Math.max(
+    const desiredBaseY = Math.max(
       baseYFromGap,
       trackTopY(width, height),
       skyBottomY(width, height) + baseScale * (SPRITE_HEADROOM + START_LOWER_MARGIN),
     );
-    // The charges bar (drawHud, below) is drawn on top of the horses, near
-    // the bottom of the canvas. A fixed height-relative spacing pushed the
-    // deepest lane's feet behind it — found in play: the nearest horse's
-    // legs read as cut off, worse on mobile because the bar's fixed pixel
-    // height eats a bigger share of a shorter canvas. Deriving the spacing
-    // from the actual clear space above the bar keeps every lane's feet
-    // above it regardless of screen height.
-    const reservedBottom = 96;
-    const maxLaneY = height - reservedBottom;
+    // Pushing `baseY` down to clear the sky costs band — the room `laneY`
+    // has left to actually separate eight runners in. On a canvas short
+    // enough, and once the zoom-in below made every horse (and so its own
+    // required headroom) bigger, that cost can eat the band down to nothing
+    // and the pack goes right back to reading as one mashed-together blob —
+    // found in play, again: "you can see they're all mashed together,
+    // right?" `MIN_LANE_SPACING` is the floor that can't be sacrificed for
+    // it: `baseY` is pulled back up from `desiredBaseY` — trading away sky
+    // clearance, not spacing — whenever sitting at `desiredBaseY` would
+    // leave less than this much room per lane. `trackTopY` (grounding) is
+    // never given up even for this; a horse floating in the air is a worse
+    // failure than one whose head brushes the crowd stand.
+    const MIN_LANE_SPACING = baseScale * 18;
+    const latestAffordableBaseY = maxLaneY - MIN_LANE_SPACING * (LANE_COUNT - 1);
+    const baseY = Math.max(
+      trackTopY(width, height),
+      Math.min(desiredBaseY, latestAffordableBaseY),
+    );
     const laneSpacing = Math.min(
       // The ceiling only ever binds in portrait, where the band between
       // baseY and the charges bar is intentionally generous next to how
