@@ -4,6 +4,7 @@ import type { BetType, PlacedBet } from '../data/wagering.js';
 import { getBetOptions, getStakeOptions } from '../data/wagering.js';
 import { CONSUMABLES } from '../data/consumables.js';
 import { saveCareer } from './career.js';
+import { supports3d } from '../render/raceView.js';
 
 export interface RaceDayChoices {
   /** Race-day consumable ids to spend on this race. */
@@ -165,6 +166,7 @@ export function mountRaceDayScreen(
           <button type="button" class="raceday-view-btn" data-view="2d">2D</button>
           <button type="button" class="raceday-view-btn" data-view="3d">3D</button>
         </div>
+        <span class="raceday-view-note" hidden>3D needs a bigger screen</span>
         <button class="btn btn-primary" id="go-btn">Start Race</button>
       </div>
     </div>
@@ -178,11 +180,19 @@ export function mountRaceDayScreen(
    * sticks, so a career of twenty starts is not twenty re-picks.
    */
   const applyViewButtons = (): void => {
-    const current = stable.settings.raceView ?? '2d';
+    // A saved 3D preference survives moving to a phone, so what is ON is what
+    // the race will actually run in — not what was picked on the desktop.
+    const wanted = stable.settings.raceView ?? '2d';
+    const current = wanted === '3d' && !supports3d() ? '2d' : wanted;
     for (const btn of root.querySelectorAll<HTMLButtonElement>('.raceday-view-btn')) {
       btn.classList.toggle('is-active', btn.dataset.view === current);
       btn.setAttribute('aria-pressed', String(btn.dataset.view === current));
+      if (btn.dataset.view !== '3d') continue;
+      btn.disabled = !supports3d();
+      btn.title = supports3d() ? '' : 'Needs a larger window';
     }
+    const note = root.querySelector<HTMLElement>('.raceday-view-note');
+    if (note) note.hidden = supports3d();
   };
   for (const btn of root.querySelectorAll<HTMLButtonElement>('.raceday-view-btn')) {
     btn.addEventListener('click', () => {

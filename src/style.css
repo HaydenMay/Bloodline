@@ -8135,3 +8135,18 @@ span.archive-allele {
   background: var(--accent);
   color: var(--bg);
 }
+
+.raceday-view-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-right: 12px;
+}
+
+.raceday-view-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.raceday-view-btn:disabled:hover {
+  color: var(--muted);
+}

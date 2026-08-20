@@ -103,6 +103,36 @@ describe('race view choice', () => {
     second.teardown();
   });
 
+  it('offers 3D on a desktop window', () => {
+    const { host, teardown } = mount(career);
+    const btn = host.querySelector<HTMLButtonElement>('.raceday-view-btn[data-view="3d"]')!;
+    expect(btn.disabled).toBe(false);
+    expect(host.querySelector<HTMLElement>('.raceday-view-note')!.hidden).toBe(true);
+    teardown();
+  });
+
+  it('closes 3D off on a phone, and shows 2D as what will actually run', () => {
+    // A stable that picked 3D on a desktop and then opened on a phone. The
+    // saved preference is untouched — it is right again on the next desktop —
+    // but the button has to say what this device will do.
+    const first = mount(career);
+    first.host.querySelector<HTMLButtonElement>('.raceday-view-btn[data-view="3d"]')!.click();
+    first.teardown();
+
+    const width = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { value: 390, configurable: true });
+    try {
+      const { host, teardown } = mount({ ...career, stable: loadStable()! });
+      expect(host.querySelector<HTMLButtonElement>('.raceday-view-btn[data-view="3d"]')!.disabled).toBe(true);
+      expect(host.querySelector('.raceday-view-btn.is-active')?.getAttribute('data-view')).toBe('2d');
+      expect(host.querySelector<HTMLElement>('.raceday-view-note')!.hidden).toBe(false);
+      expect(loadStable()?.settings.raceView).toBe('3d');
+      teardown();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
+    }
+  });
+
   it('can be switched back to 2D', () => {
     const { host, teardown } = mount(career);
     host.querySelector<HTMLButtonElement>('.raceday-view-btn[data-view="3d"]')!.click();

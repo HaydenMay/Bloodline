@@ -79,18 +79,32 @@ export class RaceScene3d {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Raw linear output is what makes untonemapped WebGL read as plastic: the
+    // sunlit side of a white horse clips flat and the shadowed side crushes to
+    // one dead value, so nothing has any roll-off. ACES gives the highlights
+    // somewhere to go.
+    //
+    // The curve costs contrast, because the palette was authored against no
+    // curve at all. Paying that back with exposure only lifts the whole frame
+    // into haze — it comes back from the lighting instead: a harder sun and a
+    // dimmer sky, which is what a bright afternoon actually looks like.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
     // Behind the chrome canvas, which the screen keeps drawing the HUD on.
     // Layering lives in style.css, with the matching --overlay class.
     const canvas = this.renderer.domElement;
     canvas.className = 'race-canvas-3d';
     this.host.insertBefore(canvas, this.host.firstChild);
 
-    this.scene.add(new THREE.HemisphereLight('#bfe0ff', '#4a6b3a', 0.85));
+    this.scene.add(new THREE.HemisphereLight('#bfe0ff', '#4a6b3a', 0.55));
 
-    this.sun = new THREE.DirectionalLight('#fff4e0', 2.1);
+    this.sun = new THREE.DirectionalLight('#fff4e0', 3.1);
     this.sun.position.set(40, 70, 25);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(4096, 4096);
+    // The default bias leaves the horses' own shadows crawling on their legs.
+    this.sun.shadow.bias = -0.0006;
+    this.sun.shadow.normalBias = 0.02;
     // A tight frustum that follows the field keeps shadows crisp instead of
     // smearing one map across a mile of racecourse.
     const shadowCam = this.sun.shadow.camera;

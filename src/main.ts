@@ -83,6 +83,7 @@ import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
 import { DEFAULTS } from './data/colors.js';
+import { supports3d } from './render/raceView.js';
 import { updateDivisionProgression, updateAIDivisionProgression, populatePromotionRaceField, populateDemotionRaceField, finalizePromotion, finalizeDemotion } from './sim/division.js';
 
 /**
@@ -102,7 +103,11 @@ function raceCameraMode(): RaceCameraMode | undefined {
 function raceViewMode(): RaceViewMode {
   const override = new URLSearchParams(location.search).get('view');
   if (override === '3d' || override === '2d') return override;
-  return loadStable()?.settings.raceView ?? '2d';
+  const saved = loadStable()?.settings.raceView ?? '2d';
+  // The preference is saved per stable and the stable travels between devices,
+  // so the viewport gets the last word. Enforced here as well as on the Race
+  // Day button, because this is the call that actually builds the renderer.
+  return saved === '3d' && supports3d() ? '3d' : '2d';
 }
 
 

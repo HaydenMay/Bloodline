@@ -58,3 +58,27 @@ export function interpolateRunners(
     };
   });
 }
+
+/**
+ * The 3D view is desktop-only, by viewport rather than by user agent.
+ *
+ * Not a performance floor — the procedural field is a few thousand triangles
+ * and runs fine on a phone. It is a framing one, and it is what buys the
+ * headroom to make the 3D view better. A racecourse read side-on needs
+ * horizontal room: on a tall phone screen the camera has to choose between a
+ * fisheye lens and letting the field run off both edges, and it currently
+ * fudges that with MIN_FRAMING_ASPECT. The 2D view was built for that shape
+ * and stays the right answer there.
+ *
+ * Both dimensions are checked, so a phone held sideways — wide enough, far too
+ * short — does not slip through.
+ */
+export const MIN_3D_WIDTH = 900;
+export const MIN_3D_HEIGHT = 600;
+
+export function supports3d(
+  width: number = window.innerWidth,
+  height: number = window.innerHeight,
+): boolean {
+  return width >= MIN_3D_WIDTH && height >= MIN_3D_HEIGHT;
+}

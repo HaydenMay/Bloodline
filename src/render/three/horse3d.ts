@@ -67,12 +67,22 @@ const LEG_PHASE = {
   foreRight: 0.6,
 } as const;
 
+/**
+ * Smooth-shaded, and denser than a phone would want.
+ *
+ * The 3D view is gated to desktop viewports (see `supports3d`), and this is
+ * what that gate is for. Flat shading on a ten-segment sphere is a style, and
+ * a defensible one, but it is not the brief: a horse faceted like a gemstone
+ * cannot look real however correct its proportions are. A horse is about 1.5k
+ * triangles at these counts and there are eight of them — nothing, next to the
+ * turf and the crowd.
+ */
 function mat(color: string, roughness = 0.85): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, roughness, flatShading: true });
+  return new THREE.MeshStandardMaterial({ color, roughness });
 }
 
 function ball(material: THREE.Material, sx: number, sy: number, sz: number): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 7), material);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), material);
   mesh.scale.set(sx, sy, sz);
   return mesh;
 }
@@ -84,9 +94,124 @@ function limb(
   length: number,
 ): THREE.Mesh {
   return new THREE.Mesh(
-    new THREE.CylinderGeometry(topRadius, bottomRadius, length, 9),
+    new THREE.CylinderGeometry(topRadius, bottomRadius, length, 16),
     material,
   );
+}
+
+/**
+ * One continuous surface through a series of cross-sections down the spine.
+ *
+ * The torso used to be three overlapping ellipsoids — chest, barrel, rump.
+ * Faceted, that reads as a horse, because the facets hide the joins. Smooth,
+ * it reads as three balls in a row: the eye follows the shading and finds two
+ * seams where a horse has none.
+ *
+ * Each station is an ellipse: a top and a bottom, so the TOPLINE and the
+ * UNDERLINE are stated separately and can be shaped against each other. That
+ * is the whole point — a horse's back and its belly are not offsets of one
+ * centre line. The withers are the high point, the back dips behind them, the
+ * croup comes back up just short; underneath, the girth hangs lowest and the
+ * belly rises to the flank.
+ */
+interface Station {
+  /** Along the spine. Positive is toward the nose. */
+  z: number;
+  top: number;
+  bottom: number;
+  halfWidth: number;
+}
+
+/** Catmull-Rom through the control values, with the ends held. */
+function spline(vals: number[], t: number): number {
+  const n = vals.length - 1;
+  const i = Math.min(n - 1, Math.floor(t * n));
+  const f = t * n - i;
+  const p = (k: number): number => vals[Math.min(n, Math.max(0, k))]!;
+  const [a, b, c, d] = [p(i - 1), p(i), p(i + 1), p(i + 2)];
+  return (
+    0.5 *
+    (2 * b +
+      (c - a) * f +
+      (2 * a - 5 * b + 4 * c - d) * f * f +
+      (-a + 3 * b - 3 * c + d) * f * f * f)
+  );
+}
+
+interface LoftOptions {
+  radial?: number;
+  rings?: number;
+  /** Half-angle about the spine. Less than PI leaves an open strip, no caps. */
+  arc?: number;
+  /** Widen every ring, for a shell that sits ON the surface it was cut from. */
+  inflate?: number;
+}
+
+function loft(material: THREE.Material, control: Station[], opts: LoftOptions = {}): THREE.Mesh {
+  const { radial = 22, rings = 46, arc = Math.PI, inflate = 1 } = opts;
+  const closed = arc >= Math.PI;
+  const perRing = closed ? radial : radial + 1;
+  // Straight runs between control stations leave the topline creased at every
+  // one of them. Splining through instead means the stations say what shape the
+  // horse is and the curve does the joining, which is the difference between a
+  // back and a series of ramps.
+  const zs = control.map((c) => c.z);
+  const tops = control.map((c) => c.top);
+  const bots = control.map((c) => c.bottom);
+  const ws = control.map((c) => c.halfWidth);
+  const stations: Station[] = [];
+  for (let r = 0; r < rings; r++) {
+    const t = r / (rings - 1);
+    stations.push({
+      z: spline(zs, t),
+      top: spline(tops, t),
+      bottom: spline(bots, t),
+      halfWidth: Math.max(0, spline(ws, t)),
+    });
+  }
+  const pos: number[] = [];
+  const index: number[] = [];
+  for (const s of stations) {
+    const cy = (s.top + s.bottom) / 2;
+    const ry = (s.top - s.bottom) / 2;
+    for (let i = 0; i < perRing; i++) {
+      const a = closed ? (i / radial) * TAU : -arc + (i / radial) * arc * 2;
+      // A rib cage is not a tube. It is widest low through the barrel and
+      // draws in to a ridge over the spine — which is what gives a horse a
+      // topline you can see from behind instead of a rolling-pin back.
+      const crest = Math.max(0, Math.cos(a));
+      const w = s.halfWidth * (1 - 0.34 * crest ** 1.4) * inflate;
+      pos.push(Math.sin(a) * w, cy + Math.cos(a) * ry, s.z);
+    }
+  }
+  for (let k = 0; k < stations.length - 1; k++) {
+    for (let i = 0; i < (closed ? radial : radial); i++) {
+      const a = k * perRing + i;
+      const b = k * perRing + ((i + 1) % perRing);
+      index.push(a, b, a + perRing, b, b + perRing, a + perRing);
+    }
+  }
+  // Flat caps at each end. Both sit inside something else — the tail dock
+  // behind, the neck in front — so they are never actually seen.
+  if (closed) {
+    const capStart = pos.length / 3;
+    for (const [n, s] of [stations[0]!, stations[stations.length - 1]!].entries()) {
+      pos.push(0, (s.top + s.bottom) / 2, s.z);
+      const centre = capStart + n;
+      const ring = n === 0 ? 0 : (stations.length - 1) * perRing;
+      for (let i = 0; i < radial; i++) {
+        const a = ring + i;
+        const b = ring + ((i + 1) % perRing);
+        if (n === 0) index.push(centre, a, b);
+        else index.push(centre, b, a);
+      }
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(index);
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, material);
 }
 
 interface Leg {
@@ -137,16 +262,36 @@ export class Horse3d {
     // it an uphill spine, which is a cow. Underneath, the girth hangs lowest
     // at the chest and rises toward the flank: the tuck-up.
     const halfWidth = BARREL_WIDTH / 2;
-    // The chest sets both ends of the vertical budget: its floor is the girth,
-    // resting exactly on the elbow, and its ceiling is the withers. Everything
-    // behind it is placed against those two lines rather than against itself.
-    const chest = ball(hide, halfWidth, DEPTH * 0.5, TRUNK * 0.213);
-    chest.position.set(0, SHOULDER_Y + DEPTH * 0.5, TRUNK * 0.287);
-    const barrel = ball(hide, halfWidth * 0.96, DEPTH * 0.462, TRUNK * 0.314);
-    barrel.position.set(0, SHOULDER_Y + DEPTH * 0.515, -TRUNK * 0.006);
-    const rump = ball(hide, halfWidth, DEPTH * 0.443, TRUNK * 0.24);
-    rump.position.set(0, SHOULDER_Y + DEPTH * 0.553, -TRUNK * 0.26);
-    this.body.add(chest, barrel, rump);
+    // z runs -TRUNK/2 at the point of buttock to +TRUNK/2 at the point of
+    // shoulder; heights are above SHOULDER_Y, which is the elbow and so the
+    // floor of the body. The withers are the one station at full DEPTH.
+    const at = (
+      z: number,
+      top: number,
+      bottom: number,
+      w: number,
+    ): Station => ({
+      z: TRUNK * z,
+      top: SHOULDER_Y + DEPTH * top,
+      bottom: SHOULDER_Y + DEPTH * bottom,
+      halfWidth: halfWidth * w,
+    });
+    const TORSO: Station[] = [
+      at(-0.5, 0.72, 0.46, 0.2),
+      at(-0.455, 0.87, 0.3, 0.58),
+      at(-0.4, 0.95, 0.2, 0.86),
+      at(-0.32, 0.99, 0.15, 0.97),
+      at(-0.24, 0.995, 0.13, 1.0),
+      at(-0.14, 0.97, 0.115, 0.96),
+      at(-0.02, 0.955, 0.055, 0.97),
+      at(0.14, 0.965, 0.005, 0.96),
+      at(0.27, 1.0, 0.01, 0.88),
+      at(0.37, 0.975, 0.09, 0.76),
+      at(0.45, 0.9, 0.25, 0.54),
+      at(0.5, 0.79, 0.44, 0.26),
+    ];
+    const torso = loft(hide, TORSO);
+    this.body.add(torso);
 
     // Neck: short, thick at the base, and raked well forward. An upright neck
     // reads as a llama; the reference sheet carries it barely above horizontal.
@@ -287,8 +432,16 @@ export class Horse3d {
     clothTop.position.set(0, SHOULDER_Y + DEPTH * 0.937, 0.03);
     this.body.add(clothTop);
 
-    const cloth = ball(silksMat, halfWidth * 1.07, DEPTH * 0.27, TRUNK * 0.155);
-    cloth.position.set(0, SHOULDER_Y + DEPTH * 0.62, 0.02);
+    // Cut from the torso's own cross-sections and inflated a hair, so it lies
+    // ON the horse instead of near it. A shape with its own idea of the barrel
+    // — a box, a lens — floats or sinks depending where you put it, because
+    // the barrel changes width along its whole length and the shape does not.
+    // An open strip has no inside, so it is drawn from both sides — otherwise
+    // whichever way the winding came out, one flank of the horse is bare.
+    const clothMat = mat(silks.primary, 0.7);
+    clothMat.side = THREE.DoubleSide;
+    this.disposables.push(clothMat);
+    const cloth = loft(clothMat, TORSO.slice(5, 9), { arc: 2.0, inflate: 1.05, rings: 22 });
     this.body.add(cloth);
 
     const saddle = ball(leather, 0.16, 0.06, 0.21);
