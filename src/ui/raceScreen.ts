@@ -24,6 +24,7 @@ import {
   isLandscape,
   loadRaceBackgroundImages,
   metreToScreen,
+  trackTopY,
   type Camera,
 } from "../render/track.js";
 import {
@@ -510,9 +511,19 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // and on a short-and-landscape canvas it can shrink past what lane 0's
     // own sprite needs: found in play driving 812x375 after the desktop fix
     // — the whole pack rendered with its heads clipped off the top of the
-    // canvas. `baseY` can never be pushed below this floor, whatever the
-    // gap fraction above computes.
-    const baseY = Math.max(baseYFromGap, baseScale * 132);
+    // canvas.
+    //
+    // A second floor, `trackTopY`: the gap shrinking to chase more spread
+    // also let `baseY` land *above* where `drawTurf` actually starts the
+    // grass — found in play again, immediately, as horses floating in the
+    // rail/crowd strip instead of standing on the running surface. `baseY`
+    // can never be pushed above either floor, whatever the gap fraction
+    // above computes.
+    const baseY = Math.max(
+      baseYFromGap,
+      baseScale * 132,
+      trackTopY(width, height),
+    );
     // The charges bar (drawHud, below) is drawn on top of the horses, near
     // the bottom of the canvas. A fixed height-relative spacing pushed the
     // deepest lane's feet behind it — found in play: the nearest horse's

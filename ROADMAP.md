@@ -1319,7 +1319,14 @@ the new floor) and 390×844 portrait (untouched): the pack now reads as a clearl
 lanes at every landscape size, mobile through desktop, with real gaps as they open rather than a
 horizontal smear.
 
-### Race screen: a trailing horse can render straddling the canvas edge
+**Corrected — found in play immediately after, a third time.** "Is the issue with them floating in the
+air fixed?" It wasn't: shrinking the gap to buy vertical spread pulled `baseY` up close enough to the
+horizon that it landed *above* `drawTurf`'s own `trackTop` (`horizon + height * 0.09`) on desktop and
+mobile landscape both — lane 0 was standing in the rail/crowd strip above the grass rather than on the
+running surface, reading as floating. `track.ts` now exports `trackTopY(width, height)`, built on the
+same `horizonY` rather than a second copy of the 0.09 offset, and `baseY` takes the max of the gap
+fraction, the sprite-headroom floor above, and this one — it can never land above the turf, whatever the
+other two compute. Re-verified at the same four sizes: every lane now stands on grass, headroom intact.
 
 **Found in play (this investigation)**, minor — while the leader pulls away, a trailing horse can be
 drawn straddling `x = 0`, mid-sprite, rather than fully in or out of frame. `raceScreen.ts:441`

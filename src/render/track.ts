@@ -74,6 +74,20 @@ export function horizonY(width: number, height: number): number {
   return height * fraction;
 }
 
+/**
+ * Where the running surface itself starts — `drawTurf`'s own `trackTop`,
+ * exported so a runner's y can be checked against it instead of just
+ * guessed at from a gap fraction. `raceScreen.ts`'s lane band shrinking to
+ * chase more vertical spread (found in play: "spread out much more on
+ * desktop landscape") pulled `baseY` up close enough to the horizon that it
+ * landed *above* this line on several screens — horses drawn standing in
+ * the rail/crowd strip above the grass, reading as floating. The lane band
+ * has to stay below this, not just above the horizon.
+ */
+export function trackTopY(width: number, height: number): number {
+  return horizonY(width, height) + height * 0.09;
+}
+
 export function metreToScreen(metres: number, cam: Camera): number {
   return (metres - cam.scrollMetres) * cam.pixelsPerMetre;
 }
