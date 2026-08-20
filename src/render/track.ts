@@ -24,22 +24,36 @@ export interface Camera {
 const MARKER_SPACING = 200;
 
 /**
- * How steeply the camera looks down, from 0 (as steep as it gets) to 1
- * (today's angle, unchanged). The single source both the backdrop's horizon
- * and the race screen's lane math key off, so they can't drift apart the
- * way `visibleMetres` and the lane geometry once did.
+ * Whether the canvas is wide enough to be worth a lower camera — width at
+ * least matching height. Portrait phones (tall, narrow) are the one shape
+ * this leaves alone; every other shape the game runs at is this way.
+ */
+export function isLandscape(width: number, height: number): boolean {
+  return width >= height;
+}
+
+/**
+ * How steeply the camera looks down within landscape, from 0 (as steep as it
+ * gets) to 1 (the tallest landscape canvases still get). The single source
+ * both the backdrop's horizon and the race screen's lane math key off, so
+ * they can't drift apart the way `visibleMetres` and the lane geometry once
+ * did. Only landscape reads this — portrait keeps its own flat framing,
+ * `HORIZON_FRACTION_PORTRAIT` below, at every height.
  *
- * A flat camera angle read fine on anything tall enough to leave hundreds of
- * pixels of ground below the horizon, but on a short canvas — a landscape
- * phone above all, plenty of width, very little height — that same angle
- * left almost no vertical room for the eight lanes to spread into below it.
- * Found in play: "the horses stack but not flat," a request for a camera
- * that looks down on the group more steeply once height is scarce, trading
- * sky for ground rather than shrinking the lanes further. Tilts continuously
- * by height rather than switching on an orientation flag, so it also helps a
- * squat split-screen window or a foldable's cover display without a new
- * case. Unchanged at/above REFERENCE_HEIGHT — desktop and tablets keep
- * today's framing exactly.
+ * First landed height-gated only (steeper below `REFERENCE_HEIGHT`, today's
+ * 0.44 unchanged above it), to fix a landscape phone — plenty of width, very
+ * little height — where a flat 44% sky left almost no vertical room for the
+ * eight lanes to spread into. **Found in play again immediately after: "the
+ * horses need to be spread out much more on desktop landscape... they need
+ * to have space between them on the y axis."** Desktop is landscape too and
+ * tall enough that the old gate left it at the unchanged 0.44 — the original
+ * "horses on desktop don't fit in the lane... a lot of screen real estate at
+ * the top isn't being used" complaint this whole file of entries opened
+ * with, still true for any landscape canvas tall enough to clear
+ * `REFERENCE_HEIGHT`. So the *ceiling* itself drops for every landscape
+ * shape (`HORIZON_FRACTION_LANDSCAPE_TALL` well below the old 0.44), and the
+ * height-based tilt below that now layers a short landscape phone even
+ * steeper on top of the new, already-lower ceiling.
  */
 const REFERENCE_HEIGHT = 650;
 
@@ -47,13 +61,16 @@ export function cameraTilt(height: number): number {
   return Math.min(1, Math.max(0, height / REFERENCE_HEIGHT));
 }
 
-const HORIZON_FRACTION_TALL = 0.44;
-const HORIZON_FRACTION_SHORT = 0.16;
+const HORIZON_FRACTION_PORTRAIT = 0.44;
+const HORIZON_FRACTION_LANDSCAPE_TALL = 0.25;
+const HORIZON_FRACTION_LANDSCAPE_SHORT = 0.16;
 
-export function horizonY(height: number): number {
+export function horizonY(width: number, height: number): number {
+  if (!isLandscape(width, height)) return height * HORIZON_FRACTION_PORTRAIT;
   const t = cameraTilt(height);
   const fraction =
-    HORIZON_FRACTION_SHORT + (HORIZON_FRACTION_TALL - HORIZON_FRACTION_SHORT) * t;
+    HORIZON_FRACTION_LANDSCAPE_SHORT +
+    (HORIZON_FRACTION_LANDSCAPE_TALL - HORIZON_FRACTION_LANDSCAPE_SHORT) * t;
   return height * fraction;
 }
 
@@ -180,7 +197,7 @@ export function drawBackdrop(
   cam: Camera,
   hype: number,
 ): void {
-  const horizon = horizonY(height);
+  const horizon = horizonY(width, height);
   // Where pure sky ends and the crowd stand begins. Found in play once the
   // real art was in: the crowd was squeezed into a fixed 58px sliver at the
   // tail of the sky region regardless of screen size, reading as "way too
@@ -376,11 +393,12 @@ function drawRail(
  */
 export function drawDistanceMarkers(
   ctx: CanvasRenderingContext2D,
+  width: number,
   height: number,
   cam: Camera,
   totalMetres: number,
 ): void {
-  const horizon = horizonY(height);
+  const horizon = horizonY(width, height);
   const markerY = horizon + 10;
 
   // Count back from the wire so the winning post lands exactly on the line,

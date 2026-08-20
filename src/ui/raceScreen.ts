@@ -21,6 +21,7 @@ import {
   drawDistanceMarkers,
   drawMinimap,
   horizonY,
+  isLandscape,
   loadRaceBackgroundImages,
   metreToScreen,
   type Camera,
@@ -127,40 +128,6 @@ const PULL_UP_WALK = 1.74;
 const HORSE_SCALE = 1.55;
 
 /**
- * Horizontal fan-out per lane step, decided in ROADMAP.md's "bunched field
- * renders as one illegible blob" entry.
- *
- * At the start, before real gaps exist, every runner sits at nearly
- * identical race-distance x with no separation but a ~1% size difference
- * per lane — eight horses render as one stacked column. This fans lanes
- * out symmetrically around the true x instead, so the pack reads as eight
- * runners in parallel lanes from the gate.
- *
- * Zigzag, not a ramp: an earlier version offset each lane by
- * `(lane - middle) * SPREAD`, a straight line from furthest-left to
- * furthest-right. Lane 7 is also the nearest/biggest lane (`laneScale`
- * below), so that combination always drew the same lane both biggest AND
- * furthest along the track — reads as "lane 7 starts ahead," a fairness
- * complaint (found in play), even though `sim/race/engine.ts` shuffles
- * lanes per race and the offset never touches race distance. Alternating
- * the sign breaks the correlation: the near/big lane is no longer always
- * the one drawn furthest right.
- *
- * Scaled by `baseScale` rather than a flat pixel count, found in the same
- * report: a flat offset is a bigger fraction of a smaller horse, so it
- * read as more exaggerated on a narrower, more-zoomed-out mobile-landscape
- * canvas than on desktop for the same lane. Tying it to the horse's own
- * drawn size keeps the fan-out proportionate everywhere.
- */
-const LANE_X_SPREAD_FACTOR = 22;
-
-/** Signed, symmetric zigzag magnitude for `laneXOffset` — see above. */
-function laneXZigzag(lane: number): number {
-  const sign = lane % 2 === 0 ? 1 : -1;
-  return sign * Math.ceil((lane + 1) / 2);
-}
-
-/**
  * How far from the left edge the player sits, as a fraction of the
  * screen — the camera's horizontal anchor. Decided in ROADMAP.md's "field
  * spread wastes most of a wide canvas" entry.
@@ -259,7 +226,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const spawnFlash = (): void => {
     // Random position in crowd area (bleachers above horizon)
     const { width, height } = surface;
-    const horizon = horizonY(height);
+    const horizon = horizonY(width, height);
     const x = Math.random() * width;
     // Crowd is positioned from horizon-58 to horizon, spawn flashes above them
     const y = (horizon - 58) + Math.random() * 58; // Within crowd stand area
@@ -480,7 +447,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     cam.scrollMetres += (target - cam.scrollMetres) * 0.1;
 
     drawBackdrop(ctx, width, height, cam, config.hype);
-    drawDistanceMarkers(ctx, height, cam, totalMetres);
+    drawDistanceMarkers(ctx, width, height, cam, totalMetres);
 
     // Spawn camera flashes from the crowd
     // Slightly higher spawn rate on mobile for better visibility
@@ -506,17 +473,46 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // Lane 0 is the rail (furthest from camera), so higher lanes draw nearer
     // and larger. Sorting by lane keeps the overlap correct.
     const isSmallScreen = width < 600;
+    const landscape = isLandscape(width, height);
     // The gap between the horizon and where lane 0 starts — the near-rail
-    // strip of track before any runner appears. At today's camera angle
-    // (tall screens) this reproduces the old flat 0.58/0.60 exactly: it's
-    // `horizonY` (0.44) plus a 0.14/0.16 gap. On a short canvas the gap
-    // shrinks too, using the same `cameraTilt` the horizon itself tilts on,
-    // so the room `horizonY` reclaims from the sky actually reaches the
-    // lanes instead of being spent widening this decorative strip instead.
+    // strip of track before any runner appears. Portrait keeps the original
+    // flat 0.58/0.60 (horizonY's 0.44 plus a 0.14/0.16 gap) at every height,
+    // since portrait was never the complaint.
+    //
+    // Landscape — every other shape the game runs at, mobile through desktop
+    // — uses a much smaller gap on the same `cameraTilt` curve `horizonY`
+    // itself tilts on, so the ground `horizonY` reclaims from the sky
+    // reaches the lanes instead of being spent re-widening this strip.
+    // Found in play, twice: first a landscape phone read as "the horses
+    // stack but not flat" (fixed by tilting `horizonY` on short canvases),
+    // then immediately "the horses need to be spread out much more on
+    // desktop landscape... they need space between them on the y axis" —
+    // desktop clears `REFERENCE_HEIGHT`, so the first fix left it at the
+    // old, tall-screen framing untouched. `horizonY` now drops its ceiling
+    // for every landscape shape, not just short ones, and this gap follows
+    // it down, so desktop and tablets get the same room mobile-landscape
+    // got, not just screens short enough to trip a height gate.
     const tilt = cameraTilt(height);
-    const gapTall = isSmallScreen ? 0.14 : 0.16;
-    const gapShort = isSmallScreen ? 0.05 : 0.06;
-    const baseY = horizonY(height) + height * (gapShort + (gapTall - gapShort) * tilt);
+    // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
+    // Computed here, ahead of `baseY`, because `baseY` needs it below.
+    const baseScale =
+      (HORSE_METRES * cam.pixelsPerMetre * HORSE_SCALE) / RIG_UNITS;
+    const baseYFromGap = landscape
+      ? horizonY(width, height) + height * (0.03 + 0.02 * tilt)
+      : horizonY(width, height) + height * (isSmallScreen ? 0.14 : 0.16);
+    // The rig draws well above its own (x, y) anchor — head, ears and mane
+    // reach well above the ground point drawHorse is called with; 132 rig
+    // units is that headroom measured empirically (screenshotting the
+    // clipping and walking the constant up until it stopped), not derived
+    // from the rig's own coordinates, which are only known up to whatever a
+    // chain of rotations (neck pitch, ear tilt, gait bob) does to them. The
+    // gap above shrinks that headroom on landscape's much steeper camera,
+    // and on a short-and-landscape canvas it can shrink past what lane 0's
+    // own sprite needs: found in play driving 812x375 after the desktop fix
+    // — the whole pack rendered with its heads clipped off the top of the
+    // canvas. `baseY` can never be pushed below this floor, whatever the
+    // gap fraction above computes.
+    const baseY = Math.max(baseYFromGap, baseScale * 132);
     // The charges bar (drawHud, below) is drawn on top of the horses, near
     // the bottom of the canvas. A fixed height-relative spacing pushed the
     // deepest lane's feet behind it — found in play: the nearest horse's
@@ -527,13 +523,15 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const reservedBottom = 96;
     const maxLaneY = height - reservedBottom;
     const laneSpacing = Math.min(
-      isSmallScreen ? height * 0.0525 : height * 0.055,
+      // The ceiling only ever binds in portrait, where the band between
+      // baseY and the charges bar is intentionally generous next to how
+      // little of it 8 lanes need. Landscape's much bigger band (above) is
+      // the real, honest constraint, so its ceiling is set high enough to
+      // never be the one that bites.
+      landscape ? height * 0.14 : isSmallScreen ? height * 0.0525 : height * 0.055,
       (maxLaneY - baseY) / (LANE_COUNT - 1),
     );
     const laneY = (lane: number): number => baseY + lane * laneSpacing;
-    // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
-    const baseScale =
-      (HORSE_METRES * cam.pixelsPerMetre * HORSE_SCALE) / RIG_UNITS;
     // Flattened per ROADMAP.md's decision: the backdrop art is flat pixel
     // art with no depth cues, so horses read as same-size runners in
     // parallel lanes rather than leaning into an over-the-shoulder depth
@@ -541,14 +539,16 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // recentred on true scale rather than skewed below it.
     const laneScale = (lane: number): number =>
       baseScale * (0.97 + lane * 0.01);
-    const laneXOffset = (lane: number): number =>
-      laneXZigzag(lane) * baseScale * LANE_X_SPREAD_FACTOR;
+    // No x-offset. A version of this fanned lanes out horizontally too —
+    // fixed the original "one stacked column" blob, but the player's next
+    // note was explicit: separation belongs on the y axis lanes already
+    // stand for, not smeared sideways across the axis that reads as race
+    // position. `laneY`'s now-much-bigger spacing (above) does the job the
+    // x-offset was drafted in to help with.
 
     for (const r of [...runners].sort((a, b) => a.lane - b.lane)) {
       const pu0 = pullUp.get(r.id);
-      const x =
-        metreToScreen(r.distance + (pu0?.extra ?? 0), cam) +
-        laneXOffset(r.lane);
+      const x = metreToScreen(r.distance + (pu0?.extra ?? 0), cam);
       if (x < -140 || x > width + 140) continue;
 
       const y = laneY(r.lane);
