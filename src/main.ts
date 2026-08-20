@@ -5,7 +5,12 @@ import { generateHorse, generateWorld } from './sim/horse.js';
 import { FIELD_SIZE, RUNNING_STYLES } from './data/index.js';
 import type { RunnerSnapshot } from './sim/race/engine.js';
 import { attachInfoBox } from './ui/infoBox.js';
-import { mountRaceScreen } from './ui/raceScreen.js';
+import {
+  mountRaceScreen,
+  type RaceCameraMode,
+  type RaceViewMode,
+} from './ui/raceScreen.js';
+
 import { mountRaceIntro, type RaceIntroConfig } from './ui/raceIntro.js';
 import { mountHorsePreview } from './ui/horsePreview.js';
 import { mountSilksDemo } from './ui/silksDemo.js';
@@ -79,6 +84,27 @@ import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
 import { DEFAULTS } from './data/colors.js';
 import { updateDivisionProgression, updateAIDivisionProgression, populatePromotionRaceField, populateDemotionRaceField, finalizePromotion, finalizeDemotion } from './sim/division.js';
+
+/**
+ * Which way to draw the race.
+ *
+ * The Race Day screen writes the choice to settings before starting a race, so
+ * this reads it back. `?view=3d` overrides it, for driving the renderer
+ * directly without clicking through a whole career first.
+ */
+function raceCameraMode(): RaceCameraMode | undefined {
+  const cam = new URLSearchParams(location.search).get('cam');
+  return cam === 'chase' || cam === 'aerial' || cam === 'head-on' || cam === 'side-on'
+    ? cam
+    : undefined;
+}
+
+function raceViewMode(): RaceViewMode {
+  const override = new URLSearchParams(location.search).get('view');
+  if (override === '3d' || override === '2d') return override;
+  return loadStable()?.settings.raceView ?? '2d';
+}
+
 
 /**
  * Phase 2 harness screen.
@@ -257,6 +283,8 @@ function startRace(seed: string): void {
       playerSilks,
       config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
       autopilotToggle,
+      raceView: raceViewMode(),
+      cameraMode: raceCameraMode(),
       autoStartCountdown: opts?.autoStartCountdown ?? false,
       onRaceStart: () => {
         // Lock autopilot once race starts — can't change during race
@@ -2055,6 +2083,8 @@ function startRaceWithHorse(
         field,
         playerHorseId: player.id,
         playerSilks: career.playerSilks,
+        raceView: raceViewMode(),
+        cameraMode: raceCameraMode(),
         config: {
           seed: 'race-' + Date.now(),
           metres: raceDistance,

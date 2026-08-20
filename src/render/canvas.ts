@@ -15,12 +15,25 @@ export interface Surface {
   destroy(): void;
 }
 
-export function createSurface(host: HTMLElement): Surface {
+export interface SurfaceOptions {
+  /**
+   * Whether the surface may be see-through.
+   *
+   * Opaque by default — the 2D view fills every pixel with its backdrop, and
+   * telling the browser so is free performance. The 3D view draws the world on
+   * its own WebGL canvas underneath and leaves this one carrying nothing but
+   * chrome, which only composites if there is transparency to composite
+   * through.
+   */
+  alpha?: boolean;
+}
+
+export function createSurface(host: HTMLElement, options: SurfaceOptions = {}): Surface {
   const canvas = document.createElement('canvas');
   canvas.className = 'race-canvas';
   host.appendChild(canvas);
 
-  const ctx = canvas.getContext('2d', { alpha: false });
+  const ctx = canvas.getContext('2d', { alpha: options.alpha ?? false });
   if (!ctx) throw new Error('Canvas 2D is unavailable');
 
   const surface: Surface = {

@@ -32,6 +32,7 @@
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.1.2",
     "@types/pngjs": "^6.0.5",
+    "@types/three": "^0.169.0",
     "eslint": "^10.8.0",
     "jsdom": "^30.0.1",
     "pngjs": "^7.0.0",
@@ -42,6 +43,7 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.3",
+    "three": "^0.169.0"
   }
 }

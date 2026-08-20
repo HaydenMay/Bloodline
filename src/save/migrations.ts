@@ -30,6 +30,14 @@ const migrations: Record<number, Migration> = {
     delete next.reputation;
     return next;
   },
+  /** The 2D/3D race view choice, added with the Three.js renderer. */
+  3: (data) => ({
+    ...data,
+    settings: {
+      ...(data.settings as Record<string, unknown>),
+      raceView: '2d',
+    },
+  }),
 };
 
 export class SaveTooNewError extends Error {

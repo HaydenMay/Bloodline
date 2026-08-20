@@ -15,7 +15,7 @@
 import { DEFAULTS } from '../data/colors.js';
 
 /** Bump this whenever the shape of StableSave changes. */
-export const CURRENT_VERSION = 3;
+export const CURRENT_VERSION = 4;
 
 export const SLOT_COUNT = 3;
 
@@ -64,6 +64,12 @@ export interface SaveSettings {
   sfxVolume: number;
   textScale: number;
   autopilotEnabled: boolean;
+  /**
+   * Which way the race is drawn. Picked per race on the Race Day screen; this
+   * is the sticky default, so you are not re-choosing it before all twenty
+   * starts of a career.
+   */
+  raceView: '2d' | '3d';
 }
 
 export const defaultSettings = (): SaveSettings => ({
@@ -76,6 +82,7 @@ export const defaultSettings = (): SaveSettings => ({
   sfxVolume: 0.9,
   textScale: 1,
   autopilotEnabled: false,
+  raceView: '2d',
 });
 
 export const createStable = (stableName: string, seed: string): StableSave => ({

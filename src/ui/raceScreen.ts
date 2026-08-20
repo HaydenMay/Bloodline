@@ -14,6 +14,7 @@ import {
 } from "../render/palette.js";
 import { drawMinimap } from "../render/track.js";
 import { createRaceView2d } from "../render/raceView2d.js";
+import { createRaceView3d } from "../render/raceView3d.js";
 import { interpolateRunners, type RaceView } from "../render/raceView.js";
 import {
   createRace,
@@ -66,7 +67,15 @@ export interface RaceScreenOptions {
   onRaceStart?: () => void;
   onFinish?: (placings: RunnerSnapshot[]) => void;
   autoStartCountdown?: boolean;
+  /** Which way to draw the race. Chosen per race on the Race Day screen. */
+  raceView?: RaceViewMode;
+  /** 3D only — which camera to open on. */
+  cameraMode?: RaceCameraMode | undefined;
 }
+
+export type RaceCameraMode = 'side-on' | 'chase' | 'aerial' | 'head-on';
+
+export type RaceViewMode = "2d" | "3d";
 
 export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const {
@@ -82,10 +91,17 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     autoStartCountdown,
   } = opts;
 
+  const viewMode: RaceViewMode = opts.raceView ?? "2d";
+
   // Read autopilot state from toggle element when race starts, not when button clicked
   const getAutopilot = (): boolean => autopilotToggle?.checked ?? false;
 
-  const surface = createSurface(host);
+  // In 3D the world is drawn on a WebGL canvas underneath, and this surface
+  // carries nothing but chrome — which only composites if it can be seen
+  // through. In 2D it is filled edge to edge by the backdrop, so it stays
+  // opaque and the browser gets to skip the blend.
+  const surface = createSurface(host, { alpha: viewMode === "3d" });
+  if (viewMode === "3d") surface.canvas.classList.add("race-canvas--overlay");
   const input: PlayerInput = {
     takingBack: false,
     kickPending: false,
@@ -134,15 +150,27 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   // The world is drawn by a view. Everything below this line is the screen's
   // own business — loop, chrome, input — and does not care which view it is.
-  const view: RaceView = createRaceView2d({
-    surface,
-    playerHorseId,
-    silksFor,
-    coatOf,
-    totalMetres,
-    hype: config.hype,
-    horseIds: field.map((h) => h.id),
-  });
+  const view: RaceView =
+    viewMode === "3d"
+      ? createRaceView3d({
+          host,
+          playerHorseId,
+          silksFor,
+          coatOf,
+          totalMetres,
+          lanes: new Map(race.snapshot().runners.map((r) => [r.id, r.lane])),
+          horseIds: field.map((h) => h.id),
+          cameraMode: opts.cameraMode,
+        })
+      : createRaceView2d({
+          surface,
+          playerHorseId,
+          silksFor,
+          coatOf,
+          totalMetres,
+          hype: config.hype,
+          horseIds: field.map((h) => h.id),
+        });
 
   let prev: RaceSnapshot = race.snapshot();
   let curr: RaceSnapshot = prev;
@@ -249,6 +277,10 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // each lerping their own.
     const runners = interpolateRunners(prev, curr, alpha);
     const player = runners.find((r) => r.id === playerHorseId)!;
+
+    // The 2D view repaints every pixel; the 3D one leaves this canvas for the
+    // chrome alone, so last frame's HUD has to be wiped first.
+    if (viewMode === "3d") ctx.clearRect(0, 0, width, height);
 
     view.render({ runners, player, progress: curr.progress, dt });
 

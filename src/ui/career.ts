@@ -97,6 +97,15 @@ export interface RivalDossier {
 
 export interface SaveSettings {
   autopilotEnabled: boolean;
+  /**
+   * Which way the race is drawn — chosen per race on the Race Day screen, and
+   * kept here so it sticks rather than being re-picked before all twenty
+   * starts of a career.
+   *
+   * Optional so a stable saved before the 3D view existed still loads; absent
+   * reads as '2d', which is what those saves were playing anyway.
+   */
+  raceView?: '2d' | '3d';
 }
 
 /**
