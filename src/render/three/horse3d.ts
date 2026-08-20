@@ -3,26 +3,50 @@ import type { Coat, Silks } from '../palette.js';
 
 /**
  * A horse built from primitives and animated procedurally — no rigged asset,
- * no keyframes. Proportions are taken from `src/assets/racer.png`, the 24-frame
- * gallop reference: a thoroughbred is long in the leg (ground to elbow is over
- * half its height at the withers), deep through the girth, and at racing pace
- * carries its neck low and stretched rather than upright.
+ * no keyframes.
+ *
+ * Every dimension below is derived from WITHER_HEIGHT by a conformation ratio,
+ * rather than being a number that looked right in a screenshot. Judging
+ * proportion by eye is what produced the deer and the cow this model has
+ * already been through: each fix was plausible on its own and the whole drifted
+ * anyway, because nothing tied the parts to each other.
+ *
+ * The ratios are standard thoroughbred conformation. The two that do the most
+ * work are DEPTH and FORELEG, which sum to 1: the bottom of the girth sits at
+ * the elbow, so a horse is exactly half body and half leg. Get that split wrong
+ * in either direction and no amount of detail rescues the silhouette.
  *
  * Metres throughout, matching the simulation. There is no conversion boundary
  * anywhere in the game (REBUILD.md §3).
  */
+const WITHER_HEIGHT = 1.6;
+/** Girth bottom to withers. Half the horse. */
+const DEPTH = 0.48 * WITHER_HEIGHT;
+/** Ground to elbow. The other half. */
+const FORELEG = 0.52 * WITHER_HEIGHT;
+/** Point of shoulder to point of buttock. A horse is very nearly square. */
+const TRUNK = 1.02 * WITHER_HEIGHT;
+/** Across the barrel at its widest. */
+const BARREL_WIDTH = 0.3 * WITHER_HEIGHT;
 
 /**
- * Leg segments. A thoroughbred stands about 1.6 m at the withers with the
- * elbow a shade under a metre off the ground — legs are roughly 58% of its
- * height, not the two-thirds a first pass tends to draw. Longer than this and
- * the silhouette reads as a deer.
+ * The elbow, and so the floor of the body. Stated, not derived.
+ *
+ * It used to be the sum of the leg segments, on the reasoning that this
+ * guaranteed the hooves met the ground. It did not: below the cannon come a
+ * fetlock, a pastern and a hoof, each placed by its own offset, and those
+ * offsets were never in the sum — so the horses stood 6 cm into the turf and
+ * every height measured off SHOULDER_Y was quietly short. The segments are now
+ * fractions OF this height and are checked to close.
  */
-const UPPER_LEG = 0.47;
-const LOWER_LEG = 0.41;
-const HOOF = 0.06;
-/** Derived, so the hooves always land exactly on the ground plane. */
-const SHOULDER_Y = UPPER_LEG + LOWER_LEG + HOOF;
+const SHOULDER_Y = FORELEG;
+/** Fetlock centre down to hoof centre. */
+const PASTERN_DROP = FORELEG * 0.09;
+const HOOF = FORELEG * 0.075;
+/** What is left for the two long bones, split as forearm : cannon. */
+const CANNON_AND_FOREARM = FORELEG - PASTERN_DROP - HOOF / 2;
+const UPPER_LEG = CANNON_AND_FOREARM * 0.53;
+const LOWER_LEG = CANNON_AND_FOREARM * 0.47;
 
 /** Metres of ground covered per stride — a real gallop is about three body lengths. */
 export const STRIDE_METRES = 2.47 * 3;
@@ -112,18 +136,22 @@ export class Horse3d {
     // short — a first pass that simply raised each mass toward the tail gave
     // it an uphill spine, which is a cow. Underneath, the girth hangs lowest
     // at the chest and rises toward the flank: the tuck-up.
-    const chest = ball(hide, 0.245, 0.37, 0.38);
-    chest.position.set(0, SHOULDER_Y + 0.24, 0.48);
-    const barrel = ball(hide, 0.235, 0.345, 0.56);
-    barrel.position.set(0, SHOULDER_Y + 0.22, -0.02);
-    const rump = ball(hide, 0.245, 0.34, 0.38);
-    rump.position.set(0, SHOULDER_Y + 0.25, -0.54);
+    const halfWidth = BARREL_WIDTH / 2;
+    // The chest sets both ends of the vertical budget: its floor is the girth,
+    // resting exactly on the elbow, and its ceiling is the withers. Everything
+    // behind it is placed against those two lines rather than against itself.
+    const chest = ball(hide, halfWidth, DEPTH * 0.5, TRUNK * 0.213);
+    chest.position.set(0, SHOULDER_Y + DEPTH * 0.5, TRUNK * 0.287);
+    const barrel = ball(hide, halfWidth * 0.96, DEPTH * 0.462, TRUNK * 0.314);
+    barrel.position.set(0, SHOULDER_Y + DEPTH * 0.515, -TRUNK * 0.006);
+    const rump = ball(hide, halfWidth, DEPTH * 0.443, TRUNK * 0.24);
+    rump.position.set(0, SHOULDER_Y + DEPTH * 0.553, -TRUNK * 0.26);
     this.body.add(chest, barrel, rump);
 
     // Neck: short, thick at the base, and raked well forward. An upright neck
     // reads as a llama; the reference sheet carries it barely above horizontal.
     this.neckBase = 0.92;
-    this.neck.position.set(0, SHOULDER_Y + 0.44, 0.62);
+    this.neck.position.set(0, SHOULDER_Y + DEPTH * 0.78, TRUNK * 0.343);
     this.neck.rotation.x = this.neckBase;
     const neckMesh = limb(hide, 0.125, 0.215, 0.64);
     neckMesh.position.y = 0.32;
@@ -170,7 +198,7 @@ export class Horse3d {
     // of hair much thicker than the dock itself, which spreads rather than
     // narrows.
     let parent: THREE.Group = this.body;
-    let origin = new THREE.Vector3(0, SHOULDER_Y + 0.42, -0.86);
+    let origin = new THREE.Vector3(0, SHOULDER_Y + DEPTH * 0.72, -TRUNK * 0.49);
     // r0 is the end nearest the horse, r1 the far end. The plume swells just
     // past the dock and then tapers to a point; a first pass had every segment
     // widening toward the tip, which gave it a club on the end.
@@ -197,10 +225,10 @@ export class Horse3d {
     }
 
     const legSpec = [
-      { x: -0.145, z: 0.44, front: true, phase: LEG_PHASE.foreLeft },
-      { x: 0.145, z: 0.44, front: true, phase: LEG_PHASE.foreRight },
-      { x: -0.155, z: -0.5, front: false, phase: LEG_PHASE.hindLeft },
-      { x: 0.155, z: -0.5, front: false, phase: LEG_PHASE.hindRight },
+      { x: -0.145, z: TRUNK * 0.318, front: true, phase: LEG_PHASE.foreLeft },
+      { x: 0.145, z: TRUNK * 0.318, front: true, phase: LEG_PHASE.foreRight },
+      { x: -0.155, z: -TRUNK * 0.282, front: false, phase: LEG_PHASE.hindLeft },
+      { x: 0.155, z: -TRUNK * 0.282, front: false, phase: LEG_PHASE.hindRight },
     ];
 
     for (const spec of legSpec) {
@@ -229,8 +257,8 @@ export class Horse3d {
       fetlock.position.y = -LOWER_LEG;
       lower.add(fetlock);
 
-      const pastern = limb(points, 0.045, 0.05, 0.07);
-      pastern.position.y = -LOWER_LEG - 0.045;
+      const pastern = limb(points, 0.045, 0.05, PASTERN_DROP);
+      pastern.position.y = -LOWER_LEG - PASTERN_DROP * 0.55;
       pastern.rotation.x = -0.25;
       lower.add(pastern);
 
@@ -238,7 +266,7 @@ export class Horse3d {
         new THREE.CylinderGeometry(0.052, 0.06, HOOF, 8),
         mat('#2a2521', 0.6),
       );
-      hoof.position.y = -LOWER_LEG - 0.085;
+      hoof.position.y = -LOWER_LEG - PASTERN_DROP;
       lower.add(hoof);
 
       upper.add(lower);
@@ -256,25 +284,23 @@ export class Horse3d {
     this.disposables.push(leather);
 
     const clothTop = ball(silksMat, 0.25, 0.055, 0.32);
-    clothTop.position.set(0, SHOULDER_Y + 0.52, 0.03);
+    clothTop.position.set(0, SHOULDER_Y + DEPTH * 0.937, 0.03);
     this.body.add(clothTop);
 
-    for (const side of [-1, 1]) {
-      const flap = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.26, 0.36), silksMat);
-      flap.position.set(side * 0.245, SHOULDER_Y + 0.36, 0.02);
-      this.body.add(flap);
-    }
+    const cloth = ball(silksMat, halfWidth * 1.07, DEPTH * 0.27, TRUNK * 0.155);
+    cloth.position.set(0, SHOULDER_Y + DEPTH * 0.62, 0.02);
+    this.body.add(cloth);
 
     const saddle = ball(leather, 0.16, 0.06, 0.21);
-    saddle.position.set(0, SHOULDER_Y + 0.57, 0.06);
+    saddle.position.set(0, SHOULDER_Y + DEPTH * 1.015, 0.06);
     this.body.add(saddle);
 
     // Girth, round the barrel just behind the elbow.
     const girthGeo = new THREE.TorusGeometry(0.3, 0.022, 6, 20);
     const girth = new THREE.Mesh(girthGeo, leather);
     this.disposables.push(girthGeo);
-    girth.position.set(0, SHOULDER_Y + 0.23, 0.14);
-    girth.scale.set(0.82, 1.16, 1);
+    girth.position.set(0, SHOULDER_Y + DEPTH * 0.5, 0.14);
+    girth.scale.set(halfWidth / 0.3, DEPTH * 0.5 / 0.3, 1);
     this.body.add(girth);
 
     // ---- Jockey ------------------------------------------------------------
@@ -283,7 +309,7 @@ export class Horse3d {
     // A single stacked pair of spheres has no shoulder line and no elbow, and
     // at any size reads as a bean in silks. Crouched in the irons: seat off
     // the saddle, back flat and forward, knees high, hands down at the withers.
-    this.seatY = SHOULDER_Y + 0.72;
+    this.seatY = SHOULDER_Y + DEPTH * 1.132;
     this.jockey.position.set(0, this.seatY, 0.1);
     this.jockeyTorso.rotation.x = 0.92;
 
