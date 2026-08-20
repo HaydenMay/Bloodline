@@ -4,30 +4,17 @@ import {
   type Loop,
   type Surface,
 } from "../render/canvas.js";
-import { drawHorse } from "../render/horse.js";
 import {
   coatForHorse,
   hashId,
   RIVAL_SILKS,
-  SKIN_TONES,
   UI,
   type Coat,
   type Silks,
 } from "../render/palette.js";
-import { loadFrameSequence, drawFrame } from "../render/frameAnimation.js";
-import {
-  cameraTilt,
-  drawBackdrop,
-  drawDistanceMarkers,
-  drawMinimap,
-  horizonY,
-  isLandscape,
-  loadRaceBackgroundImages,
-  metreToScreen,
-  skyBottomY,
-  trackTopY,
-  type Camera,
-} from "../render/track.js";
+import { drawMinimap } from "../render/track.js";
+import { createRaceView2d } from "../render/raceView2d.js";
+import { interpolateRunners, type RaceView } from "../render/raceView.js";
 import {
   createRace,
   type LiveRace,
@@ -46,115 +33,19 @@ import type {
   RaceConfig,
   RaceEntrant,
 } from "../sim/race/types.js";
-import { CHARGE_CAPACITY, LANE_COUNT, TICK_HZ } from "../sim/race/constants.js";
+import { CHARGE_CAPACITY, TICK_HZ } from "../sim/race/constants.js";
 import type { Horse } from "../sim/types.js";
 import { attachInfoBox } from "./infoBox.js";
 
 /**
  * The race screen.
  *
- * Owns the loop, the camera, the HUD and the DRIVE control. Reads simulation
- * state and draws it; never writes back except through the player's control
- * input, which is just another controller as far as the engine is concerned.
+ * Owns the loop, the HUD, the chrome and the DRIVE control. The world itself —
+ * track, camera, runners — belongs to a `RaceView`, so the same race can be
+ * drawn side-on in 2D or in 3D without any of this changing. Reads simulation
+ * state; never writes back except through the player's control input, which is
+ * just another controller as far as the engine is concerned.
  */
-
-/**
- * A horse is about 2.47 metres nose to tail, and the rig is drawn 100 local
- * units long. Tying the two together is what stops the treadmill effect:
- * previously the horse was drawn roughly eight times too big for the track
- * scale, so it crossed barely one body length a second while its legs cycled
- * three times.
- *
- * Metres throughout, matching the simulation. There is no conversion boundary
- * anywhere in the game (REBUILD.md §3).
- */
-const HORSE_METRES = 2.47;
-const RIG_UNITS = 100;
-
-/**
- * Metres covered per stride. A real gallop is ~3 body lengths.
- *
- * Stride RATE is speed divided by this. The simulation's speed is now honest at
- * the source — BASE_SPEED is real metres per second and there is no TIME_SCALE
- * lever to divide back out — so this is simply the real number, with nothing
- * left to compensate for.
- */
-const STRIDE_METRES = HORSE_METRES * 3;
-
-/**
- * Ceiling on how often the legs turn over, in stride cycles per second.
- *
- * A galloping horse does not go faster by running its legs quicker. Cadence
- * stays roughly flat across a wide range of speed and the extra ground comes
- * from a LONGER stride — which is why an accelerating horse looks powerful
- * rather than frantic. Deriving the rate from speed alone got that backwards:
- * it held up at the start, then wound tighter and tighter as the field came up
- * to racing pace, until the gait read as a wind-up toy.
- *
- * Capped, extra speed simply slides the horse further per cycle. Set by eye at
- * the size horses actually appear on screen, and deliberately well under the
- * ~2.3 a real thoroughbred turns over at: small and fast reads quicker than
- * life, and at this scale anything near the true cadence looks frantic.
- */
-const MAX_STRIDE_RATE = 0.9;
-
-/**
- * Speed a finished horse settles to after the wire, in metres/sec.
- *
- * Non-zero on purpose: the stride rate is derived from speed, so a horse that
- * decays to a standstill also freezes its own gait, and the sheet holds whatever
- * gallop frame it happened to land on. Walking on keeps the cycle turning over.
- */
-const PULL_UP_WALK = 1.74;
-
-/**
- * Sprite pixels per rig unit, so both draw the same horse at the same size.
- *
- * The rig spans about 123 of its own units nose to tail-tip; the sprite spans
- * about 181 pixels across the same animal. Scaling the sprite by the rig's
- * scale alone would draw it half again too big.
- */
-
-/**
- * How much bigger than life the horses are drawn.
- *
- * Strictly, a horse should span exactly its own 2.47 metres of track, and that
- * is what the scale chain below computes. Drawn honestly it is also small: with
- * 42 metres across the screen a horse is about a seventeenth of the width, and on a
- * phone that is a smudge with a coloured dot on top — you cannot read your silks
- * or tell a bay from a dark bay, which is most of what the art is for.
- *
- * So they are deliberately oversized. It is a legibility cheat, not a bug, and
- * it is a single number so it can be argued with.
- */
-const HORSE_SCALE = 1.55;
-
-/**
- * How far from the left edge the player sits, as a fraction of the
- * screen — the camera's horizontal anchor. Decided in ROADMAP.md's "field
- * spread wastes most of a wide canvas" entry.
- *
- * Used to be a flat 0.36 always, which reserved 64% of the screen for
- * whatever lay ahead of the player — fine mid-pack, but a horse running
- * clear at the front has nothing ahead of it at all, so that 64% was
- * empty turf and sky every time. DEFAULT_ANCHOR_FRACTION is that old
- * constant, kept for the case where the field has no spread to read yet
- * (everyone at the same distance, e.g. still at the gate). Once there is
- * real spread, the anchor slides between the two extremes below by how
- * much of the field's content actually lies ahead of the player versus
- * behind it — MIN when the player is caught (nothing ahead, show the
- * field it's chasing), MAX when the player is clear (nothing behind,
- * show the field it's outrunning instead of empty track).
- *
- * Deliberately leaves `visibleMetres` alone rather than also widening it
- * on wide screens: that would shrink every horse to fit more track in,
- * trading away the "deliberately oversized... legibility cheat" HORSE_SCALE
- * documents above. Reclaiming the wasted-ahead space by pointing it at
- * real content does not have that cost.
- */
-const MIN_ANCHOR_FRACTION = 0.22;
-const MAX_ANCHOR_FRACTION = 0.7;
-const DEFAULT_ANCHOR_FRACTION = 0.36;
 
 /** Track sections, by the leader's progress. Each fires once. */
 const CALLOUTS = [
@@ -162,11 +53,6 @@ const CALLOUTS = [
   { at: 0.56, text: "Round the turn" },
   { at: 0.84, text: "Down the stretch!" },
 ] as const;
-
-function skinToneFor(id: string): string {
-  const hash = hashId(id);
-  return SKIN_TONES[hash % SKIN_TONES.length]!.hex;
-}
 
 export interface RaceScreenOptions {
   host: HTMLElement;
@@ -200,12 +86,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const getAutopilot = (): boolean => autopilotToggle?.checked ?? false;
 
   const surface = createSurface(host);
-  let frameSequence: Awaited<ReturnType<typeof loadFrameSequence>> | null =
-    null;
-  void loadFrameSequence("east-run", 8).then((seq) => {
-    frameSequence = seq;
-  });
-  void loadRaceBackgroundImages();
   const input: PlayerInput = {
     takingBack: false,
     kickPending: false,
@@ -216,29 +96,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const entrants: RaceEntrant[] = field.map((horse) => ({ horse }));
   const race: LiveRace = createRace(entrants, config);
   const totalMetres = race.totalMetres;
-
-  // Crowd camera flashes - track active flashes for drawing
-  interface Flash {
-    x: number;
-    y: number;
-    age: number;
-    duration: number;
-  }
-  const flashes: Flash[] = [];
-  const spawnFlash = (): void => {
-    // Random position in crowd area (bleachers above horizon)
-    const { width, height } = surface;
-    const horizon = horizonY(width, height);
-    const x = Math.random() * width;
-    // Crowd is positioned from horizon-58 to horizon, spawn flashes above them
-    const y = (horizon - 58) + Math.random() * 58; // Within crowd stand area
-    flashes.push({
-      x,
-      y,
-      age: 0,
-      duration: 0.15 + Math.random() * 0.1, // 150-250ms
-    });
-  };
 
   // The player's horse runs the SAME base ride as every opponent; this input
   // only modulates it (REBUILD.md §11.4). When autopilot is OFF, this input
@@ -275,14 +132,17 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const coatOf = new Map<string, Coat | string>();
   for (const h of field) coatOf.set(h.id, coatForHorse(h));
 
-  // Stride phase is visual only, advanced from speed so hooves match the ground.
-  const stride = new Map<string, number>();
-  for (const h of field) stride.set(h.id, Math.random());
-
-  // Once a horse crosses the line the simulation stops touching it, but its last
-  // speed is still set — so the renderer would cycle its legs forever. Finished
-  // horses coast on past the wire and pull up instead.
-  const pullUp = new Map<string, { extra: number; speed: number }>();
+  // The world is drawn by a view. Everything below this line is the screen's
+  // own business — loop, chrome, input — and does not care which view it is.
+  const view: RaceView = createRaceView2d({
+    surface,
+    playerHorseId,
+    silksFor,
+    coatOf,
+    totalMetres,
+    hype: config.hype,
+    horseIds: field.map((h) => h.id),
+  });
 
   let prev: RaceSnapshot = race.snapshot();
   let curr: RaceSnapshot = prev;
@@ -321,8 +181,6 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     if (started || countdownEndsAt !== 0) return;
     countdownEndsAt = performance.now() + COUNTDOWN_MS;
   };
-
-  const cam: Camera = { scrollMetres: 0, pixelsPerMetre: 1.6 };
 
   const tick = (): void => {
     if (!started) {
@@ -383,308 +241,16 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     calloutUntil = performance.now() + 2200;
   };
 
-  const drawFlash = (ctx: CanvasRenderingContext2D, x: number, y: number, alpha: number, screenWidth: number): void => {
-    // Draw a concave diamond (camera flash symbol) with pinched sides
-    // Scale size based on screen width: smaller on mobile, larger on desktop
-    const size = screenWidth < 600 ? 8 : 6;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = 'white';
-    ctx.beginPath();
-    // Top point
-    ctx.moveTo(x, y - size);
-    // Right point (with inward curve)
-    ctx.quadraticCurveTo(x + size * 0.6, y, x + size, y);
-    // Bottom point (with inward curve)
-    ctx.quadraticCurveTo(x, y + size * 0.6, x, y + size);
-    // Left point (with inward curve)
-    ctx.quadraticCurveTo(x - size * 0.6, y, x - size, y);
-    // Back to top (with inward curve)
-    ctx.quadraticCurveTo(x, y - size * 0.6, x, y - size);
-    ctx.fill();
-    ctx.restore();
-  };
-
   const draw = (alpha: number, dt: number): void => {
     const { ctx, width, height } = surface;
-    const lerp = (a: number, b: number): number => a + (b - a) * alpha;
 
-    // Interpolated positions, so motion is smooth at any refresh rate.
-    const runners = curr.runners.map((r, i) => {
-      const p = prev.runners[i];
-      return {
-        ...r,
-        distance: p ? lerp(p.distance, r.distance) : r.distance,
-        speed: p ? lerp(p.speed, r.speed) : r.speed,
-      };
-    });
-
+    // Interpolated once, then shared. The chrome has to agree with the world
+    // about where each horse is, so both read the same numbers rather than
+    // each lerping their own.
+    const runners = interpolateRunners(prev, curr, alpha);
     const player = runners.find((r) => r.id === playerHorseId)!;
 
-    // Show a fixed window of TRACK, not a fixed number of pixels — so the
-    // relationship between a horse's size and the ground it covers stays
-    // correct at any screen size. That relationship is what sells the speed.
-    // On mobile, reduce visible metres to show horses larger.
-    //
-    // A landscape phone used to get the full 42m too — same as desktop —
-    // because this only ever keyed off width. Found in play: "the green
-    // grass is taking up too much screen space" on iPhone landscape, which
-    // is really the same root cause read from the other side: horses that
-    // are a fixed real-world size, shown across a fixed 42m window, come out
-    // small on a short canvas, so grass dominates by default rather than
-    // because anything is actually wasted. Tilts on the same curve
-    // `horizonY` uses — 28m at the shortest landscape canvases (matching
-    // portrait's mobile zoom), unchanged at 42m once height clears
-    // `REFERENCE_HEIGHT` — so desktop and tablets are untouched.
-    const visibleMetres =
-      width < 600
-        ? 28
-        : isLandscape(width, height)
-          ? 28 + 14 * cameraTilt(height)
-          : 42;
-    cam.pixelsPerMetre = width / visibleMetres;
-
-    // How far the rest of the field actually extends beyond the player, in
-    // metres each way — the real content the anchor should be pointed at.
-    let aheadMetres = 0;
-    let behindMetres = 0;
-    for (const r of runners) {
-      const delta = r.distance - player.distance;
-      if (delta > aheadMetres) aheadMetres = delta;
-      else if (-delta > behindMetres) behindMetres = -delta;
-    }
-    const fieldSpan = aheadMetres + behindMetres;
-    const anchorFraction =
-      fieldSpan > 0
-        ? MIN_ANCHOR_FRACTION +
-          (MAX_ANCHOR_FRACTION - MIN_ANCHOR_FRACTION) *
-            (behindMetres / fieldSpan)
-        : DEFAULT_ANCHOR_FRACTION;
-
-    const target = player.distance - (width * anchorFraction) / cam.pixelsPerMetre;
-    cam.scrollMetres += (target - cam.scrollMetres) * 0.1;
-
-    drawBackdrop(ctx, width, height, cam, config.hype);
-    drawDistanceMarkers(ctx, width, height, cam, totalMetres);
-
-    // Spawn camera flashes from the crowd
-    // Slightly higher spawn rate on mobile for better visibility
-    const spawnRate = width < 600 ? 0.45 : 0.4;
-    if (Math.random() < spawnRate) {
-      spawnFlash();
-    }
-
-    // Update and draw camera flashes
-    for (let i = flashes.length - 1; i >= 0; i--) {
-      const flash = flashes[i]!;
-      flash.age += dt;
-      if (flash.age > flash.duration) {
-        flashes.splice(i, 1);
-      } else {
-        // Fade in quickly, then fade out
-        const progress = flash.age / flash.duration;
-        const alpha = progress < 0.3 ? progress / 0.3 : 1 - (progress - 0.3) / 0.7;
-        drawFlash(ctx, flash.x, flash.y, alpha, width);
-      }
-    }
-
-    // Lane 0 is the rail (furthest from camera), so higher lanes draw nearer
-    // and larger. Sorting by lane keeps the overlap correct.
-    const isSmallScreen = width < 600;
-    const landscape = isLandscape(width, height);
-    // The gap between the horizon and where lane 0 starts — the near-rail
-    // strip of track before any runner appears. Portrait keeps the original
-    // flat 0.58/0.60 (horizonY's 0.44 plus a 0.14/0.16 gap) at every height,
-    // since portrait was never the complaint.
-    //
-    // Landscape — every other shape the game runs at, mobile through desktop
-    // — uses a much smaller gap on the same `cameraTilt` curve `horizonY`
-    // itself tilts on, so the ground `horizonY` reclaims from the sky
-    // reaches the lanes instead of being spent re-widening this strip.
-    // Found in play, twice: first a landscape phone read as "the horses
-    // stack but not flat" (fixed by tilting `horizonY` on short canvases),
-    // then immediately "the horses need to be spread out much more on
-    // desktop landscape... they need space between them on the y axis" —
-    // desktop clears `REFERENCE_HEIGHT`, so the first fix left it at the
-    // old, tall-screen framing untouched. `horizonY` now drops its ceiling
-    // for every landscape shape, not just short ones, and this gap follows
-    // it down, so desktop and tablets get the same room mobile-landscape
-    // got, not just screens short enough to trip a height gate.
-    const tilt = cameraTilt(height);
-    // A horse is HORSE_YARDS long, full stop. Perspective only nudges it.
-    // Computed here, ahead of `baseY`, because `baseY` needs it below.
-    const baseScale =
-      (HORSE_METRES * cam.pixelsPerMetre * HORSE_SCALE) / RIG_UNITS;
-    const baseYFromGap = landscape
-      ? horizonY(width, height) + height * (0.03 + 0.02 * tilt)
-      : horizonY(width, height) + height * (isSmallScreen ? 0.14 : 0.16);
-    // The rig draws well above its own (x, y) anchor — head, ears and mane
-    // reach roughly 132 rig units above the ground point drawHorse is called
-    // with, measured empirically (screenshotting the clipping and walking
-    // the constant up until it stopped) rather than derived from the rig's
-    // own coordinates, which pass through too many rotations (neck pitch,
-    // ear tilt, gait bob) to sum by hand.
-    const SPRITE_HEADROOM = 132;
-    // Extra clearance below the strict sky floor, so the pack starts sitting
-    // clearly in the grass with room to breathe rather than immediately
-    // brushing the crowd stand the instant it clears the sky — asked for
-    // once the sky-floating bug above was actually fixed: "have them start
-    // lower on the y axis." Scaled by `baseScale` like `SPRITE_HEADROOM`
-    // itself, and also by `tilt`: a short landscape canvas is exactly the
-    // shape that had almost no vertical band to begin with, so pushing it
-    // down further there would spend the whole point of this file's other
-    // fixes buying it that band back. Desktop and tablets, with plenty of
-    // band to spare, get the full margin; mobile landscape gets little to
-    // none, sliding in on the same curve everything else here tilts on.
-    const START_LOWER_MARGIN = 40 * tilt;
-    // The charges bar (drawHud, below) is drawn on top of the horses, near
-    // the bottom of the canvas. A fixed height-relative spacing pushed the
-    // deepest lane's feet behind it — found in play: the nearest horse's
-    // legs read as cut off, worse on mobile because the bar's fixed pixel
-    // height eats a bigger share of a shorter canvas. Deriving the spacing
-    // from the actual clear space above the bar keeps every lane's feet
-    // above it regardless of screen height.
-    const reservedBottom = 96;
-    const maxLaneY = height - reservedBottom;
-    // `baseY` — lane 0's own anchor, i.e. its feet — has to clear three
-    // separate floors, found in play one at a time as each fix chased more
-    // vertical spread than the last:
-    //
-    // 1. `trackTopY`: the anchor itself has to land on the grass, not in the
-    //    strip above it (`drawTurf`'s fallback boundary when the real art
-    //    hasn't loaded).
-    // 2. `skyBottomY(...) + SPRITE_HEADROOM + START_LOWER_MARGIN`: grounding
-    //    the anchor does not ground the HEAD above it. "Is the issue with
-    //    them floating in the air fixed?" — it wasn't: the anchor was on the
-    //    grass, but lane 0's head, `SPRITE_HEADROOM` above it, still cleared
-    //    the crowd stand entirely and stood in open sky. This is the floor
-    //    that actually keeps the whole horse, not just its feet, off the
-    //    sky, plus the margin above so it isn't sitting right at that line.
-    // 3. Sitting at either floor still leaves plenty of room for the
-    //    headroom itself above `baseY` — (2) already accounts for it — so
-    //    there is no separate bare-headroom term here; it would only ever
-    //    be weaker than (2).
-    const desiredBaseY = Math.max(
-      baseYFromGap,
-      trackTopY(width, height),
-      skyBottomY(width, height) + baseScale * (SPRITE_HEADROOM + START_LOWER_MARGIN),
-    );
-    // Pushing `baseY` down to clear the sky costs band — the room `laneY`
-    // has left to actually separate eight runners in. On a canvas short
-    // enough, and once the zoom-in below made every horse (and so its own
-    // required headroom) bigger, that cost can eat the band down to nothing
-    // and the pack goes right back to reading as one mashed-together blob —
-    // found in play, again: "you can see they're all mashed together,
-    // right?" `MIN_LANE_SPACING` is the floor that can't be sacrificed for
-    // it: `baseY` is pulled back up from `desiredBaseY` — trading away sky
-    // clearance, not spacing — whenever sitting at `desiredBaseY` would
-    // leave less than this much room per lane. `trackTopY` (grounding) is
-    // never given up even for this; a horse floating in the air is a worse
-    // failure than one whose head brushes the crowd stand.
-    const MIN_LANE_SPACING = baseScale * 18;
-    const latestAffordableBaseY = maxLaneY - MIN_LANE_SPACING * (LANE_COUNT - 1);
-    const baseY = Math.max(
-      trackTopY(width, height),
-      Math.min(desiredBaseY, latestAffordableBaseY),
-    );
-    const laneSpacing = Math.min(
-      // The ceiling only ever binds in portrait, where the band between
-      // baseY and the charges bar is intentionally generous next to how
-      // little of it 8 lanes need. Landscape's much bigger band (above) is
-      // the real, honest constraint, so its ceiling is set high enough to
-      // never be the one that bites.
-      landscape ? height * 0.14 : isSmallScreen ? height * 0.0525 : height * 0.055,
-      (maxLaneY - baseY) / (LANE_COUNT - 1),
-    );
-    const laneY = (lane: number): number => baseY + lane * laneSpacing;
-    // Flattened per ROADMAP.md's decision: the backdrop art is flat pixel
-    // art with no depth cues, so horses read as same-size runners in
-    // parallel lanes rather than leaning into an over-the-shoulder depth
-    // cheat. Was 0.88 + lane * 0.04 (a 28% span); shrunk toward 0 and
-    // recentred on true scale rather than skewed below it.
-    const laneScale = (lane: number): number =>
-      baseScale * (0.97 + lane * 0.01);
-    // No x-offset. A version of this fanned lanes out horizontally too —
-    // fixed the original "one stacked column" blob, but the player's next
-    // note was explicit: separation belongs on the y axis lanes already
-    // stand for, not smeared sideways across the axis that reads as race
-    // position. `laneY`'s now-much-bigger spacing (above) does the job the
-    // x-offset was drafted in to help with.
-
-    for (const r of [...runners].sort((a, b) => a.lane - b.lane)) {
-      const pu0 = pullUp.get(r.id);
-      const x = metreToScreen(r.distance + (pu0?.extra ?? 0), cam);
-      if (x < -140 || x > width + 140) continue;
-
-      const y = laneY(r.lane);
-      const scale = laneScale(r.lane);
-
-      // Stride is driven by DISTANCE COVERED, not by frame count. Hooves stay
-      // planted on the ground instead of spinning, and the gait runs at the
-      // same rate regardless of refresh rate.
-      let drawSpeed = r.speed;
-      if (r.finished) {
-        const pu = pullUp.get(r.id) ?? { extra: 0, speed: r.speed };
-        // Pull up to a WALK, not to a standstill. Decaying to zero froze the
-        // stride rate at zero with it, leaving the horse as a statue held in a
-        // mid-gallop frame — the same "reset" read, arriving two seconds later.
-        pu.speed = Math.max(PULL_UP_WALK, pu.speed - 11 * dt);
-        pu.extra += pu.speed * dt;
-        pullUp.set(r.id, pu);
-        drawSpeed = pu.speed;
-      }
-
-      const strideRate = Math.min(drawSpeed / STRIDE_METRES, MAX_STRIDE_RATE);
-      const phase = ((stride.get(r.id) ?? 0) + strideRate * dt) % 1;
-      stride.set(r.id, phase);
-
-      const isPlayer = r.id === playerHorseId;
-
-      // drawHorseShadow(ctx, x, y + 8, scale);
-
-      // Draw frame-based animation if loaded, otherwise fall back to procedural rig.
-      if (frameSequence) {
-        drawFrame(ctx, x, y, frameSequence, {
-          phase,
-          scale: scale * 2.2,
-          scheme: {
-            coat: coatOf.get(r.id)!,
-            silks: silksFor.get(r.id)!,
-            jockeySkin: skinToneFor(r.id),
-          },
-        });
-      } else {
-        drawHorse(ctx, x, y, {
-          coat: coatOf.get(r.id)!,
-          silks: silksFor.get(r.id)!,
-          pose: {
-            phase,
-            intensity: Math.min(1, Math.max(0, (drawSpeed - 18) / 14)),
-            drive: r.finished ? 0 : r.effort,
-          },
-          scale,
-          faded: false,
-        });
-      }
-
-      if (isPlayer) {
-        const markerY = y - 180 * scale;
-        const bounce = Math.sin(performance.now() / 260) * 3;
-
-        ctx.fillStyle = UI.accent;
-        ctx.beginPath();
-        ctx.moveTo(x, markerY + bounce);
-        ctx.lineTo(x - 9, markerY - 13 + bounce);
-        ctx.lineTo(x + 9, markerY - 13 + bounce);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = UI.accent;
-        ctx.font = "700 12px ui-sans-serif, system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("YOU", x, markerY - 19 + bounce);
-      }
-    }
+    view.render({ runners, player, progress: curr.progress, dt });
 
     drawHud(ctx, width, height, player, runners);
 
@@ -1207,6 +773,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
 
   return (): void => {
     loop.stop();
+    view.dispose();
     surface.destroy();
     window.clearTimeout(holdTimer);
     host.removeEventListener("pointerdown", down);
