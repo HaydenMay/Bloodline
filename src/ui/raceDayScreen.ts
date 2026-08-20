@@ -160,12 +160,38 @@ export function mountRaceDayScreen(
       </div>
 
       <div class="raceday-actions">
+        <div class="raceday-view" role="group" aria-label="Race view">
+          <span class="raceday-view-label">View</span>
+          <button type="button" class="raceday-view-btn" data-view="2d">2D</button>
+          <button type="button" class="raceday-view-btn" data-view="3d">3D</button>
+        </div>
         <button class="btn btn-primary" id="go-btn">Start Race</button>
       </div>
     </div>
   `;
 
   container.appendChild(root);
+
+  /**
+   * 2D or 3D, chosen here rather than buried in settings — it is a decision
+   * about this race, taken at the moment you commit to running it. The choice
+   * sticks, so a career of twenty starts is not twenty re-picks.
+   */
+  const applyViewButtons = (): void => {
+    const current = stable.settings.raceView ?? '2d';
+    for (const btn of root.querySelectorAll<HTMLButtonElement>('.raceday-view-btn')) {
+      btn.classList.toggle('is-active', btn.dataset.view === current);
+      btn.setAttribute('aria-pressed', String(btn.dataset.view === current));
+    }
+  };
+  for (const btn of root.querySelectorAll<HTMLButtonElement>('.raceday-view-btn')) {
+    btn.addEventListener('click', () => {
+      stable.settings.raceView = btn.dataset.view === '3d' ? '3d' : '2d';
+      saveCareer(career);
+      applyViewButtons();
+    });
+  }
+  applyViewButtons();
 
   const stakesBox = root.querySelector<HTMLElement>('#bet-stakes');
   const summary = root.querySelector<HTMLElement>('#bet-summary');

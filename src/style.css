@@ -8000,3 +8000,48 @@ span.archive-allele {
 .archive-attrs-toggle + .stat-rows {
   margin-top: 10px;
 }
+
+/*
+ * Race view selector, sat beside Start Race. Same family as the bet-type
+ * buttons it shares the screen with, one size down — it is a preference, not
+ * one of the three commitments the Race Day grid is actually about.
+ */
+.raceday-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 14px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+.raceday-view-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.raceday-view-btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.raceday-view-btn:hover {
+  color: var(--text);
+}
+
+.raceday-view-btn.is-active {
+  background: var(--accent);
+  color: var(--bg);
+}
