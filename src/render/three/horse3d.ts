@@ -163,21 +163,37 @@ export class Horse3d {
       this.neck.add(tuft);
     }
 
-    // Tail: a short chain so it can stream and ripple behind.
+    // Tail: a short bony dock carrying a full plume of hair.
+    //
+    // A chain of evenly tapering cylinders reads as an aerial, because a real
+    // tail is not a rod — it is a stubby dock with hide on it and then a mass
+    // of hair much thicker than the dock itself, which spreads rather than
+    // narrows.
     let parent: THREE.Group = this.body;
     let origin = new THREE.Vector3(0, SHOULDER_Y + 0.42, -0.86);
-    for (let i = 0; i < 5; i++) {
+    // r0 is the end nearest the horse, r1 the far end. The plume swells just
+    // past the dock and then tapers to a point; a first pass had every segment
+    // widening toward the tip, which gave it a club on the end.
+    const TAIL = [
+      { r0: 0.052, r1: 0.062, len: 0.15, hide: true },
+      { r0: 0.078, r1: 0.084, len: 0.22, hide: false },
+      { r0: 0.084, r1: 0.07, len: 0.22, hide: false },
+      { r0: 0.07, r1: 0.05, len: 0.22, hide: false },
+      { r0: 0.05, r1: 0.022, len: 0.2, hide: false },
+    ];
+    for (const [i, spec] of TAIL.entries()) {
       const seg = new THREE.Group();
       seg.position.copy(origin);
-      // Longer than the joint spacing so segments overlap rather than reading
-      // as a chain of separate sticks.
-      const mesh = limb(hair, 0.055 - i * 0.007, 0.085 - i * 0.007, 0.2);
-      mesh.position.y = -0.09;
+      const mesh = limb(spec.hide ? hide : hair, spec.r0, spec.r1, spec.len);
+      mesh.position.y = -spec.len / 2 + 0.01;
+      // Flattened side to side: a tail hangs as a curtain, not a sausage.
+      mesh.scale.x = spec.hide ? 1 : 0.66;
       seg.add(mesh);
       parent.add(seg);
       this.tail.push(seg);
       parent = seg;
-      origin = new THREE.Vector3(0, -0.145, 0);
+      origin = new THREE.Vector3(0, -(spec.len - 0.05), 0);
+      void i;
     }
 
     const legSpec = [
@@ -201,11 +217,28 @@ export class Horse3d {
 
       const lower = new THREE.Group();
       lower.position.y = -UPPER_LEG;
-      const lowerMesh = limb(points, 0.036, 0.058, LOWER_LEG);
+      // Below the knee a horse is slim but not spindly: the cannon carries the
+      // flexor tendons behind it, so it reads as a flat column, and it ends in
+      // a distinct fetlock rather than tapering into the hoof. Drawn as a bare
+      // taper it looks like wire.
+      const lowerMesh = limb(points, 0.05, 0.072, LOWER_LEG);
       lowerMesh.position.y = -LOWER_LEG / 2;
       lower.add(lowerMesh);
-      const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.04, HOOF, 7), mat('#2a2521', 0.6));
-      hoof.position.y = -LOWER_LEG - HOOF / 2;
+
+      const fetlock = ball(points, 0.062, 0.055, 0.062);
+      fetlock.position.y = -LOWER_LEG;
+      lower.add(fetlock);
+
+      const pastern = limb(points, 0.045, 0.05, 0.07);
+      pastern.position.y = -LOWER_LEG - 0.045;
+      pastern.rotation.x = -0.25;
+      lower.add(pastern);
+
+      const hoof = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.052, 0.06, HOOF, 8),
+        mat('#2a2521', 0.6),
+      );
+      hoof.position.y = -LOWER_LEG - 0.085;
       lower.add(hoof);
 
       upper.add(lower);
@@ -213,46 +246,104 @@ export class Horse3d {
       this.legs.push({ upper, lower, phase: spec.phase, front: spec.front });
     }
 
-    // Jockey, folded right down over the withers. In the reference the rider is
-    // small and very compact — knees up, back flat, head beside the neck — not
-    // sitting upright the way a hack rider does.
-    this.seatY = SHOULDER_Y + 0.66;
-    this.jockey.position.set(0, this.seatY, 0.12);
-    this.jockeyTorso.rotation.x = 0.95;
-    const seat = ball(silksMat, 0.135, 0.11, 0.13);
-    seat.position.set(0, 0, -0.04);
-    const torso = ball(silksMat, 0.13, 0.19, 0.12);
-    torso.position.y = 0.13;
-    this.jockeyTorso.add(seat, torso);
+    // ---- Tack ------------------------------------------------------------
+    //
+    // A racing saddle is tiny, but the number cloth under it is not, and from
+    // trackside the cloth and the girth are most of what says "racehorse"
+    // rather than "loose horse". Without them the rider appears to be sitting
+    // directly on the animal.
+    const leather = mat('#5a3a22', 0.7);
+    this.disposables.push(leather);
+
+    const clothTop = ball(silksMat, 0.25, 0.055, 0.32);
+    clothTop.position.set(0, SHOULDER_Y + 0.52, 0.03);
+    this.body.add(clothTop);
+
+    for (const side of [-1, 1]) {
+      const flap = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.26, 0.36), silksMat);
+      flap.position.set(side * 0.245, SHOULDER_Y + 0.36, 0.02);
+      this.body.add(flap);
+    }
+
+    const saddle = ball(leather, 0.16, 0.06, 0.21);
+    saddle.position.set(0, SHOULDER_Y + 0.57, 0.06);
+    this.body.add(saddle);
+
+    // Girth, round the barrel just behind the elbow.
+    const girthGeo = new THREE.TorusGeometry(0.3, 0.022, 6, 20);
+    const girth = new THREE.Mesh(girthGeo, leather);
+    this.disposables.push(girthGeo);
+    girth.position.set(0, SHOULDER_Y + 0.23, 0.14);
+    girth.scale.set(0.82, 1.16, 1);
+    this.body.add(girth);
+
+    // ---- Jockey ------------------------------------------------------------
+    //
+    // Built as hips, back, shoulders and jointed limbs rather than one ovoid.
+    // A single stacked pair of spheres has no shoulder line and no elbow, and
+    // at any size reads as a bean in silks. Crouched in the irons: seat off
+    // the saddle, back flat and forward, knees high, hands down at the withers.
+    this.seatY = SHOULDER_Y + 0.72;
+    this.jockey.position.set(0, this.seatY, 0.1);
+    this.jockeyTorso.rotation.x = 0.92;
+
+    const hips = ball(silksMat, 0.145, 0.125, 0.15);
+    const back = ball(silksMat, 0.152, 0.235, 0.135);
+    back.position.y = 0.2;
+    // Wider than the hips — the shoulder line is what makes it read as a body.
+    const shoulders = ball(silksMat, 0.19, 0.115, 0.145);
+    shoulders.position.y = 0.36;
+    this.jockeyTorso.add(hips, back, shoulders);
 
     const headGroup = new THREE.Group();
-    headGroup.position.set(0, 0.35, 0.05);
-    headGroup.rotation.x = -0.85;
-    const jHead = new THREE.Mesh(new THREE.SphereGeometry(0.083, 8, 6), skin);
+    headGroup.position.set(0, 0.49, 0.04);
+    // Counter-rotates the torso's lean, so the rider looks up the track
+    // instead of at the horse's shoulder.
+    headGroup.rotation.x = -0.92;
+    const neckStub = limb(skin, 0.045, 0.05, 0.08);
+    neckStub.position.y = -0.04;
+    const jHead = new THREE.Mesh(new THREE.SphereGeometry(0.1, 9, 7), skin);
     const helmet = new THREE.Mesh(
-      new THREE.SphereGeometry(0.096, 9, 6, 0, TAU, 0, Math.PI * 0.62),
+      new THREE.SphereGeometry(0.116, 10, 7, 0, TAU, 0, Math.PI * 0.6),
       capMat,
     );
-    const peak = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.02, 0.09), capMat);
-    peak.position.set(0, 0.02, 0.1);
-    headGroup.add(jHead, helmet, peak);
+    helmet.position.y = 0.012;
+    const peak = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.022, 0.1), capMat);
+    peak.position.set(0, 0.012, 0.105);
+    headGroup.add(neckStub, jHead, helmet, peak);
     this.jockeyTorso.add(headGroup);
 
     for (const side of [-1, 1]) {
-      const arm = limb(silksMat, 0.025, 0.032, 0.29);
-      arm.position.set(side * 0.15, 0.08, 0.27);
-      arm.rotation.x = 2.16;
-      this.jockey.add(arm);
+      // Arm: shoulder down and forward to an elbow, forearm on to the reins.
+      const upperArm = limb(silksMat, 0.044, 0.052, 0.26);
+      upperArm.position.set(side * 0.165, 0.13, 0.25);
+      upperArm.rotation.x = 2.25;
+      this.jockey.add(upperArm);
 
-      const thigh = limb(breeches, 0.036, 0.048, 0.2);
-      thigh.position.set(side * 0.185, -0.08, 0.1);
-      thigh.rotation.x = 2.03;
+      const forearm = limb(skin, 0.031, 0.037, 0.24);
+      forearm.position.set(side * 0.145, -0.02, 0.42);
+      forearm.rotation.x = 1.98;
+      this.jockey.add(forearm);
+
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.042, 7, 5), skin);
+      hand.position.set(side * 0.14, -0.09, 0.53);
+      this.jockey.add(hand);
+
+      // Leg: thigh forward to a high knee, shin back down into a short iron.
+      const thigh = limb(breeches, 0.062, 0.078, 0.3);
+      thigh.position.set(side * 0.185, -0.06, 0.14);
+      thigh.rotation.x = 1.85;
       this.jockey.add(thigh);
 
-      const boot = limb(bootMat, 0.045, 0.052, 0.24);
-      boot.position.set(side * 0.2, -0.26, 0.14);
-      boot.rotation.x = 0.5;
+      const boot = limb(bootMat, 0.058, 0.07, 0.36);
+      boot.position.set(side * 0.205, -0.27, 0.22);
+      boot.rotation.x = 0.34;
       this.jockey.add(boot);
+
+      const iron = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.012, 5, 10), leather);
+      iron.position.set(side * 0.21, -0.44, 0.15);
+      iron.rotation.y = Math.PI / 2;
+      this.jockey.add(iron);
     }
 
     this.jockey.add(this.jockeyTorso);
