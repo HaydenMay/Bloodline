@@ -1352,6 +1352,20 @@ the full push while a short landscape canvas — the shape this whole entry exis
 before; mobile landscape is close to unchanged, A/B'd against the pre-margin screenshot directly rather
 than judged by eye.
 
+**A related but distinct gap, found in play right after: "the green grass is taking up too much screen
+space" on iPhone landscape.** Measuring the actual rendered canvas (812×375 in Playwright resolves to a
+375-height *viewport*, but the canvas itself sits under the bottom info bar and is closer to 313px tall)
+turned up the real cause: `visibleMetres` — the fixed window of *track* shown, which sets how big a horse
+is drawn — only ever keyed off `width` (`width < 600 ? 28 : 42`), never height. So a landscape phone got
+the same 42m window as a 1440px desktop despite having a fraction of the vertical room, and a horse that
+is a fixed real-world 2.47m drawn across a fixed 42m window comes out proportionally small on a short
+canvas — grass dominates by default because the horses themselves are small, not because any specific
+strip of the canvas is provably unused. `visibleMetres` now tilts on the same `cameraTilt` curve
+`horizonY` already uses for landscape: 28m (the same zoom portrait mobile gets) at the shortest
+landscape canvases, unchanged at 42m once height clears `REFERENCE_HEIGHT` — so desktop and tablets are
+byte-identical to before. Verified at 812×375: horses visibly larger, both at the bunched start and once
+real gaps open mid-race; desktop and tablet screenshots confirmed pixel-unchanged.
+
 **Found in play (this investigation)**, minor — while the leader pulls away, a trailing horse can be
 drawn straddling `x = 0`, mid-sprite, rather than fully in or out of frame. `raceScreen.ts:441`
 already culls runners outside `[-140, width + 140]` in screen-space by design, so pop-in/pop-out at

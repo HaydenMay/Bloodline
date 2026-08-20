@@ -424,8 +424,24 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // Show a fixed window of TRACK, not a fixed number of pixels — so the
     // relationship between a horse's size and the ground it covers stays
     // correct at any screen size. That relationship is what sells the speed.
-    // On mobile, reduce visible metres to show horses larger
-    const visibleMetres = width < 600 ? 28 : 42;
+    // On mobile, reduce visible metres to show horses larger.
+    //
+    // A landscape phone used to get the full 42m too — same as desktop —
+    // because this only ever keyed off width. Found in play: "the green
+    // grass is taking up too much screen space" on iPhone landscape, which
+    // is really the same root cause read from the other side: horses that
+    // are a fixed real-world size, shown across a fixed 42m window, come out
+    // small on a short canvas, so grass dominates by default rather than
+    // because anything is actually wasted. Tilts on the same curve
+    // `horizonY` uses — 28m at the shortest landscape canvases (matching
+    // portrait's mobile zoom), unchanged at 42m once height clears
+    // `REFERENCE_HEIGHT` — so desktop and tablets are untouched.
+    const visibleMetres =
+      width < 600
+        ? 28
+        : isLandscape(width, height)
+          ? 28 + 14 * cameraTilt(height)
+          : 42;
     cam.pixelsPerMetre = width / visibleMetres;
 
     // How far the rest of the field actually extends beyond the player, in
