@@ -509,6 +509,18 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // own coordinates, which pass through too many rotations (neck pitch,
     // ear tilt, gait bob) to sum by hand.
     const SPRITE_HEADROOM = 132;
+    // Extra clearance below the strict sky floor, so the pack starts sitting
+    // clearly in the grass with room to breathe rather than immediately
+    // brushing the crowd stand the instant it clears the sky — asked for
+    // once the sky-floating bug above was actually fixed: "have them start
+    // lower on the y axis." Scaled by `baseScale` like `SPRITE_HEADROOM`
+    // itself, and also by `tilt`: a short landscape canvas is exactly the
+    // shape that had almost no vertical band to begin with, so pushing it
+    // down further there would spend the whole point of this file's other
+    // fixes buying it that band back. Desktop and tablets, with plenty of
+    // band to spare, get the full margin; mobile landscape gets little to
+    // none, sliding in on the same curve everything else here tilts on.
+    const START_LOWER_MARGIN = 40 * tilt;
     // `baseY` — lane 0's own anchor, i.e. its feet — has to clear three
     // separate floors, found in play one at a time as each fix chased more
     // vertical spread than the last:
@@ -516,12 +528,13 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // 1. `trackTopY`: the anchor itself has to land on the grass, not in the
     //    strip above it (`drawTurf`'s fallback boundary when the real art
     //    hasn't loaded).
-    // 2. `skyBottomY(...) + SPRITE_HEADROOM`: grounding the anchor does not
-    //    ground the HEAD above it. "Is the issue with them floating in the
-    //    air fixed?" — it wasn't: the anchor was on the grass, but lane 0's
-    //    head, `SPRITE_HEADROOM` above it, still cleared the crowd stand
-    //    entirely and stood in open sky. This is the floor that actually
-    //    keeps the whole horse, not just its feet, off the sky.
+    // 2. `skyBottomY(...) + SPRITE_HEADROOM + START_LOWER_MARGIN`: grounding
+    //    the anchor does not ground the HEAD above it. "Is the issue with
+    //    them floating in the air fixed?" — it wasn't: the anchor was on the
+    //    grass, but lane 0's head, `SPRITE_HEADROOM` above it, still cleared
+    //    the crowd stand entirely and stood in open sky. This is the floor
+    //    that actually keeps the whole horse, not just its feet, off the
+    //    sky, plus the margin above so it isn't sitting right at that line.
     // 3. Sitting at either floor still leaves plenty of room for the
     //    headroom itself above `baseY` — (2) already accounts for it — so
     //    there is no separate bare-headroom term here; it would only ever
@@ -529,7 +542,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     const baseY = Math.max(
       baseYFromGap,
       trackTopY(width, height),
-      skyBottomY(width, height) + baseScale * SPRITE_HEADROOM,
+      skyBottomY(width, height) + baseScale * (SPRITE_HEADROOM + START_LOWER_MARGIN),
     );
     // The charges bar (drawHud, below) is drawn on top of the horses, near
     // the bottom of the canvas. A fixed height-relative spacing pushed the

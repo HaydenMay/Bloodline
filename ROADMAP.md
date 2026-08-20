@@ -1342,6 +1342,16 @@ not just the anchor, but the anchor *plus the sprite's own height above it* — 
 crowd stand at worst, never above it. Re-verified at all four sizes with the head/crowd boundary checked
 directly, not just glanced at: no lane's head clears the crowd stand into sky at any of them.
 
+**Refined — found in play once the floating bug was actually gone: "Nice spaced better. Have them start
+lower on the y axis."** Sitting exactly at the sky floor put lane 0's head right at the crowd stand's
+top edge with no room to breathe. A `START_LOWER_MARGIN` (40 rig units, `baseScale`-scaled like
+everything else here) pushes `baseY` further down past that floor — but only on screens with band to
+spare: it's also scaled by `tilt`, the same curve `horizonY` itself tilts on, so desktop and tablets get
+the full push while a short landscape canvas — the shape this whole entry exists to protect the band of
+— gets little to none. Verified: desktop and tablet now start visibly lower with the same spacing as
+before; mobile landscape is close to unchanged, A/B'd against the pre-margin screenshot directly rather
+than judged by eye.
+
 **Found in play (this investigation)**, minor — while the leader pulls away, a trailing horse can be
 drawn straddling `x = 0`, mid-sprite, rather than fully in or out of frame. `raceScreen.ts:441`
 already culls runners outside `[-140, width + 140]` in screen-space by design, so pop-in/pop-out at
