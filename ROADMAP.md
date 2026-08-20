@@ -1328,6 +1328,20 @@ same `horizonY` rather than a second copy of the 0.09 offset, and `baseY` takes 
 fraction, the sprite-headroom floor above, and this one — it can never land above the turf, whatever the
 other two compute. Re-verified at the same four sizes: every lane now stands on grass, headroom intact.
 
+**Still wrong — found in play again, immediately: "that doesn't look fixed to me... only mobile portrait
+looks right."** They were right and the screenshots I'd been checking were misleading me: `trackTopY`
+turned out to describe a boundary that only exists in `drawTurf`'s *fallback* path (no art loaded). With
+the real art loaded — the normal case — `drawTurf` tiles `grass.png` starting at `horizon` itself, well
+above `trackTopY`, so grounding the *anchor* against `trackTopY` was already trivially satisfied and
+never the actual constraint. The real bug: a horse's head, ears and mane sit `SPRITE_HEADROOM` (132 rig
+units) *above* its anchor, and on the much smaller gap landscape now uses, that put lane 0's head above
+`skyBottom` — the crowd stand's own top edge — standing in open blue sky no matter where its feet were.
+Grounding the feet was never going to fix a problem that lived in the head. `track.ts` now also exports
+`skyBottomY(width, height)`, and `baseY`'s floor is `skyBottomY(...) + baseScale * SPRITE_HEADROOM` —
+not just the anchor, but the anchor *plus the sprite's own height above it* — clamped to stay within the
+crowd stand at worst, never above it. Re-verified at all four sizes with the head/crowd boundary checked
+directly, not just glanced at: no lane's head clears the crowd stand into sky at any of them.
+
 **Found in play (this investigation)**, minor — while the leader pulls away, a trailing horse can be
 drawn straddling `x = 0`, mid-sprite, rather than fully in or out of frame. `raceScreen.ts:441`
 already culls runners outside `[-140, width + 140]` in screen-space by design, so pop-in/pop-out at

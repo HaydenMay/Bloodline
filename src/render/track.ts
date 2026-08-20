@@ -88,6 +88,22 @@ export function trackTopY(width: number, height: number): number {
   return horizonY(width, height) + height * 0.09;
 }
 
+/**
+ * Where pure sky ends and the crowd stand begins — `drawBackdrop`'s own
+ * `skyBottom`, exported for the same reason as `trackTopY`: a runner's y
+ * needs to be checked against it, not just assumed to be in bounds. The
+ * `trackTopY` floor keeps a lane's own *anchor* on the grass, but a horse's
+ * head, ears and mane reach roughly 130 rig units above that anchor
+ * (`raceScreen.ts`'s sprite-headroom floor) — high enough, on the lane band
+ * `raceScreen.ts` now spreads across a short-and-landscape canvas, to clear
+ * the crowd stand entirely and stand in open blue sky. Found in play: "is
+ * the issue with them floating in the air fixed?" — it wasn't; grounding the
+ * anchor doesn't ground the head above it.
+ */
+export function skyBottomY(width: number, height: number): number {
+  return horizonY(width, height) * (0.29 / 0.44);
+}
+
 export function metreToScreen(metres: number, cam: Camera): number {
   return (metres - cam.scrollMetres) * cam.pixelsPerMetre;
 }

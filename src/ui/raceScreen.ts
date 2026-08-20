@@ -24,6 +24,7 @@ import {
   isLandscape,
   loadRaceBackgroundImages,
   metreToScreen,
+  skyBottomY,
   trackTopY,
   type Camera,
 } from "../render/track.js";
@@ -502,27 +503,33 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       ? horizonY(width, height) + height * (0.03 + 0.02 * tilt)
       : horizonY(width, height) + height * (isSmallScreen ? 0.14 : 0.16);
     // The rig draws well above its own (x, y) anchor — head, ears and mane
-    // reach well above the ground point drawHorse is called with; 132 rig
-    // units is that headroom measured empirically (screenshotting the
-    // clipping and walking the constant up until it stopped), not derived
-    // from the rig's own coordinates, which are only known up to whatever a
-    // chain of rotations (neck pitch, ear tilt, gait bob) does to them. The
-    // gap above shrinks that headroom on landscape's much steeper camera,
-    // and on a short-and-landscape canvas it can shrink past what lane 0's
-    // own sprite needs: found in play driving 812x375 after the desktop fix
-    // — the whole pack rendered with its heads clipped off the top of the
-    // canvas.
+    // reach roughly 132 rig units above the ground point drawHorse is called
+    // with, measured empirically (screenshotting the clipping and walking
+    // the constant up until it stopped) rather than derived from the rig's
+    // own coordinates, which pass through too many rotations (neck pitch,
+    // ear tilt, gait bob) to sum by hand.
+    const SPRITE_HEADROOM = 132;
+    // `baseY` — lane 0's own anchor, i.e. its feet — has to clear three
+    // separate floors, found in play one at a time as each fix chased more
+    // vertical spread than the last:
     //
-    // A second floor, `trackTopY`: the gap shrinking to chase more spread
-    // also let `baseY` land *above* where `drawTurf` actually starts the
-    // grass — found in play again, immediately, as horses floating in the
-    // rail/crowd strip instead of standing on the running surface. `baseY`
-    // can never be pushed above either floor, whatever the gap fraction
-    // above computes.
+    // 1. `trackTopY`: the anchor itself has to land on the grass, not in the
+    //    strip above it (`drawTurf`'s fallback boundary when the real art
+    //    hasn't loaded).
+    // 2. `skyBottomY(...) + SPRITE_HEADROOM`: grounding the anchor does not
+    //    ground the HEAD above it. "Is the issue with them floating in the
+    //    air fixed?" — it wasn't: the anchor was on the grass, but lane 0's
+    //    head, `SPRITE_HEADROOM` above it, still cleared the crowd stand
+    //    entirely and stood in open sky. This is the floor that actually
+    //    keeps the whole horse, not just its feet, off the sky.
+    // 3. Sitting at either floor still leaves plenty of room for the
+    //    headroom itself above `baseY` — (2) already accounts for it — so
+    //    there is no separate bare-headroom term here; it would only ever
+    //    be weaker than (2).
     const baseY = Math.max(
       baseYFromGap,
-      baseScale * 132,
       trackTopY(width, height),
+      skyBottomY(width, height) + baseScale * SPRITE_HEADROOM,
     );
     // The charges bar (drawHud, below) is drawn on top of the horses, near
     // the bottom of the canvas. A fixed height-relative spacing pushed the
