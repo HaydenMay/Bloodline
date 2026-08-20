@@ -187,10 +187,27 @@ export class RaceScene3d {
     }
     const mid = (lead + tail) / 2;
     const spread = lead - tail;
-    const packPoint = sample(this.startDistance + mid, 0).position;
+
+    /**
+     * Every camera is anchored on the PLAYER, not on the middle of the field.
+     *
+     * Framing the pack looks right only while the player is in it: the moment
+     * they drop off the back or go clear, the shot stays with the bunch and
+     * the horse you are actually riding walks out of frame. Biasing a little
+     * toward the pack keeps the rivals in shot without letting them steal the
+     * camera.
+     */
+    const focus = player.distance + (mid - player.distance) * 0.22;
+    /** How far the player sits from the middle of the field, in metres. */
+    const offPace = Math.abs(player.distance - mid);
+    const packPoint = sample(this.startDistance + focus, 0).position;
+    const playerPoint = sample(
+      this.startDistance + player.distance,
+      this.laneOffset(player.lane),
+    ).position;
 
     let desired: THREE.Vector3;
-    let lookAt = packPoint.clone().setY(1.15);
+    let lookAt = playerPoint.clone().setY(1.2);
     let responsiveness = 3.5;
 
     switch (this.cameraMode) {
@@ -203,13 +220,13 @@ export class RaceScene3d {
         break;
       }
       case 'aerial': {
-        desired = sample(this.startDistance + mid - 30, 0).position.setY(52 + spread * 0.4);
+        desired = sample(this.startDistance + focus - 30, 0).position.setY(52 + spread * 0.4);
         responsiveness = 2.2;
         break;
       }
       case 'head-on': {
         // Down the track ahead of the leader, looking back, so the field runs
-        // straight at the lens.
+        // straight at the lens — but still framed on the player behind it.
         desired = sample(this.startDistance + lead + 38, 0).position.setY(3.2);
         responsiveness = 3;
         break;
@@ -218,18 +235,30 @@ export class RaceScene3d {
       default: {
         // A tracking truck running inside the rail, level with the field —
         // the same read as the 2D view, so the race plays the same way.
-        // Eases back as the runners string out so the whole field stays in shot.
+        //
+        // Held tight on the player rather than on the pack, and pulled back
+        // only by how far off the pace they actually are. Keying the pull-back
+        // to the field's full spread instead meant one runaway leader or one
+        // tailed-off backmarker shoved the camera miles out and shrank the
+        // horse you are riding to nothing.
+        // Sat slightly AHEAD of the player along the track, so they ride into
+        // frame from the left with the ground they are running at open in
+        // front of them. Anchored behind instead, the shot trails the horse
+        // and fills the screen with track already covered.
         desired = sample(
-          this.startDistance + mid + 2,
-          -(TRACK_HALF_WIDTH + 9 + spread * 0.38),
-        ).position.setY(4.4 + spread * 0.1);
+          this.startDistance + player.distance + 9,
+          -(TRACK_HALF_WIDTH + 9 + offPace * 0.3),
+        ).position.setY(4.4 + offPace * 0.08);
         break;
       }
     }
 
-    const smoothing = 1 - Math.exp(-dt * responsiveness);
-    this.camera.position.lerp(desired, smoothing);
-    this.camTarget.lerp(lookAt, smoothing);
+    // The camera BODY eases — that lag is what makes the move feel filmed
+    // rather than welded on. Its AIM does not: sharing one smoothing meant the
+    // look target trailed a horse running at 17 m/s, so the player drifted off
+    // toward the edge of frame exactly when the racing got interesting.
+    this.camera.position.lerp(desired, 1 - Math.exp(-dt * responsiveness));
+    this.camTarget.lerp(lookAt, 1 - Math.exp(-dt * responsiveness * 3));
     this.camera.lookAt(this.camTarget);
 
     this.sun.position.set(packPoint.x + 40, 70, packPoint.z + 25);

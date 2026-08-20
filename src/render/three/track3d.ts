@@ -215,27 +215,22 @@ export function buildCourse(scene: THREE.Scene): { dispose(): void } {
     scene.add(posts);
   }
 
-  // The winning post and the line across the track.
+  // The finish: a white line painted across the track, and nothing else.
+  //
+  // It used to carry a pair of tall red posts as well, standing right where
+  // the grandstand does — so the stand read as the finish marker and the line
+  // underneath it went unnoticed. One unambiguous mark is clearer than three
+  // competing ones. Run a little wider than the track so it visibly crosses
+  // the whole running surface rather than stopping short of the rails.
   const line = track(
-    new THREE.PlaneGeometry(TRACK_HALF_WIDTH * 2, 0.6),
-    new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 }),
+    new THREE.PlaneGeometry(TRACK_HALF_WIDTH * 2 + 3, 1),
+    new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }),
   );
   const at = sample(FINISH_DISTANCE);
-  line.position.set(at.position.x, 0.02, at.position.z);
+  line.position.set(at.position.x, 0.03, at.position.z);
   line.rotation.x = -Math.PI / 2;
   line.rotation.z = -at.heading;
   scene.add(line);
-
-  for (const side of [-TRACK_HALF_WIDTH, TRACK_HALF_WIDTH]) {
-    const p = sample(FINISH_DISTANCE, side).position;
-    const postMat = new THREE.MeshStandardMaterial({ color: '#d8332f', roughness: 0.6 });
-    const postGeo = new THREE.CylinderGeometry(0.14, 0.14, 4.2, 8);
-    owned.push(postGeo, postMat);
-    const post = new THREE.Mesh(postGeo, postMat);
-    post.position.set(p.x, 2.1, p.z);
-    post.castShadow = true;
-    scene.add(post);
-  }
 
   buildStand(scene, owned);
 
@@ -246,13 +241,25 @@ export function buildCourse(scene: THREE.Scene): { dispose(): void } {
   };
 }
 
+/**
+ * The grandstand, set well back and running the length of the home straight.
+ *
+ * Sat close to the rail at the winning post it read as the finish line itself.
+ * Pushed back and stretched out it becomes what it should be — the wall the
+ * crowd sits along behind the straight — leaving the painted line to mark the
+ * finish on its own.
+ */
 function buildStand(scene: THREE.Scene, owned: { dispose(): void }[]): void {
-  const anchor = sample(FINISH_DISTANCE, TRACK_HALF_WIDTH + 20).position;
+  const anchor = sample(FINISH_DISTANCE, TRACK_HALF_WIDTH + 62).position;
   const heading = sample(FINISH_DISTANCE).heading;
 
   const stand = new THREE.Group();
   stand.position.copy(anchor);
-  stand.rotation.y = heading;
+  // `heading` aligns local +Z with the direction of travel, which is what a
+  // runner wants. The stand's length is its local X, so it needs the extra
+  // quarter turn — without it the whole structure runs ACROSS the course and
+  // 300 m off into the country instead of lining the straight.
+  stand.rotation.y = heading + Math.PI / 2;
 
   const add = (geo: THREE.BufferGeometry, m: THREE.Material): THREE.Mesh => {
     owned.push(geo, m);
@@ -261,35 +268,41 @@ function buildStand(scene: THREE.Scene, owned: { dispose(): void }[]): void {
     return mesh;
   };
 
+  // Kept low and long. A tall block this close to the rail becomes a grey
+  // wall across the sky and the seating ends up stranded on top of it, so the
+  // structure is short and the crowd is banked up its front face where it can
+  // actually be seen.
   const base = add(
-    new THREE.BoxGeometry(150, 9, 22),
+    new THREE.BoxGeometry(300, 6, 26),
     new THREE.MeshStandardMaterial({ color: '#e8e2d6', roughness: 0.9 }),
   );
-  base.position.y = 4.5;
+  base.position.y = 3;
   base.castShadow = true;
   base.receiveShadow = true;
 
   const roof = add(
-    new THREE.BoxGeometry(154, 0.8, 25),
+    new THREE.BoxGeometry(306, 0.9, 30),
     new THREE.MeshStandardMaterial({ color: '#3f5d78', roughness: 0.7 }),
   );
   roof.position.y = 13.5;
   roof.castShadow = true;
 
-  // Terraced crowd, instanced so a few thousand spectators stay cheap.
+  // Terraced crowd, instanced so a few thousand spectators stay cheap. Local
+  // -Z is trackward once the group is turned, so the tiers step back and up
+  // away from the running rail, the way real banked seating does.
   const crowdGeo = new THREE.BoxGeometry(0.45, 0.75, 0.45);
   const crowdMat = new THREE.MeshStandardMaterial({ roughness: 0.95 });
   owned.push(crowdGeo, crowdMat);
-  const rows = 8;
-  const perRow = 150;
+  const rows = 9;
+  const perRow = 300;
   const crowd = new THREE.InstancedMesh(crowdGeo, crowdMat, rows * perRow);
   const matrix = new THREE.Matrix4();
   const color = new THREE.Color();
   let i = 0;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < perRow; c++) {
-      const x = -72 + (c / (perRow - 1)) * 144 + (r % 2) * 0.45;
-      matrix.makeTranslation(x, 9.4 + r * 0.6, -4 - r * 1.9);
+      const x = -146 + (c / (perRow - 1)) * 292 + (r % 2) * 0.45;
+      matrix.makeTranslation(x, 6.4 + r * 0.72, -12 + r * 1.5);
       crowd.setMatrixAt(i, matrix);
       color.setHSL(Math.random(), 0.55, 0.45 + Math.random() * 0.25);
       crowd.setColorAt(i, color);
