@@ -80,5 +80,6 @@ export function supports3d(
   width: number = window.innerWidth,
   height: number = window.innerHeight,
 ): boolean {
-  return width >= MIN_3D_WIDTH && height >= MIN_3D_HEIGHT;
+  return true
+//width >= MIN_3D_WIDTH && height >= MIN_3D_HEIGHT;
 }
