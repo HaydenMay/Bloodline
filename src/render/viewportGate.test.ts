@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { supports3d, MIN_3D_WIDTH, MIN_3D_HEIGHT } from './raceView.js';
+import { supports3d } from './raceView.js';
 
 /**
  * The 3D view is gated on viewport, and both halves of that matter.
