@@ -73,8 +73,8 @@ export function interpolateRunners(
  * Both dimensions are checked, so a phone held sideways — wide enough, far too
  * short — does not slip through.
  */
-export const MIN_3D_WIDTH = 900;
-export const MIN_3D_HEIGHT = 600;
+//export const MIN_3D_WIDTH = 900;
+//export const MIN_3D_HEIGHT = 600;
 
 export function supports3d(
   //width: number = window.innerWidth,
