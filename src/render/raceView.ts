@@ -77,8 +77,8 @@ export const MIN_3D_WIDTH = 900;
 export const MIN_3D_HEIGHT = 600;
 
 export function supports3d(
-  width: number = window.innerWidth,
-  height: number = window.innerHeight,
+  //width: number = window.innerWidth,
+  //height: number = window.innerHeight,
 ): boolean {
   return true
 //width >= MIN_3D_WIDTH && height >= MIN_3D_HEIGHT;
