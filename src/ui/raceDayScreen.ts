@@ -187,9 +187,9 @@ export function mountRaceDayScreen(
     for (const btn of root.querySelectorAll<HTMLButtonElement>('.raceday-view-btn')) {
       btn.classList.toggle('is-active', btn.dataset.view === current);
       btn.setAttribute('aria-pressed', String(btn.dataset.view === current));
-      if (btn.dataset.view !== '3d') continue;
-      btn.disabled = !supports3d();
-      btn.title = supports3d() ? '' : 'Needs a larger window';
+      // if (btn.dataset.view !== '3d') continue;
+      // btn.disabled = !supports3d();
+      // btn.title = supports3d() ? '' : 'Needs a larger window';
     }
     const note = root.querySelector<HTMLElement>('.raceday-view-note');
     if (note) note.hidden = supports3d();
