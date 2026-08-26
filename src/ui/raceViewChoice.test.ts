@@ -6,12 +6,9 @@ import { createNewCareer, createStable, loadStable, type Career } from './career
 import { DEFAULTS } from '../data/colors.js';
 
 /**
- * The 2D/3D choice lives on Race Day, next to Start Race, and sticks.
- *
- * Worth a test rather than a look: the whole point of putting it here instead
- * of in a settings menu is that it is picked per race, and the whole point of
- * persisting it is that a twenty-start career is not twenty re-picks. Both
- * halves are invisible until they break.
+ * 3D mode is disabled — the procedural models don't animate well enough yet.
+ * All 3D code is preserved for future re-enablement. These tests verify that
+ * the UI no longer offers 3D and always defaults to 2D.
  */
 
 function horse(): Horse {
@@ -73,71 +70,28 @@ describe('race view choice', () => {
 
   it('opens on 2D for a stable that has never chosen', () => {
     const { host, teardown } = mount(career);
-    const active = host.querySelector('.raceday-view-btn.is-active');
-    expect(active?.getAttribute('data-view')).toBe('2d');
+    // 3D mode is disabled — no view buttons should exist
+    const btns = host.querySelectorAll('.raceday-view-btn');
+    expect(btns.length).toBe(0);
     teardown();
   });
 
-  it('moves the active state when 3D is picked', () => {
-    const { host, teardown } = mount(career);
-    host.querySelector<HTMLButtonElement>('.raceday-view-btn[data-view="3d"]')!.click();
+  it('always uses 2D regardless of saved preference', () => {
+    // Even if a saved stable had raceView: '3d', it should be forced to '2d'
+    const stable = createStable('raceView-2');
+    stable.settings.raceView = '3d';
+    const savedCareer = createNewCareer(horse(), DEFAULTS.playerSilksDefault, stable);
 
-    const active = host.querySelectorAll('.raceday-view-btn.is-active');
-    expect(active.length).toBe(1);
-    expect(active[0]!.getAttribute('data-view')).toBe('3d');
+    const { host, teardown } = mount(savedCareer);
+    // No 3D button should exist
+    const btn3d = host.querySelector('.raceday-view-btn[data-view="3d"]');
+    expect(btn3d).toBeNull();
     teardown();
   });
 
-  it('persists the choice, so the next race opens on it', () => {
-    const first = mount(career);
-    first.host.querySelector<HTMLButtonElement>('.raceday-view-btn[data-view="3d"]')!.click();
-    first.teardown();
-
-    expect(loadStable()?.settings.raceView).toBe('3d');
-
-    // A fresh screen, reading the saved stable rather than the one in hand.
-    const reloaded = { ...career, stable: loadStable()! };
-    const second = mount(reloaded);
-    const active = second.host.querySelector('.raceday-view-btn.is-active');
-    expect(active?.getAttribute('data-view')).toBe('3d');
-    second.teardown();
-  });
-
-  it('offers 3D on a desktop window', () => {
-    const { host, teardown } = mount(career);
-    const btn = host.querySelector<HTMLButtonElement>('.raceday-view-btn[data-view="3d"]')!;
-    expect(btn.disabled).toBe(false);
-    expect(host.querySelector<HTMLElement>('.raceday-view-note')!.hidden).toBe(true);
-    teardown();
-  });
-
-  //it('closes 3D off on a phone, and shows 2D as what will actually run', () => {
-    // A stable that picked 3D on a desktop and then opened on a phone. The
-    // saved preference is untouched — it is right again on the next desktop —
-    // but the button has to say what this device will do.
-    //const first = mount(career);
-    //first.host.querySelector<HTMLButtonElement>('.raceday-view-btn[data-view="3d"]')!.click();
-    //first.teardown();
-
-    //const width = window.innerWidth;
-    //Object.defineProperty(window, 'innerWidth', { value: 390, configurable: true });
-    //try {
-      //const { host, teardown } = mount({ ...career, stable: loadStable()! });
-      //expect(host.querySelector<HTMLButtonElement>('.raceday-view-btn[data-view="3d"]')!.disabled).toBe(true);
-      //expect(host.querySelector('.raceday-view-btn.is-active')?.getAttribute('data-view')).toBe('2d');
-      //expect(host.querySelector<HTMLElement>('.raceday-view-note')!.hidden).toBe(false);
-      ///expect(loadStable()?.settings.raceView).toBe('3d');
-    //teardown();
-  //  } finally {
-      //Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
- //   }
-  //});
-
-  it('can be switched back to 2D', () => {
-    const { host, teardown } = mount(career);
-    host.querySelector<HTMLButtonElement>('.raceday-view-btn[data-view="3d"]')!.click();
-    host.querySelector<HTMLButtonElement>('.raceday-view-btn[data-view="2d"]')!.click();
-
+  it('forces raceView to 2d in saved stable', () => {
+    const { teardown } = mount(career);
+    // The mount function should force raceView to '2d'
     expect(loadStable()?.settings.raceView).toBe('2d');
     teardown();
   });

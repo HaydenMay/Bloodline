@@ -83,15 +83,15 @@ import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
 import { DEFAULTS } from './data/colors.js';
-import { supports3d } from './render/raceView.js';
 import { updateDivisionProgression, updateAIDivisionProgression, populatePromotionRaceField, populateDemotionRaceField, finalizePromotion, finalizeDemotion } from './sim/division.js';
 
 /**
  * Which way to draw the race.
  *
- * The Race Day screen writes the choice to settings before starting a race, so
- * this reads it back. `?view=3d` overrides it, for driving the renderer
- * directly without clicking through a whole career first.
+ * 3D mode is disabled — the procedural models don't animate well enough yet
+ * (legs go crazy while body stays still), and the scene is empty until the
+ * very end. All code is preserved for future re-enablement when the models
+ * are ready.
  */
 function raceCameraMode(): RaceCameraMode | undefined {
   const cam = new URLSearchParams(location.search).get('cam');
@@ -101,13 +101,9 @@ function raceCameraMode(): RaceCameraMode | undefined {
 }
 
 function raceViewMode(): RaceViewMode {
-  const override = new URLSearchParams(location.search).get('view');
-  if (override === '3d' || override === '2d') return override;
-  const saved = loadStable()?.settings.raceView ?? '2d';
-  // The preference is saved per stable and the stable travels between devices,
-  // so the viewport gets the last word. Enforced here as well as on the Race
-  // Day button, because this is the call that actually builds the renderer.
-  return saved === '3d' && supports3d() ? '3d' : '2d';
+  // 3D mode disabled — models don't animate well enough yet.
+  // Always return '2d' regardless of saved preference or URL override.
+  return '2d';
 }
 
 
