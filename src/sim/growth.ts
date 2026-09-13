@@ -65,12 +65,27 @@ export const FINAL_AGE = 5;
 /**
  * Training multiplier by age. Young horses improve fastest; a five-year-old is
  * holding on rather than building.
+ *
+ * earlyBloomer shifts the curve forward: +25% at age 2, normal at 3, −25% at 4.
+ * lateBloomer shifts it back: −25% at age 2–3, +25% at age 5.
  */
-export function getAgeTrainingFactor(age: number): number {
-  if (age <= 2) return 1.25;
-  if (age === 3) return 1.1;
-  if (age === 4) return 0.85;
-  return 0.5;
+export function getAgeTrainingFactor(age: number, traits?: readonly string[]): number {
+  let base: number;
+  if (age <= 2) base = 1.25;
+  else if (age === 3) base = 1.1;
+  else if (age === 4) base = 0.85;
+  else base = 0.5;
+
+  if (traits?.includes('earlyBloomer')) {
+    if (age <= 2) base *= 1.25;
+    else if (age >= 4) base *= 0.75;
+  }
+  if (traits?.includes('lateBloomer')) {
+    if (age <= 3) base *= 0.75;
+    else if (age >= 5) base *= 1.25;
+  }
+
+  return base;
 }
 
 /**

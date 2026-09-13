@@ -12,7 +12,10 @@ export default defineConfig(({ command }) => ({
   build: {
     target: 'es2022',
     outDir: 'dist',
-    sourcemap: true,
+    // Release builds should not publish the TypeScript source alongside the
+    // paid browser game. Keep source maps available through local development
+    // tooling instead.
+    sourcemap: false,
   },
   server: {
     // `npm run dev:host` exposes this on the local network for phone testing.

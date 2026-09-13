@@ -224,11 +224,11 @@ describe('wagering', () => {
     expect(favourite).toBeGreaterThan(outsider);
   });
 
-  it('never offers a certainty or a hopeless price', () => {
+  it('returns a normalized probability for a dominant favourite', () => {
     const field = weakField();
     const p = winProbability(field[0]!, field);
-    expect(p).toBeGreaterThanOrEqual(0.03);
-    expect(p).toBeLessThanOrEqual(0.85);
+    expect(p).toBeGreaterThan(0);
+    expect(p).toBeLessThan(1);
   });
 
   it('always pays more than the stake back', () => {
@@ -238,8 +238,21 @@ describe('wagering', () => {
     }
   });
 
-  it('prices a place shorter than a win', () => {
+  it('withholds a market it cannot price above the minimum return', () => {
     const field = weakField();
+    expect(getBetOptions(field[0]!, field)).toEqual([]);
+  });
+
+  it('caps long-shot returns so an uncertain price cannot become an exploit', () => {
+    const field = [
+      horse({ id: 'p', stats: { speed: 20, stamina: 20, burst: 20, grit: 20, temper: 20, consistency: 20 } }),
+      ...Array.from({ length: 7 }, (_, i) => horse({ id: `r${i}`, stats: { speed: 95, stamina: 95, burst: 95, grit: 95, temper: 95, consistency: 95 } })),
+    ];
+    for (const option of getBetOptions(field[0]!, field)) expect(option.odds).toBeLessThanOrEqual(10);
+  });
+
+  it('prices a place shorter than a win when both markets are available', () => {
+    const field = Array.from({ length: 8 }, (_, i) => horse({ id: `even-${i}` }));
     const [win, place] = getBetOptions(field[0]!, field);
     expect(place!.odds).toBeLessThan(win!.odds);
   });

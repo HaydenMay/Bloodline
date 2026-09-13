@@ -66,7 +66,7 @@ export const HALL_OF_FAME_BONUS = 0.25;
 export function partnerContribution(partner: BreedingPartner): number {
   const base = Math.max(0, partner.legacyBanked);
   const enshrined = partner.hallOfFame ? 1 + HALL_OF_FAME_BONUS : 1;
-  return Math.round(base * enshrined * fertility(partner.horse.age));
+  return Math.round(base * enshrined * fertility(partner.horse.age, partner.horse.traits));
 }
 
 /* ---------------------------------------------------------------------------
@@ -85,10 +85,19 @@ export const HETEROSIS_DECAY = 0.6;
  * §10: "The base never degrades — only the bonus does. Repeats are less
  * exciting, never worse." So this only ever adds, and it is rolled per pairing
  * rather than per foal, which is what stops a reroll farming it.
+ *
+ * Outcross Gem: one parent carries the trait, the bonus is 50% larger.
  */
-export function heterosisBonus(baseBudget: number, timesBred: number): number {
+export function heterosisBonus(
+  baseBudget: number,
+  timesBred: number,
+  sireTraits?: readonly string[],
+  damTraits?: readonly string[],
+): number {
   const decay = HETEROSIS_DECAY ** Math.max(0, timesBred);
-  return Math.round(baseBudget * HETEROSIS_RATE * decay);
+  let mult = 1;
+  if (sireTraits?.includes('outcrossGem') || damTraits?.includes('outcrossGem')) mult = 1.5;
+  return Math.round(baseBudget * HETEROSIS_RATE * decay * mult);
 }
 
 /* ---------------------------------------------------------------------------
@@ -183,7 +192,7 @@ export function calculateBudget(
   pedigree?: Pedigree,
 ): InheritanceBudget {
   const base = partnerContribution(sire) + partnerContribution(dam);
-  const bonus = heterosisBonus(base, timesBred);
+  const bonus = heterosisBonus(base, timesBred, sire.horse.traits, dam.horse.traits);
   return {
     base,
     bonus,
@@ -489,8 +498,18 @@ export function breed(
 
   // Traits come from the parents, and are never paid for out of the budget
   // (§10) — a rare trait is delight, not something the foal was charged for.
-  const parentTraits = [...new Set([...sire.horse.traits, ...dam.horse.traits])];
-  const pool: TraitId[] = [...parentTraits];
+  // Prepotent: each parent's traits appear twice in the pool, making them more
+  // likely to be picked — the parent passes its traits far more reliably.
+  const sireTraitList = sire.horse.traits ?? [];
+  const damTraitList = dam.horse.traits ?? [];
+  const sireBoost = sireTraitList.some((t) => t === 'prepotent');
+  const damBoost = damTraitList.some((t) => t === 'prepotent');
+  const parentTraits = [...new Set([...sireTraitList, ...damTraitList])];
+  const pool: TraitId[] = [
+    ...parentTraits,
+    ...(sireBoost ? sireTraitList : []),
+    ...(damBoost ? damTraitList : []),
+  ];
   // The mutation: one slot in the pool comes from the whole trait list instead,
   // so a foal can show something neither parent had. Added to the pool rather
   // than to the foal, so it competes for a place like any inherited trait and
@@ -581,17 +600,20 @@ export const BREEDING_MAX_AGE = 22;
  * taper matters more than the cutoff: a sire visibly running out of years is
  * something a player can plan around, where a hard stop simply removes a
  * favourite between one career and the next.
+ *
+ * Enduring: extends the fertile window by 4 years (to age 26).
  */
-export function fertility(age: number): number {
-  if (age >= BREEDING_MAX_AGE) return 0;
+export function fertility(age: number, traits?: readonly string[]): number {
+  const maxAge = traits?.includes('enduring') ? BREEDING_MAX_AGE + 4 : BREEDING_MAX_AGE;
+  if (age >= maxAge) return 0;
   if (age <= BREEDING_PRIME_AGE) return 1;
   const past = age - BREEDING_PRIME_AGE;
-  const span = BREEDING_MAX_AGE - BREEDING_PRIME_AGE;
+  const span = maxAge - BREEDING_PRIME_AGE;
   return Math.max(0, 1 - past / span);
 }
 
 export function canBreed(horse: Horse): boolean {
-  return fertility(horse.age) > 0;
+  return fertility(horse.age, horse.traits) > 0;
 }
 
 /** A pairing is valid when both are fertile, opposite sexes, and not the same horse. */

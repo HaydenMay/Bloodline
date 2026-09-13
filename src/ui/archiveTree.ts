@@ -9,7 +9,7 @@ import type { RetiredHorse, Stable } from './career.js';
  * `sim/breeding.ts` already gives us `pedigreeOf` (bloodstock + world, indexed
  * by id) and every foal's `sireId`/`damId`/`generation` since Stage 1
  * (ROADMAP.md, "What Stage 1 must record"). This module turns that into a
- * tree the screen can walk and draw: the direct ancestor chart NEXT_PLAN.md
+ * tree the screen can walk and draw: the direct ancestor chart DESIGN.md
  * Step 1 asks for, plus the sibling and "sold foal" lookups its settings need.
  */
 

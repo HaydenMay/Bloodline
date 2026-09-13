@@ -134,6 +134,8 @@ export function mountRaceDayScreen(
         ${
           stakes.length === 0
             ? `<p class="raceday-empty">Not enough cash to place a bet.</p>`
+            : betOptions.length === 0
+              ? `<p class="raceday-empty">No honest price is available for this favourite.</p>`
             : `
           <div class="bet-types">
             ${betOptions
@@ -166,16 +168,6 @@ export function mountRaceDayScreen(
   `;
 
   container.appendChild(root);
-
-  /**
-   * 2D or 3D, chosen here rather than buried in settings — it is a decision
-   * about this race, taken at the moment you commit to running it. The choice
-   * sticks, so a career of twenty starts is not twenty re-picks.
-   */
-  // 3D mode disabled — models don't animate well enough yet.
-  // Force 2D and ensure any saved 3D preference is ignored.
-  stable.settings.raceView = '2d';
-  saveCareer(career);
 
   const stakesBox = root.querySelector<HTMLElement>('#bet-stakes');
   const summary = root.querySelector<HTMLElement>('#bet-summary');

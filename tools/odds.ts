@@ -67,10 +67,10 @@ function trial(division: Division, playerStat: number, seedTag: string) {
 
     const field = [player, ...rivals];
     const implied = winProbability(player, field);
-    const [win] = getBetOptions(player, field);
+    const win = getBetOptions(player, field).find((option) => option.type === 'win');
 
     impliedSum += implied;
-    oddsSum += win!.odds;
+    oddsSum += win?.odds ?? 0;
     rivalAvg += rivals.reduce((s, h) => s + avg(h), 0) / rivals.length;
 
     const entrants: RaceEntrant[] = field.map((horse) => ({ horse }));
@@ -83,7 +83,7 @@ function trial(division: Division, playerStat: number, seedTag: string) {
     const position = outcome.results.find((r) => r.horseId === player.id)?.finishPosition ?? 8;
     if (position === 1) {
       wins += 1;
-      payout += win!.odds;
+      payout += win?.odds ?? 0;
     }
   }
 
@@ -98,7 +98,7 @@ function trial(division: Division, playerStat: number, seedTag: string) {
       `${(rivalAvg / RACES).toFixed(0).padStart(3)}   ` +
       `implied ${(implied * 100).toFixed(0).padStart(3)}%   ` +
       `actual ${(actual * 100).toFixed(0).padStart(3)}%   ` +
-      `odds ${odds.toFixed(2).padStart(5)}x   ` +
+      `odds ${odds > 0 ? odds.toFixed(2).padStart(5) + 'x' : ' no market'}   ` +
       `EV on $1,000 ${ev >= 0 ? '+' : ''}${Math.round(ev).toLocaleString().padStart(7)}`,
   );
 }

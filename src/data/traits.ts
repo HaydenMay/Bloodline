@@ -92,7 +92,18 @@ export type TraitId =
   // breeding
   | 'prepotent'
   | 'outcrossGem'
-  | 'enduring';
+  | 'enduring'
+  // additional race engine effects
+  | 'wire'
+  | 'freightTrain'
+  | 'frontLoadedPower'
+  | 'lateSurge'
+  | 'closeProof'
+  | 'railBird'
+  | 'freeSpirit'
+  | 'frontRunnerRelief'
+  | 'draftBoost'
+  | 'headCase';
 
 const t = (
   id: TraitId,
@@ -177,6 +188,18 @@ export const TRAITS: Record<TraitId, Trait> = {
   prepotent: t('prepotent', 'Prepotent', 'upside', 'breeding', 'Passes its traits to foals far more reliably.', { reach: true, tags: ['Passes traits'] }),
   outcrossGem: t('outcrossGem', 'Outcross Gem', 'upside', 'breeding', 'Larger first-cross bonus.', { tags: ['Fresh blood bonus'] }),
   enduring: t('enduring', 'Enduring', 'upside', 'breeding', 'Unusually long fertile window.', { tags: ['Long career span'] }),
+
+  // ---- Race engine effects ----
+  wire: t('wire', 'Wire', 'trade', 'gate', 'Quick into stride — accelerates faster early, but paces out later.', { affinity: 'speed', effect: 1, tags: ['Quick start', 'Fades late'] }),
+  freightTrain: t('freightTrain', 'Freight Train', 'trade', 'pace', 'Cheap to run at pace — but less punchy when it matters.', { affinity: 'stamina', tags: ['Efficient', 'Lacks burst'] }),
+  frontLoadedPower: t('frontLoadedPower', 'Front-Loaded Power', 'trade', 'energy', 'Strong early, fades late — stamina advantage in the first half.', { affinity: 'stamina', tags: ['Strong early', 'Fades late'] }),
+  lateSurge: t('lateSurge', 'Late Surge', 'trade', 'finish', 'Pace and kick stronger in the final quarter.', { affinity: 'burst', effect: 1, tags: ['Strong finish', 'Weak early'] }),
+  closeProof: t('closeProof', 'Close Proof', 'trade', 'finish', 'Cannot be headed in the final 10% once in front.', { affinity: 'grit', effect: 1, tags: ['Strong finish', 'Needs lead'] }),
+  railBird: t('railBird', 'Rail Bird', 'trade', 'pace', 'Costs less to hold position when leading on the rail.', { affinity: 'speed', tags: ['Rail preference', 'Efficient lead'] }),
+  freeSpirit: t('freeSpirit', 'Free Spirit', 'trade', 'pace', 'Independent mover — less affected by drafting drain.', { affinity: 'grit', tags: ['Independent', 'Draft resistant'] }),
+  frontRunnerRelief: t('frontRunnerRelief', 'Front-Runner Relief', 'trade', 'pace', 'Greater exponent relief when leading.', { affinity: 'stamina', tags: ['Strong lead', 'Needs position'] }),
+  draftBoost: t('draftBoost', 'Draft Boost', 'trade', 'energy', 'Extra recovery when drafting — sheltered runner.', { affinity: 'stamina', tags: ['Draft benefit', 'Pack runner'] }),
+  headCase: t('headCase', 'Head Case', 'trade', 'temperament', 'Cannot use front-runner relief when leading in a contested group.', { affinity: 'temper', effect: -1, tags: ['Volatile', 'Needs clear lead'] }),
 };
 
 export const ALL_TRAIT_IDS = Object.keys(TRAITS) as TraitId[];

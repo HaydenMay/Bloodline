@@ -6,6 +6,7 @@ import type { TraitId } from '../data/traits.js';
 import { createSurface, startLoop } from '../render/canvas.js';
 import { loadFrameSequence, drawFrame, type DrawFrameOptions } from '../render/frameAnimation.js';
 import { coatForHorse, type Silks } from '../render/palette.js';
+import { createRng, type Rng } from '../sim/rng.js';
 
 export interface TrainingSession {
   id: string;
@@ -273,6 +274,53 @@ export const ORDERED_SESSIONS: TrainingSession[] = Object.values(TRAINING_SESSIO
   return statOrder !== 0 ? statOrder : netValueOf(b) - netValueOf(a);
 });
 
+export interface TrainingOutcome {
+  horse: Horse;
+  isBreakthrough: boolean;
+  newTrait: TraitId | null;
+}
+
+/** Resolve a training result from a supplied seeded RNG, with no DOM state. */
+export function resolveTrainingSession(
+  rng: Rng,
+  horse: Horse,
+  session: TrainingSession,
+  gainMultiplier = 1,
+  downsideRelief = 0,
+): TrainingOutcome {
+  const breakthroughChance = (horse.morale / 100) * (horse.stats.temper / 100) * 0.5;
+  const isBreakthrough = rng.chance(breakthroughChance);
+  let statChanges: StatEffects = { ...session.statEffects };
+  if (isBreakthrough) {
+    const positiveStats = (Object.keys(statChanges) as Array<keyof StatEffects>)
+      .filter((stat) => (statChanges[stat] ?? 0) > 0);
+    statChanges = {};
+    for (const stat of positiveStats) statChanges[stat] = (session.statEffects[stat] ?? 0) + 2;
+  }
+  statChanges = scaleTrainingEffects(statChanges, gainMultiplier, downsideRelief);
+
+  const updatedHorse: Horse = {
+    ...horse,
+    stats: { ...horse.stats },
+    potential: { ...horse.potential },
+    traits: [...horse.traits],
+  };
+  for (const key of STAT_KEYS) {
+    const raw = statChanges[key];
+    if (raw !== undefined && raw !== 0) applyTrainedStat(updatedHorse, key, raw);
+  }
+
+  // Training affects an early career, not every year of a horse's life.
+  const candidates = session.traitPool.filter((trait) => !updatedHorse.traits.includes(trait));
+  const traitChance = isBreakthrough ? 0.15 : 0.05;
+  const newTrait =
+    horse.age <= 3 && updatedHorse.traits.length < 4 && candidates.length > 0 && rng.chance(traitChance)
+      ? rng.pick(candidates)
+      : null;
+  if (newTrait) updatedHorse.traits.push(newTrait);
+  return { horse: updatedHorse, isBreakthrough, newTrait };
+}
+
 export function mountTrainingScreen(
   container: HTMLElement,
   horse: Horse,
@@ -285,13 +333,14 @@ export function mountTrainingScreen(
   gainMultiplier = 1,
   /** Training Grounds' downside relief, 0 (full cost) to 1 (no downside at all). */
   downsideRelief = 0,
+  rng: Rng = createRng('training-screen'),
 ): () => void {
   const root = document.createElement('div');
   root.className = 'training-screen';
 
   // What this horse, in this yard, actually gets out of a session. The cards
   // below are drawn from this, so what is promised is what lands.
-  const totalMultiplier = gainMultiplier * getAgeTrainingFactor(horse.age);
+  const totalMultiplier = gainMultiplier * getAgeTrainingFactor(horse.age, horse.traits);
 
   root.innerHTML = `
     <div class="training-container">
@@ -429,7 +478,7 @@ export function mountTrainingScreen(
 
       // Breakthrough chance based on morale and temper
       const breakthroughChance = (horse.morale / 100) * (horse.stats.temper / 100) * 0.5; // 0-50% max
-      const isBreakthrough = Math.random() < breakthroughChance;
+      const isBreakthrough = rng.chance(breakthroughChance);
 
       // Calculate stat changes
       let statChanges: StatEffects = { ...session.statEffects };
@@ -467,10 +516,11 @@ export function mountTrainingScreen(
       }
 
       // Rare trait instillment (5% chance, or higher if breakthrough)
+      // Hard cap: 4 traits per horse (DESIGN.md §2).
       let newTrait: TraitId | null = null;
       const traitChance = isBreakthrough ? 0.15 : 0.05;
-      if (Math.random() < traitChance && session.traitPool.length > 0) {
-        const trait = session.traitPool[Math.floor(Math.random() * session.traitPool.length)]!;
+      if (horse.age <= 3 && rng.chance(traitChance) && session.traitPool.length > 0 && updatedHorse.traits.length < 4) {
+        const trait = rng.pick(session.traitPool);
         if (!updatedHorse.traits.includes(trait)) {
           newTrait = trait;
           updatedHorse.traits = [...updatedHorse.traits, trait];

@@ -1,9 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import { STAT_KEYS } from '../sim/growth.js';
-import { ORDERED_SESSIONS, TRAINING_SESSIONS, scaleTrainingEffects } from './trainingScreen.js';
+import { ORDERED_SESSIONS, TRAINING_SESSIONS, resolveTrainingSession, scaleTrainingEffects } from './trainingScreen.js';
 import type { StatEffects } from './trainingScreen.js';
+import { createRng, type Rng } from '../sim/rng.js';
+import type { Horse } from '../sim/types.js';
 
 const sessions = Object.values(TRAINING_SESSIONS);
+
+function horse(age = 2): Horse {
+  return {
+    id: 'training-horse', name: 'Training Horse', gender: 'mare', age,
+    stats: { speed: 50, stamina: 50, burst: 50, grit: 50, temper: 50, consistency: 50 },
+    potential: { speed: 90, stamina: 90, burst: 90, grit: 90, temper: 90, consistency: 90 },
+    style: 'stalker', moment: 'late', preferredDistance: { min: 1200, max: 1800 }, traits: [],
+    condition: 80, morale: 100, division: 'maiden', divisionLevel: 0, divisionPoints: 0,
+    starts: 0, wins: 0, places: 0, shows: 0, coat: 'bay', jockeySkill: 50,
+  };
+}
 
 /** Every stat a session moves, across the whole table. */
 function statsTouched(pick: (value: number) => boolean): Set<string> {
@@ -49,6 +62,32 @@ describe('scaleTrainingEffects', () => {
     const scaled = scaleTrainingEffects({ temper: 1, grit: 3 }, 1.5);
     expect(scaled.temper).toBe(2);
     expect(scaled.grit).toBe(5);
+  });
+});
+
+describe('training resolution', () => {
+  it('is byte-identical when replayed from the same seed', () => {
+    const session = TRAINING_SESSIONS.gatePractice!;
+    const first = resolveTrainingSession(createRng('training-replay'), horse(), session);
+    const second = resolveTrainingSession(createRng('training-replay'), horse(), session);
+    expect(second).toEqual(first);
+  });
+
+  it('never awards a training trait after the early-career window', () => {
+    const alwaysLucky: Rng = {
+      next: () => 0,
+      int: (min) => min,
+      range: (min) => min,
+      chance: () => true,
+      pick: <T>(items: readonly T[]) => items[0]!,
+      shuffle: <T>(items: readonly T[]) => [...items],
+      normal: (mean) => mean,
+      fork: () => alwaysLucky,
+    };
+    const session = TRAINING_SESSIONS.gatePractice!;
+    const result = resolveTrainingSession(alwaysLucky, horse(4), session);
+    expect(result.newTrait).toBeNull();
+    expect(result.horse.traits).toEqual([]);
   });
 });
 

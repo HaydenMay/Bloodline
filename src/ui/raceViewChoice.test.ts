@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Horse } from '../sim/types.js';
 import { mountRaceDayScreen, type RaceDayRace } from './raceDayScreen.js';
-import { createNewCareer, createStable, loadStable, type Career } from './career.js';
+import { createNewCareer, createStable, type Career } from './career.js';
 import { DEFAULTS } from '../data/colors.js';
 
 /**
@@ -76,23 +76,9 @@ describe('race view choice', () => {
     teardown();
   });
 
-  it('always uses 2D regardless of saved preference', () => {
-    // Even if a saved stable had raceView: '3d', it should be forced to '2d'
-    const stable = createStable('raceView-2');
-    stable.settings.raceView = '3d';
-    const savedCareer = createNewCareer(horse(), DEFAULTS.playerSilksDefault, stable);
-
-    const { host, teardown } = mount(savedCareer);
-    // No 3D button should exist
-    const btn3d = host.querySelector('.raceday-view-btn[data-view="3d"]');
-    expect(btn3d).toBeNull();
-    teardown();
-  });
-
-  it('forces raceView to 2d in saved stable', () => {
+  it('does not write an experimental view preference to the stable', () => {
     const { teardown } = mount(career);
-    // The mount function should force raceView to '2d'
-    expect(loadStable()?.settings.raceView).toBe('2d');
+    expect(career.stable.settings).not.toHaveProperty('raceView');
     teardown();
   });
 });

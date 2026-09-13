@@ -28,6 +28,21 @@ playwright-report/
 test-results/
 screenshot-*.png
 tests/e2e/screenshots/
+test-output.txt
 
 # Save Data
-save-data/**
+save_data/
+
+# Temporary / experimental
+.claude/
+.img2threejs-horse/
+.img2threejs-preview/
+pixel_horse_texture_test*.png
+screenshots/
+src/assets/3DAssets/
+src/assets/rotations/
+src/assets/horse-positions/
+tools/bone-diagnostic.mjs
+tools/bone-world.cjs
+tools/model-preview.html
+tools/race-shots.ts

@@ -779,3 +779,139 @@ export const FRONT_RUNNER_PRESS_TOLERANCE = 1;
 export const TRAIT_ALERT_FUMBLE = 0.4;
 export const TRAIT_GATE_RUSHER_EARLY = 0.015;
 export const TRAIT_GATE_RUSHER_PAYBACK = -0.01;
+
+// ---- Inert race engine traits ----------------------------------------------
+
+/** Wire: quick into stride, accelerates 20% faster in the first 20%. */
+export const TRAIT_WIRE_ACCEL_MULT = 1.2;
+export const TRAIT_WIRE_END = 0.2;
+
+/** Freight train: cheap to run at pace, drain exponent −0.03. */
+export const TRAIT_FREIGHT_TRAIN_DRAIN_RELIEF = -0.03;
+
+/** Needs time: recovery rate −20% during the race (extra drag from travel). */
+export const TRAIT_NEEDS_TIME_RECOVERY_MULT = 0.8;
+
+/** Front-loaded power: early stamina advantage, late disadvantage. */
+export const TRAIT_FRONT_LOADED_POWER_EARLY_RECOVERY_MULT = 1.25;
+export const TRAIT_FRONT_LOADED_POWER_LATE_RECOVERY_MULT = 0.75;
+export const TRAIT_FRONT_LOADED_POWER_SWITCH = 0.5;
+
+/** Late surge: kick is 25% stronger after 75% of the race. */
+export const TRAIT_LATE_SURGE_KICK_MULT = 1.25;
+export const TRAIT_LATE_SURGE_THRESHOLD = 0.75;
+
+/** Close proof: cannot be headed in the final 10% once in front. */
+export const TRAIT_CLOSE_PROOF_THRESHOLD = 0.9;
+
+/** Rail bird: costs less to hold position when leading. */
+export const TRAIT_RAIL_BIRD_DRAIN_MULT = 0.85;
+
+/** Free spirit: −20% draft drain when drafting (independent mover). */
+export const TRAIT_FREE_SPIRIT_DRAFT_MULT = 0.8;
+
+/** Front runner relief: +50% exponent relief when leading. */
+export const TRAIT_FRONT_RUNNER_RELIEF_MULT = 1.5;
+
+/** Draft boost: +50% drafting recovery when sheltered. */
+export const TRAIT_DRAFT_BOOST_RECOVERY_MULT = 1.5;
+
+/** Head case: cannot use front-runner relief when leading in a group. */
+export const TRAIT_HEAD_CASE_NO_RELIEF = true;
+
+// ---- Gate traits (inert) ---------------------------------------------------
+
+/** Fast gate: fumble chance is halved. */
+export const TRAIT_FAST_GATE_FUMBLE_MULT = 0.5;
+
+/** Coiled: slow away — pace reduced 15% in the first 10%, then +10% burst after. */
+export const TRAIT_COILED_SLOW_MULT = 0.85;
+export const TRAIT_COILED_SLOW_END = 0.1;
+export const TRAIT_COILED_BURST_MULT = 1.1;
+export const TRAIT_COILED_BURST_START = 0.1;
+
+// ---- Pace traits (inert) ---------------------------------------------------
+
+/** Tractable: out-of-position regen penalty halved. */
+export const TRAIT_TRACTABLE_REGEN_MULT = 0.5;
+
+/** Free runner: early pace +5% but drains extra if Temper < 50. */
+export const TRAIT_FREE_RUNNER_EARLY_MULT = 1.05;
+export const TRAIT_FREE_RUNNER_EARLY_END = 0.25;
+export const TRAIT_FREE_RUNNER_DRAIN_MULT = 1.15;
+
+/** Pace pusher: when leading, forces pace +3% for the whole field (burns rivals). */
+export const TRAIT_PACE_PUSHER_PACE_LIFT = 0.03;
+
+/** Rail hugger: +20% charge regen on inside lane, −20% when forced wide. */
+export const TRAIT_RAIL_HUGGER_REGEN_MULT = 1.2;
+export const TRAIT_RAIL_HUGGER_WIDE_MULT = 0.8;
+
+/** Wide runner: avoids traffic, but travels 3% further. */
+export const TRAIT_WIDE_RUNNER_EXTRA_DISTANCE = 0.03;
+
+/** Herd animal: regen +20% in pack, −20% isolated in front. */
+export const TRAIT_HERD_ANIMAL_PACK_MULT = 1.2;
+export const TRAIT_HERD_ANIMAL_ALONE_MULT = 0.8;
+
+/** Loner: regen −15% in pack, +25% with clear air. */
+export const TRAIT_LONER_PACK_MULT = 0.85;
+export const TRAIT_LONER_CLEAR_MULT = 1.25;
+
+// ---- Finish traits (inert) -------------------------------------------------
+
+/** Heart: surge +20% when within a length of the lead in the final 25%. */
+export const TRAIT_HEART_SURGE_MULT = 1.2;
+export const TRAIT_HEART_RANGE_LENGTHS = 1;
+export const TRAIT_HEART_THRESHOLD = 0.75;
+
+/** Turn of foot: kick 30% stronger but 40% shorter. */
+export const TRAIT_TURN_OF_FOOT_KICK_MULT = 1.3;
+export const TRAIT_TURN_OF_FOOT_DURATION_MULT = 0.6;
+
+/** Relentless: kick 20% weaker but 50% longer. */
+export const TRAIT_RELENTLESS_KICK_MULT = 0.8;
+export const TRAIT_RELENTLESS_DURATION_MULT = 1.5;
+
+/** Grinder: kick is zero — but deceleration reduced 40%. */
+export const TRAIT_GRINDER_KILL_KICK = true;
+export const TRAIT_GRINDER_DECEL_MULT = 0.6;
+
+// ---- Traffic traits (inert) ------------------------------------------------
+
+/** Needs room: −30% speed when press ≥ 2, +15% when clear (press = 0, rank > 3). */
+export const TRAIT_NEEDS_ROOM_PRESSED_MULT = 0.7;
+export const TRAIT_NEEDS_ROOM_CLEAR_MULT = 1.15;
+export const TRAIT_NEEDS_ROOM_PRESS_THRESHOLD = 2;
+
+/** Bulldozer: press cost reduced 40% (grit-driven, forces through). */
+export const TRAIT_BULLDOZER_PRESS_MULT = 0.6;
+
+/** Highly strung: slower to shake off green moments (duration +50%), but +10% kick response. */
+export const TRAIT_HIGHLY_STRUNG_GREEN_MULT = 1.5;
+export const TRAIT_HIGHLY_STRUNG_KICK_MULT = 1.1;
+
+/** Crowd feeder: +10% speed in fields ≥ 8, −5% in fields < 6. */
+export const TRAIT_CROWD_FEEDER_BIG_MULT = 1.1;
+export const TRAIT_CROWD_FEEDER_SMALL_MULT = 0.95;
+export const TRAIT_CROWD_FEEDER_THRESHOLD = 8;
+
+// ---- Temperament traits (inert) --------------------------------------------
+
+/** Professional: consistency +5% per race start (up to +25% at 5 starts). */
+export const TRAIT_PROFESSIONAL_CONSISTENCY_PER_START = 0.05;
+export const TRAIT_PROFESSIONAL_MAX = 0.25;
+
+/** Hot-headed: amplifies temper swings — form spread +30%. */
+export const TRAIT_HOT_HEADED_FORM_MULT = 1.3;
+
+/** Big game: +10% speed in high-hype races (stakes/group), −5% in low-hype. */
+export const TRAIT_BIG_GAME_STAKES_MULT = 1.1;
+export const TRAIT_BIG_GAME_LOW_MULT = 0.95;
+
+/** Stage fright: −8% speed in high-hype races, +5% in low-hype. */
+export const TRAIT_STAGE_FRIGHT_STAKES_MULT = 0.92;
+export const TRAIT_STAGE_FRIGHT_LOW_MULT = 1.05;
+
+/** Grudge holder: +5% speed against a specific rival it has lost to before. */
+export const TRAIT_GRUDGE_HOLDER_RIVAL_MULT = 1.05;

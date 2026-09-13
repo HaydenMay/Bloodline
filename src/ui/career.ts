@@ -97,15 +97,10 @@ export interface RivalDossier {
 
 export interface SaveSettings {
   autopilotEnabled: boolean;
-  /**
-   * Which way the race is drawn — chosen per race on the Race Day screen, and
-   * kept here so it sticks rather than being re-picked before all twenty
-   * starts of a career.
-   *
-   * Optional so a stable saved before the 3D view existed still loads; absent
-   * reads as '2d', which is what those saves were playing anyway.
-   */
-  raceView?: '2d' | '3d';
+  /** Shortens decorative UI animation without changing race timing. */
+  reducedMotion: boolean;
+  /** Applied to the document root; 1 is the release default. */
+  textScale: number;
 }
 
 /**
@@ -279,7 +274,7 @@ export function createStable(seed: string = `stable-${Date.now()}`): Stable {
     world: generateWorld(rng, names, WORLD_POPULATION),
     worldArchive: [],
     dossier: {},
-    settings: { autopilotEnabled: false },
+    settings: { autopilotEnabled: false, reducedMotion: false, textScale: 1 },
     facilities: {
       barn: 0,
       training: 0,
@@ -311,7 +306,14 @@ function normaliseStable(stable: Stable): Stable {
   if (!stable.staff) stable.staff = createStaffRoster();
   if (!stable.consumables) stable.consumables = {};
   if (!stable.dossier) stable.dossier = {};
-  if (!stable.settings) stable.settings = { autopilotEnabled: false };
+  if (!stable.settings) stable.settings = { autopilotEnabled: false, reducedMotion: false, textScale: 1 };
+  if (typeof stable.settings.autopilotEnabled !== 'boolean') stable.settings.autopilotEnabled = false;
+  if (typeof stable.settings.reducedMotion !== 'boolean') stable.settings.reducedMotion = false;
+  if (typeof stable.settings.textScale !== 'number') stable.settings.textScale = 1;
+  stable.settings.textScale = Math.min(1.2, Math.max(0.9, stable.settings.textScale));
+  // The unfinished 3D presentation is not a release option. Old saved values
+  // are removed during normalisation so the state cannot quietly return.
+  delete (stable.settings as SaveSettings & { raceView?: unknown }).raceView;
   if (typeof stable.cash !== 'number') stable.cash = STARTING_CASH;
   // Prestige replaced it as the single gate; drop it so it cannot be read again.
   delete (stable as unknown as { reputation?: number }).reputation;

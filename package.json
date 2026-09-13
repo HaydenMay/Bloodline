@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "test:watch": "vitest",
     "harness": "tsx tools/harness.ts",
     "bloodline": "tsx tools/bloodline.ts",

@@ -7,8 +7,6 @@ import type { RunnerSnapshot } from './sim/race/engine.js';
 import { attachInfoBox } from './ui/infoBox.js';
 import {
   mountRaceScreen,
-  type RaceCameraMode,
-  type RaceViewMode,
 } from './ui/raceScreen.js';
 
 import { mountRaceIntro, type RaceIntroConfig } from './ui/raceIntro.js';
@@ -79,32 +77,12 @@ import {
 import { saveFileName } from './save/durability.js';
 import { mountDossierScreen } from './ui/dossierScreen.js';
 import { mountTestCareerSetup } from './ui/testCareerSetup.js';
+import { mountSettingsScreen } from './ui/settingsScreen.js';
 import type { Horse } from './sim/types.js';
 import type { Silks } from './render/palette.js';
 import { RIVAL_SILKS, hashId } from './render/palette.js';
 import { DEFAULTS } from './data/colors.js';
 import { updateDivisionProgression, updateAIDivisionProgression, populatePromotionRaceField, populateDemotionRaceField, finalizePromotion, finalizeDemotion } from './sim/division.js';
-
-/**
- * Which way to draw the race.
- *
- * 3D mode is disabled — the procedural models don't animate well enough yet
- * (legs go crazy while body stays still), and the scene is empty until the
- * very end. All code is preserved for future re-enablement when the models
- * are ready.
- */
-function raceCameraMode(): RaceCameraMode | undefined {
-  const cam = new URLSearchParams(location.search).get('cam');
-  return cam === 'chase' || cam === 'aerial' || cam === 'head-on' || cam === 'side-on'
-    ? cam
-    : undefined;
-}
-
-function raceViewMode(): RaceViewMode {
-  // 3D mode disabled — models don't animate well enough yet.
-  // Always return '2d' regardless of saved preference or URL override.
-  return '2d';
-}
 
 
 /**
@@ -284,8 +262,6 @@ function startRace(seed: string): void {
       playerSilks,
       config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
       autopilotToggle,
-      raceView: raceViewMode(),
-      cameraMode: raceCameraMode(),
       autoStartCountdown: opts?.autoStartCountdown ?? false,
       onRaceStart: () => {
         // Lock autopilot once race starts — can't change during race
@@ -410,6 +386,29 @@ if (params.has('preview')) {
 } else if (params.has('test-race')) {
   // ?test-race opens the test race (development harness)
   startRace('bloodline-demo');
+} else if (params.has('test-race-day')) {
+  // Stable, deterministic browser-test entrypoint for the last decision before
+  // a race. Unlike the cinematic intro, this is where the opponent dossier is
+  // intentionally available.
+  const { field, playerId } = buildField('bloodline-race-day');
+  const player = field.find((horse) => horse.id === playerId)!;
+  const career = createNewCareer(player, DEFAULTS.playerSilksDefault, createStable('bloodline-race-day'));
+  let raceDayTeardown: (() => void) | null = null;
+  raceDayTeardown = mountRaceDayScreen(
+    app,
+    career,
+    field,
+    { name: 'Test Race', distance: 1400, going: 'good', purse: 22_400, toWinner: 11_200 },
+    () => {},
+    () => {},
+    (resume) => {
+      const dossierTeardown = mountDossierScreen(app, field, player, career.stable.dossier, () => {
+        dossierTeardown();
+        resume();
+      });
+    },
+  );
+  teardown = () => raceDayTeardown?.();
 } else if (params.has('test-career')) {
   // ?test-career opens the test career setup
   const rng = createRng(`test-career-${Date.now()}`);
@@ -834,6 +833,18 @@ function showMainMenu(): void {
   const savedCareer = loadCareer();
 
   const callbacks: MainMenuCallbacks = {
+    onSettings: () => {
+      const stable = savedCareer?.stable ?? loadStable();
+      if (!stable) return;
+      teardownMenu();
+      teardown = mountSettingsScreen(app, stable, {
+        onSave: (updated) => {
+          applyStableSettings(updated);
+          saveStable(updated);
+        },
+        onBack: showMainMenu,
+      });
+    },
     onNewGame: () => {
       // Starting fresh while a horse is mid-career would drop everything that
       // horse has earned the yard, because its legacy only banks on retirement.
@@ -966,6 +977,7 @@ function showMainMenu(): void {
   };
 
   const yard = savedCareer?.stable ?? loadStable();
+  applyStableSettings(yard);
   callbacks.hasStable = !!yard;
   // The door only appears once there is something behind it — which is true
   // the moment a horse exists at all, not only once one has been retired. A
@@ -987,6 +999,14 @@ function showMainMenu(): void {
       tone: 'warning',
     });
   }
+}
+
+/** Apply release accessibility preferences whenever a stable is loaded. */
+function applyStableSettings(stable: Stable | null | undefined): void {
+  const settings = stable?.settings;
+  const scale = settings?.textScale ?? 1;
+  document.documentElement.style.setProperty('--text-scale', String(scale));
+  document.documentElement.dataset.reducedMotion = String(settings?.reducedMotion === true);
 }
 
 function showStarterSelection(): void {
@@ -1238,6 +1258,7 @@ function showTrainingScreen(career: Career): void {
     },
     gainMultiplier,
     downsideRelief,
+    createRng(`training-${career.horse.id}-${career.week}-${career.stats.racesCompleted}`),
   );
 }
 
@@ -2084,8 +2105,6 @@ function startRaceWithHorse(
         field,
         playerHorseId: player.id,
         playerSilks: career.playerSilks,
-        raceView: raceViewMode(),
-        cameraMode: raceCameraMode(),
         config: {
           seed: 'race-' + Date.now(),
           metres: raceDistance,

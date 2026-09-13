@@ -26,6 +26,9 @@ export interface Consumable {
 
 const clamp = (value: number): number => Math.max(0, Math.min(100, value));
 
+/** Good Doer: consumable gains boosted 50%. */
+const goodDoerMult = (h: Horse): number => h.traits?.includes('goodDoer') ? 1.5 : 1;
+
 export const CONSUMABLES: Record<string, Consumable> = {
   bran_mash: {
     id: 'bran_mash',
@@ -37,7 +40,7 @@ export const CONSUMABLES: Record<string, Consumable> = {
     prestigeRequired: 0,
     effectLabel: '+15 condition',
     apply: (h) => {
-      h.condition = clamp(h.condition + 15);
+      h.condition = clamp(h.condition + 15 * goodDoerMult(h));
     },
   },
   electrolytes: {
@@ -50,7 +53,7 @@ export const CONSUMABLES: Record<string, Consumable> = {
     prestigeRequired: 0,
     effectLabel: '+25 condition',
     apply: (h) => {
-      h.condition = clamp(h.condition + 25);
+      h.condition = clamp(h.condition + 25 * goodDoerMult(h));
     },
   },
   turnout_day: {
@@ -63,7 +66,7 @@ export const CONSUMABLES: Record<string, Consumable> = {
     prestigeRequired: 0,
     effectLabel: '+20 morale',
     apply: (h) => {
-      h.morale = clamp(h.morale + 20);
+      h.morale = clamp(h.morale + 20 * goodDoerMult(h));
     },
   },
   sports_massage: {
@@ -76,8 +79,8 @@ export const CONSUMABLES: Record<string, Consumable> = {
     prestigeRequired: 150,
     effectLabel: '+20 condition and +10 morale',
     apply: (h) => {
-      h.condition = clamp(h.condition + 20);
-      h.morale = clamp(h.morale + 10);
+      h.condition = clamp(h.condition + 20 * goodDoerMult(h));
+      h.morale = clamp(h.morale + 10 * goodDoerMult(h));
     },
   },
   blinkers: {
@@ -158,13 +161,27 @@ export function totalHeld(inventory: Record<string, number>): number {
 /**
  * Applies every race-day item selected for this race to a copy of the horse.
  * The original is untouched, so the boost lasts exactly one race.
+ *
+ * Good Doer: consumable stat gains are 50% larger.
  */
 export function applyRaceDayItems(horse: Horse, itemIds: string[]): Horse {
   if (itemIds.length === 0) return horse;
   const boosted: Horse = { ...horse, stats: { ...horse.stats } };
   for (const id of itemIds) {
     const item = CONSUMABLES[id];
-    if (item?.kind === 'raceDay') item.apply(boosted);
+    if (item?.kind === 'raceDay') {
+      const before = { ...boosted.stats };
+      item.apply(boosted);
+      if (horse.traits?.includes('goodDoer')) {
+        // Boost each stat gain by 50%
+        for (const key of ['speed', 'stamina', 'burst', 'grit', 'temper', 'consistency'] as const) {
+          const delta = boosted.stats[key] - before[key];
+          if (delta > 0) {
+            boosted.stats[key] = clamp(before[key] + Math.round(delta * 1.5));
+          }
+        }
+      }
+    }
   }
   return boosted;
 }

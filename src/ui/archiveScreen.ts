@@ -27,7 +27,7 @@ import {
 import type { Stable } from './career.js';
 
 /**
- * The Archive (DESIGN.md 10, NEXT_PLAN.md Step 1-2).
+ * The Archive (DESIGN.md §10, Steps 1-4).
  *
  * "A CK3-style family tree — portrait cards on generational rows, connecting
  * lines, click any ancestor for a detail card." Direct line in full, side
@@ -349,7 +349,7 @@ export function mountArchiveScreen(container: HTMLElement, options: ArchiveOptio
   }
 
   /**
-   * The inheritance map (NEXT_PLAN.md Step 3) and the potential trace below
+   * The inheritance map (Step 3) and the potential trace below
    * it share this: every rendered card matching some predicate, however
    * folded or unfolded the tree currently is. Walks the same rows and
    * sibling filter `renderRows` draws from, so a trace only ever points at

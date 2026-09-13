@@ -85,6 +85,93 @@ body {
   padding: max(20px, env(safe-area-inset-top)) 20px
     max(20px, env(safe-area-inset-bottom));
   overflow-y: auto;
+  zoom: var(--text-scale, 1);
+}
+
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+}
+
+.settings-screen {
+  width: min(680px, 100%);
+  padding: 12px 0 28px;
+}
+
+.settings-container {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-topbar {
+  display: grid;
+  grid-template-columns: 96px 1fr 96px;
+  align-items: center;
+  text-align: center;
+}
+
+.settings-topbar h1,
+.settings-card h2 {
+  margin: 0;
+}
+
+.settings-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.settings-card h2 {
+  padding: 16px 18px 10px;
+  font-size: 16px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 15px 18px;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.settings-row span {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-row small,
+.settings-note {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.settings-row input {
+  inline-size: 22px;
+  block-size: 22px;
+  flex: none;
+}
+
+.settings-row select {
+  min-height: 40px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  font: inherit;
+}
+
+.settings-note {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
 }
 
 .boot {
@@ -8149,4 +8236,53 @@ span.archive-allele {
 
 .raceday-view-btn:disabled:hover {
   color: var(--muted);
+}
+
+/* Release-facing menu copy and desktop legibility. */
+.main-menu-content {
+  width: min(760px, calc(100vw - 40px));
+  gap: clamp(24px, 5vh, 44px);
+}
+
+.main-menu-pitch {
+  max-width: 620px;
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(16px, 1.4vw, 20px);
+  line-height: 1.6;
+}
+
+@media (min-width: 900px) {
+  .detail-label {
+    font-size: 11px;
+  }
+
+  .detail-value {
+    font-size: 14px;
+  }
+
+  .training-desc {
+    font-size: 14px;
+  }
+
+  .training-stats {
+    font-size: 12px;
+  }
+
+  .status-label {
+    font-size: 1rem;
+  }
+}
+@media (min-width: 1200px) {
+  .hub-container {
+    max-width: 1120px;
+  }
+
+  .training-container {
+    max-width: 1080px;
+  }
+
+  .training-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }

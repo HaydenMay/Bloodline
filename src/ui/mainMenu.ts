@@ -13,6 +13,7 @@ export interface MainMenuCallbacks {
   onExport?: () => void;
   /** Receives the text of a save file the player chose. */
   onImport?: (text: string) => void;
+  onSettings?: () => void;
   /**
    * The Archive — the pedigree tree — opened straight from the menu.
    *
@@ -40,6 +41,7 @@ export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbac
       <div class="main-menu-title">
         <h1>Bloodline</h1>
       </div>
+      <p class="main-menu-pitch">Build a stable through generations: train a horse, race its career, then breed the next generation.</p>
       <div class="main-menu-actions">
         ${callbacks.onContinue ? '<button class="btn btn-primary" id="continue-btn">Continue Career</button>' : ''}
         <button class="btn btn-primary" id="new-game-btn">${callbacks.hasStable ? 'New Horse' : 'Start Your Stable'}</button>
@@ -55,6 +57,7 @@ export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbac
           : ''
       }
       <div class="main-menu-save">
+        ${callbacks.hasStable ? '<button class="menu-link" id="settings-btn">Settings</button>' : ''}
         <button class="menu-link" id="export-btn">Back Up Save</button>
         <button class="menu-link" id="import-btn">Restore Save</button>
         <input type="file" id="import-file" accept="application/json,.json" hidden />
@@ -89,6 +92,9 @@ export function mountMainMenu(container: HTMLElement, callbacks: MainMenuCallbac
 
   menu.querySelector<HTMLButtonElement>('#export-btn')!.addEventListener('click', () => {
     callbacks.onExport?.();
+  });
+  menu.querySelector<HTMLButtonElement>('#settings-btn')?.addEventListener('click', () => {
+    callbacks.onSettings?.();
   });
 
   const fileInput = menu.querySelector<HTMLInputElement>('#import-file')!;

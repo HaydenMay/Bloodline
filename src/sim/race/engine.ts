@@ -73,6 +73,7 @@ import {
   MORALE_MIN_FACTOR,
   OFF_COLOUR_BASE,
   OFF_COLOUR_PENALTY,
+  ABSOLUTE_SPEED_CEILING,
   CONTACT_LENGTHS,
   CONTACT_MAX_LIFT,
   CONTACT_RAMP_LENGTHS,
@@ -96,6 +97,55 @@ import {
   TRAIT_IRON_LUNGS_RECOVER,
   TRAIT_QUICK_RECOVERY_DRAFT,
   TRAIT_THIRSTY_RECOVER,
+  TRAIT_WIRE_ACCEL_MULT,
+  TRAIT_WIRE_END,
+  TRAIT_FREIGHT_TRAIN_DRAIN_RELIEF,
+  TRAIT_NEEDS_TIME_RECOVERY_MULT,
+  TRAIT_FRONT_LOADED_POWER_EARLY_RECOVERY_MULT,
+  TRAIT_FRONT_LOADED_POWER_LATE_RECOVERY_MULT,
+  TRAIT_FRONT_LOADED_POWER_SWITCH,
+  TRAIT_LATE_SURGE_KICK_MULT,
+  TRAIT_LATE_SURGE_THRESHOLD,
+  TRAIT_CLOSE_PROOF_THRESHOLD,
+  TRAIT_RAIL_BIRD_DRAIN_MULT,
+  TRAIT_FREE_SPIRIT_DRAFT_MULT,
+  TRAIT_FRONT_RUNNER_RELIEF_MULT,
+  TRAIT_DRAFT_BOOST_RECOVERY_MULT,
+  TRAIT_FAST_GATE_FUMBLE_MULT,
+  TRAIT_COILED_SLOW_MULT,
+  TRAIT_COILED_SLOW_END,
+  TRAIT_COILED_BURST_MULT,
+  TRAIT_COILED_BURST_START,
+  TRAIT_FREE_RUNNER_EARLY_MULT,
+  TRAIT_FREE_RUNNER_EARLY_END,
+  TRAIT_FREE_RUNNER_DRAIN_MULT,
+  TRAIT_PACE_PUSHER_PACE_LIFT,
+  TRAIT_WIDE_RUNNER_EXTRA_DISTANCE,
+  TRAIT_HERD_ANIMAL_PACK_MULT,
+  TRAIT_HERD_ANIMAL_ALONE_MULT,
+  TRAIT_LONER_PACK_MULT,
+  TRAIT_LONER_CLEAR_MULT,
+  TRAIT_HEART_SURGE_MULT,
+  TRAIT_HEART_RANGE_LENGTHS,
+  TRAIT_HEART_THRESHOLD,
+  TRAIT_TURN_OF_FOOT_KICK_MULT,
+  TRAIT_RELENTLESS_KICK_MULT,
+  TRAIT_GRINDER_DECEL_MULT,
+  TRAIT_NEEDS_ROOM_PRESSED_MULT,
+  TRAIT_NEEDS_ROOM_CLEAR_MULT,
+  TRAIT_NEEDS_ROOM_PRESS_THRESHOLD,
+  TRAIT_BULLDOZER_PRESS_MULT,
+  TRAIT_HIGHLY_STRUNG_GREEN_MULT,
+  TRAIT_CROWD_FEEDER_BIG_MULT,
+  TRAIT_CROWD_FEEDER_SMALL_MULT,
+  TRAIT_CROWD_FEEDER_THRESHOLD,
+  TRAIT_PROFESSIONAL_CONSISTENCY_PER_START,
+  TRAIT_PROFESSIONAL_MAX,
+  TRAIT_HOT_HEADED_FORM_MULT,
+  TRAIT_BIG_GAME_STAKES_MULT,
+  TRAIT_BIG_GAME_LOW_MULT,
+  TRAIT_STAGE_FRIGHT_STAKES_MULT,
+  TRAIT_STAGE_FRIGHT_LOW_MULT,
 } from './constants.js';
 
 /**
@@ -337,6 +387,12 @@ function makeRunner(
 ): Runner {
   const consistency = horse.stats.consistency / 100;
 
+  // Professional: consistency climbs faster with race starts.
+  const professionalBonus = horse.traits.includes('professional')
+    ? Math.min(TRAIT_PROFESSIONAL_MAX, (horse.starts ?? 0) * TRAIT_PROFESSIONAL_CONSISTENCY_PER_START)
+    : 0;
+  const effectiveConsistency = Math.min(1, consistency + professionalBonus);
+
   // ---- Pre-race, computed ONCE and then frozen (REBUILD.md §10) ------------
   // Six things that used to poke at speed mid-race collapse into one number
   // that never moves again. The single biggest simplification in the rebuild.
@@ -347,7 +403,7 @@ function makeRunner(
   // Consistency raises the floor: at 100% consistency, no bad days, only average to good.
   const amplitude = FORM_BASE_SPREAD + FORM_TEMPER_AMPLIFY * (1 - horse.stats.temper / 100);
   const rawForm = rng.normal(0, amplitude);
-  const consistencyFloor = amplitude * (1 - consistency);
+  const consistencyFloor = amplitude * (1 - effectiveConsistency);
   // A hot-headed horse does not merely vary — it **wastes itself**: fights the
   // rider, runs keen early, arrives at the business end having spent more than
   // it needed to. So the swing is centred a little below par and Temper is what
@@ -360,21 +416,32 @@ function makeRunner(
   // a straightforward liability. Symmetric noise cannot reward the stat that
   // removes it; the centre has to move.
   const temperCost = TEMPER_MEAN_COST * (1 - horse.stats.temper / 100);
-  const form = 1 - temperCost + Math.max(-consistencyFloor, rawForm);
+  const hotHeadedMult = horse.traits.includes('hotHeaded') ? TRAIT_HOT_HEADED_FORM_MULT : 1;
+  const form = 1 - temperCost + Math.max(-consistencyFloor * hotHeadedMult, rawForm * hotHeadedMult);
 
   const going = goingFor(horse, config);
   const distance = distanceFactor(horse.preferredDistance, config.metres);
 
+  // Big game / stage fright: affected by race hype.
+  let hypeMult = 1;
+  if (horse.traits.includes('bigGame')) {
+    hypeMult *= config.hype >= 70 ? TRAIT_BIG_GAME_STAKES_MULT : config.hype <= 30 ? TRAIT_BIG_GAME_LOW_MULT : 1;
+  }
+  if (horse.traits.includes('stageFright')) {
+    hypeMult *= config.hype >= 70 ? TRAIT_STAGE_FRIGHT_STAKES_MULT : config.hype <= 30 ? TRAIT_STAGE_FRIGHT_LOW_MULT : 1;
+  }
+
   // Consistency prevents bad race events: at high consistency, fumbles/off-colour/greens can't happen
   const fumbleChance =
-    FUMBLE_BASE * (1 - consistency) * (horse.traits.includes('alert') ? TRAIT_ALERT_FUMBLE : 1);
+    FUMBLE_BASE * (1 - effectiveConsistency) * (horse.traits.includes('alert') ? TRAIT_ALERT_FUMBLE : 1)
+    * (horse.traits.includes('fastGate') ? TRAIT_FAST_GATE_FUMBLE_MULT : 1);
   const fumbledStart = rng.chance(fumbleChance);
-  const offColour = consistency < 1 && rng.chance(OFF_COLOUR_BASE * (1 - consistency));
+  const offColour = effectiveConsistency < 1 && rng.chance(OFF_COLOUR_BASE * (1 - effectiveConsistency));
   const delivery = offColour ? OFF_COLOUR_PENALTY : 1;
 
   const greenAt: number[] = [];
   for (let i = 0; i < 2; i++) {
-    if (consistency < 1 && rng.chance(GREEN_BASE * (1 - consistency))) greenAt.push(rng.range(0.1, 0.9));
+    if (effectiveConsistency < 1 && rng.chance(GREEN_BASE * (1 - effectiveConsistency))) greenAt.push(rng.range(0.1, 0.9));
   }
   greenAt.sort((a, b) => a - b);
 
@@ -384,7 +451,7 @@ function makeRunner(
     horse,
     cruise: cruiseFor(horse),
     accel: accelFor(horse),
-    preRace: condition * morale * form * going * distance * delivery,
+    preRace: condition * morale * form * going * distance * delivery * hypeMult,
     lane,
     tankMods: tankModsFor(horse),
     plan,
@@ -434,12 +501,23 @@ function makeRunner(
  */
 function kickStrengthFor(horse: Horse, behind = false): number {
   const closerBonus = horse.style === 'closer' && behind ? CLOSER_BEHIND_KICK_BONUS : 0;
-  return clamp01(
+  let strength = clamp01(
     KICK_GRIT_WEIGHT * (horse.stats.grit / 100) +
       KICK_BURST_WEIGHT * (horse.stats.burst / 100) +
       KICK_JOCKEY_WEIGHT * (horse.jockeySkill / 100) +
       closerBonus,
   );
+
+  // Turn of foot: kick is 30% stronger.
+  if (horse.traits.includes('turnOfFoot')) strength *= TRAIT_TURN_OF_FOOT_KICK_MULT;
+
+  // Relentless: kick is 20% weaker.
+  if (horse.traits.includes('relentless')) strength *= TRAIT_RELENTLESS_KICK_MULT;
+
+  // Grinder: kick is zero.
+  if (horse.traits.includes('grinder')) strength = 0;
+
+  return clamp01(strength);
 }
 
 /** Ramp in, hold, decay out. Zero outside the kick's own window. */
@@ -464,7 +542,12 @@ function kickFactorFor(runner: Runner, elapsed: number): number {
   if (runner.kickAt < 0) return 1;
   const shaped = kickShape(elapsed - runner.kickAt);
   if (shaped <= 0) return 1;
-  return 1 + Math.min(KICK_MAX_BONUS, KICK_MAX_BONUS * runner.kickStrength * shaped);
+  let mult = 1;
+  // Turn of foot: kick is stronger but shorter.
+  if (runner.horse.traits.includes('turnOfFoot')) mult *= TRAIT_TURN_OF_FOOT_KICK_MULT;
+  // Relentless: kick is weaker but longer — strength already reduced in kickStrengthFor.
+  // Grinder: kick is zero — strength already zeroed in kickStrengthFor.
+  return 1 + Math.min(KICK_MAX_BONUS, KICK_MAX_BONUS * runner.kickStrength * shaped * mult);
 }
 
 // ---------------------------------------------------------------------------
@@ -574,6 +657,21 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
         r.press <= FRONT_RUNNER_PRESS_TOLERANCE
           ? FRONT_RUNNER_EXPONENT_RELIEF
           : 0;
+
+      // Rail bird: costs less to hold position when leading (drain reduced).
+      if (r.horse.traits.includes('railBird') && r.rank === 1 && settled) {
+        r.frontRelief += TRAIT_RAIL_BIRD_DRAIN_MULT;
+      }
+
+      // Head case: cannot use front-runner relief when leading in a group.
+      if (r.horse.traits.includes('headCase') && r.press > 0) {
+        r.frontRelief = 0;
+      }
+
+      // Pace pusher: when leading, forces a faster pace (burns rivals and self).
+      if (r.horse.traits.includes('pacePusher') && r.rank === 1 && settled) {
+        r.frontRelief += TRAIT_PACE_PUSHER_PACE_LIFT;
+      }
     }
   };
 
@@ -618,6 +716,18 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
       // early horse's broad and mild, and the two are worth the same over a
       // race. Outside it entirely a kick still works, just poorly.
       r.kickStrength = kickStrengthFor(r.horse, r.rank > 1) * kickWindowBonus(r.horse.moment, ownProgress);
+
+      // Heart: surge when within a length of the lead in the final 25%.
+      if (
+        r.horse.traits.includes('heart') &&
+        ownProgress >= TRAIT_HEART_THRESHOLD &&
+        r.rank <= 2
+      ) {
+        const gapLengths = (leaderDistance - r.distance) / METRES_PER_LENGTH;
+        if (gapLengths <= TRAIT_HEART_RANGE_LENGTHS) {
+          r.kickStrength *= TRAIT_HEART_SURGE_MULT;
+        }
+      }
       r.kicksFired += 1;
 
       // A player tap brings the next planned kick FORWARD; the AI's own
@@ -662,11 +772,38 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
       else if (ownProgress < 0.4) pace += TRAIT_GATE_RUSHER_PAYBACK;
     }
 
+    // Wire: quick into stride — pace is higher in the first 20%.
+    if (r.horse.traits.includes('wire') && ownProgress < TRAIT_WIRE_END) {
+      pace *= TRAIT_WIRE_ACCEL_MULT;
+    }
+
+    // Late surge: pace is higher in the final 25%.
+    if (r.horse.traits.includes('lateSurge') && ownProgress >= TRAIT_LATE_SURGE_THRESHOLD) {
+      pace *= TRAIT_LATE_SURGE_KICK_MULT;
+    }
+
+    // Coiled: slow away, exceptional burst once rolling.
+    if (r.horse.traits.includes('coiled')) {
+      if (ownProgress < TRAIT_COILED_SLOW_END) {
+        pace *= TRAIT_COILED_SLOW_MULT;
+      } else if (ownProgress >= TRAIT_COILED_BURST_START) {
+        pace *= TRAIT_COILED_BURST_MULT;
+      }
+    }
+
+    // Free runner: fights to go faster early — wasteful unless Temper is high.
+    if (r.horse.traits.includes('freeRunner') && ownProgress < TRAIT_FREE_RUNNER_EARLY_END) {
+      pace *= TRAIT_FREE_RUNNER_EARLY_MULT;
+    }
+
     // A fumbled start and a green moment cost ground the same way: the horse is
     // briefly not running its own race.
     if (r.fumbledStart && elapsed < FUMBLE_DURATION) pace = PACE_MIN;
     if (r.nextGreen < r.greenAt.length && ownProgress >= r.greenAt[r.nextGreen]!) {
-      r.greenUntil = elapsed + GREEN_DURATION;
+      const greenDuration = r.horse.traits.includes('highlyStrung')
+        ? GREEN_DURATION * TRAIT_HIGHLY_STRUNG_GREEN_MULT
+        : GREEN_DURATION;
+      r.greenUntil = elapsed + greenDuration;
       r.nextGreen += 1;
       record('green', r.horse.id);
     }
@@ -679,21 +816,88 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
     const fatigue = fatigueFactor(r.tank, r.tankMods.fatigueRelief);
 
     // ---- 4. THE ONLY PLACE SPEED IS WRITTEN (REBUILD.md R1) ---------------
-    const target = r.cruise * r.preRace * pace * kick * fatigue;
+    // Traits and a well-timed kick can change *how* a horse reaches its top
+    // gear, never exceed the simulation's hard physical ceiling. This keeps
+    // new trait effects inside the invariant the balance harness measures.
+    const ceiling = r.cruise * r.preRace * ABSOLUTE_SPEED_CEILING;
+    const target = Math.min(ceiling, r.cruise * r.preRace * pace * kick * fatigue);
 
-    if (r.speed < target) r.speed = Math.min(target, r.speed + r.accel * dt);
-    else r.speed = Math.max(target, r.speed - r.accel * DECEL_MULT * dt);
+    // Close proof: if in front in the final 10%, speed cannot drop below current.
+    if (
+      r.horse.traits.includes('closeProof') &&
+      r.rank === 1 &&
+      ownProgress >= TRAIT_CLOSE_PROOF_THRESHOLD
+    ) {
+      r.speed = Math.max(r.speed, target);
+    } else if (r.speed < target) {
+      r.speed = Math.min(target, r.speed + r.accel * dt);
+    } else {
+      const decelMult = r.horse.traits.includes('grinder') ? TRAIT_GRINDER_DECEL_MULT : 1;
+      r.speed = Math.max(target, r.speed - r.accel * DECEL_MULT * decelMult * dt);
+    }
 
     // ---- 5. Move ----------------------------------------------------------
-    r.distance += r.speed * dt;
+    const wideExtra = r.horse.traits.includes('wideRunner') ? 1 + TRAIT_WIDE_RUNNER_EXTRA_DISTANCE : 1;
+    r.distance += r.speed * dt * wideExtra;
 
     // ---- 6. Tank ----------------------------------------------------------
+    const frontReliefMult = r.horse.traits.includes('frontRunnerRelief')
+      ? TRAIT_FRONT_RUNNER_RELIEF_MULT
+      : 1;
     const effectiveTankMods: TankModifiers =
       r.frontRelief > 0
-        ? { ...r.tankMods, exponentRelief: r.tankMods.exponentRelief + r.frontRelief }
+        ? { ...r.tankMods, exponentRelief: r.tankMods.exponentRelief + r.frontRelief * frontReliefMult }
         : r.tankMods;
-    const drain = drainPerSecond(pace, r.speed, totalMetres, effectiveTankMods, r.press);
-    const recover = recoverPerSecond(
+
+    // Freight train: cheap to run — drain exponent reduced.
+    if (r.horse.traits.includes('freightTrain')) {
+      effectiveTankMods.exponentRelief += TRAIT_FREIGHT_TRAIN_DRAIN_RELIEF;
+    }
+
+    // Needs room: penalty when pressed hard, bonus when clear.
+    let trafficMult = 1;
+    if (r.horse.traits.includes('needsRoom')) {
+      if (r.press >= TRAIT_NEEDS_ROOM_PRESS_THRESHOLD) {
+        trafficMult = TRAIT_NEEDS_ROOM_PRESSED_MULT;
+      } else if (r.press === 0 && r.rank > 3) {
+        trafficMult = TRAIT_NEEDS_ROOM_CLEAR_MULT;
+      }
+    }
+
+    // Bulldozer: press cost reduced 40%.
+    const effectivePress = r.horse.traits.includes('bulldozer')
+      ? r.press * TRAIT_BULLDOZER_PRESS_MULT
+      : r.press;
+
+    // Crowd feeder: bonus in large fields, penalty in small.
+    if (r.horse.traits.includes('crowdFeeder')) {
+      trafficMult *= runners.length >= TRAIT_CROWD_FEEDER_THRESHOLD
+        ? TRAIT_CROWD_FEEDER_BIG_MULT
+        : TRAIT_CROWD_FEEDER_SMALL_MULT;
+    }
+
+    // Needs time: extra drag from travel, recovery reduced during the race.
+    let raceRecoveryMult = 1;
+    if (r.horse.traits.includes('needsTime')) {
+      raceRecoveryMult *= TRAIT_NEEDS_TIME_RECOVERY_MULT;
+    }
+
+    // Front-loaded power: early stamina advantage, late disadvantage.
+    if (r.horse.traits.includes('frontLoadedPower')) {
+      if (ownProgress < TRAIT_FRONT_LOADED_POWER_SWITCH) {
+        raceRecoveryMult *= TRAIT_FRONT_LOADED_POWER_EARLY_RECOVERY_MULT;
+      } else {
+        raceRecoveryMult *= TRAIT_FRONT_LOADED_POWER_LATE_RECOVERY_MULT;
+      }
+    }
+
+    // Free runner: extra drain if Temper < 50.
+    if (r.horse.traits.includes('freeRunner') && r.horse.stats.temper < 50) {
+      raceRecoveryMult *= TRAIT_FREE_RUNNER_DRAIN_MULT;
+    }
+
+    const drain = drainPerSecond(pace, r.speed, totalMetres, effectiveTankMods, effectivePress) * trafficMult;
+    let recover = recoverPerSecond(
       r.horse.stats.stamina,
       r.speed,
       totalMetres,
@@ -703,6 +907,36 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
       runners.length,
       r.easyLead,
     );
+    recover *= raceRecoveryMult;
+
+    // Free spirit: −20% draft drain when drafting (independent mover).
+    if (r.horse.traits.includes('freeSpirit') && r.drafting) {
+      recover *= TRAIT_FREE_SPIRIT_DRAFT_MULT;
+    }
+
+    // Draft boost: +50% drafting recovery when sheltered.
+    if (r.horse.traits.includes('draftBoost') && r.drafting) {
+      recover *= TRAIT_DRAFT_BOOST_RECOVERY_MULT;
+    }
+
+    // Herd animal: regen bonus in pack, penalty isolated in front.
+    if (r.horse.traits.includes('herdAnimal')) {
+      const inPack = r.press > 0 || runners.some(
+        (o) => o !== r && !o.finished && Math.abs(o.distance - r.distance) <= 10,
+      );
+      if (inPack) recover *= TRAIT_HERD_ANIMAL_PACK_MULT;
+      else if (r.rank === 1) recover *= TRAIT_HERD_ANIMAL_ALONE_MULT;
+    }
+
+    // Loner: regen penalty in pack, bonus with clear air.
+    if (r.horse.traits.includes('loner')) {
+      const inPack = r.press > 0 || runners.some(
+        (o) => o !== r && !o.finished && Math.abs(o.distance - r.distance) <= 10,
+      );
+      if (inPack) recover *= TRAIT_LONER_PACK_MULT;
+      else if (r.rank > 3) recover *= TRAIT_LONER_CLEAR_MULT;
+    }
+
     r.regenMult = drain > 0 ? recover / drain : 1;
     r.tank = clamp01(r.tank + (recover - drain) * dt);
 

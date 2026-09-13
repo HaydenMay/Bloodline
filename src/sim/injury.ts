@@ -90,6 +90,9 @@ export function getInjuryChance(
   // The Iron Horse trait is explicitly "very low injury risk".
   if (horse.traits?.includes('ironHorse')) chance *= 0.4;
 
+  // Glass Cannon: high ceiling, fragile.
+  if (horse.traits?.includes('glassCannon')) chance *= 1.6;
+
   return Math.max(0, chance * (1 - medicalProtection(facilities)));
 }
 

@@ -1,5 +1,12 @@
 import * as THREE from 'three';
-import { Horse3d } from './horse3d.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Horse3dRigged } from './horse3dRigged.js';
+import { GradeShader } from './gradeShader.js';
 import {
   buildCourse,
   buildSky,
@@ -47,8 +54,12 @@ export class RaceScene3d {
   private readonly scene = new THREE.Scene();
   private readonly camera: THREE.PerspectiveCamera;
   private readonly renderer: THREE.WebGLRenderer;
+  private readonly composer: EffectComposer;
+  private readonly bloom: UnrealBloomPass;
+  private readonly grade: ShaderPass;
+  private readonly envTarget: THREE.WebGLRenderTarget;
   private readonly sun: THREE.DirectionalLight;
-  private readonly horses = new Map<string, Horse3d>();
+  private readonly horses = new Map<string, Horse3dRigged>();
   private readonly lastDistance = new Map<string, number>();
   private readonly course: { dispose(): void };
   private readonly sky: { dispose(): void };
@@ -76,7 +87,10 @@ export class RaceScene3d {
     this.camera = new THREE.PerspectiveCamera(fovFor(aspect), aspect, 0.1, 1600);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // Capped below native on high-DPI screens: the fullscreen post passes
+    // below resample the frame several times, and past ~1.75 the extra texels
+    // buy nothing visible at broadcast distance while costing real frame time.
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // Raw linear output is what makes untonemapped WebGL read as plastic: the
@@ -96,7 +110,54 @@ export class RaceScene3d {
     canvas.className = 'race-canvas-3d';
     this.host.insertBefore(canvas, this.host.firstChild);
 
+    // Post chain: scene → bloom → tone map → grade.
+    //
+    // The scene is rendered in linear HDR into the composer's buffers and the
+    // OutputPass applies the renderer's ACES curve plus the sRGB conversion,
+    // so bloom reads the HDR highlights before the tone curve rolls them off —
+    // which is what keeps the glow soft instead of blown out. The grade pass
+    // runs last, in display space, where a colourist would work.
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloom = new UnrealBloomPass(
+      new THREE.Vector2(rect.width, rect.height),
+      0.35,
+      0.5,
+      0.85,
+    );
+    this.composer.addPass(this.bloom);
+    this.composer.addPass(new OutputPass());
+    this.grade = new ShaderPass(GradeShader);
+    this.grade.renderToScreen = true;
+    this.composer.addPass(this.grade);
+
+    // Image-based lighting, from a procedural room probe — no asset, no load.
+    //
+    // Hemisphere light only fills the diffuse term; with nothing in
+    // `scene.environment` a PBR material has nothing to reflect, so roughness
+    // does almost nothing visible and every coat reads as matte plastic. The
+    // probe is deliberately dim (the sun stays the key) — it exists to put a
+    // believable ambient specular on everything, which is most of what
+    // separates "shaded" from "lit".
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const room = new RoomEnvironment();
+    this.envTarget = pmrem.fromScene(room, 0.04);
+    this.scene.environment = this.envTarget.texture;
+    this.scene.environmentIntensity = 0.4;
+    pmrem.dispose();
+    room.dispose();
+
     this.scene.add(new THREE.HemisphereLight('#bfe0ff', '#4a6b3a', 0.55));
+
+    // Cool separation light from behind the stands, opposite the sun. It casts
+    // no shadow and does almost nothing to surfaces facing the camera — its
+    // whole job is a bright edge on the far side of each horse so they read
+    // against the turf and each other instead of merging into the field.
+    const rim = new THREE.DirectionalLight('#cfe4ff', 0.9);
+    rim.position.set(-45, 30, -25);
+    rim.target.position.set(0, 1, 0);
+    this.scene.add(rim, rim.target);
 
     this.sun = new THREE.DirectionalLight('#fff4e0', 3.1);
     this.sun.position.set(40, 70, 25);
@@ -120,7 +181,7 @@ export class RaceScene3d {
     this.sky = buildSky(this.scene);
 
     for (const r of opts.runners) {
-      const horse = new Horse3d(r.coat, r.silks);
+      const horse = new Horse3dRigged(r.coat, r.silks);
       this.horses.set(r.id, horse);
       this.scene.add(horse.root);
     }
@@ -147,6 +208,8 @@ export class RaceScene3d {
     this.camera.fov = fovFor(aspect);
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
+    this.composer.setSize(w, h);
+    this.bloom.setSize(w, h);
   }
 
   /** Lane 0 is the rail. Spreads the field across the track's real width. */
@@ -171,6 +234,7 @@ export class RaceScene3d {
 
       const at = sample(this.startDistance + r.distance, this.laneOffset(r.lane));
       horse.root.position.copy(at.position);
+      horse.root.position.y += 1.6;
       horse.root.rotation.y = at.heading;
       // Lean into the turns.
       horse.root.rotation.z = THREE.MathUtils.lerp(
@@ -186,7 +250,8 @@ export class RaceScene3d {
     }
 
     this.updateCamera(frame, dt);
-    this.renderer.render(this.scene, this.camera);
+    this.grade.uniforms['uTime']!.value = performance.now() / 1000;
+    this.composer.render();
     void player;
   }
 
@@ -295,6 +360,8 @@ export class RaceScene3d {
     this.marker.geometry.dispose();
     (this.marker.material as THREE.Material).dispose();
     this.renderer.domElement.remove();
+    this.composer.dispose();
+    this.envTarget.dispose();
     this.renderer.dispose();
   }
 }

@@ -94,6 +94,11 @@ export interface UpkeepChange {
 /**
  * Applies the cost of a race and the following week's recovery, and returns the
  * net change so the UI can report it. Mutates the horse.
+ *
+ * hardKnocker: thrives on a busy campaign; recovery is 40% faster when condition
+ * is below 50 (busy), 30% slower when above 80 (rested).
+ * needsTime: requires longer between starts, but gains more from every rest;
+ * recovery rate is 30% slower, ceiling is 8 points higher.
  */
 export function applyRaceUpkeep(
   horse: Horse,
@@ -104,10 +109,21 @@ export function applyRaceUpkeep(
   const conditionBefore = horse.condition;
   const moraleBefore = horse.morale;
 
+  let rate = getRecoveryRate(facilities);
+  let ceiling = getConditionCeiling(facilities);
+
+  if (horse.traits?.includes('hardKnocker')) {
+    rate *= horse.condition < 50 ? 1.4 : horse.condition > 80 ? 0.7 : 1;
+  }
+  if (horse.traits?.includes('needsTime')) {
+    rate *= 0.7;
+    ceiling = Math.min(100, ceiling + 8);
+  }
+
   // The race takes its toll, less whatever the Barn absorbs.
   const cost = RACE_CONDITION_COST * (1 - getConditionRetention(facilities));
   const spent = clamp(horse.condition - cost);
-  horse.condition = restToward(spent, getConditionCeiling(facilities), getRecoveryRate(facilities));
+  horse.condition = restToward(spent, ceiling, rate);
 
   const swing = moraleChangeFor(finishingPosition, fieldSize);
   // Premium feed makes a good result count for more; it cannot soften a bad one.
@@ -129,11 +145,18 @@ export function applyRestWeek(horse: Horse, facilities: Record<string, number>):
   const conditionBefore = horse.condition;
   const moraleBefore = horse.morale;
 
-  horse.condition = restToward(
-    horse.condition,
-    getConditionCeiling(facilities),
-    getRecoveryRate(facilities),
-  );
+  let rate = getRecoveryRate(facilities);
+  let ceiling = getConditionCeiling(facilities);
+
+  if (horse.traits?.includes('hardKnocker')) {
+    rate *= horse.condition < 50 ? 1.4 : horse.condition > 80 ? 0.7 : 1;
+  }
+  if (horse.traits?.includes('needsTime')) {
+    rate *= 0.7;
+    ceiling = Math.min(100, ceiling + 8);
+  }
+
+  horse.condition = restToward(horse.condition, ceiling, rate);
   horse.morale = restToward(horse.morale, moraleCeiling(facilities), MORALE_RECOVERY_RATE);
 
   return {

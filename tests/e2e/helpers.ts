@@ -114,22 +114,21 @@ export async function selectRaceFromCalendar(page: Page): Promise<string> {
  */
 export async function verifyAtRaceIntro(page: Page): Promise<void> {
   const bodyText = await page.locator('body').textContent();
-  const hasDistance = bodyText?.includes('Distance');
-  const hasGoing = bodyText?.includes('Going');
-  const hasField = bodyText?.includes('Field');
+  const hasRaceDay = bodyText?.includes('Race Day');
+  const hasOpponents = bodyText?.includes('Opponents');
 
-  if (!hasDistance || !hasGoing || !hasField) {
-    throw new Error(`Not at race intro. Body contains: ${bodyText?.substring(0, 200)}`);
+  if (!hasRaceDay || !hasOpponents) {
+    throw new Error(`Not at race day. Body contains: ${bodyText?.substring(0, 200)}`);
   }
 
-  console.log('✓ Verified at race intro screen');
+  console.log('✓ Verified at race day screen');
 }
 
 /**
  * Click View Opponents button to open dossier
  */
 export async function openViewOpponents(page: Page): Promise<void> {
-  const viewOpponentsButton = page.locator('button:has-text("View Opponents")');
+  const viewOpponentsButton = page.getByRole('button', { name: 'Opponents' });
   await expect(viewOpponentsButton).toBeVisible({ timeout: 5000 });
   await viewOpponentsButton.click();
   console.log('Clicked View Opponents');
@@ -152,7 +151,7 @@ export async function waitForDossier(page: Page): Promise<void> {
  * Click Start Race button on dossier screen
  */
 export async function clickStartRaceOnDossier(page: Page): Promise<void> {
-  const startRaceButton = page.locator('button:has-text("Start Race")');
+  const startRaceButton = page.getByRole('button', { name: 'Back to Race Card' });
   await expect(startRaceButton).toBeVisible();
   await startRaceButton.click();
   console.log('Clicked Start Race from dossier');
@@ -165,11 +164,11 @@ export async function clickStartRaceOnDossier(page: Page): Promise<void> {
 export async function verifyReturnedToRaceIntro(page: Page): Promise<void> {
   // Check race intro content is visible
   const bodyText = await page.locator('body').textContent();
-  const hasDistance = bodyText?.includes('Distance');
-  const hasGoing = bodyText?.includes('Going');
+  const hasRaceDay = bodyText?.includes('Race Day');
+  const hasOpponents = bodyText?.includes('Opponents');
 
-  if (!hasDistance || !hasGoing) {
-    throw new Error(`Failed to return to race intro. Current text: ${bodyText?.substring(0, 200)}`);
+  if (!hasRaceDay || !hasOpponents) {
+    throw new Error(`Failed to return to race day. Current text: ${bodyText?.substring(0, 200)}`);
   }
 
   // Verify dossier is no longer visible

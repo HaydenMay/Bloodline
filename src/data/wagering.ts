@@ -52,20 +52,31 @@ export function rateHorse(horse: Horse): number {
 }
 
 /**
- * The player's implied chance of winning, from their rating share of the field.
- * Clamped so no price is ever a certainty or a hopeless case.
+ * The player's implied chance of winning, from a softmax over rating gaps.
+ * Rating share cannot represent a clear favourite in an eight-horse field: a
+ * horse can own 30% of the total rating yet be much more likely than 30% to
+ * win. The steepness is calibrated against `npm run odds`.
  */
+export const RATING_GAP_STEEPNESS = 0.125;
+
 export function winProbability(player: Horse, field: Horse[]): number {
   const runners = field.length > 0 ? field : [player];
   const ratings = runners.map(rateHorse);
-  const total = ratings.reduce((a, b) => a + b, 0);
-  if (total <= 0) return 1 / runners.length;
-  const share = rateHorse(player) / total;
-  return Math.max(0.03, Math.min(0.85, share));
+  const playerIndex = runners.indexOf(player);
+  if (playerIndex < 0) return 1 / runners.length;
+  const max = Math.max(...ratings);
+  const weights = ratings.map((rating) => Math.exp((rating - max) * RATING_GAP_STEEPNESS));
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  return total > 0 ? weights[playerIndex]! / total : 1 / runners.length;
 }
 
 /** The bookmaker's margin — why betting every race is a slow way to lose. */
 const OVERROUND = 0.88;
+/** We never sell a bet whose honest price would return less than the stake. */
+const MIN_RETURN = 1.1;
+/** Long-shot uncertainty is hard to price; cap the payout rather than leak an exploit. */
+const MAX_RETURN = 10;
+const MAX_PRICED_PROBABILITY = OVERROUND / MIN_RETURN;
 
 export function getBetOptions(player: Horse, field: Horse[]): BetOption[] {
   const win = winProbability(player, field);
@@ -75,20 +86,24 @@ export function getBetOptions(player: Horse, field: Horse[]): BetOption[] {
   // A rough lift on the win chance, capped short of certainty.
   const place = Math.min(0.9, win * placesPaid * 0.75 + 0.05);
 
-  return [
-    {
+  const options: BetOption[] = [];
+  if (win <= MAX_PRICED_PROBABILITY) {
+    options.push({
       type: 'win',
       label: 'Win',
       description: 'Pays only if your horse wins.',
-      odds: Math.max(1.1, Math.round((OVERROUND / win) * 10) / 10),
-    },
-    {
+      odds: Math.min(MAX_RETURN, Math.round((OVERROUND / win) * 10) / 10),
+    });
+  }
+  if (place <= MAX_PRICED_PROBABILITY) {
+    options.push({
       type: 'place',
       label: 'Place',
       description: `Pays if your horse finishes in the first ${placesPaid}.`,
-      odds: Math.max(1.05, Math.round((OVERROUND / place) * 10) / 10),
-    },
-  ];
+      odds: Math.min(MAX_RETURN, Math.round((OVERROUND / place) * 10) / 10),
+    });
+  }
+  return options;
 }
 
 /**

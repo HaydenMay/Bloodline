@@ -1,73 +1,20 @@
 import { test, expect } from '@playwright/test';
 
-test('Dossier View Opponents flow: race intro → dossier → start race', async ({ page }) => {
-  // Use the test-race parameter to jump straight to race intro
-  // This simulates having gone through: starter → training → race calendar → selected a race
-  await page.goto('/?test-race');
-
-  console.log('=== RACE INTRO ===');
+test('Dossier flow returns to the race card without losing the field', async ({ page }, testInfo) => {
+  await page.goto('/?test-race-day');
   await expect(page).toHaveTitle('Bloodline');
+  await expect(page.getByRole('heading', { name: 'Race Day' })).toBeVisible();
 
-  // Wait for race intro to load
-  await page.waitForTimeout(2000);
-  await page.screenshot({ path: '/tmp/race-intro-test.png' });
+  await page.screenshot({ path: testInfo.outputPath('race-day.png') });
+  await page.getByRole('button', { name: 'Opponents' }).click();
 
-  // Verify we're at the race intro by looking for race details
-  const bodyText = await page.locator('body').textContent();
-  console.log('At race intro, body contains:', bodyText?.substring(0, 150));
+  const dossier = page.locator('.dossier-carousel');
+  await expect(dossier).toBeVisible();
+  await expect(page.getByText('Field Dossier')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('dossier.png') });
 
-  if (!bodyText?.includes('Distance') || !bodyText?.includes('Going')) {
-    throw new Error('Race intro not found');
-  }
-
-  // 1. CLICK VIEW OPPONENTS
-  console.log('=== VIEW OPPONENTS ===');
-  const viewOpponentsButton = page.locator('button:has-text("View Opponents")');
-  await expect(viewOpponentsButton).toBeVisible({ timeout: 5000 });
-  await viewOpponentsButton.click();
-  console.log('Clicked View Opponents');
-
-  // 2. DOSSIER CAROUSEL LOADS
-  console.log('=== DOSSIER SCREEN ===');
-  const dossierCarousel = page.locator('.dossier-carousel');
-  await dossierCarousel.waitFor({ state: 'visible', timeout: 10000 });
-
-  const fieldDossierTitle = page.locator('text=Field Dossier');
-  await expect(fieldDossierTitle).toBeVisible();
-  console.log('Dossier screen loaded');
-
-  await page.screenshot({ path: '/tmp/dossier-screen-loaded.png' });
-
-  // 3. CLICK START RACE BUTTON
-  console.log('=== CLICK START RACE ===');
-  const startRaceButton = page.locator('button:has-text("Start Race")');
-  await expect(startRaceButton).toBeVisible();
-  await startRaceButton.click();
-  console.log('Clicked Start Race from dossier');
-
-  // 4. VERIFY PRE-RACE CARD LOADED
-  console.log('=== VERIFY PRE-RACE CARD ===');
-  await page.waitForTimeout(500);
-  await page.screenshot({ path: '/tmp/after-start-race-final.png' });
-
-  // Verify we're at the pre-race card (Riders, take your marks screen)
-  const returnedBodyText = await page.locator('body').textContent();
-  const hasKickText = returnedBodyText?.includes('KICK');
-  const hasPullText = returnedBodyText?.includes('PULL');
-
-  if (!hasKickText || !hasPullText) {
-    throw new Error('Failed to reach pre-race card. Current text: ' + returnedBodyText?.substring(0, 200));
-  }
-
-  // Verify dossier is gone
-  const dossierVisible = await dossierCarousel.count() > 0 && await page.evaluate(() => {
-    const elem = document.querySelector('.dossier-carousel');
-    return elem && window.getComputedStyle(elem).display !== 'none';
-  });
-
-  if (dossierVisible) {
-    throw new Error('Dossier carousel still visible after Start Race click');
-  }
-
-  console.log('✓ Successfully tested full flow: Race Intro → Dossier → Start Race → Pre-race Card');
+  await page.getByRole('button', { name: 'Back to Race Card' }).click();
+  await expect(page.getByRole('heading', { name: 'Race Day' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Opponents' })).toBeVisible();
+  await expect(dossier).toHaveCount(0);
 });
