@@ -214,10 +214,11 @@ function startRace(seed: string): void {
         <span class="rb-name">${player.name}</span>
         <span class="rb-style">${styleLabel(player.style)} · ${momentLabel(player.moment)}</span>
       </div>
-      <div class="rb-moment">
-        <span class="rb-moment-label">Preferred length</span>
-        <span class="rb-pref">${player.preferredDistance.min}–${player.preferredDistance.max} m</span>
-      </div>
+      <div class="rb-hint" id="rb-hint-text">Burst from the track · hold to <b>SETTLE</b></div>
+      <button class="rb-burst" id="burst-button" type="button" disabled>
+        <span>Burst</span>
+        <small>Tap when ready</small>
+      </button>
       <div class="rb-controls">
         <label class="rb-autopilot">
           <input type="checkbox" id="autopilot-toggle" ${autopilot ? 'checked' : ''}>
@@ -226,7 +227,6 @@ function startRace(seed: string): void {
         <button class="rb-skip" id="skip-race-btn" disabled>Skip Race</button>
         <button class="rb-auto" id="auto-race-btn" disabled>Auto-race</button>
       </div>
-      <div class="rb-hint" id="rb-hint-text">Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b></div>
       <button class="rb-again">New race</button>
     `;
     app.appendChild(bar);
@@ -234,13 +234,14 @@ function startRace(seed: string): void {
     attachInfoBox(bar.querySelector<HTMLElement>('.rb-horse')!, player, playerSilks, true);
 
     const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
+    const burstButton = bar.querySelector<HTMLButtonElement>('#burst-button')!;
     const hintText = bar.querySelector<HTMLElement>('#rb-hint-text')!;
 
     autopilotToggle.addEventListener('change', (e) => {
       autopilot = (e.target as HTMLInputElement).checked;
       hintText.innerHTML = autopilot
         ? 'Watch the race · autopilot is on'
-        : 'Tap to <b>KICK</b> · hold to <b>TAKE A PULL</b>';
+        : 'Burst from the track · hold to <b>SETTLE</b>';
     });
 
     bar.querySelector('.rb-again')!.addEventListener('click', (e) => {
@@ -262,6 +263,7 @@ function startRace(seed: string): void {
       playerSilks,
       config: { metres: RACE_METRES, going: 'good', hype: 0.65, seed: `${seed}-run` },
       autopilotToggle,
+      burstButton,
       autoStartCountdown: opts?.autoStartCountdown ?? false,
       onRaceStart: () => {
         // Lock autopilot once race starts — can't change during race
@@ -1534,10 +1536,11 @@ function startRaceWithHorse(
           <span class="rb-name">${player.name}</span>
           <span class="rb-style">${styleLabel(player.style)} · ${momentLabel(player.moment)}</span>
         </div>
-        <div class="rb-moment">
-          <span class="rb-moment-label">Preferred length</span>
-          <span class="rb-pref">${player.preferredDistance.min}–${player.preferredDistance.max} m</span>
-        </div>
+        <div class="rb-hint rb-callout" id="callout">Burst from the track · hold to <b>SETTLE</b></div>
+        <button class="rb-burst" id="burst-button" type="button" disabled>
+          <span>Burst</span>
+          <small>Tap when ready</small>
+        </button>
         <div class="rb-controls">
           <label class="rb-autopilot">
             <input type="checkbox" id="autopilot-toggle">
@@ -1546,7 +1549,6 @@ function startRaceWithHorse(
           <button class="rb-skip" id="skip-race-btn" disabled>Skip Race</button>
           <button class="rb-auto" id="auto-race-btn" disabled>Auto-race</button>
         </div>
-        <div class="rb-callout" id="callout"></div>
       `;
       app.appendChild(bar);
 
@@ -1556,9 +1558,10 @@ function startRaceWithHorse(
       const infoBoxCleanup = attachInfoBox(playerHorseNameEl, player, career.playerSilks, true);
 
       const autopilotToggle = bar.querySelector<HTMLInputElement>('#autopilot-toggle')!;
+      const burstButton = bar.querySelector<HTMLButtonElement>('#burst-button')!;
       const hintText = bar.querySelector<HTMLDivElement>('.rb-callout')!;
 
-      hintText.innerHTML = 'Tap or hold spacebar to kick · hold tap to take a pull';
+      hintText.innerHTML = 'Burst from the track · hold to <b>SETTLE</b>';
 
       // Load saved autopilot preference
       autopilotToggle.checked = career.stable.settings.autopilotEnabled;
@@ -1570,7 +1573,7 @@ function startRaceWithHorse(
         const isChecked = (e.target as HTMLInputElement).checked;
         hintText.innerHTML = isChecked
           ? 'Watch the race · autopilot is on'
-          : 'Tap or hold spacebar to kick · hold tap to take a pull';
+          : 'Burst from the track · hold to <b>SETTLE</b>';
         // Save autopilot preference
         career.stable.settings.autopilotEnabled = isChecked;
         saveCareer(career);
@@ -2112,6 +2115,7 @@ function startRaceWithHorse(
           hype: raceHype,
         },
         autopilotToggle,
+        burstButton,
         ...(skipUnlocked && { skipToggle: skipBtn }),
         ...(skipUnlocked && { autoRaceToggle: autoBtn }),
         onRaceStart: () => {

@@ -62,6 +62,8 @@ export interface RaceScreenOptions {
   playerSilks: Silks;
   config: RaceConfig;
   autopilotToggle?: HTMLInputElement;
+  /** Visible alternative to the stage tap, especially useful on touch devices. */
+  burstButton?: HTMLButtonElement;
   skipToggle?: HTMLButtonElement;
   autoRaceToggle?: HTMLButtonElement;
   onRaceStart?: () => void;
@@ -80,6 +82,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     playerSilks,
     config,
     autopilotToggle,
+    burstButton,
     skipToggle,
     autoRaceToggle,
     onRaceStart,
@@ -258,6 +261,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     view.render({ runners, player, progress: curr.progress, dt });
 
     drawHud(ctx, width, height, player, runners);
+    if (burstButton) {
+      burstButton.disabled = !started || !running || getAutopilot() || player.kicksRemaining === 0 || player.kickReady < 1;
+    }
 
     // Update hover triggers over result names once the finish screen is drawn
     if (!running) updateResultHoverTriggers();
@@ -272,45 +278,96 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   ): void => {
     const pad = 14;
 
-    // ---- Distance remaining ----------------------------------------------
+    // ---- Race state --------------------------------------------------------
+    // Position alone tells a player very little. The first card gives them
+    // distance, the gap that matters, and a short tactical reading.
     const remaining = Math.max(0, totalMetres - player.distance);
+    const leader = runners.reduce((best, runner) =>
+      runner.distance > best.distance ? runner : best,
+    );
+    const gapToLeader = Math.max(0, leader.distance - player.distance) / 2.47;
+    const closestAhead = runners
+      .filter((runner) => runner.distance > player.distance)
+      .reduce<RunnerSnapshot | null>(
+        (nearest, runner) =>
+          !nearest || runner.distance < nearest.distance ? runner : nearest,
+        null,
+      );
+    const gapToNext = closestAhead
+      ? (closestAhead.distance - player.distance) / 2.47
+      : 0;
+    const state = input.takingBack
+      ? 'Settling'
+      : player.condition <= 0.33
+        ? 'Under pressure'
+        : player.drafting
+          ? 'Drafting well'
+          : player.rank === 1
+            ? 'Setting the pace'
+            : gapToNext <= 1
+              ? 'Tracking the leader'
+              : 'Chasing the field';
+    const stateW = Math.min(238, Math.max(170, width * 0.29));
+    const stateH = 66;
+
     ctx.fillStyle = UI.bgOverlay72;
-    roundRect(ctx, pad, pad, 168, 46, 10);
+    roundRect(ctx, pad, pad, stateW, stateH, 12);
     ctx.fill();
+    ctx.strokeStyle = UI.accentMedium;
+    ctx.lineWidth = 1;
+    roundRect(ctx, pad, pad, stateW, stateH, 12);
+    ctx.stroke();
 
     ctx.fillStyle = UI.muted;
-    ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
+    ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText("TO GO", pad + 12, pad + 18);
-
+    ctx.fillText("RACE STATE", pad + 12, pad + 17);
     ctx.fillStyle = UI.text;
-    ctx.font = "700 20px ui-monospace, monospace";
-    ctx.fillText(`${Math.round(remaining)} m`, pad + 12, pad + 38);
-
+    ctx.font = "800 24px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText(`P${player.rank}`, pad + 12, pad + 43);
     ctx.fillStyle = UI.muted;
     ctx.font = "600 11px ui-sans-serif, system-ui, sans-serif";
-    ctx.textAlign = "right";
+    ctx.fillText(`of ${runners.length} · ${Math.round(remaining)}m to go`, pad + 54, pad + 40);
+    ctx.fillStyle = UI.accent;
+    ctx.font = "700 11px ui-sans-serif, system-ui, sans-serif";
     ctx.fillText(
-      `${ordinal(player.rank)} of ${runners.length}`,
-      pad + 156,
-      pad + 38,
+      player.rank === 1 ? "Leading" : gapToLeader < 0.05 ? "In the pack" : `${gapToLeader.toFixed(1)}L behind`,
+      pad + 12,
+      pad + 58,
     );
+    ctx.textAlign = "right";
+    ctx.fillStyle = UI.muted;
+    ctx.fillText(state, pad + stateW - 12, pad + 58);
 
     // There is deliberately no "your moment" window drawn here. Moment no
     // longer opens a window at all — it selects a pace-curve shape (REBUILD.md
     // §6) — so there is nothing to mark and nothing to mistime.
 
-    // ---- Minimap ----------------------------------------------------------
+    // ---- Field map ---------------------------------------------------------
+    const mapW = Math.min(112, Math.max(88, width * 0.22));
+    const mapH = 80;
+    const mapX = width - pad - mapW;
+    ctx.fillStyle = UI.bgOverlay72;
+    roundRect(ctx, mapX, pad, mapW, mapH, 12);
+    ctx.fill();
+    ctx.strokeStyle = UI.accentMedium;
+    ctx.lineWidth = 1;
+    roundRect(ctx, mapX, pad, mapW, mapH, 12);
+    ctx.stroke();
+    ctx.fillStyle = UI.muted;
+    ctx.font = "700 9px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("FIELD MAP", mapX + mapW / 2, pad + 14);
     drawMinimap(
       ctx,
-      width - pad - 84,
-      pad,
-      84,
-      56,
-      runners.map((r) => ({
-        progress: Math.min(1, r.distance / totalMetres),
-        colour: silksFor.get(r.id)!.primary,
-        isPlayer: r.id === playerHorseId,
+      mapX + 10,
+      pad + 18,
+      mapW - 20,
+      mapH - 26,
+      runners.map((runner) => ({
+        progress: Math.min(1, runner.distance / totalMetres),
+        colour: silksFor.get(runner.id)!.primary,
+        isPlayer: runner.id === playerHorseId,
       })),
     );
 
@@ -319,9 +376,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // toward it regenerating. Spending one early to fight for a slot is a
     // real choice, so how many are left has to stay visible the whole race,
     // not only revealed at the window.
-    const barW = Math.min(320, width - pad * 2);
+    const barW = Math.min(500, width - pad * 2);
     const barX = (width - barW) / 2;
-    const barY = height - pad - 34;
+    const barY = height - pad - 56;
 
     // YOUR MOMENT — the one piece of timing information the player rides on.
     // Drawn as the whole bar lighting up rather than a word in a corner: this
@@ -331,13 +388,13 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       ctx.shadowColor = UI.accentGlowShadow;
       ctx.shadowBlur = 18;
       ctx.fillStyle = UI.accentLight;
-      roundRect(ctx, barX, barY, barW, 26, 13);
+      roundRect(ctx, barX, barY, barW, 56, 18);
       ctx.fill();
       ctx.restore();
 
       ctx.strokeStyle = UI.accentGlowStrong;
       ctx.lineWidth = 2;
-      roundRect(ctx, barX, barY, barW, 26, 13);
+      roundRect(ctx, barX, barY, barW, 56, 18);
       ctx.stroke();
 
       // A banner above it, so the moment ARRIVING is an event and not just a
@@ -354,7 +411,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       ctx.fillText("YOUR MOMENT", width / 2, bannerY + 14);
     } else {
       ctx.fillStyle = UI.bgOverlay72;
-      roundRect(ctx, barX, barY, barW, 26, 13);
+      roundRect(ctx, barX, barY, barW, 56, 18);
       ctx.fill();
     }
 
@@ -362,8 +419,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     ctx.font = LABEL_FONT;
     ctx.textAlign = "left";
     ctx.fillStyle = UI.textVariant;
-    ctx.fillText("CHARGES", barX + 12, barY + 17);
-    const labelW = ctx.measureText("CHARGES").width;
+    ctx.fillText("BURSTS", barX + 18, barY + 18);
+    const labelW = ctx.measureText("BURSTS").width;
 
     // ---- Regen indicator ---------------------------------------------------
     // The dots show the bank, but never whether it's currently filling well —
@@ -384,7 +441,7 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
         : condTier === 2
           ? UI.condition.fair
           : UI.condition.poor;
-    ctx.fillText("=".repeat(condTier), barX + 20 + labelW, barY + 17);
+    ctx.fillText("=".repeat(condTier), barX + 26 + labelW, barY + 18);
 
     // ---- Drafting indicator ------------------------------------------------
     // Visual cue that the horse is sheltering behind a rival and getting regen bonus.
@@ -402,8 +459,8 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // as fatigue starts to bite, so an empty row of dots means a beaten horse.
     const dotR = 6;
     const dotGap = 20;
-    const dotsY = barY + 13;
-    const dotsX0 = barX + 28 + labelW + arrowsMaxW + 12;
+    const dotsY = barY + 32;
+    const dotsX0 = barX + 28 + labelW + arrowsMaxW + 14;
 
     // A horse cannot lunge twice in the same stride, so a charge you own is not
     // always a charge you can spend. Dimming the whole row while the cooldown
@@ -442,9 +499,9 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
       const sweepW = (CHARGE_CAPACITY - 1) * dotGap + dotR * 2;
       const sweepX = dotsX0 - dotR;
       ctx.fillStyle = UI.mutedVeryDim;
-      ctx.fillRect(sweepX, dotsY + dotR + 4, sweepW, 2);
+      ctx.fillRect(sweepX, dotsY + dotR + 5, sweepW, 2);
       ctx.fillStyle = UI.accent;
-      ctx.fillRect(sweepX, dotsY + dotR + 4, sweepW * player.kickReady, 2);
+      ctx.fillRect(sweepX, dotsY + dotR + 5, sweepW * player.kickReady, 2);
     }
 
     ctx.font = LABEL_FONT;
@@ -454,17 +511,25 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
     // into an exhausted horse and get no explanation for why nothing happened.
     if (input.takingBack) {
       ctx.fillStyle = UI.ok;
-      ctx.fillText("TAKING A PULL", barX + barW - 12, barY + 17);
+      ctx.fillText("SETTLING", barX + barW - 18, barY + 21);
     } else if (player.kicksRemaining === 0) {
       ctx.fillStyle = UI.warning;
-      ctx.fillText("NO CHARGES", barX + barW - 12, barY + 17);
+      ctx.fillText("NO BURSTS LEFT", barX + barW - 18, barY + 21);
     } else if (!ready) {
       ctx.fillStyle = UI.mutedStrong;
-      ctx.fillText("GETTING BACK", barX + barW - 12, barY + 17);
+      ctx.fillText("RECHARGING", barX + barW - 18, barY + 21);
     } else if (player.inWindow) {
       ctx.fillStyle = UI.accent;
-      ctx.fillText("GO NOW", barX + barW - 12, barY + 17);
+      ctx.fillText("KICK NOW", barX + barW - 18, barY + 21);
+    } else {
+      ctx.fillStyle = UI.accent;
+      ctx.fillText("READY TO KICK", barX + barW - 18, barY + 21);
     }
+
+    ctx.fillStyle = UI.muted;
+    ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("Tap to burst · hold to settle", barX + barW - 18, barY + 42);
 
     // ---- Call-outs ---------------------------------------------------------
     if (performance.now() < calloutUntil && callout) {
@@ -660,6 +725,11 @@ export function mountRaceScreen(opts: RaceScreenOptions): () => void {
   const tap = (): void => {
     if (!getAutopilot()) input.kickPending = true;
   };
+
+  burstButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (started && running && !getAutopilot()) tap();
+  });
 
   const down = (e: Event): void => {
     e.preventDefault();
@@ -947,12 +1017,6 @@ function wrapText(
     }
   }
   if (line) out.push(line);
-}
-
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]!);
 }
 
 function roundRect(
