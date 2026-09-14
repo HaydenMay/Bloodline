@@ -61,7 +61,12 @@ function rollStats(rng: Rng, band: DivisionBand): Stats {
   const mid = (lo + hi) / 2;
   const spread = (hi - lo) / 2;
 
-  const stat = (): number => clamp100(rng.normal(mid, spread * 1.6));
+  // A division band should describe a field, not merely its average. The old
+  // 1.6 multiplier produced Open runners far outside 43-60 often enough that
+  // ordinary cards contained hidden championship-level outliers and 35+ length
+  // tails. Keep variation meaningful while making the division labels and a
+  // trained four-stat advantage visible in the races they are meant to shape.
+  const stat = (): number => clamp100(rng.normal(mid, spread * 0.75));
 
   return {
     speed: stat(),

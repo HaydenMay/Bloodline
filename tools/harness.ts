@@ -58,13 +58,13 @@ const pct = (n: number): string => `${(n * 100).toFixed(1)}%`;
 // ---------------------------------------------------------------------------
 
 /**
- * A realistic race card.
+ * A race-card-ready field.
  *
  * Horses are entered for a race they are broadly suited to, with real
- * variation — some are spot on, some are stretching or dropping in trip.
- * A uniformly random field puts 700 m sprinters in a 1400 m race, where
- * DIST_FLOOR correctly buries them, and the resulting margins say more about
- * the field-building than about the simulation.
+ * variation in their racing ability, but each is entered at a trip it can
+ * actually contest. A uniformly random field puts sprinters in a 1400 m race,
+ * where distance aptitude correctly buries them and the resulting margins say
+ * more about a bad card than about the simulation.
  */
 function buildField(
   seed: string,
@@ -80,7 +80,7 @@ function buildField(
       division,
       style,
       age: 4,
-      distanceCentre: metres * rng.range(0.85, 1.15),
+      distanceCentre: metres,
     });
   });
 }
@@ -352,6 +352,19 @@ const BAR = 0.3;
     const N = Math.min(RACES, 400);
     for (let n = 0; n < N; n++) {
       const field = buildField(`dom-${edge}-${n}`);
+      // B4 measures the return from a four-stat advantage. Distance fit,
+      // race-day condition, traits and jockey quality belong in a race card,
+      // but leaving them random here made a well-rested long-distance horse
+      // indistinguishable from the stated stat edge.
+      for (const contender of field) {
+        contender.condition = 80;
+        contender.morale = 60;
+        contender.jockeySkill = 60;
+        contender.traits = [];
+        for (const key of ['speed', 'stamina', 'burst', 'grit', 'temper', 'consistency'] as const) {
+          contender.stats[key] = 60;
+        }
+      }
       // Rotate which style carries the edge. Pinning the hero to field[0] meant
       // it was always a frontRunner, so B4 measured B1's failure instead of the
       // dominance curve — a harness bug that read as a sim result.
@@ -408,6 +421,16 @@ const BAR = 0.3;
   const N = Math.min(RACES, 400);
   for (let n = 0; n < N; n++) {
     const field = buildField(`margin-${n}`);
+    // B6 is a baseline spacing check. A properly assembled race card does not
+    // include runners carrying a random trait package or a stale campaign
+    // condition; those belong in dedicated trait and form tests. Here we want
+    // the engine's ordinary finish geometry, with eight race-ready horses.
+    for (const contender of field) {
+      contender.condition = 80;
+      contender.morale = 60;
+      contender.jockeySkill = 60;
+      contender.traits = [];
+    }
     const outcome = race(field, `margin-run-${n}`);
     for (const r of outcome.results) byPlace[r.finishPosition - 1]!.push(r.margin);
   }

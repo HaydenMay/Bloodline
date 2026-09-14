@@ -134,7 +134,7 @@ export const KICK_MAX_BONUS = 0.2;
  */
 export const GRIT_FATIGUE_RELIEF = 0.09;
 
-export const FATIGUE_FLOOR = 0.86;
+export const FATIGUE_FLOOR = 0.96;
 
 /**
  * Tank level at which fatigue starts to bite. A smooth ramp below, never a cliff.
@@ -574,7 +574,7 @@ export const TEMPER_MEAN_COST = 0.015;
 export const FUMBLE_BASE = 0.22;
 
 /** Seconds a fumbled starter is stuck at PACE_MIN. */
-export const FUMBLE_DURATION = 1.6;
+export const FUMBLE_DURATION = 0.7;
 
 /** Chance of running below true ability at 0 Consistency. */
 export const OFF_COLOUR_BASE = 0.17;
@@ -583,7 +583,7 @@ export const OFF_COLOUR_BASE = 0.17;
 export const OFF_COLOUR_PENALTY = 0.97;
 
 /** Seconds a green moment costs. */
-export const GREEN_DURATION = 1.2;
+export const GREEN_DURATION = 0.5;
 
 /** Chance of each of up to two green moments, at 0 Consistency. */
 export const GREEN_BASE = 0.3;
@@ -743,6 +743,7 @@ export const TRAIT_CRUISER_EXPONENT_RELIEF = 2;
  * to."
  */
 export const FRONT_RUNNER_EXPONENT_RELIEF = 11;
+
 
 /**
  * A stalker's own edge: more out of every draft than a generic horse gets.

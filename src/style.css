@@ -4533,6 +4533,150 @@ html[data-reduced-motion="true"] *::after {
   }
 }
 
+/* The championship is a milestone and a choice, not a second race screen.
+   Keep this card deliberately compact so it remains legible over the game on
+   a phone as well as a desktop display. */
+.championship-victory {
+  inset: 0;
+  width: auto;
+  height: auto;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.championship-victory-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(9, 13, 23, 0.78);
+  backdrop-filter: blur(5px);
+}
+
+.championship-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 520px);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: clamp(24px, 5vw, 40px);
+  border: 1px solid color-mix(in srgb, var(--champion-colour) 70%, white);
+  border-radius: 18px;
+  background: linear-gradient(155deg, rgba(33, 43, 62, 0.98), rgba(14, 19, 29, 0.98));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.48), 0 0 48px color-mix(in srgb, var(--champion-colour) 24%, transparent);
+  color: var(--text);
+  text-align: left;
+  animation: championship-card-in 220ms ease-out both;
+}
+
+.championship-kicker {
+  margin: 0 0 8px;
+  color: var(--champion-colour);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.championship-card h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(28px, 6vw, 42px);
+  line-height: 1.05;
+}
+
+.championship-summary,
+.championship-next-step {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.championship-summary strong {
+  color: var(--text);
+}
+
+.championship-podium {
+  display: grid;
+  gap: 8px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.championship-podium-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.championship-podium-row.is-winner {
+  border-color: color-mix(in srgb, var(--champion-colour) 75%, transparent);
+  background: color-mix(in srgb, var(--champion-colour) 16%, transparent);
+}
+
+.championship-place {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.is-winner .championship-place {
+  background: var(--champion-colour);
+  color: #121720;
+}
+
+.championship-podium-name {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.championship-podium-status {
+  color: var(--champion-colour);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.championship-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.championship-actions .btn {
+  min-height: 48px;
+  padding-inline: 12px;
+}
+
+@keyframes championship-card-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 420px) {
+  .championship-card {
+    padding: 22px;
+  }
+
+  .championship-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ========================================================================== *
    Stable Hub — Main navigation and status screen
    ========================================================================== */

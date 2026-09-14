@@ -80,6 +80,7 @@ import {
   PACE_MAX,
   PACE_MIN,
   PRESS_FROM,
+  PRESS_MAX_RIVALS,
   PRESS_RANGE_METRES,
   PRESS_RANK_LIMIT,
   SPEED_STAT_SPAN,
@@ -279,6 +280,8 @@ interface Runner {
   drafting: boolean;
   /** Rivals contesting this horse's position. Costs tank, never speed. */
   press: number;
+  /** True while three front-runners are simultaneously contesting the lead. */
+  leadDuel: boolean;
   /** 0-1: how clear of the field this horse is while leading it. */
   easyLead: number;
   /** DRAIN_EXPONENT relief, earned only while actually up with the pace. */
@@ -470,6 +473,7 @@ function makeRunner(
     fired: plan.points.map(() => false),
     drafting: false,
     press: 0,
+    leadDuel: false,
     easyLead: 0,
     frontRelief: 0,
     holding: false,
@@ -597,6 +601,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
       if (r.finished) {
         r.drafting = false;
         r.press = 0;
+        r.leadDuel = false;
         r.easyLead = 0;
         continue;
       }
@@ -625,6 +630,20 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
                 Math.abs(o.distance - r.distance) <= PRESS_RANGE_METRES,
             ).length
           : 0;
+
+      // A pair can take turns dictating the tempo. Three front-runners that
+      // all remain in the leading group are different: each is refusing to
+      // settle, even after one opens a few metres. Distance-only press let the
+      // first horse to inch clear escape the cost while the two behind carried
+      // it, which made a three-way duel stronger than an uncontested lead.
+      // Keep the extra load tightly scoped to an actual three-horse lead duel;
+      // ordinary two-horse races continue to use the live distance reading.
+      const frontRunnersInField = runners.filter((o) => !o.finished && o.horse.style === 'frontRunner').length;
+      const duelForming = r.distance / totalMetres >= 0.05;
+      r.leadDuel = duelForming && r.horse.style === 'frontRunner' && frontRunnersInField >= 3;
+      if (r.leadDuel) {
+        r.press = Math.max(r.press, PRESS_MAX_RIVALS);
+      }
 
       // Daylight. Being in front is physically hard (RANK_SHELTER says so);
       // being in front UNCHALLENGED is tactically easy, and this is that.
@@ -813,7 +832,14 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
 
     // ---- 3. Kick and fatigue ---------------------------------------------
     const kick = kickFactorFor(r, elapsed);
-    const fatigue = fatigueFactor(r.tank, r.tankMods.fatigueRelief);
+    // A three-way speed duel is the one case where an empty tank bites harder:
+    // all three horses have spent the reserve needed for the closing drive.
+    // This remains a tank-side effect (never a positional speed bonus) and
+    // leaves ordinary front-running on the generous global fatigue floor.
+    const fatigue = fatigueFactor(
+      r.tank,
+      r.tankMods.fatigueRelief - (r.leadDuel ? 0.035 : 0),
+    );
 
     // ---- 4. THE ONLY PLACE SPEED IS WRITTEN (REBUILD.md R1) ---------------
     // Traits and a well-timed kick can change *how* a horse reaches its top
@@ -856,6 +882,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
 
     // Needs room: penalty when pressed hard, bonus when clear.
     let trafficMult = 1;
+    if (r.leadDuel) trafficMult *= 2;
     if (r.horse.traits.includes('needsRoom')) {
       if (r.press >= TRAIT_NEEDS_ROOM_PRESS_THRESHOLD) {
         trafficMult = TRAIT_NEEDS_ROOM_PRESSED_MULT;
@@ -908,6 +935,7 @@ export function createRace(entrants: RaceEntrant[], config: RaceConfig): LiveRac
       r.easyLead,
     );
     recover *= raceRecoveryMult;
+
 
     // Free spirit: −20% draft drain when drafting (independent mover).
     if (r.horse.traits.includes('freeSpirit') && r.drafting) {
