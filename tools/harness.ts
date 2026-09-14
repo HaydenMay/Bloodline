@@ -254,7 +254,7 @@ const BAR = 0.3;
 }
 
 // ---------------------------------------------------------------------------
-// B1b/B2b — championship-specific balance (high-tier horses)
+// B1b/B2b - championship-specific balance (high-tier horses)
 // ---------------------------------------------------------------------------
 
 {
@@ -290,6 +290,40 @@ const BAR = 0.3;
     champStyleRates.map((r) => `${r.key} ${pct(r.rate)}`).join('  ') +
       `   (worst ${worstChampStyle.key})`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// B1c - style balance by division. A style may not win the early game only to
+// disappear as the field's quality rises; this caught exactly that regression.
+// ---------------------------------------------------------------------------
+
+{
+  const N = Math.min(RACES, 300);
+  const divisionDetails: string[] = [];
+  let allBalanced = true;
+
+  for (const division of DIVISIONS) {
+    const wins: Record<string, number> = {};
+    const runs: Record<string, number> = {};
+    for (const style of RUNNING_STYLES) {
+      wins[style] = 0;
+      runs[style] = 0;
+    }
+
+    for (let n = 0; n < N; n++) {
+      const field = buildField(`division-style-${division}-${n}`, division);
+      const byId = new Map(field.map((horse) => [horse.id, horse]));
+      for (const horse of field) runs[horse.style]! += 1;
+      const winner = byId.get(race(field, `division-style-run-${division}-${n}`).results[0]!.horseId)!;
+      wins[winner.style]! += 1;
+    }
+
+    const rates = RUNNING_STYLES.map((style) => wins[style]! / runs[style]!);
+    allBalanced &&= rates.every((rate) => Math.abs(rate - FAIR) / FAIR <= BAR);
+    divisionDetails.push(`${division.slice(0, 5)} ${RUNNING_STYLES.map((style) => `${style}:${pct(wins[style]! / runs[style]!)}`).join(' ')}`);
+  }
+
+  report('B1c style balance by division', allBalanced, divisionDetails.join('   '));
 }
 
 // ---------------------------------------------------------------------------

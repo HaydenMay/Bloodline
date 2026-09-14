@@ -13,6 +13,7 @@ Result: **13/13 gates passed**.
 | Gate | Measurement |
 |---|---|
 | Championship style balance | frontRunner 11.5%, stalker 11.3%, midPack 12.8%, closer 14.5% |
+| Style balance by division | Maiden frontRunner 12.3%; Novice 9.5%; Open 9.5%; Stakes 11.8%; Championship 11.8% |
 | Contested lead | lone front-runner 10.0%; each of three 3.5% |
 | Dominance | +5% four-stat edge 21.5%; +40% edge 78.5% |
 | Margin profile | 2nd 1.8L, 3rd 3.9L, 4th 5.2L, 8th 14.2L |
