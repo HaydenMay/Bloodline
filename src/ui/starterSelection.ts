@@ -27,10 +27,11 @@ export function mountStarterSelection(
    * for you.
    */
   usedNames: Iterable<string> = [],
+  providedStarters?: Horse[],
 ): () => void {
   const rng = createRng(`starter-${Date.now()}`);
   const names = createNameGenerator(rng, usedNames);
-  const starters = generateStarterSix(rng, names, stablePrestige);
+  const starters = providedStarters ?? generateStarterSix(rng, names, stablePrestige);
 
   const silksFor = new Map<string, Silks>();
   const taken = new Set<number>();

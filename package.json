@@ -26,7 +26,9 @@
     "margin-profile": "tsx tools/margin-profile.ts",
     "check": "npm run lint && npm run build && npm run test",
     "stat-leverage": "tsx tools/stat-leverage.ts",
-    "trained-style-balance": "tsx tools/trained-style-balance.ts"
+    "trained-style-balance": "tsx tools/trained-style-balance.ts",
+    "build:demo": "tsc --noEmit && vite build --config vite.demo.config.ts",
+    "dev:demo": "vite --config vite.demo.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

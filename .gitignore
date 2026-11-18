@@ -46,3 +46,4 @@ tools/bone-diagnostic.mjs
 tools/bone-world.cjs
 tools/model-preview.html
 tools/race-shots.ts
+dist-demo/
